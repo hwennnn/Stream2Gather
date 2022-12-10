@@ -7,10 +7,14 @@ import {
   BsVolumeMute,
   BsVolumeUp,
 } from "react-icons/bs";
-import ReactPlayer from "react-player";
+
+import dynamic from "next/dynamic";
 import screenfull from "screenfull";
 import { getFormattedTime } from "../helpers/time-helper";
 import useWindowDimensions from "../hooks/useWindowDimensions";
+const ReactPlayer = dynamic(() => import("../components/VideoPlayer"), {
+  ssr: false,
+});
 
 export default function Home() {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -29,8 +33,8 @@ export default function Home() {
 
   const onPlayerReady = () => {
     setIsPlayerReady(true);
-    setIsPlaying(true);
-    setIsMuted(false);
+    // setIsPlaying(true);
+    setIsMuted(true);
   };
 
   const updateProgress = ({
@@ -51,6 +55,8 @@ export default function Home() {
     const x = event.pageX - progressBarRef.current.getBoundingClientRect().left;
     const bw = progressBarRef.current.scrollWidth;
     const timeline = (x / bw) * duration;
+
+    setIsPlaying(true);
     playerRef.current.seekTo(timeline, "seconds");
 
     // var isPlaying = playing;
@@ -86,7 +92,8 @@ export default function Home() {
           className="absolute top-0 left-0"
           width="100%"
           height="100%"
-          ref={playerRef}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           onReady={() => onPlayerReady()}
           onProgress={(callback: any) => updateProgress(callback)}
           onDuration={(duration: number) => updateDuration(duration)}
@@ -104,15 +111,16 @@ export default function Home() {
               },
             },
           }}
+          playerref={playerRef}
         />
       </div>
 
       <div className="flex col p-2 bg-gray-800">
         <button className="mr-5" onClick={() => setIsPlaying(!isPlaying)}>
-          {!isPlaying ? (
-            <BsPlay size={32} color={"white"} />
-          ) : (
+          {isPlaying ? (
             <BsPause size={32} color={"white"} />
+          ) : (
+            <BsPlay size={32} color={"white"} />
           )}
         </button>
 

@@ -87,71 +87,80 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div className="relative pt-[56.25%]">
-        <ReactPlayer
-          className="absolute top-0 left-0"
-          width="100%"
-          height="100%"
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onReady={() => onPlayerReady()}
-          onProgress={(callback: any) => updateProgress(callback)}
-          onDuration={(duration: number) => updateDuration(duration)}
-          muted={isMuted}
-          playing={isPlaying}
-          url={playingUrl}
-          config={{
-            youtube: {
-              playerVars: {
-                showinfo: 0,
-                controls: 0,
-                disablekb: 1,
-                modestbranding: 1,
-                rel: 0,
-              },
-            },
-          }}
-          playerref={playerRef}
-        />
-      </div>
+      <div className="flex flex-col tablet:flex-row w-full">
+        <div className="w-full tablet:w-3/4">
+          <div className="relative pt-[56.25%]">
+            <ReactPlayer
+              className="absolute top-0 left-0"
+              width="100%"
+              height="100%"
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onReady={() => onPlayerReady()}
+              onProgress={(callback: any) => updateProgress(callback)}
+              onDuration={(duration: number) => updateDuration(duration)}
+              muted={isMuted}
+              playing={isPlaying}
+              url={playingUrl}
+              config={{
+                youtube: {
+                  playerVars: {
+                    showinfo: 0,
+                    controls: 0,
+                    disablekb: 1,
+                    modestbranding: 1,
+                    rel: 0,
+                  },
+                },
+              }}
+              playerref={playerRef}
+            />
+          </div>
 
-      <div className="flex col p-2 bg-gray-800">
-        <button className="mr-5" onClick={() => setIsPlaying(!isPlaying)}>
-          {isPlaying ? (
-            <BsPause size={32} color={"white"} />
-          ) : (
-            <BsPlay size={32} color={"white"} />
-          )}
-        </button>
+          <div className="flex col items-center p-2 bg-gray-800">
+            <button className="mr-5" onClick={() => setIsPlaying(!isPlaying)}>
+              {isPlaying ? (
+                <BsPause size={32} color={"white"} />
+              ) : (
+                <BsPlay size={32} color={"white"} />
+              )}
+            </button>
 
-        <div className="mt-1 mr-5 text-white">
-          {getFormattedTime(playingSeconds)}
-          {" / "}
-          {getFormattedTime(duration)}
+            <div className="mr-5 text-white">
+              {getFormattedTime(playingSeconds)}
+              {" / "}
+              {getFormattedTime(duration)}
+            </div>
+
+            <div
+              ref={progressBarRef}
+              onClick={seek}
+              className="flex-1 h-3 rounded-sm border-black bg-white"
+            >
+              <div
+                className="h-3 bg-gray-400"
+                style={{ width: (playingSeconds / duration) * 100 + "%" }}
+              ></div>
+            </div>
+
+            <button className="ml-5" onClick={() => setIsMuted(!isMuted)}>
+              {!isMuted ? (
+                <BsVolumeUp color={"white"} size={32} />
+              ) : (
+                <BsVolumeMute color={"white"} size={32} />
+              )}
+            </button>
+
+            <button
+              className="ml-5 mr-2"
+              onClick={() => handleClickFullscreen()}
+            >
+              <BsFullscreen color={"white"} size={24} />
+            </button>
+          </div>
         </div>
 
-        <div
-          ref={progressBarRef}
-          onClick={seek}
-          className="flex-1 mt-2 h-4 rounded-sm border-black bg-white"
-        >
-          <div
-            className="h-4 bg-gray-400"
-            style={{ width: (playingSeconds / duration) * 100 + "%" }}
-          ></div>
-        </div>
-
-        <button className="ml-5" onClick={() => setIsMuted(!isMuted)}>
-          {!isMuted ? (
-            <BsVolumeUp color={"white"} size={32} />
-          ) : (
-            <BsVolumeMute color={"white"} size={32} />
-          )}
-        </button>
-
-        <button className="ml-5 mr-2" onClick={() => handleClickFullscreen()}>
-          <BsFullscreen color={"white"} size={24} />
-        </button>
+        <div className="w-full tablet:w-1/4 bg-gray-600">Section</div>
       </div>
     </div>
   );

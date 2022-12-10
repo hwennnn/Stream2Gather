@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "esModuleInterop": true,
+    "target": "es2018",
+    "types": [
+      "node"
+    ],
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "api/*": [
+        "src/api/*"
+      ],
+      "config/*": [
+        "src/config/*"
+      ],
+      "core/*": [
+        "src/core/*"
+      ],
+      "node_locales/*": [
+        "src/node_locales/*"
+      ],
+      "shared/*": [
+        "src/shared/*"
+      ],
+    },
+    "resolveJsonModule": true
+  },
+  "include": [
+    "src/**/*"
+  ]
+}

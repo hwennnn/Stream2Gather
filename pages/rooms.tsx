@@ -10,11 +10,15 @@ import {
 
 import dynamic from "next/dynamic";
 import screenfull from "screenfull";
+import { io } from "socket.io-client";
 import { getFormattedTime } from "../helpers/time-helper";
 import useWindowDimensions from "../hooks/useWindowDimensions";
+
 const ReactPlayer = dynamic(() => import("../components/VideoPlayer"), {
   ssr: false,
 });
+const SERVER_URL: string = process.env.SERVER_URL as string;
+const socket = io(SERVER_URL);
 
 export default function Home() {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
@@ -35,6 +39,11 @@ export default function Home() {
     setIsPlayerReady(true);
     // setIsPlaying(true);
     setIsMuted(true);
+
+    socket.emit("join_room", {
+      roomID: "room1",
+      uid: "hwen",
+    });
   };
 
   const updateProgress = ({

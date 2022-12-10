@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+}
+
 html,
 body {
   padding: 0;

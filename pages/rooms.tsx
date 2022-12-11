@@ -8,6 +8,7 @@ import {
   BsVolumeUp,
 } from "react-icons/bs";
 
+import { NextPage } from "next";
 import dynamic from "next/dynamic";
 import screenfull from "screenfull";
 import { io } from "socket.io-client";
@@ -20,7 +21,11 @@ const ReactPlayer = dynamic(() => import("../components/VideoPlayer"), {
 const SERVER_URL: string = process.env.SERVER_URL as string;
 const socket = io(SERVER_URL);
 
-export default function Home() {
+interface Props {
+  id: string | string[] | undefined;
+}
+
+const Rooms: NextPage<Props> = ({ id }) => {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoAuthor, setVideoAuthor] = useState("");
@@ -40,8 +45,8 @@ export default function Home() {
     // setIsPlaying(true);
     setIsMuted(true);
 
-    socket.emit("join_room", {
-      roomID: "room1",
+    socket.emit("join-room", {
+      roomID: id,
       uid: "hwen",
     });
   };
@@ -173,4 +178,12 @@ export default function Home() {
       </div>
     </div>
   );
-}
+};
+
+Rooms.getInitialProps = async ({ query }) => {
+  const { id } = query;
+
+  return { id };
+};
+
+export default Rooms;

@@ -46,16 +46,36 @@ app.use('*', function (req: Request, res: Response) {
     res.sendStatus(404);
 });
 
+let rooms: Map<string, Array<SocketUser>> = new Map();
+let socketToUser: Map<string, SocketUser> = new Map();
+
+interface SocketUser {
+    uid: string;
+    socketID: string;
+    sessionRoomID: string;
+}
+
 io.on("connection", (socket) => {
-    socket.on('join_room', ({ uid, roomID }: { uid: string, roomID: string }) => {
-        console.log(`${uid} has joined the ${roomID}`);
+    socket.on('join-room', ({ uid, roomID }: { uid: string, roomID: string }) => {
+        console.log(`${uid} has joined the room with id ${roomID}`);
         socket.emit("message", "Welcome to Stream2Gether. " + socket.id);
         socket.join(roomID);
+
+        const user: SocketUser = { uid: uid, socketID: socket.id, sessionRoomID: roomID };
+        if (rooms[roomID] === undefined) {
+            rooms[roomID] = [];
+        }
+        rooms[roomID].push(user);
+        socketToUser.set(socket.id, user);
     });
 
     // Runs when client disconnects
     socket.on('disconnect', () => {
-        console.log(`${socket.id} has left the room`);
+        const { uid, sessionRoomID }: SocketUser = socketToUser.get(socket.id);
+        rooms = rooms[sessionRoomID].filter((user: SocketUser) => user.uid !== uid);
+        socketToUser.delete(socket.id);
+
+        console.log(`${uid} has left the room with id ${sessionRoomID}`);
     });
 });
 

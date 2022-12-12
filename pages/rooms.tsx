@@ -49,6 +49,14 @@ const Rooms: NextPage<Props> = ({ id }) => {
       roomID: id,
       uid: "hwen",
     });
+
+    socket.on("member_add", (member) => {
+      console.log("new member", member);
+    });
+
+    socket.on("member_left", (socketID) => {
+      console.log("member left", socketID);
+    });
   };
 
   const updateProgress = ({

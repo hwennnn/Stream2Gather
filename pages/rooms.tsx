@@ -57,6 +57,28 @@ const Rooms: NextPage<Props> = ({ id }) => {
     socket.on("member_left", (socketID) => {
       console.log("member left", socketID);
     });
+
+    socket.on("room_info", (roomInfo) => {
+      console.log("roomInfo", roomInfo);
+      const { playingIndex, playlist } = roomInfo;
+      const { isPlaying, playedTimestamp, lastTimestampUpdatedTime } =
+        playlist[playingIndex];
+      const currentTimestamp =
+        Number.parseInt(playedTimestamp) +
+        (Date.now() - Number.parseInt(lastTimestampUpdatedTime)) / 1000;
+
+      setIsPlaying(isPlaying);
+      playerRef.current.seekTo(currentTimestamp, "seconds");
+    });
+
+    socket.on("video_events", (videoEvent) => {
+      const { isPlaying, playedTimestamp, lastTimestampUpdatedTime } =
+        videoEvent;
+      const currentTimestamp = Number.parseInt(playedTimestamp);
+
+      setIsPlaying(isPlaying);
+      playerRef.current.seekTo(currentTimestamp, "seconds");
+    });
   };
 
   const updateProgress = ({
@@ -73,23 +95,46 @@ const Rooms: NextPage<Props> = ({ id }) => {
     setDuration(duration);
   };
 
+  const play = () => {
+    var isPlaying = true;
+    var timestamp = playerRef.current.getCurrentTime();
+    const data = {
+      roomID: id,
+      isPlaying,
+      timestamp,
+    };
+
+    socket.emit("video-events", data);
+  };
+
+  const pause = () => {
+    var isPlaying = false;
+    var timestamp = playerRef.current.getCurrentTime();
+    const data = {
+      roomID: id,
+      isPlaying,
+      timestamp,
+    };
+
+    socket.emit("video-events", data);
+  };
+
   const seek = (event: any) => {
     const x = event.pageX - progressBarRef.current.getBoundingClientRect().left;
     const bw = progressBarRef.current.scrollWidth;
-    const timeline = (x / bw) * duration;
+    const timestamp = (x / bw) * duration;
 
     setIsPlaying(true);
-    playerRef.current.seekTo(timeline, "seconds");
+    playerRef.current.seekTo(timestamp, "seconds");
 
-    // var isPlaying = playing;
-    // const data = {
-    //     isPlaying,
-    //     timeline
-    // };
-    // socket.emit('changes', {
-    //     roomID,
-    //     data
-    // });
+    var isPlaying = true;
+    const data = {
+      roomID: id,
+      isPlaying,
+      timestamp,
+    };
+
+    socket.emit("video-events", data);
   };
 
   const handleClickFullscreen = () => {
@@ -116,8 +161,8 @@ const Rooms: NextPage<Props> = ({ id }) => {
               className="absolute top-0 left-0"
               width="100%"
               height="100%"
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
+              // onPlay={() => play()}
+              // onPause={() => pause()}
               onReady={() => onPlayerReady()}
               onProgress={(callback: any) => updateProgress(callback)}
               onDuration={(duration: number) => updateDuration(duration)}
@@ -142,9 +187,9 @@ const Rooms: NextPage<Props> = ({ id }) => {
           <div className="flex col items-center p-2 bg-gray-800">
             <button className="mr-5" onClick={() => setIsPlaying(!isPlaying)}>
               {isPlaying ? (
-                <BsPause size={32} color={"white"} />
+                <BsPause onClick={pause} size={32} color={"white"} />
               ) : (
-                <BsPlay size={32} color={"white"} />
+                <BsPlay onClick={play} size={32} color={"white"} />
               )}
             </button>
 

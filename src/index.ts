@@ -169,7 +169,7 @@ io.on("connection", (socket) => {
     socket.on('video-events', async ({ roomID, isPlaying, timestamp }) => {
         console.log(`video-events: ${roomID}, ${isPlaying}, ${timestamp}`);
         const roomInfo = await getRoomInfo(roomID);
-        roomInfo.playlist[roomInfo.playingIndex].playedTimestamp = timestamp;
+        roomInfo.playlist[roomInfo.playingIndex].playedTimestamp = timestamp.toString();
         roomInfo.playlist[roomInfo.playingIndex].lastTimestampUpdatedTime = new Date().getTime().toString();
         roomInfo.playlist[roomInfo.playingIndex].isPlaying = isPlaying;
         await setRoomInfo(roomID, roomInfo);

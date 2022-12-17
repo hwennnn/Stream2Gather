@@ -29,7 +29,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [videoTitle, setVideoTitle] = useState("");
   const [videoAuthor, setVideoAuthor] = useState("");
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [playing, setPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [playingUrl, setPlayingUrl] = useState("https://youtu.be/Y8JFxS1HlDo");
   const [playingSeconds, setPlayingSeconds] = useState(0);
@@ -42,7 +42,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
 
   const onPlayerReady = () => {
     setIsPlayerReady(true);
-    // setIsPlaying(true);
+    // setPlaying(true);
     setIsMuted(true);
 
     socket.emit("join-room", {
@@ -63,20 +63,28 @@ const Rooms: NextPage<Props> = ({ id }) => {
       const { playingIndex, playlist } = roomInfo;
       const { isPlaying, playedTimestamp, lastTimestampUpdatedTime } =
         playlist[playingIndex];
-      const currentTimestamp =
-        Number.parseInt(playedTimestamp) +
-        (Date.now() - Number.parseInt(lastTimestampUpdatedTime)) / 1000;
 
-      setIsPlaying(isPlaying);
-      playerRef.current.seekTo(currentTimestamp, "seconds");
+      if (isPlaying === true) {
+        const currentTimestamp =
+          Number.parseFloat(playedTimestamp) +
+          (Date.now() - Number.parseInt(lastTimestampUpdatedTime)) / 1000;
+
+        setPlaying(true);
+        playerRef.current.seekTo(currentTimestamp, "seconds");
+      } else {
+        const currentTimestamp = Number.parseFloat(playedTimestamp);
+
+        setPlaying(false);
+        playerRef.current.seekTo(currentTimestamp, "seconds");
+      }
     });
 
     socket.on("video_events", (videoEvent) => {
       const { isPlaying, playedTimestamp, lastTimestampUpdatedTime } =
         videoEvent;
-      const currentTimestamp = Number.parseInt(playedTimestamp);
+      const currentTimestamp = Number.parseFloat(playedTimestamp);
 
-      setIsPlaying(isPlaying);
+      setPlaying(isPlaying);
       playerRef.current.seekTo(currentTimestamp, "seconds");
     });
   };
@@ -96,6 +104,8 @@ const Rooms: NextPage<Props> = ({ id }) => {
   };
 
   const play = () => {
+    setPlaying(true);
+
     var isPlaying = true;
     var timestamp = playerRef.current.getCurrentTime();
     const data = {
@@ -103,11 +113,13 @@ const Rooms: NextPage<Props> = ({ id }) => {
       isPlaying,
       timestamp,
     };
-
+    // console.log("play", data);
     socket.emit("video-events", data);
   };
 
   const pause = () => {
+    setPlaying(false);
+
     var isPlaying = false;
     var timestamp = playerRef.current.getCurrentTime();
     const data = {
@@ -115,7 +127,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
       isPlaying,
       timestamp,
     };
-
+    // console.log("pause", data);
     socket.emit("video-events", data);
   };
 
@@ -124,7 +136,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
     const bw = progressBarRef.current.scrollWidth;
     const timestamp = (x / bw) * duration;
 
-    setIsPlaying(true);
+    setPlaying(true);
     playerRef.current.seekTo(timestamp, "seconds");
 
     var isPlaying = true;
@@ -167,7 +179,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
               onProgress={(callback: any) => updateProgress(callback)}
               onDuration={(duration: number) => updateDuration(duration)}
               muted={isMuted}
-              playing={isPlaying}
+              playing={playing}
               url={playingUrl}
               config={{
                 youtube: {
@@ -185,8 +197,8 @@ const Rooms: NextPage<Props> = ({ id }) => {
           </div>
 
           <div className="flex col items-center p-2 bg-gray-800">
-            <button className="mr-5" onClick={() => setIsPlaying(!isPlaying)}>
-              {isPlaying ? (
+            <button className="mr-5" onClick={() => setPlaying(!playing)}>
+              {playing ? (
                 <BsPause onClick={pause} size={32} color={"white"} />
               ) : (
                 <BsPlay onClick={play} size={32} color={"white"} />

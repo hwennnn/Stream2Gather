@@ -1,23 +1,27 @@
 import "reflect-metadata";
-
-import { ApolloServer } from '@apollo/server';
-import { expressMiddleware } from '@apollo/server/express4';
-import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
-import { json } from 'body-parser';
-import connectRedis from "connect-redis";
-import cors from 'cors';
 import "dotenv-safe/config";
-import express, { Request, Response } from 'express';
-import session from "express-session";
-import { createServer } from "http";
-import Redis from 'ioredis';
-import { buildSchema } from 'type-graphql';
-import { COOKIE_NAME, __prod__ } from "./constants";
-import { AppDataSource } from './data-source';
-import CustomSocket from "./models/custom_socket";
-import { UserResolver } from './resolvers/userResolver';
-import { MyContext } from "./types";
 
+import { ApolloServer } from "@apollo/server";
+import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
+import {
+    ApolloServerPluginLandingPageLocalDefault,
+    ApolloServerPluginLandingPageProductionDefault,
+} from "@apollo/server/plugin/landingPage/default";
+import { AppDataSource } from "./data-source";
+import { buildSchema } from "type-graphql";
+import { COOKIE_NAME, __prod__ } from "./constants";
+import { createServer } from "http";
+import { expressMiddleware } from "@apollo/server/express4";
+import { json } from "body-parser";
+import { MyContext } from "./types";
+import { UserResolver } from "./resolvers/userResolver";
+import connectRedis from "connect-redis";
+import cors from "cors";
+import CustomSocket from "./models/custom_socket";
+import express, { Request, Response } from "express";
+import Redis from "ioredis";
+import session from "express-session";
+import { User } from "./entity/User";
 
 const main = async () => {
     await AppDataSource.initialize();
@@ -29,9 +33,9 @@ const main = async () => {
     const redis = new Redis(process.env.REDIS_ADDRESS as string);
     const socket = new CustomSocket(httpServer, redis);
 
-    if (__prod__) {
-        app.set("trust proxy", 1);
-    }
+    // User.clear();
+    app.set("trust proxy", process.env.NODE_ENV !== "production");
+
     app.use(
         cors({
             origin: process.env.CORS_ORIGIN,
@@ -68,31 +72,41 @@ const main = async () => {
             resolvers: [UserResolver],
             validate: false,
         }),
-        plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+        plugins: [
+            ApolloServerPluginDrainHttpServer({ httpServer }),
+            process.env.NODE_ENV === "production"
+                ? ApolloServerPluginLandingPageProductionDefault({
+                      graphRef: "my-graph-id@my-graph-variant",
+                      footer: false,
+                  })
+                : ApolloServerPluginLandingPageLocalDefault({
+                      footer: false,
+                      includeCookies: true,
+                  }),
+        ],
     });
 
     await apolloServer.start();
 
     app.use(
-        '/graphql',
+        "/graphql",
         cors<cors.CorsRequest>(),
         json(),
         expressMiddleware(apolloServer, {
             context: async ({ req, res }) => ({ req, res, redis }),
-        }),
+        })
     );
 
     //The 404 Route (ALWAYS Keep this as the last route)
-    app.use('*', function (req: Request, res: Response) {
+    app.use("*", function (req: Request, res: Response) {
         res.sendStatus(404);
     });
 
     httpServer.listen(process.env.PORT, () => {
-        console.log(`Server listening on port ${process.env.PORT}...`)
+        console.log(`Server listening on port ${process.env.PORT}...`);
     });
-}
+};
 
 main().catch((err) => {
     console.log(err);
 });
-

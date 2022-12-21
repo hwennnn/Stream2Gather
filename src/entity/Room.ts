@@ -1,33 +1,39 @@
-import { ObjectType, Field } from "type-graphql"
-import { BaseEntity, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm"
+import { ObjectType, Field } from "type-graphql";
+import {
+    BaseEntity,
+    Column,
+    CreateDateColumn,
+    Entity,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+} from "typeorm";
 
 @ObjectType()
 @Entity()
 export class Room extends BaseEntity {
-
     @Field()
     @PrimaryGeneratedColumn("increment")
-    id!: string
+    id!: string;
 
     @Field()
     @Column()
-    currentUrl!: string
+    currentUrl!: string;
 
     @Field()
     @Column()
-    playingIndex!: number
+    playingIndex!: number;
 
     @Field()
     @Column()
-    playedTimestamp!: number
+    playedTimestamp!: number;
 
     @Field()
     @Column()
-    lastTimestampUpdatedTime!: number
+    lastTimestampUpdatedTime!: number;
 
     @Field()
     @Column()
-    isPlaying!: boolean
+    isPlaying!: boolean;
 
     @Field(() => String)
     @CreateDateColumn()

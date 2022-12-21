@@ -1,13 +1,14 @@
+import "reflect-metadata";
+
 import cors from 'cors';
-import dotenv from 'dotenv';
+import "dotenv-safe/config";
 import express, { Request, Response } from 'express';
 import helmet from 'helmet';
 import { createServer } from "http";
 import Redis from 'ioredis';
 import { Server } from "socket.io";
-import { RoomInfo, RoomMember, VideoInfo } from './core/models/rooms';
+import { RoomInfo, RoomMember, VideoInfo } from './models/rooms';
 
-dotenv.config()
 
 const PORT = process.env.PORT;
 

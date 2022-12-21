@@ -3,19 +3,31 @@ import { BaseEntity, Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, U
 
 @ObjectType()
 @Entity()
-export class User extends BaseEntity {
+export class Room extends BaseEntity {
 
     @Field()
-    @PrimaryGeneratedColumn("uuid")
-    id: string
+    @PrimaryGeneratedColumn("increment")
+    id!: string
 
     @Field()
     @Column()
-    username!: string
+    currentUrl!: string
 
     @Field()
-    @Column({ unique: true })
-    email!: string
+    @Column()
+    playingIndex!: number
+
+    @Field()
+    @Column()
+    playedTimestamp!: number
+
+    @Field()
+    @Column()
+    lastTimestampUpdatedTime!: number
+
+    @Field()
+    @Column()
+    isPlaying!: boolean
 
     @Field(() => String)
     @CreateDateColumn()

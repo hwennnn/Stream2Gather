@@ -15,7 +15,7 @@ import { buildSchema } from 'type-graphql';
 import { COOKIE_NAME, __prod__ } from "./constants";
 import { AppDataSource } from './data-source';
 import CustomSocket from "./models/custom_socket";
-import { HelloResolver } from './resolvers/hello';
+import { UserResolver } from './resolvers/userResolver';
 import { MyContext } from "./types";
 
 
@@ -29,7 +29,9 @@ const main = async () => {
     const redis = new Redis(process.env.REDIS_ADDRESS as string);
     const socket = new CustomSocket(httpServer, redis);
 
-    app.set("trust proxy", 1);
+    if (__prod__) {
+        app.set("trust proxy", 1);
+    }
     app.use(
         cors({
             origin: process.env.CORS_ORIGIN,
@@ -63,7 +65,7 @@ const main = async () => {
     // Setup Apollo Server with GraphQL
     const apolloServer = new ApolloServer<MyContext>({
         schema: await buildSchema({
-            resolvers: [HelloResolver],
+            resolvers: [UserResolver],
             validate: false,
         }),
         plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
@@ -77,7 +79,6 @@ const main = async () => {
         json(),
         expressMiddleware(apolloServer, {
             context: async ({ req, res }) => ({ req, res, redis }),
-
         }),
     );
 

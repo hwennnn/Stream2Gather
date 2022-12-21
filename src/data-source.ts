@@ -1,5 +1,5 @@
-import "reflect-metadata"
 import { DataSource } from "typeorm"
+import { Room } from "./entity/Room"
 import { User } from "./entity/User"
 
 export const AppDataSource = new DataSource({
@@ -11,7 +11,7 @@ export const AppDataSource = new DataSource({
     database: "stream2gather",
     synchronize: true,
     logging: true,
-    entities: [User],
+    entities: [User, Room],
     migrations: [],
     subscribers: [],
 })

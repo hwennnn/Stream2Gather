@@ -1,197 +1,97 @@
 import "reflect-metadata";
 
+import { ApolloServer } from '@apollo/server';
+import { expressMiddleware } from '@apollo/server/express4';
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
+import { json } from 'body-parser';
+import connectRedis from "connect-redis";
 import cors from 'cors';
 import "dotenv-safe/config";
 import express, { Request, Response } from 'express';
-import helmet from 'helmet';
+import session from "express-session";
 import { createServer } from "http";
 import Redis from 'ioredis';
-import { Server } from "socket.io";
-import { RoomInfo, RoomMember, VideoInfo } from './models/rooms';
+import { buildSchema } from 'type-graphql';
+import { COOKIE_NAME, __prod__ } from "./constants";
+import { AppDataSource } from './data-source';
+import CustomSocket from "./models/custom_socket";
+import { HelloResolver } from './resolvers/hello';
+import { MyContext } from "./types";
 
 
-const PORT = process.env.PORT;
+const main = async () => {
+    await AppDataSource.initialize();
 
-const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-        origin: process.env.CORS_ORIGIN,
-        methods: ["GET", "POST"]
-    }
-});
+    const app = express();
+    const RedisStore = connectRedis(session);
+    const httpServer = createServer(app);
 
-/**
- *  App Configuration
- */
-app.use(helmet()); //safety
-app.use(cors()); //safety
-app.use(
-    (
-        req: express.Request,
-        res: express.Response,
-        next: express.NextFunction
-    ): void => {
-        express.json()(req, res, next);
-    }
-);
+    const redis = new Redis(process.env.REDIS_ADDRESS as string);
+    const socket = new CustomSocket(httpServer, redis);
 
+    app.set("trust proxy", 1);
+    app.use(
+        cors({
+            origin: process.env.CORS_ORIGIN,
+            credentials: true,
+        })
+    );
+    app.use(
+        session({
+            name: COOKIE_NAME,
+            store: new RedisStore({
+                client: redis as any,
+                disableTouch: true,
+            }),
+            cookie: {
+                maxAge: 1000 * 60 * 60 * 24 * 14, // 14 days
+                httpOnly: true,
+                sameSite: "lax", // csrf
+                secure: __prod__, // cookie only works in https
+                domain: __prod__ ? ".cloudrun.com" : undefined,
+            },
+            saveUninitialized: false,
+            secret: process.env.SESSION_SECRET as string,
+            resave: false,
+        })
+    );
 
-/**
- * Server Activation
- */
-app.get("/health", (req: Request, res: Response) => {
-    res.send("ok");
-});
-
-//The 404 Route (ALWAYS Keep this as the last route)
-app.use('*', function (req: Request, res: Response) {
-    res.sendStatus(404);
-});
-
-const redisAddress = process.env.REDIS_ADDRESS || 'redis://127.0.0.1:6379';
-const redis = new Redis(redisAddress);
-const redisSubscribers = initRedisSubscribers();
-
-function addRedisSubscriber(subscriber_key: string) {
-    var client = new Redis(redisAddress);
-
-    client.subscribe(subscriber_key);
-    client.on('message', function (channel, message) {
-        message = JSON.parse(message);
-        const { roomID, receiverSocketID } = message;
-        if (receiverSocketID !== undefined && receiverSocketID !== null) {
-            io.to(receiverSocketID).emit(subscriber_key, message);
-        }
-        else if (roomID !== undefined && roomID !== null) {
-            io.to(roomID).emit(subscriber_key, message);
-        }
+    app.get("/health", (req: Request, res: Response) => {
+        res.send("ok");
     });
 
-    return client;
-}
-
-function initRedisSubscribers() {
-    var redisSubscribers = new Map<String, Redis>();
-    const channels = ['messages', 'member_add', 'member_left', "room_info", "video_events"];
-
-    for (const channel of channels) {
-        redisSubscribers.set(channel, addRedisSubscriber(channel));
-    }
-
-    return redisSubscribers;
-}
-
-function getMembersDBKey(roomID: string) {
-    return `${roomID}_members`;
-}
-
-// async function getMembers(roomID: string) {
-//     var redis_members = await redis.hgetall(getMembersDBKey(roomID));
-//     let members = new Map<String, String>();
-//     for (var key in redis_members) {
-//         members.set(key, JSON.parse(redis_members[key]));
-//     }
-//     return members;
-// }
-
-// async function getMember(socketID: string) {
-//     let member : string | null = await redis.hget('members', socketID);
-//     if (member === null) {return null};
-//     return JSON.parse(member);
-// }
-
-async function getRoomInfo(roomID: string) {
-    var roomInfo = await redis.hget("room_info", roomID) as string;
-    return JSON.parse(roomInfo);
-}
-
-async function setRoomInfo(roomID: string, roomInfo?: any) {
-    const defaultVideoInfo: VideoInfo = {
-        playedTimestamp: "0",
-        lastTimestampUpdatedTime: new Date().getTime().toString(),
-        videoID: "Y8JFxS1HlDo",
-        videoURL: "https://youtu.be/Y8JFxS1HlDo",
-        thumbnailURL: "",
-        videoTitle: "",
-        videoAuthor: "",
-        isPlaying: true,
-    };
-
-    const defaultRoomInfo: RoomInfo = {
-        roomID: roomID,
-        currentURL: "https://youtu.be/Y8JFxS1HlDo",
-        playingIndex: 0,
-        playlist: [defaultVideoInfo]
-    };
-
-    roomInfo ??= defaultRoomInfo;
-    await redis.hset("room_info", roomID, JSON.stringify(roomInfo));
-
-    return roomInfo;
-}
-
-function addReceiverSocketID(message: any, receiverSocketID: string) {
-    message.receiverSocketID = receiverSocketID;
-    return message;
-};
-
-io.on("connection", (socket) => {
-    // cache the current room id on the socket (scoped)
-    let currentRoomID: string | null = null;
-    // console.log("New client connected", socket.id);
-    // socket.emit("Welcome to stream2gather. " + socket.id);
-
-    const getRoomInfoOrSetDefault = async (roomID: string) => {
-        var roomInfo = await getRoomInfo(roomID);
-        if (roomInfo === null) {
-            roomInfo = await setRoomInfo(roomID);
-        }
-
-        return roomInfo;
-    }
-
-    const updateRoomMember = async (roomID: string, member: RoomMember) => {
-        await redis.hset(getMembersDBKey(roomID), socket.id, JSON.stringify(member));
-    };
-
-    socket.on('join-room', async ({ uid, roomID }: { uid: string, roomID: string }) => {
-        const member: RoomMember = { uid: uid, socketID: socket.id, roomID: roomID };
-        console.log(`${socket.id} has joined the room with id ${roomID}`);
-        socket.join(roomID);
-        currentRoomID = roomID;
-
-        Promise.all([getRoomInfoOrSetDefault(roomID), updateRoomMember(roomID, member)]).then(async ([roomInfo, _]) => {
-            await redis.publish('member_add', JSON.stringify(member));
-            await redis.publish('room_info', JSON.stringify(addReceiverSocketID(roomInfo, socket.id))); // post to current socket only
-        });
-
+    // Setup Apollo Server with GraphQL
+    const apolloServer = new ApolloServer<MyContext>({
+        schema: await buildSchema({
+            resolvers: [HelloResolver],
+            validate: false,
+        }),
+        plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
     });
 
-    socket.on('video-events', async ({ roomID, isPlaying, timestamp }) => {
-        console.log(`video-events: ${roomID}, ${isPlaying}, ${timestamp}`);
-        const roomInfo = await getRoomInfo(roomID);
-        roomInfo.playlist[roomInfo.playingIndex].playedTimestamp = timestamp.toString();
-        roomInfo.playlist[roomInfo.playingIndex].lastTimestampUpdatedTime = new Date().getTime().toString();
-        roomInfo.playlist[roomInfo.playingIndex].isPlaying = isPlaying;
-        await setRoomInfo(roomID, roomInfo);
+    await apolloServer.start();
 
-        await redis.publish('video_events', JSON.stringify({ roomID, ...roomInfo.playlist[roomInfo.playingIndex] }));
+    app.use(
+        '/graphql',
+        cors<cors.CorsRequest>(),
+        json(),
+        expressMiddleware(apolloServer, {
+            context: async ({ req, res }) => ({ req, res, redis }),
+
+        }),
+    );
+
+    //The 404 Route (ALWAYS Keep this as the last route)
+    app.use('*', function (req: Request, res: Response) {
+        res.sendStatus(404);
     });
 
-
-    // Runs when client disconnects
-    socket.on('disconnect', async () => {
-        console.log(`${socket.id} has left the room with id ${currentRoomID}`);
-        const payload = {
-            roomID: currentRoomID,
-            socketID: socket.id,
-        };
-        await redis.hdel(getMembersDBKey(currentRoomID!), socket.id);
-        await redis.publish('member_left', JSON.stringify(payload));
+    httpServer.listen(process.env.PORT, () => {
+        console.log(`Server listening on port ${process.env.PORT}...`)
     });
+}
+
+main().catch((err) => {
+    console.log(err);
 });
 
-httpServer.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}...`)
-});

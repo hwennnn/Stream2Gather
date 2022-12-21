@@ -39,3 +39,10 @@ dist/**/*
 
 # ignore yarn.lock
 yarn.lock
+
+# Genearted by typeorm
+.idea/
+.vscode/
+build/
+tmp/
+temp/

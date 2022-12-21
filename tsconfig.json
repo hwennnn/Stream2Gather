@@ -1,35 +1,38 @@
 {
   "compilerOptions": {
+    "target": "es2017",
     "module": "commonjs",
-    "esModuleInterop": true,
-    "target": "es2018",
-    "types": [
-      "node"
+    "lib": [
+      "dom",
+      "es6",
+      "es2017",
+      "esnext.asynciterable"
     ],
-    "moduleResolution": "node",
+    "skipLibCheck": true,
     "sourceMap": true,
-    "outDir": "dist",
-    "baseUrl": ".",
-    "paths": {
-      "api/*": [
-        "src/api/*"
-      ],
-      "config/*": [
-        "src/config/*"
-      ],
-      "core/*": [
-        "src/core/*"
-      ],
-      "node_locales/*": [
-        "src/node_locales/*"
-      ],
-      "shared/*": [
-        "src/shared/*"
-      ],
-    },
-    "resolveJsonModule": true
+    "outDir": "./dist",
+    "moduleResolution": "node",
+    "removeComments": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitThis": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "resolveJsonModule": true,
+    "baseUrl": "."
   },
+  "exclude": [
+    "node_modules"
+  ],
   "include": [
-    "src/**/*"
+    "./src/**/*.tsx",
+    "./src/**/*.ts"
   ]
 }

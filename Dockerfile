@@ -1,18 +1,27 @@
 FROM node:14.17.1 as base
 
-# Add package file
-COPY package*.json ./
+# Create app directory
+WORKDIR /usr/src/app
+
+# Install app dependencies
+# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# where available (npm@5+)
+COPY package.json ./
+COPY yarn.lock ./
 
 # Install dependencies
-RUN npm install --only production
+RUN yarn install --production=true
 
 # Copy source
-COPY src ./src
-COPY tsconfig.json ./tsconfig.json
+COPY . .
+COPY .env.production .env
 
 # Build dist
-RUN npm run build
+RUN yarn build
+
+ENV NODE_ENV production
 
 # Expose port 8080
 EXPOSE 8080
-CMD npm run prod
+CMD [ "node", "dist/index.js" ]
+USER node

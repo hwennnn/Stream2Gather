@@ -1,4 +1,3 @@
-import { RoomInfo, RoomMember, VideoInfo } from 'core/models/rooms';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
@@ -6,6 +5,7 @@ import helmet from 'helmet';
 import { createServer } from "http";
 import Redis from 'ioredis';
 import { Server } from "socket.io";
+import { RoomInfo, RoomMember, VideoInfo } from './core/models/rooms';
 
 dotenv.config()
 
@@ -39,7 +39,7 @@ app.use(
 /**
  * Server Activation
  */
-app.get("/health", (req, res) => {
+app.get("/health", (req: Request, res: Response) => {
     res.send("ok");
 });
 
@@ -71,11 +71,11 @@ function addRedisSubscriber(subscriber_key: string) {
 }
 
 function initRedisSubscribers() {
-    var redisSubscribers = {};
+    var redisSubscribers = new Map<String, Redis>();
     const channels = ['messages', 'member_add', 'member_left', "room_info", "video_events"];
 
     for (const channel of channels) {
-        redisSubscribers[channel] = addRedisSubscriber(channel);
+        redisSubscribers.set(channel, addRedisSubscriber(channel));
     }
 
     return redisSubscribers;
@@ -85,22 +85,23 @@ function getMembersDBKey(roomID: string) {
     return `${roomID}_members`;
 }
 
-async function getMembers(roomID: string) {
-    var redis_members = await redis.hgetall(getMembersDBKey(roomID));
-    var members = {};
-    for (var key in redis_members) {
-        members[key] = JSON.parse(redis_members[key]);
-    }
-    return members;
-}
+// async function getMembers(roomID: string) {
+//     var redis_members = await redis.hgetall(getMembersDBKey(roomID));
+//     let members = new Map<String, String>();
+//     for (var key in redis_members) {
+//         members.set(key, JSON.parse(redis_members[key]));
+//     }
+//     return members;
+// }
 
-async function getMember(socketID: string) {
-    var member = await redis.hget('members', socketID);
-    return JSON.parse(member);
-}
+// async function getMember(socketID: string) {
+//     let member : string | null = await redis.hget('members', socketID);
+//     if (member === null) {return null};
+//     return JSON.parse(member);
+// }
 
 async function getRoomInfo(roomID: string) {
-    var roomInfo = await redis.hget("room_info", roomID);
+    var roomInfo = await redis.hget("room_info", roomID) as string;
     return JSON.parse(roomInfo);
 }
 
@@ -136,9 +137,9 @@ function addReceiverSocketID(message: any, receiverSocketID: string) {
 
 io.on("connection", (socket) => {
     // cache the current room id on the socket (scoped)
-    let currentRoomID: string = null;
+    let currentRoomID: string | null = null;
     // console.log("New client connected", socket.id);
-    // socket.emit("Welcome to Stream2Gether. " + socket.id);
+    // socket.emit("Welcome to stream2gather. " + socket.id);
 
     const getRoomInfoOrSetDefault = async (roomID: string) => {
         var roomInfo = await getRoomInfo(roomID);
@@ -185,9 +186,11 @@ io.on("connection", (socket) => {
             roomID: currentRoomID,
             socketID: socket.id,
         };
-        await redis.hdel(getMembersDBKey(currentRoomID), socket.id);
+        await redis.hdel(getMembersDBKey(currentRoomID!), socket.id);
         await redis.publish('member_left', JSON.stringify(payload));
     });
 });
 
-httpServer.listen(PORT);
+httpServer.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}...`)
+});

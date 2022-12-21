@@ -15,6 +15,7 @@ import { expressMiddleware } from "@apollo/server/express4";
 import { json } from "body-parser";
 import { MyContext } from "./types";
 import { UserResolver } from "./resolvers/userResolver";
+import { RoomResolver } from "./resolvers/roomResolver";
 import connectRedis from "connect-redis";
 import cors from "cors";
 import CustomSocket from "./models/custom_socket";
@@ -22,6 +23,7 @@ import express, { Request, Response } from "express";
 import Redis from "ioredis";
 import session from "express-session";
 import { User } from "./entity/User";
+import { Room } from "./entity/Room";
 
 const main = async () => {
     await AppDataSource.initialize();
@@ -32,7 +34,7 @@ const main = async () => {
 
     const redis = new Redis(process.env.REDIS_ADDRESS as string);
     const socket = new CustomSocket(httpServer, redis);
-
+    // await Room.clear();
     // User.clear();
     app.set("trust proxy", process.env.NODE_ENV !== "production");
 
@@ -69,7 +71,7 @@ const main = async () => {
     // Setup Apollo Server with GraphQL
     const apolloServer = new ApolloServer<MyContext>({
         schema: await buildSchema({
-            resolvers: [UserResolver],
+            resolvers: [UserResolver, RoomResolver],
             validate: false,
         }),
         plugins: [

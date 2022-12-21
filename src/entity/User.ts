@@ -1,9 +1,12 @@
+import { Room } from "./Room";
 import { ObjectType, Field } from "type-graphql";
 import {
     BaseEntity,
     Column,
     CreateDateColumn,
     Entity,
+    JoinTable,
+    ManyToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
@@ -13,7 +16,7 @@ import {
 export class User extends BaseEntity {
     @Field()
     @PrimaryGeneratedColumn("uuid")
-    id: string;
+    id!: string;
 
     @Field()
     @Column()
@@ -30,4 +33,8 @@ export class User extends BaseEntity {
     @Field(() => String)
     @UpdateDateColumn()
     updatedAt: Date;
+
+    @Field(() => [Room])
+    @ManyToMany(() => Room, (rooms) => rooms.users)
+    rooms: Room[];
 }

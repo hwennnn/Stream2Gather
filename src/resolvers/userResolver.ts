@@ -10,7 +10,10 @@ import {
     Mutation,
     Field,
     ObjectType,
+    FieldResolver,
+    Root,
 } from "type-graphql";
+import { FieldError } from "./types";
 
 @InputType()
 class UsernameEmailInput {
@@ -18,14 +21,6 @@ class UsernameEmailInput {
     email: string;
     @Field()
     username: string;
-}
-
-@ObjectType()
-class FieldError {
-    @Field()
-    field: string;
-    @Field()
-    message: string;
 }
 
 @ObjectType()
@@ -39,6 +34,16 @@ class UserResponse {
 
 @Resolver(User)
 export class UserResolver {
+    @FieldResolver(() => String)
+    email(@Root() user: User, @Ctx() { req }: MyContext) {
+        // this is the current user and its ok to show them their own email
+        if (req.session.userId === user.id) {
+            return user.email;
+        }
+        // current user wants to see someone elses email
+        return "";
+    }
+
     @Query(() => User, { nullable: true })
     me(@Ctx() { req }: MyContext): Promise<User | null> | null {
         // you are not logged in
@@ -46,17 +51,20 @@ export class UserResolver {
             return null;
         }
 
-        return User.findOne({ where: { id: req.session.userId } });
+        return User.findOne({
+            where: { id: req.session.userId },
+            relations: { rooms: true },
+        });
     }
 
     @Query(() => User, { nullable: true })
     async user(@Arg("id") id: string): Promise<User | null> {
-        return User.findOne({ where: { id } });
+        return User.findOne({ where: { id }, relations: { rooms: true } });
     }
 
     @Query(() => [User])
     async users(): Promise<User[]> {
-        return User.find();
+        return User.find({ relations: { rooms: true } });
     }
 
     @Mutation(() => UserResponse)

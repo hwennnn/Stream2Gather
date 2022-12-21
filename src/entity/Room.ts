@@ -1,12 +1,19 @@
+import { DEFAULT_VIDEO_URL } from "./../constants";
 import { ObjectType, Field } from "type-graphql";
 import {
     BaseEntity,
     Column,
     CreateDateColumn,
     Entity,
+    JoinColumn,
+    JoinTable,
+    ManyToMany,
+    OneToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
+import { User } from "./User";
+import { rootCertificates } from "tls";
 
 @ObjectType()
 @Entity()
@@ -16,24 +23,28 @@ export class Room extends BaseEntity {
     id!: string;
 
     @Field()
-    @Column()
-    currentUrl!: string;
+    @Column({ default: false })
+    isPublic: boolean;
 
     @Field()
-    @Column()
-    playingIndex!: number;
+    @Column({ default: DEFAULT_VIDEO_URL })
+    currentUrl: string;
 
     @Field()
-    @Column()
-    playedTimestamp!: number;
+    @Column({ default: 0 })
+    playingIndex: number;
 
     @Field()
-    @Column()
-    lastTimestampUpdatedTime!: number;
+    @Column({ default: 0 })
+    playedTimestamp: number;
 
     @Field()
-    @Column()
-    isPlaying!: boolean;
+    @Column({ default: new Date().getTime().toString() })
+    lastTimestampUpdatedTime!: string;
+
+    @Field()
+    @Column({ default: true })
+    isPlaying: boolean;
 
     @Field(() => String)
     @CreateDateColumn()
@@ -42,4 +53,15 @@ export class Room extends BaseEntity {
     @Field(() => String)
     @UpdateDateColumn()
     updatedAt: Date;
+
+    // @Field(() => User)
+    // @JoinColumn()
+    // creator!: User;
+
+    @Field(() => [User])
+    @ManyToMany(() => User, (users) => users.rooms, {
+        cascade: true,
+    })
+    @JoinTable()
+    users!: User[];
 }

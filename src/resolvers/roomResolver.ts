@@ -44,7 +44,7 @@ export class RoomResolver {
         try {
             return Room.findOne({
                 where: { id },
-                relations: { users: true, creator: true },
+                relations: { members: true, creator: true },
             });
         } catch (err) {
             console.log(err);
@@ -55,7 +55,7 @@ export class RoomResolver {
 
     @Query(() => [Room])
     async rooms(): Promise<Room[]> {
-        return Room.find({ relations: { users: true, creator: true } });
+        return Room.find({ relations: { members: true, creator: true } });
     }
 
     @Mutation(() => RoomResponse)
@@ -68,7 +68,7 @@ export class RoomResolver {
         if (user !== null) {
             let room = await Room.create({
                 creator: user,
-                users: [user],
+                members: [user],
             }).save();
 
             const roomInfo: RoomInfo = defaultRoomInfo;

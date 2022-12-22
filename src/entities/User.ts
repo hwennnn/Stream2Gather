@@ -35,7 +35,7 @@ export class User extends BaseEntity {
     updatedAt: Date;
 
     @Field(() => [Room])
-    @ManyToMany(() => Room, (rooms) => rooms.users)
+    @ManyToMany(() => Room, (rooms) => rooms.members)
     rooms: Room[];
 
     @Field(() => [Room])

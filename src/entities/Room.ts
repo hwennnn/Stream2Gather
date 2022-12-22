@@ -24,12 +24,6 @@ export class Room extends BaseEntity {
     @Column({ default: false })
     isPublic: boolean;
 
-    @Field(() => RoomInfo)
-    roomInfo: RoomInfo;
-
-    @Field(() => [RoomMember])
-    activeMembers: RoomMember[];
-
     @Field(() => String)
     @CreateDateColumn()
     createdAt: Date;
@@ -46,10 +40,18 @@ export class Room extends BaseEntity {
     creator!: User;
 
     @Field(() => [User])
-    @ManyToMany(() => User, (users) => users.rooms, {
+    @ManyToMany(() => User, (members) => members.rooms, {
         cascade: true,
         onDelete: "CASCADE",
     })
     @JoinTable()
-    users!: User[];
+    members!: User[];
+
+    // Fetch from redis
+    @Field(() => RoomInfo)
+    roomInfo: RoomInfo;
+
+    // Fetch from redis
+    @Field(() => [RoomMember])
+    activeMembers: RoomMember[];
 }

@@ -48,7 +48,8 @@ export default class CustomSocket {
 
         client.subscribe(subscriber_key);
         client.on("message", (channel, message) => {
-            const { roomId, receiverSocketId } = JSON.parse(message);
+            message = JSON.parse(message);
+            const { roomId, receiverSocketId } = message;
             if (receiverSocketId !== undefined && receiverSocketId !== null) {
                 this.io.to(receiverSocketId).emit(subscriber_key, message);
             } else if (roomId !== undefined && roomId !== null) {
@@ -105,6 +106,7 @@ export default class CustomSocket {
                             member
                         ),
                     ]).then(async ([roomInfo, _]) => {
+                        console.log("roomInfo", roomInfo);
                         await this.redis.publish(
                             RedisChannel.NEW_MEMBER,
                             JSON.stringify(member)

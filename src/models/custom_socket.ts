@@ -25,8 +25,11 @@ export default class CustomSocket {
             },
         });
         this.redis = redis;
+    }
+
+    init(): void {
         this.redisSubscribers = this.initRedisSubscribers();
-        this.initConnection();
+        this.initSocketConnection();
     }
 
     private addRedisSubscriber(subscriber_key: string): Redis {
@@ -120,7 +123,7 @@ export default class CustomSocket {
     // //     return JSON.parse(member);
     // // }
 
-    private initConnection(): void {
+    private initSocketConnection(): void {
         this.io.on("connection", (socket) => {
             // cache the current room id on the socket (scoped)
             let currentRoomID: string | null = null;

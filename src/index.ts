@@ -34,6 +34,7 @@ const main = async () => {
 
     const redis = new Redis(process.env.REDIS_ADDRESS as string);
     const socket = new CustomSocket(httpServer, redis);
+    socket.init();
     // await User.delete({});
     // await Room.delete({});
 

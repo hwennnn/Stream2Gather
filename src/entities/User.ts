@@ -7,6 +7,7 @@ import {
     Entity,
     JoinTable,
     ManyToMany,
+    OneToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
@@ -37,4 +38,8 @@ export class User extends BaseEntity {
     @Field(() => [Room])
     @ManyToMany(() => Room, (rooms) => rooms.users)
     rooms: Room[];
+
+    @Field(() => [Room])
+    @OneToMany(() => Room, (room) => room.creator)
+    createdRooms: Room[];
 }

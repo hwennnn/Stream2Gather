@@ -1,12 +1,12 @@
 import "reflect-metadata";
 import "dotenv-safe/config";
 
-import { ApolloServer } from "@apollo/server";
-import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import {
     ApolloServerPluginLandingPageLocalDefault,
     ApolloServerPluginLandingPageProductionDefault,
 } from "@apollo/server/plugin/landingPage/default";
+import { ApolloServer } from "@apollo/server";
+import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import { AppDataSource } from "./data-source";
 import { buildSchema } from "type-graphql";
 import { COOKIE_NAME, __prod__ } from "./constants";
@@ -14,16 +14,16 @@ import { createServer } from "http";
 import { expressMiddleware } from "@apollo/server/express4";
 import { json } from "body-parser";
 import { MyContext } from "./types";
-import { UserResolver } from "./resolvers/userResolver";
+import { Room } from "./entities/Room";
 import { RoomResolver } from "./resolvers/roomResolver";
+import { User } from "./entities/User";
+import { UserResolver } from "./resolvers/userResolver";
 import connectRedis from "connect-redis";
 import cors from "cors";
 import CustomSocket from "./models/custom_socket";
 import express, { Request, Response } from "express";
 import Redis from "ioredis";
 import session from "express-session";
-import { User } from "./entity/User";
-import { Room } from "./entity/Room";
 
 const main = async () => {
     await AppDataSource.initialize();
@@ -34,10 +34,10 @@ const main = async () => {
 
     const redis = new Redis(process.env.REDIS_ADDRESS as string);
     const socket = new CustomSocket(httpServer, redis);
-    // await Room.clear();
-    // User.clear();
-    app.set("trust proxy", process.env.NODE_ENV !== "production");
+    // await User.delete({});
+    // await Room.delete({});
 
+    app.set("trust proxy", !__prod__);
     app.use(
         cors({
             origin: process.env.CORS_ORIGIN,
@@ -110,5 +110,5 @@ const main = async () => {
 };
 
 main().catch((err) => {
-    console.log(err);
+    console.error(err);
 });

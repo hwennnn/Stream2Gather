@@ -1,5 +1,5 @@
-import { COOKIE_NAME } from "./../constants";
-import { Room } from "../entity/Room";
+import { COOKIE_NAME } from "../constants";
+import { Room } from "../entities/Room";
 import { MyContext } from "../types";
 import {
     Resolver,
@@ -14,7 +14,7 @@ import {
     Root,
 } from "type-graphql";
 import { FieldError } from "./types";
-import { User } from "../entity/User";
+import { User } from "../entities/User";
 
 @ObjectType()
 class RoomResponse {
@@ -29,15 +29,21 @@ class RoomResponse {
 export class RoomResolver {
     @Query(() => Room, { nullable: true })
     async room(@Arg("id") id: string): Promise<Room | null> {
-        return Room.findOne({
-            where: { id },
-            relations: { users: true },
-        });
+        try {
+            return Room.findOne({
+                where: { id },
+                relations: { users: true, creator: true },
+            });
+        } catch (err) {
+            console.log(err);
+        }
+
+        return null;
     }
 
     @Query(() => [Room])
     async rooms(): Promise<Room[]> {
-        return Room.find({ relations: { users: true } });
+        return Room.find({ relations: { users: true, creator: true } });
     }
 
     @Mutation(() => RoomResponse)
@@ -47,7 +53,7 @@ export class RoomResolver {
 
         if (user !== null) {
             let room = await Room.create({
-                // creator: user,
+                creator: user,
                 users: [user],
             }).save();
 
@@ -64,5 +70,17 @@ export class RoomResolver {
                 },
             ],
         };
+    }
+
+    @Mutation(() => Boolean)
+    async deleteRoom(@Arg("id") id: string): Promise<boolean> {
+        try {
+            await Room.delete({ id });
+        } catch (err) {
+            console.error(err);
+            return false;
+        }
+
+        return true;
     }
 }

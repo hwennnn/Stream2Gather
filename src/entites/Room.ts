@@ -1,4 +1,4 @@
-import { DEFAULT_VIDEO_URL } from "./../constants";
+import { DEFAULT_VIDEO_URL } from "../constants";
 import { ObjectType, Field } from "type-graphql";
 import {
     BaseEntity,
@@ -12,8 +12,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
-import { User } from "./User";
-import { rootCertificates } from "tls";
+import { User } from "src/entities/User";
 
 @ObjectType()
 @Entity()
@@ -54,13 +53,17 @@ export class Room extends BaseEntity {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    // @Field(() => User)
-    // @JoinColumn()
-    // creator!: User;
+    @Field(() => User)
+    creator: User;
+
+    @Field(() => String)
+    @Column()
+    creatorId: string;
 
     @Field(() => [User])
     @ManyToMany(() => User, (users) => users.rooms, {
         cascade: true,
+        onDelete: "CASCADE",
     })
     @JoinTable()
     users!: User[];

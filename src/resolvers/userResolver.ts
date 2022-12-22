@@ -1,5 +1,5 @@
-import { COOKIE_NAME } from "./../constants";
-import { User } from "../entity/User";
+import { COOKIE_NAME } from "../constants";
+import { User } from "../entities/User";
 import { MyContext } from "../types";
 import {
     Resolver,
@@ -53,7 +53,7 @@ export class UserResolver {
 
         return User.findOne({
             where: { id: req.session.userId },
-            relations: { rooms: true },
+            relations: { rooms: true, createdRooms: true },
         });
     }
 

@@ -1,15 +1,15 @@
-import { Video } from "./entity/Video";
+import { Video } from "./entities/Video";
 import { DataSource } from "typeorm";
-import { Room } from "./entity/Room";
-import { User } from "./entity/User";
+import { Room } from "./entities/Room";
+import { User } from "./entities/User";
 
 export const AppDataSource = new DataSource({
     type: "postgres",
-    host: "localhost",
-    port: 5432,
-    username: "postgres",
-    password: "postgres",
-    database: "stream2gather",
+    host: process.env.PG_HOST,
+    port: parseInt(process.env.PG_PORT),
+    username: process.env.PG_USER,
+    password: process.env.PG_PASSWORD,
+    database: process.env.PG_DB,
     synchronize: true,
     logging: true,
     entities: [User, Room, Video],

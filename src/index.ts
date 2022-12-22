@@ -24,6 +24,7 @@ import CustomSocket from "./models/custom_socket";
 import express, { Request, Response } from "express";
 import Redis from "ioredis";
 import session from "express-session";
+import RedisRoomHelper from "./utils/redisRoomHelper";
 
 const main = async () => {
     await AppDataSource.initialize();
@@ -96,7 +97,12 @@ const main = async () => {
         cors<cors.CorsRequest>(),
         json(),
         expressMiddleware(apolloServer, {
-            context: async ({ req, res }) => ({ req, res, redis }),
+            context: async ({ req, res }) => ({
+                req,
+                res,
+                redis,
+                redisRoomHelper: new RedisRoomHelper(redis),
+            }),
         })
     );
 

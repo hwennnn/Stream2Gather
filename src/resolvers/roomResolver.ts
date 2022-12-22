@@ -12,7 +12,7 @@ import {
 import { Room } from "../entities/Room";
 import { User } from "../entities/User";
 import { MyContext } from "../types";
-import { defaultRoomInfo, RoomInfo } from "./../models/RedisModel";
+import { defaultRoomInfo, RoomInfo, RoomMember } from "./../models/RedisModel";
 import { FieldError } from "./types";
 
 @ObjectType()
@@ -28,6 +28,12 @@ class RoomResponse {
 export class RoomResolver {
     @FieldResolver(() => RoomInfo, { nullable: true })
     async roomInfo(@Root() room: Room, @Ctx() { redis }: MyContext) {
+        var roomInfo = (await redis.hget("room_info", room.id)) as string;
+        return JSON.parse(roomInfo);
+    }
+
+    @FieldResolver(() => [RoomMember], { nullable: true })
+    async activeMembers(@Root() room: Room, @Ctx() { redis }: MyContext) {
         var roomInfo = (await redis.hget("room_info", room.id)) as string;
         return JSON.parse(roomInfo);
     }

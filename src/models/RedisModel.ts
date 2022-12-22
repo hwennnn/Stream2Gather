@@ -6,10 +6,16 @@ export enum VideoPlatform {
     DAILYMOTION = "DAILYMOTION",
 }
 
-export interface RoomMember {
+@ObjectType()
+export class RoomMember {
+    @Field()
     uid: string;
-    socketID: string;
-    roomID: string;
+
+    @Field()
+    socketId: string;
+
+    @Field()
+    roomId: string;
 }
 
 @ObjectType()

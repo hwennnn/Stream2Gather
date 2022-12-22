@@ -10,7 +10,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
-import { RoomInfo } from "../models/RedisModel";
+import { RoomInfo, RoomMember } from "../models/RedisModel";
 import { User } from "./User";
 
 @ObjectType()
@@ -26,6 +26,9 @@ export class Room extends BaseEntity {
 
     @Field(() => RoomInfo)
     roomInfo: RoomInfo;
+
+    @Field(() => [RoomMember])
+    activeMembers: RoomMember[];
 
     @Field(() => String)
     @CreateDateColumn()

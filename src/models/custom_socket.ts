@@ -1,7 +1,8 @@
 import { IncomingMessage, Server, ServerResponse } from "http";
-import { Server as SocketServer } from "socket.io";
 import Redis from "ioredis";
+import { Server as SocketServer } from "socket.io";
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
+import RedisHelper from "../utils/redisHelper";
 import RedisRoomHelper from "../utils/redisRoomHelper";
 import { RoomMember } from "./RedisModel";
 
@@ -20,8 +21,8 @@ export default class CustomSocket {
         DefaultEventsMap,
         any
     >;
-    private redis: Redis;
     private redisSubscribers: Map<String, Redis>;
+    private redisHelper: RedisHelper;
     private roomRedisHelper: RedisRoomHelper;
 
     constructor(
@@ -34,11 +35,11 @@ export default class CustomSocket {
                 methods: ["GET", "POST"],
             },
         });
-        this.redis = redis;
+        this.redisHelper = new RedisHelper(redis);
+        this.roomRedisHelper = new RedisRoomHelper(redis);
     }
 
     init(): void {
-        this.roomRedisHelper = new RedisRoomHelper(this.redis);
         this.redisSubscribers = this.initRedisSubscribers();
         this.initSocketConnection();
     }
@@ -69,11 +70,6 @@ export default class CustomSocket {
         }
 
         return redisSubscribers;
-    }
-
-    private specifyReceiverSocketId(message: any, receiverSocketId: string) {
-        message.receiverSocketId = receiverSocketId;
-        return message;
     }
 
     private initSocketConnection(): void {
@@ -107,20 +103,17 @@ export default class CustomSocket {
                         ),
                     ]).then(async ([roomInfo, _]) => {
                         console.log("roomInfo", roomInfo);
-                        await this.redis.publish(
+
+                        await this.redisHelper.publish(
                             RedisChannel.NEW_MEMBER,
-                            JSON.stringify(member)
+                            member
                         );
 
                         // post to current socket only
-                        await this.redis.publish(
+                        await this.redisHelper.publish(
                             RedisChannel.ROOM_INFO,
-                            JSON.stringify(
-                                this.specifyReceiverSocketId(
-                                    roomInfo,
-                                    socket.id
-                                )
-                            )
+                            roomInfo,
+                            socket.id
                         );
                     });
                 }
@@ -152,9 +145,9 @@ export default class CustomSocket {
 
                     await this.roomRedisHelper.setRoomInfo(roomId, roomInfo);
 
-                    await this.redis.publish(
+                    await this.redisHelper.publish(
                         RedisChannel.STREAMING_EVENTS,
-                        JSON.stringify({ payload })
+                        payload
                     );
                 }
             );
@@ -173,9 +166,9 @@ export default class CustomSocket {
                     currentRoomId!,
                     socket.id
                 );
-                await this.redis.publish(
+                await this.redisHelper.publish(
                     RedisChannel.MEMBER_LEFT,
-                    JSON.stringify(payload)
+                    payload
                 );
             });
         });

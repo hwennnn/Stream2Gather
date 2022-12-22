@@ -32,4 +32,13 @@ export default class RedisHelper {
 
         return result;
     }
+
+    public async publish(
+        channel: string,
+        payload: any,
+        receiverSocketId?: string
+    ): Promise<void> {
+        if (receiverSocketId) payload.receiverSocketId = receiverSocketId;
+        await this.redis.publish(channel, JSON.stringify(payload));
+    }
 }

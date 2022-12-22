@@ -26,7 +26,7 @@ export default class RedisRoomHelper extends RedisHelper {
         return `${roomId}_members`;
     }
 
-    public async getRoomMembers(roomId: string): Promise<RoomMember[]> {
+    public async getActiveMembers(roomId: string): Promise<RoomMember[]> {
         return await this.hgetall<RoomMember>(this.getMembersTableKey(roomId));
     }
 

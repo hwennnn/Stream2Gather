@@ -100,7 +100,6 @@ const main = async () => {
             context: async ({ req, res }) => ({
                 req,
                 res,
-                redis,
                 redisRoomHelper: new RedisRoomHelper(redis),
             }),
         })

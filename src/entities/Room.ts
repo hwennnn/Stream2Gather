@@ -1,20 +1,17 @@
-import { DEFAULT_VIDEO_URL } from "../constants";
-import { ObjectType, Field } from "type-graphql";
+import { Field, ObjectType } from "type-graphql";
 import {
     BaseEntity,
     Column,
     CreateDateColumn,
     Entity,
-    JoinColumn,
     JoinTable,
     ManyToMany,
     ManyToOne,
-    OneToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
+import { RoomInfo } from "../models/RedisModel";
 import { User } from "./User";
-import { rootCertificates } from "tls";
 
 @ObjectType()
 @Entity()
@@ -27,25 +24,8 @@ export class Room extends BaseEntity {
     @Column({ default: false })
     isPublic: boolean;
 
-    @Field()
-    @Column({ default: DEFAULT_VIDEO_URL })
-    currentUrl: string;
-
-    @Field()
-    @Column({ default: 0 })
-    playingIndex: number;
-
-    @Field()
-    @Column({ default: 0 })
-    playedTimestamp: number;
-
-    @Field()
-    @Column({ default: new Date().getTime().toString() })
-    lastTimestampUpdatedTime!: string;
-
-    @Field()
-    @Column({ default: true })
-    isPlaying: boolean;
+    @Field(() => RoomInfo)
+    roomInfo: RoomInfo;
 
     @Field(() => String)
     @CreateDateColumn()
@@ -57,6 +37,7 @@ export class Room extends BaseEntity {
 
     @Field(() => User)
     @ManyToOne(() => User, (user) => user.createdRooms, {
+        cascade: true,
         onDelete: "CASCADE",
     })
     creator!: User;

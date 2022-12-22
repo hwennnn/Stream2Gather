@@ -1,4 +1,3 @@
-import { Video } from "./entities/Video";
 import { DataSource } from "typeorm";
 import { Room } from "./entities/Room";
 import { User } from "./entities/User";
@@ -12,7 +11,7 @@ export const AppDataSource = new DataSource({
     database: process.env.PG_DB,
     synchronize: true,
     logging: true,
-    entities: [User, Room, Video],
+    entities: [User, Room],
     migrations: [],
     subscribers: [],
 });

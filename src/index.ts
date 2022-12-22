@@ -77,7 +77,7 @@ const main = async () => {
         }),
         plugins: [
             ApolloServerPluginDrainHttpServer({ httpServer }),
-            process.env.NODE_ENV === "production"
+            __prod__
                 ? ApolloServerPluginLandingPageProductionDefault({
                       graphRef: "my-graph-id@my-graph-variant",
                       footer: false,

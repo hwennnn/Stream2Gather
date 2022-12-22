@@ -1,20 +1,19 @@
-import { COOKIE_NAME } from "../constants";
-import { Room } from "../entities/Room";
-import { MyContext } from "../types";
 import {
-    Resolver,
-    Query,
-    Ctx,
     Arg,
-    InputType,
-    Mutation,
+    Ctx,
     Field,
-    ObjectType,
     FieldResolver,
+    Mutation,
+    ObjectType,
+    Query,
+    Resolver,
     Root,
 } from "type-graphql";
-import { FieldError } from "./types";
+import { Room } from "../entities/Room";
 import { User } from "../entities/User";
+import { MyContext } from "../types";
+import { defaultRoomInfo, RoomInfo } from "./../models/RedisModel";
+import { FieldError } from "./types";
 
 @ObjectType()
 class RoomResponse {
@@ -27,6 +26,12 @@ class RoomResponse {
 
 @Resolver(Room)
 export class RoomResolver {
+    @FieldResolver(() => RoomInfo, { nullable: true })
+    async roomInfo(@Root() room: Room, @Ctx() { redis }: MyContext) {
+        var roomInfo = (await redis.hget("room_info", room.id)) as string;
+        return JSON.parse(roomInfo);
+    }
+
     @Query(() => Room, { nullable: true })
     async room(@Arg("id") id: string): Promise<Room | null> {
         try {
@@ -47,7 +52,7 @@ export class RoomResolver {
     }
 
     @Mutation(() => RoomResponse)
-    async createRoom(@Ctx() { req }: MyContext): Promise<RoomResponse> {
+    async createRoom(@Ctx() { req, redis }: MyContext): Promise<RoomResponse> {
         const uid: string = req.session.userId!;
         const user = await User.findOne({ where: { id: uid } });
 
@@ -57,7 +62,10 @@ export class RoomResolver {
                 users: [user],
             }).save();
 
-            console.log("roomCreated", room);
+            const roomInfo: RoomInfo = defaultRoomInfo;
+            roomInfo.id = room.id;
+
+            await redis.hset("room_info", room.id, JSON.stringify(roomInfo));
 
             return { room };
         }

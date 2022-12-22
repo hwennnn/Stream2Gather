@@ -1,16 +1,15 @@
-import { Room } from "./Room";
-import { ObjectType, Field } from "type-graphql";
+import { Field, ObjectType } from "type-graphql";
 import {
     BaseEntity,
     Column,
     CreateDateColumn,
     Entity,
-    JoinTable,
     ManyToMany,
     OneToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
+import { Room } from "./Room";
 
 @ObjectType()
 @Entity()

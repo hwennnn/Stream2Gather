@@ -1,0 +1,77 @@
+import { Field, Float, Int, ObjectType } from "type-graphql";
+
+export enum VideoPlatform {
+    YOUTUBE = "YOUTUBE",
+    TWITCH = "TWITCH",
+    DAILYMOTION = "DAILYMOTION",
+}
+
+export interface RoomMember {
+    uid: string;
+    socketID: string;
+    roomID: string;
+}
+
+@ObjectType()
+export class RoomInfo {
+    @Field()
+    id: string;
+
+    @Field()
+    currentUrl: string;
+
+    @Field(() => Int)
+    playingIndex: number;
+
+    @Field(() => Float)
+    playedSeconds: number;
+
+    @Field()
+    playedTimestampUpdatedAt: string;
+
+    @Field()
+    isPlaying: boolean;
+
+    @Field(() => [VideoInfo])
+    playlist: VideoInfo[];
+}
+
+@ObjectType()
+export class VideoInfo {
+    @Field(() => String)
+    platform: VideoPlatform;
+
+    @Field()
+    id: string;
+
+    @Field()
+    url: string;
+
+    @Field()
+    thumbnailUrl: string;
+
+    @Field()
+    title: string;
+
+    @Field()
+    author: string;
+}
+
+export const defaultVideoInfo: VideoInfo = {
+    platform: VideoPlatform.YOUTUBE,
+    id: "Y8JFxS1HlDo",
+    url: "https://youtu.be/Y8JFxS1HlDo",
+    thumbnailUrl: "",
+    title: "",
+    author: "",
+};
+
+export const defaultRoomInfo: RoomInfo = {
+    id: "",
+    currentUrl: defaultVideoInfo.url,
+    playingIndex: 0,
+    playedSeconds: 0.0,
+    playedTimestampUpdatedAt: new Date().getTime().toString(),
+    isPlaying: true,
+    playlist: [defaultVideoInfo],
+};

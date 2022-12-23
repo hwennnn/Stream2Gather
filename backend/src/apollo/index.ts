@@ -11,7 +11,7 @@ import express from "express";
 import { Server } from "http";
 import Redis from "ioredis";
 import { buildSchema } from "type-graphql";
-import { __prod__ } from "../constants/constants";
+import { __prod__ } from "../constants/config";
 import { RoomResolver } from "../resolvers/roomResolver";
 import { UserResolver } from "../resolvers/userResolver";
 import { MyContext } from "../types";

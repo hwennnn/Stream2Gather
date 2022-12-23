@@ -48,10 +48,10 @@ export class Room extends BaseEntity {
     members!: User[];
 
     // Fetch from redis
-    @Field(() => RoomInfo)
+    @Field(() => RoomInfo, { nullable: true })
     roomInfo: RoomInfo;
 
     // Fetch from redis
-    @Field(() => [RoomMember])
+    @Field(() => [RoomMember], { nullable: true })
     activeMembers: RoomMember[];
 }

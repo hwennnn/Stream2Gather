@@ -23,6 +23,14 @@ class UsernameEmailInput {
     username: string;
 }
 
+@InputType()
+class UserRelationsInput {
+    @Field()
+    rooms: boolean = false;
+    @Field()
+    createdRooms: boolean = false;
+}
+
 @ObjectType()
 class UserResponse {
     @Field(() => [FieldError], { nullable: true })
@@ -31,6 +39,15 @@ class UserResponse {
     @Field(() => User, { nullable: true })
     user?: User;
 }
+
+const formatRelations = (relations: UserRelationsInput) => {
+    const formattedRelations = {
+        rooms: relations.rooms === true,
+        createdRooms: relations.createdRooms === true,
+    };
+
+    return formattedRelations;
+};
 
 @Resolver(User)
 export class UserResolver {
@@ -65,6 +82,14 @@ export class UserResolver {
     @Query(() => [User])
     async users(): Promise<User[]> {
         return User.find({ relations: { rooms: true } });
+    }
+
+    @Query(() => [User])
+    async usersWithRelations(
+        @Arg("options") options: UserRelationsInput
+    ): Promise<User[]> {
+        console.log(formatRelations(options));
+        return User.find({ relations: formatRelations(options) });
     }
 
     @Mutation(() => UserResponse)

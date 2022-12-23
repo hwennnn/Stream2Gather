@@ -34,11 +34,11 @@ export class User extends BaseEntity {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    @Field(() => [Room])
+    @Field(() => [Room], { nullable: true })
     @ManyToMany(() => Room, (rooms) => rooms.members)
     rooms: Room[];
 
-    @Field(() => [Room])
+    @Field(() => [Room], { nullable: true })
     @OneToMany(() => Room, (room) => room.creator)
     createdRooms: Room[];
 }

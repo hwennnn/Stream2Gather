@@ -8,10 +8,12 @@ import {
     Query,
     Resolver,
     Root,
+    UseMiddleware,
 } from "type-graphql";
 import { Room } from "../entities/Room";
 import { User } from "../entities/User";
 import { MyContext } from "../types";
+import { isAuth } from "./../middleware/isAuth";
 import { defaultRoomInfo, RoomInfo, RoomMember } from "./../models/RedisModel";
 import { FieldError } from "./types";
 
@@ -59,6 +61,7 @@ export class RoomResolver {
     }
 
     @Mutation(() => RoomResponse)
+    @UseMiddleware(isAuth)
     async createRoom(
         @Ctx() { req, redisRoomHelper }: MyContext
     ): Promise<RoomResponse> {
@@ -90,6 +93,7 @@ export class RoomResolver {
     }
 
     @Mutation(() => Boolean)
+    @UseMiddleware(isAuth)
     async deleteRoom(@Arg("id") id: string): Promise<boolean> {
         try {
             await Room.delete({ id });

@@ -32,10 +32,15 @@ const initApolloServer = async (
         schema,
         plugins: [
             ApolloServerPluginDrainHttpServer({ httpServer }),
-            ApolloServerPluginLandingPageLocalDefault({
-                footer: false,
-                includeCookies: true,
-            }),
+            __prod__
+                ? ApolloServerPluginLandingPageProductionDefault({
+                      graphRef: "my-graph-id@my-graph-variant",
+                      footer: false,
+                  })
+                : ApolloServerPluginLandingPageLocalDefault({
+                      footer: false,
+                      includeCookies: true,
+                  }),
         ],
     });
 

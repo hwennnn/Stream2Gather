@@ -29,13 +29,18 @@ export class ApiServer {
         const redis = new Redis(process.env.REDIS_ADDRESS as string);
 
         app.set("trust proxy", !__prod__);
-        app.use(helmet());
+        app.use(
+            helmet({
+                crossOriginEmbedderPolicy: __prod__,
+                contentSecurityPolicy: __prod__,
+            })
+        );
         app.use(cors(corsOptions));
         app.use(session(sessionOptions(redis)));
         app.use(router);
 
         const httpServer = createServer(app);
-        // httpServer.timeout = 1200000;
+        httpServer.timeout = 1200000;
 
         await initApolloServer(app, httpServer, redis);
 

@@ -6,7 +6,7 @@ import { createServer, Server } from "http";
 import Redis from "ioredis";
 import { Server as SocketServer } from "socket.io";
 import initApolloServer from "./apollo";
-import { __prod__ } from "./constants";
+import { __prod__ } from "./constants/constants";
 import initializeDB from "./db/initializeDb";
 import errorRouter from "./routes/404";
 import router from "./routes/routes";

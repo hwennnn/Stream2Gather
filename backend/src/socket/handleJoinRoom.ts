@@ -26,7 +26,7 @@ export const handleJoinRoom = (
         console.log(`${socket.id} has joined the room with id ${roomId}`);
 
         socket.join(roomId);
-        // currentRoomId = roomId;
+        socket.roomId = roomId;
 
         Promise.all([
             redisRoomHelper.getRoomInfo(roomId),

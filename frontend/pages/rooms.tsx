@@ -12,6 +12,14 @@ import { NextPage } from "next";
 import dynamic from "next/dynamic";
 import screenfull from "screenfull";
 import { io } from "socket.io-client";
+import {
+    REQ_JOIN_ROOM,
+    REQ_STREAMING_EVENTS,
+    RES_MEMBER_LEFT,
+    RES_NEW_MEMBER,
+    RES_ROOM_INFO,
+    RES_STREAMING_EVENTS,
+} from "../constants/socket";
 import { getFormattedTime } from "../helpers/time-helper";
 import useWindowDimensions from "../hooks/useWindowDimensions";
 
@@ -47,21 +55,21 @@ const Rooms: NextPage<Props> = ({ id }) => {
         // setPlaying(true);
         setIsMuted(true);
 
-        socket.emit("join-room", {
+        socket.emit(REQ_JOIN_ROOM, {
             roomId: id,
             uid: "hwen",
         });
 
-        socket.on("new_member", (member) => {
-            console.log("new member", member);
+        socket.on(RES_NEW_MEMBER, (member) => {
+            console.log(RES_NEW_MEMBER, member);
         });
 
-        socket.on("member_left", (socketID) => {
-            console.log("member left", socketID);
+        socket.on(RES_MEMBER_LEFT, (socketID) => {
+            console.log(RES_MEMBER_LEFT, socketID);
         });
 
-        socket.on("room_info", (roomInfo) => {
-            console.log("roomInfo", roomInfo);
+        socket.on(RES_ROOM_INFO, (roomInfo) => {
+            console.log(RES_ROOM_INFO, roomInfo);
             const {
                 isPlaying,
                 playedSeconds,
@@ -97,7 +105,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
             }
         });
 
-        socket.on("streaming_events", (videoEvent) => {
+        socket.on(RES_STREAMING_EVENTS, (videoEvent) => {
             const { isPlaying, playedSeconds } = videoEvent;
             const currentTimestamp = Number.parseFloat(playedSeconds);
 
@@ -131,7 +139,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
             timestamp,
         };
         // console.log("play", data);
-        socket.emit("video-events", data);
+        socket.emit(REQ_STREAMING_EVENTS, data);
     };
 
     const pause = () => {
@@ -145,7 +153,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
             timestamp,
         };
         // console.log("pause", data);
-        socket.emit("video-events", data);
+        socket.emit(REQ_STREAMING_EVENTS, data);
     };
 
     const seek = (event: any) => {
@@ -164,7 +172,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
             timestamp,
         };
 
-        socket.emit("video-events", data);
+        socket.emit(REQ_STREAMING_EVENTS, data);
     };
 
     const handleClickFullscreen = () => {

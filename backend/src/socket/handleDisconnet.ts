@@ -11,7 +11,7 @@ export const handleDisconnect = (
     redisRoomHelper: RedisRoomHelper
 ): DisconnetFunction => {
     return async (): Promise<void> => {
-        const currentRoomId = "5";
+        const currentRoomId = socket.roomId;
 
         console.log(`${socket.id} has left the room with id ${currentRoomId}`);
         const payload = {

@@ -1,4 +1,4 @@
-import { COOKIE_NAME } from "../constants";
+import { COOKIE_NAME } from "../constants/constants";
 import { User } from "../entities/User";
 import { MyContext } from "../types";
 import {

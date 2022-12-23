@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { RoomInfo, RoomMember } from "src/models/RedisModel";
+import { RoomInfo, RoomMember } from "../models/RedisModel";
 import RedisHelper from "./redisHelper";
 
 enum RoomTable {
@@ -46,7 +46,10 @@ export default class RedisRoomHelper extends RedisHelper {
         roomId: string,
         socketId: string
     ): Promise<RoomMember | null> {
-        return await this.get(this.getMembersTableKey(roomId), socketId);
+        return await this.get<RoomMember>(
+            this.getMembersTableKey(roomId),
+            socketId
+        );
     }
 
     public async removeRoomMember(

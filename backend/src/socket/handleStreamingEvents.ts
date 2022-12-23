@@ -1,6 +1,6 @@
-import RedisHelper from "src/utils/redisHelper";
-import RedisRoomHelper from "src/utils/redisRoomHelper";
-import { RedisChannel } from "./initRedisSubscribers";
+import { RES_STREAMING_EVENTS } from "./../constants/socket";
+import RedisHelper from "../utils/redisHelper";
+import RedisRoomHelper from "../utils/redisRoomHelper";
 
 type StreamRoomFunction = ({
     roomId,
@@ -33,6 +33,6 @@ export const handleStreamingEvents = (
 
         await redisRoomHelper.setRoomInfo(roomId, roomInfo);
 
-        await redisHelper.publish(RedisChannel.STREAMING_EVENTS, payload);
+        await redisHelper.publish(RES_STREAMING_EVENTS, payload);
     };
 };

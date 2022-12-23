@@ -18,7 +18,7 @@ export default class RedisHelper {
         return JSON.parse(value) as T;
     }
 
-    public async delete<T>(table: string, key: string): Promise<void> {
+    public async delete(table: string, key: string): Promise<void> {
         await this.redis.hdel(table, key);
     }
 

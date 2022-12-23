@@ -1,3 +1,9 @@
+import {
+    CONNECT,
+    REQ_JOIN_ROOM,
+    REQ_STREAMING_EVENTS,
+    DISCONNECT,
+} from "./../constants/socket";
 import { handleDisconnect } from "./handleDisconnet";
 import { handleStreamingEvents } from "./handleStreamingEvents";
 import { handleJoinRoom } from "./handleJoinRoom";
@@ -13,19 +19,19 @@ const setUpIo = (io: SocketServer, redis: Redis): void => {
 
     initRedisSubscribers(io);
 
-    io.on("connection", (socket) => {
+    io.on(CONNECT, (socket) => {
         socket.on(
-            "join-room",
+            REQ_JOIN_ROOM,
             handleJoinRoom(socket, redisHelper, redisRoomHelper)
         );
 
         socket.on(
-            "video-events",
+            REQ_STREAMING_EVENTS,
             handleStreamingEvents(redisHelper, redisRoomHelper)
         );
 
         socket.on(
-            "disconnect",
+            DISCONNECT,
             handleDisconnect(socket, redisHelper, redisRoomHelper)
         );
     });

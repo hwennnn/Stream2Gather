@@ -1,13 +1,13 @@
 import Redis from "ioredis";
 import { Socket as SocketServer } from "socket.io";
-
-export enum RedisChannel {
-    MESSAGE = "messages",
-    NEW_MEMBER = "new_member",
-    MEMBER_LEFT = "member_left",
-    ROOM_INFO = "room_info",
-    STREAMING_EVENTS = "streaming_events",
-}
+import {
+    REDIS_PUB_MESSAGE,
+    RES_MEMBER_LEFT,
+    RES_MESSAGE,
+    RES_NEW_MEMBER,
+    RES_ROOM_INFO,
+    RES_STREAMING_EVENTS,
+} from "./../constants/socket";
 
 const addRedisSubscriber = (
     io: SocketServer,
@@ -16,7 +16,7 @@ const addRedisSubscriber = (
     let client = new Redis(process.env.REDIS_ADDRESS as string);
 
     client.subscribe(subscriber_key);
-    client.on("message", (channel, message) => {
+    client.on(REDIS_PUB_MESSAGE, (_channel, message) => {
         message = JSON.parse(message);
         const { roomId, receiverSocketId } = message;
         if (receiverSocketId !== undefined && receiverSocketId !== null) {
@@ -31,7 +31,13 @@ const addRedisSubscriber = (
 
 const initRedisSubscribers = (io: SocketServer): Map<String, Redis> => {
     let redisSubscribers = new Map<String, Redis>();
-    const channels = Object.values(RedisChannel);
+    const channels = [
+        RES_MESSAGE,
+        RES_NEW_MEMBER,
+        RES_MEMBER_LEFT,
+        RES_ROOM_INFO,
+        RES_STREAMING_EVENTS,
+    ];
 
     for (const channel of channels) {
         redisSubscribers.set(channel, addRedisSubscriber(io, channel));

@@ -2,7 +2,7 @@ import { Socket } from "socket.io";
 import { RoomMember } from "../models/RedisModel";
 import RedisHelper from "../utils/redisHelper";
 import RedisRoomHelper from "../utils/redisRoomHelper";
-import { RedisChannel } from "./initRedisSubscribers";
+import { RES_NEW_MEMBER, RES_ROOM_INFO } from "./../constants/socket";
 
 type JoinRoomFunction = ({
     uid,
@@ -34,14 +34,10 @@ export const handleJoinRoom = (
         ]).then(async ([roomInfo, _]) => {
             console.log("roomInfo", roomInfo);
 
-            await redisHelper.publish(RedisChannel.NEW_MEMBER, member);
+            await redisHelper.publish(RES_NEW_MEMBER, member);
 
             // post to current socket only
-            await redisHelper.publish(
-                RedisChannel.ROOM_INFO,
-                roomInfo,
-                socket.id
-            );
+            await redisHelper.publish(RES_ROOM_INFO, roomInfo, socket.id);
         });
     };
 };

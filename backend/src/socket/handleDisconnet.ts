@@ -1,7 +1,7 @@
 import { Socket } from "socket.io";
+import { RES_MEMBER_LEFT } from "../constants/socket";
 import RedisHelper from "../utils/redisHelper";
 import RedisRoomHelper from "../utils/redisRoomHelper";
-import { RedisChannel } from "./initRedisSubscribers";
 
 type DisconnetFunction = ({}: {}) => Promise<void>;
 
@@ -20,6 +20,6 @@ export const handleDisconnect = (
         };
 
         await redisRoomHelper.removeRoomMember(currentRoomId!, socket.id);
-        await redisHelper.publish(RedisChannel.MEMBER_LEFT, payload);
+        await redisHelper.publish(RES_MEMBER_LEFT, payload);
     };
 };

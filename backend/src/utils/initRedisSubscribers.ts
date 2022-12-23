@@ -9,7 +9,7 @@ function addRedisSubscriber(
     var client = new Redis(process.env.REDIS_ADDRESS as string);
 
     client.subscribe(subscriber_key);
-    client.on("message", function (channel, message) {
+    client.on("message", function (_channel, message) {
         message = JSON.parse(message);
         const { roomID, receiverSocketID } = message;
         if (receiverSocketID !== undefined && receiverSocketID !== null) {

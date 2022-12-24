@@ -1,13 +1,17 @@
 import Link from "next/link";
-import { useMeQuery } from "../generated/graphql";
+import { useLogoutMutation, useMeQuery } from "../generated/graphql";
 
 const Navbar = () => {
-    const { data, isLoading, error } = useMeQuery();
+    const { data, isLoading, isError } = useMeQuery();
+
+    const { mutate } = useLogoutMutation();
 
     const isLoggedIn =
-        !isLoading && !error && data?.me !== null && data?.me !== undefined;
+        !isLoading && !isError && data?.me !== null && data?.me !== undefined;
 
-    const logout = async () => {};
+    const logout = async () => {
+        mutate({});
+    };
 
     return (
         <div className="flex flex-col">

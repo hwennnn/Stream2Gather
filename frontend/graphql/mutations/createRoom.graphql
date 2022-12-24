@@ -1,8 +1,7 @@
 mutation CreateRoom {
   createRoom {
-    errors {
-      field
-      message
+    errors{
+      ...RegularError
     }
     room {
       id

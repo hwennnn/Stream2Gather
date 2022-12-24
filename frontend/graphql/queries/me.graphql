@@ -1,13 +1,5 @@
 query Me {
   me {
-    id
-    username
-    email
-    createdRooms {
-      id
-    }
-    rooms {
-      id
-    }
+    ...UserItem
   }
 }

@@ -5,10 +5,7 @@ mutation Register($options: UsernameEmailInput!) {
       message
     }
     user {
-      id
-      username
-      email
-      createdAt
+      ...UserItem
     }
   }
 }

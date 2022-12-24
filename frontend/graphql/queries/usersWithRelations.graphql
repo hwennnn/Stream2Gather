@@ -1,8 +1,6 @@
 query UsersWithRelations($options: UserRelationsInput!) {
   usersWithRelations(options: $options) {
-    id
-    username
-    email
+    ...UserItem
     createdRooms {
       id
     }

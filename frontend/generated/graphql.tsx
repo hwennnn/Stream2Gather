@@ -157,6 +157,8 @@ export type VideoInfo = {
 
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
+export type UserItemFragment = { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string };
+
 export type CreateRoomMutationVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -172,12 +174,12 @@ export type RegisterMutationVariables = Exact<{
 }>;
 
 
-export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string } | null } };
+export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string } | null } };
 
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null } | null };
+export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string } | null };
 
 export type RoomQueryVariables = Exact<{
   id: Scalars['String'];
@@ -196,7 +198,7 @@ export type UsersWithRelationsQueryVariables = Exact<{
 }>;
 
 
-export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username: string, email: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
+export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
 
 export const RegularErrorFragmentDoc = `
     fragment RegularError on FieldError {
@@ -204,12 +206,20 @@ export const RegularErrorFragmentDoc = `
   message
 }
     `;
+export const UserItemFragmentDoc = `
+    fragment UserItem on User {
+  id
+  username
+  email
+  createdAt
+  updatedAt
+}
+    `;
 export const CreateRoomDocument = `
     mutation CreateRoom {
   createRoom {
     errors {
-      field
-      message
+      ...RegularError
     }
     room {
       id
@@ -221,7 +231,7 @@ export const CreateRoomDocument = `
     }
   }
 }
-    `;
+    ${RegularErrorFragmentDoc}`;
 export const useCreateRoomMutation = <
       TError = unknown,
       TContext = unknown
@@ -253,14 +263,11 @@ export const RegisterDocument = `
       message
     }
     user {
-      id
-      username
-      email
-      createdAt
+      ...UserItem
     }
   }
 }
-    `;
+    ${UserItemFragmentDoc}`;
 export const useRegisterMutation = <
       TError = unknown,
       TContext = unknown
@@ -273,18 +280,10 @@ export const useRegisterMutation = <
 export const MeDocument = `
     query Me {
   me {
-    id
-    username
-    email
-    createdRooms {
-      id
-    }
-    rooms {
-      id
-    }
+    ...UserItem
   }
 }
-    `;
+    ${UserItemFragmentDoc}`;
 export const useMeQuery = <
       TData = MeQuery,
       TError = unknown
@@ -375,9 +374,7 @@ export const useRoomsQuery = <
 export const UsersWithRelationsDocument = `
     query UsersWithRelations($options: UserRelationsInput!) {
   usersWithRelations(options: $options) {
-    id
-    username
-    email
+    ...UserItem
     createdRooms {
       id
     }
@@ -386,7 +383,7 @@ export const UsersWithRelationsDocument = `
     }
   }
 }
-    `;
+    ${UserItemFragmentDoc}`;
 export const useUsersWithRelationsQuery = <
       TData = UsersWithRelationsQuery,
       TError = unknown

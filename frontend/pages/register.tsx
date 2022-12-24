@@ -2,6 +2,7 @@ import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { FC } from "react";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { useRegisterMutation } from "../generated/graphql";
 import { validateFormEmail } from "../utils/validateEmail";
 import { validateFormPassword } from "../utils/validatePassword";
 import { validateFormUsername } from "../utils/validateUsername";
@@ -18,6 +19,8 @@ const Register: FC<{}> = () => {
         password: "",
         username: "",
     };
+
+    const { mutate } = useRegisterMutation();
 
     return (
         <Layout>
@@ -52,11 +55,15 @@ const Register: FC<{}> = () => {
 
                         return errors;
                     }}
-                    onSubmit={(values, { setSubmitting }) => {
-                        setTimeout(() => {
-                            console.log(values);
-                            setSubmitting(false);
-                        }, 1000);
+                    onSubmit={async (values, { setSubmitting }) => {
+                        console.log(values);
+                        mutate({
+                            options: {
+                                email: values.email,
+                                username: values.username,
+                            },
+                        });
+                        setSubmitting(false);
                     }}
                 >
                     {({ isSubmitting }) => (

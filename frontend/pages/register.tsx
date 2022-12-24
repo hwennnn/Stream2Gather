@@ -20,7 +20,7 @@ const Register: FC<{}> = () => {
         username: "",
     };
 
-    const { mutate } = useRegisterMutation();
+    const { mutateAsync } = useRegisterMutation();
 
     return (
         <Layout>
@@ -57,7 +57,7 @@ const Register: FC<{}> = () => {
                     }}
                     onSubmit={async (values, { setSubmitting }) => {
                         console.log(values);
-                        mutate({
+                        await mutateAsync({
                             options: {
                                 email: values.email,
                                 username: values.username,

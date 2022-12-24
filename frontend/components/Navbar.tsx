@@ -4,13 +4,16 @@ import { useLogoutMutation, useMeQuery } from "../generated/graphql";
 const Navbar = () => {
     const { data, isLoading, isError } = useMeQuery();
 
-    const { mutate } = useLogoutMutation();
+    const { mutateAsync } = useLogoutMutation();
 
     const isLoggedIn =
         !isLoading && !isError && data?.me !== null && data?.me !== undefined;
 
     const logout = async () => {
-        mutate({});
+        let result = await mutateAsync({});
+        if (result.logout === true) {
+            window.location.reload();
+        }
     };
 
     return (

@@ -1,3 +1,7 @@
+import Redis from "ioredis";
+import { Server } from "socket.io";
+import { DefaultEventsMap } from "socket.io/dist/typed-events";
+import { REDIS_PUB_MESSAGE } from "../constants/socket";
 import {
     RES_MEMBER_LEFT,
     RES_MESSAGE,
@@ -5,10 +9,6 @@ import {
     RES_ROOM_INFO,
     RES_STREAMING_EVENTS,
 } from "./../constants/socket";
-import Redis from "ioredis";
-import { Server } from "socket.io";
-import { DefaultEventsMap } from "socket.io/dist/typed-events";
-import { REDIS_PUB_MESSAGE } from "../constants/socket";
 
 function addRedisSubscriber(
     subscriber_key: string,
@@ -20,7 +20,7 @@ function addRedisSubscriber(
     client.on(REDIS_PUB_MESSAGE, function (_channel, message) {
         message = JSON.parse(message);
         const { roomId, receiverSocketId } = message;
-        console.log(REDIS_PUB_MESSAGE, roomId ?? receiverSocketId, message);
+        // console.log(_channel, roomId ?? receiverSocketId, message);
         if (receiverSocketId !== undefined && receiverSocketId !== null) {
             io.to(receiverSocketId).emit(subscriber_key, message);
         } else if (roomId !== undefined && roomId !== null) {

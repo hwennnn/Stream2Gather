@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import {
     BsFullscreen,
     BsPause,
@@ -21,37 +21,42 @@ import {
     RES_STREAMING_EVENTS,
 } from "../constants/socket";
 import { getFormattedTime } from "../helpers/time-helper";
-import useWindowDimensions from "../hooks/useWindowDimensions";
+import useRoomStore from "../store/useRoomStore";
 
 const ReactPlayer = dynamic(() => import("../components/VideoPlayer"), {
     ssr: false,
 });
-const SERVER_URL: string = process.env.SERVER_URL as string;
-const socket = io(SERVER_URL);
 
 interface Props {
     id: string | string[] | undefined;
 }
 
-const Rooms: NextPage<Props> = ({ id }) => {
-    const [isPlayerReady, setIsPlayerReady] = useState(false);
-    const [videoTitle, setVideoTitle] = useState("");
-    const [videoAuthor, setVideoAuthor] = useState("");
-    const [playing, setPlaying] = useState(false);
-    const [isMuted, setIsMuted] = useState(false);
-    const [playingUrl, setPlayingUrl] = useState(
-        "https://youtu.be/Y8JFxS1HlDo"
-    );
-    const [playingSeconds, setPlayingSeconds] = useState(0);
-    const [duration, setDuration] = useState(0);
+const socket = io(`${process.env.SERVER_URL}`, {
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    reconnectionAttempts: Infinity,
+});
 
-    const { width, height } = useWindowDimensions();
+const Rooms: NextPage<Props> = ({ id }) => {
+    const playing = useRoomStore((state) => state.playing);
+    const isMuted = useRoomStore((state) => state.isMuted);
+    const playingUrl = useRoomStore((state) => state.playingUrl);
+    const playedSeconds = useRoomStore((state) => state.playedSeconds);
+    const duration = useRoomStore((state) => state.duration);
+
+    const setPlaying = useRoomStore((state) => state.setPlaying);
+    const setIsMuted = useRoomStore((state) => state.setIsMuted);
+    const setPlayingUrl = useRoomStore((state) => state.setPlayingUrl);
+    const setPlayedSeconds = useRoomStore((state) => state.setPlayedSeconds);
+    const setDuration = useRoomStore((state) => state.setDuration);
+
+    console.log(playing, isMuted, playingUrl, playedSeconds, duration);
 
     const playerRef = useRef<any>();
     const progressBarRef = useRef<any>();
 
     const onPlayerReady = () => {
-        setIsPlayerReady(true);
         // setPlaying(true);
         setIsMuted(true);
 
@@ -106,6 +111,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
         });
 
         socket.on(RES_STREAMING_EVENTS, (videoEvent) => {
+            console.log(RES_STREAMING_EVENTS, videoEvent);
             const { isPlaying, playedSeconds } = videoEvent;
             const currentTimestamp = Number.parseFloat(playedSeconds);
 
@@ -121,7 +127,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
         played: number;
         playedSeconds: number;
     }) => {
-        setPlayingSeconds(playedSeconds);
+        setPlayedSeconds(playedSeconds);
     };
 
     const updateDuration = (duration: number) => {
@@ -247,7 +253,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
                         </button>
 
                         <div className="mr-5 text-white">
-                            {getFormattedTime(playingSeconds)}
+                            {getFormattedTime(playedSeconds)}
                             {" / "}
                             {getFormattedTime(duration)}
                         </div>
@@ -261,7 +267,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
                                 className="h-3 bg-gray-400"
                                 style={{
                                     width:
-                                        (playingSeconds / duration) * 100 + "%",
+                                        (playedSeconds / duration) * 100 + "%",
                                 }}
                             ></div>
                         </div>

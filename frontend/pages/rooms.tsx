@@ -1,4 +1,3 @@
-import Head from "next/head";
 import { useRef } from "react";
 import {
     BsFullscreen,
@@ -12,6 +11,7 @@ import { NextPage } from "next";
 import dynamic from "next/dynamic";
 import screenfull from "screenfull";
 import { io } from "socket.io-client";
+import Layout from "../components/Layout";
 import {
     REQ_JOIN_ROOM,
     REQ_STREAMING_EVENTS,
@@ -188,16 +188,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
     };
 
     return (
-        <div className="">
-            <Head>
-                <title>Rooms | Stream2Gether</title>
-                <meta
-                    name="description"
-                    content="A platform to watch videos in sync with your friends"
-                />
-                <link rel="icon" href="/favicon.ico" />
-            </Head>
-
+        <Layout>
             <div className="flex flex-col tablet:flex-row w-full">
                 <div className="w-full tablet:w-3/4">
                     <div className="relative pt-[56.25%]">
@@ -294,7 +285,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
 
                 <div className="w-full tablet:w-1/4 bg-gray-600">Section</div>
             </div>
-        </div>
+        </Layout>
     );
 };
 

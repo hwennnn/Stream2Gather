@@ -4,14 +4,20 @@ import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { validateFormEmail } from "../utils/validateEmail";
 import { validateFormPassword } from "../utils/validatePassword";
+import { validateFormUsername } from "../utils/validateUsername";
 
 interface RegisterFormValues {
     email: string;
     password: string;
+    username: string;
 }
 
 const Register: FC<{}> = () => {
-    const initialValues: RegisterFormValues = { email: "", password: "" };
+    const initialValues: RegisterFormValues = {
+        email: "",
+        password: "",
+        username: "",
+    };
 
     return (
         <Layout>
@@ -24,6 +30,13 @@ const Register: FC<{}> = () => {
                     initialValues={initialValues}
                     validate={(values) => {
                         let errors: FormikErrors<RegisterFormValues> = {};
+
+                        let usernameValidation = validateFormUsername(
+                            values.username
+                        );
+                        if (usernameValidation !== undefined) {
+                            errors.username = usernameValidation;
+                        }
 
                         let emailValidation = validateFormEmail(values.email);
                         if (emailValidation !== undefined) {
@@ -48,6 +61,26 @@ const Register: FC<{}> = () => {
                 >
                     {({ isSubmitting }) => (
                         <Form className="mt-10">
+                            <div className="mb-6">
+                                <label
+                                    htmlFor="email"
+                                    className="block mb-2 title-small text-gray-900 dark:text-white"
+                                >
+                                    Your username
+                                </label>
+                                <Field
+                                    className="bg-gray-50 border border-gray-300 text-gray-900 title-smaller rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                    type="username"
+                                    name="username"
+                                    placeholder="Saul Goodman"
+                                />
+                                <ErrorMessage
+                                    name="username"
+                                    component="div"
+                                    className="mt-1 text-red-500 title-smaller"
+                                />
+                            </div>
+
                             <div className="mb-6">
                                 <label
                                     htmlFor="email"

@@ -1,6 +1,14 @@
+import {
+    RES_MEMBER_LEFT,
+    RES_MESSAGE,
+    RES_NEW_MEMBER,
+    RES_ROOM_INFO,
+    RES_STREAMING_EVENTS,
+} from "./../constants/socket";
 import Redis from "ioredis";
 import { Server } from "socket.io";
 import { DefaultEventsMap } from "socket.io/dist/typed-events";
+import { REDIS_PUB_MESSAGE } from "../constants/socket";
 
 function addRedisSubscriber(
     subscriber_key: string,
@@ -9,13 +17,14 @@ function addRedisSubscriber(
     var client = new Redis(process.env.REDIS_ADDRESS as string);
 
     client.subscribe(subscriber_key);
-    client.on("message", function (_channel, message) {
+    client.on(REDIS_PUB_MESSAGE, function (_channel, message) {
         message = JSON.parse(message);
-        const { roomID, receiverSocketID } = message;
-        if (receiverSocketID !== undefined && receiverSocketID !== null) {
-            io.to(receiverSocketID).emit(subscriber_key, message);
-        } else if (roomID !== undefined && roomID !== null) {
-            io.to(roomID).emit(subscriber_key, message);
+        const { roomId, receiverSocketId } = message;
+        console.log(REDIS_PUB_MESSAGE, roomId ?? receiverSocketId, message);
+        if (receiverSocketId !== undefined && receiverSocketId !== null) {
+            io.to(receiverSocketId).emit(subscriber_key, message);
+        } else if (roomId !== undefined && roomId !== null) {
+            io.to(roomId).emit(subscriber_key, message);
         }
     });
 
@@ -27,11 +36,11 @@ export default function initRedisSubscribers(
 ) {
     var redisSubscribers = new Map<String, Redis>();
     const channels = [
-        "messages",
-        "member_add",
-        "member_left",
-        "room_info",
-        "video_events",
+        RES_MESSAGE,
+        RES_NEW_MEMBER,
+        RES_MEMBER_LEFT,
+        RES_ROOM_INFO,
+        RES_STREAMING_EVENTS,
     ];
 
     for (const channel of channels) {

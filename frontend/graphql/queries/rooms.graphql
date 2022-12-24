@@ -1,0 +1,19 @@
+query Rooms {
+  rooms {
+    id
+    isPublic
+    roomInfo {
+      playedSeconds
+      isPlaying
+      playedTimestampUpdatedAt
+      currentUrl
+    }
+    createdAt
+    creator {
+      id
+    }
+    activeMembers {
+      socketId
+    }
+  }
+}

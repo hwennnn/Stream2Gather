@@ -1,0 +1,28 @@
+query Room($id: String!) {
+  room(id: $id) {
+    id
+    isPublic
+    roomInfo {
+      playedSeconds
+      isPlaying
+      playedTimestampUpdatedAt
+      currentUrl
+      playingIndex
+      playlist {
+        id
+        url
+        title
+        author
+        platform
+        thumbnailUrl
+      }
+    }
+    createdAt
+    creator {
+      id
+    }
+    activeMembers {
+      socketId
+    }
+  }
+}

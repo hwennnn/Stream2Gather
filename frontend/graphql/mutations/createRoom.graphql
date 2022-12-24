@@ -1,0 +1,17 @@
+mutation CreateRoom {
+  createRoom {
+    errors {
+      field
+      message
+    }
+    room {
+      id
+      isPublic
+      createdAt
+      creator {
+        id
+      }
+    }
+  }
+}
+  

@@ -13,7 +13,7 @@ import router from "./routes/routes";
 import sessionOptions from "./session/session";
 import setUpIo from "./socket";
 
-const corsOptions: CorsOptions = {
+export const corsOptions: CorsOptions = {
     origin: process.env.CORS_ORIGIN,
     credentials: true,
 };

@@ -18,6 +18,7 @@ const config: CodegenConfig = {
                         headers: {
                             "Content-Type": "application/json",
                         },
+                        credentials: "include",
                     },
                 },
             },

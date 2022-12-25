@@ -1,15 +1,18 @@
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+} from "firebase/auth";
 import { auth } from "./firebase";
 
-interface CreateWithEmailPasswordArgs {
+interface EmailPasswordArgs {
     email: string;
     password: string;
 }
 
-const createWithEmailPassword = async ({
+export const createWithEmailPassword = async ({
     email,
     password,
-}: CreateWithEmailPasswordArgs): Promise<string> => {
+}: EmailPasswordArgs): Promise<string> => {
     try {
         const result = await createUserWithEmailAndPassword(
             auth,
@@ -28,4 +31,25 @@ const createWithEmailPassword = async ({
     }
 };
 
-export default createWithEmailPassword;
+export const loginWithEmailPassword = async ({
+    email,
+    password,
+}: EmailPasswordArgs): Promise<string> => {
+    try {
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        const userToken = await result.user.getIdToken();
+
+        return userToken;
+    } catch (error: any) {
+        console.log(error);
+        if (error.code === "auth/user-not-found") {
+            throw Error("User not found");
+        } else if (error.code === "auth/wrong-password") {
+            throw Error("Wrong password");
+        } else if (error.code === "auth/user-disabled") {
+            throw Error("User disabled");
+        }
+
+        throw Error("Something went wrong");
+    }
+};

@@ -27,6 +27,12 @@ class RegisterInput {
 }
 
 @InputType()
+class LoginInput {
+    @Field()
+    token: string;
+}
+
+@InputType()
 class UserRelationsInput {
     @Field()
     rooms: boolean = false;
@@ -93,6 +99,47 @@ export class UserResolver {
     ): Promise<User[]> {
         console.log(formatRelations(options));
         return User.find({ relations: formatRelations(options) });
+    }
+
+    @Mutation(() => UserResponse)
+    async login(
+        @Arg("options") options: LoginInput,
+        @Ctx() { req }: MyContext
+    ): Promise<UserResponse> {
+        let user;
+
+        try {
+            const uid = await verifyFirebaseToken(options.token);
+            user = await User.findOne({
+                where: { id: uid },
+            });
+        } catch (err: any) {
+            return {
+                errors: [
+                    {
+                        field: "unknown",
+                        message: "invalid token",
+                    },
+                ],
+            };
+        }
+
+        if (user === null) {
+            return {
+                errors: [
+                    {
+                        field: "unknown",
+                        message: "could not find the user",
+                    },
+                ],
+            };
+        }
+
+        // store user id session
+        // this will set a cookie on the user
+        // keep them logged in
+        req.session.userId = user?.id;
+        return { user };
     }
 
     @Mutation(() => UserResponse)

@@ -2,52 +2,42 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
 import { FC, useState } from "react";
-import { createWithEmailPassword } from "../auth/firebaseAuth";
+import { loginWithEmailPassword } from "../auth/firebaseAuth";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
-import { useRegisterMutation } from "../generated/graphql";
+import { useLoginMutation } from "../generated/graphql";
 import { validateFormEmail } from "../utils/validateEmail";
 import { validateFormPassword } from "../utils/validatePassword";
-import { validateFormUsername } from "../utils/validateUsername";
 
-interface RegisterFormValues {
+interface LoginFormValues {
     email: string;
     password: string;
-    username: string;
 }
 
-const Register: FC<{}> = () => {
+const Login: FC<{}> = () => {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const router = useRouter();
 
-    const initialValues: RegisterFormValues = {
+    const initialValues: LoginFormValues = {
         email: "",
         password: "",
-        username: "",
     };
 
-    const { mutateAsync } = useRegisterMutation({});
+    const { mutateAsync } = useLoginMutation({});
 
     return (
-        <Layout title="Register">
+        <Layout title="Login">
             <div className="max-w-lg mx-auto">
                 <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
-                    Register an Account
+                    Login
                 </h1>
 
                 <Formik
                     initialValues={initialValues}
                     validate={(values) => {
-                        let errors: FormikErrors<RegisterFormValues> = {};
-
-                        let usernameValidation = validateFormUsername(
-                            values.username
-                        );
-                        if (usernameValidation !== undefined) {
-                            errors.username = usernameValidation;
-                        }
+                        let errors: FormikErrors<LoginFormValues> = {};
 
                         let emailValidation = validateFormEmail(values.email);
                         if (emailValidation !== undefined) {
@@ -56,6 +46,7 @@ const Register: FC<{}> = () => {
 
                         let passwordValidation = validateFormPassword({
                             password: values.password,
+                            validateComplexity: false,
                         });
                         if (passwordValidation !== undefined) {
                             errors.password = passwordValidation;
@@ -66,10 +57,10 @@ const Register: FC<{}> = () => {
                     onSubmit={async (values, { setSubmitting }) => {
                         setErrorMessage(null);
 
-                        const { email, username, password } = values;
+                        const { email, password } = values;
 
                         try {
-                            let token = await createWithEmailPassword({
+                            let token = await loginWithEmailPassword({
                                 email,
                                 password,
                             });
@@ -77,8 +68,6 @@ const Register: FC<{}> = () => {
                             await mutateAsync({
                                 options: {
                                     token,
-                                    email,
-                                    username,
                                 },
                             });
 
@@ -96,26 +85,6 @@ const Register: FC<{}> = () => {
                 >
                     {({ isSubmitting }) => (
                         <Form className="mt-10">
-                            <div className="mb-6">
-                                <label
-                                    htmlFor="email"
-                                    className="block mb-2 title-small text-gray-900 dark:text-white"
-                                >
-                                    Your username
-                                </label>
-                                <Field
-                                    className="bg-gray-50 border border-gray-300 text-gray-900 title-smaller rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                                    type="username"
-                                    name="username"
-                                    placeholder="Saul Goodman"
-                                />
-                                <ErrorMessage
-                                    name="username"
-                                    component="div"
-                                    className="mt-1 text-red-500 title-smaller"
-                                />
-                            </div>
-
                             <div className="mb-6">
                                 <label
                                     htmlFor="email"
@@ -178,4 +147,4 @@ const Register: FC<{}> = () => {
     );
 };
 
-export default Register;
+export default Login;

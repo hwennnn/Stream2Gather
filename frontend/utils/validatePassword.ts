@@ -6,10 +6,18 @@ export const validatePassword = (password: string): boolean => {
     return passwordReg.test(password) === true;
 };
 
-export const validateFormPassword = (password: string): string | undefined => {
+interface ValidateFormPasswordArgs {
+    password: string;
+    validateComplexity?: boolean;
+}
+
+export const validateFormPassword = ({
+    password,
+    validateComplexity = true,
+}: ValidateFormPasswordArgs): string | undefined => {
     if (password === "") {
         return "Required";
-    } else if (!validatePassword(password)) {
+    } else if (validateComplexity && !validatePassword(password)) {
         return "Invalid password. Must be at least 12 characters long, with at least a symbol, upper and lower case letters and a number";
     } else {
         return undefined;

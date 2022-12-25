@@ -39,10 +39,15 @@ export type FieldError = {
   message: Scalars['String'];
 };
 
+export type LoginInput = {
+  token: Scalars['String'];
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
   createRoom: RoomResponse;
   deleteRoom: Scalars['Boolean'];
+  login: UserResponse;
   logout: Scalars['Boolean'];
   register: UserResponse;
 };
@@ -50,6 +55,11 @@ export type Mutation = {
 
 export type MutationDeleteRoomArgs = {
   id: Scalars['String'];
+};
+
+
+export type MutationLoginArgs = {
+  options: LoginInput;
 };
 
 
@@ -165,6 +175,13 @@ export type CreateRoomMutationVariables = Exact<{ [key: string]: never; }>;
 
 export type CreateRoomMutation = { __typename?: 'Mutation', createRoom: { __typename?: 'RoomResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, room?: { __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, creator: { __typename?: 'User', id: string } } | null } };
 
+export type LoginMutationVariables = Exact<{
+  options: LoginInput;
+}>;
+
+
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string } | null } };
+
 export type LogoutMutationVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -240,6 +257,28 @@ export const useCreateRoomMutation = <
     useMutation<CreateRoomMutation, TError, CreateRoomMutationVariables, TContext>(
       ['CreateRoom'],
       (variables?: CreateRoomMutationVariables) => fetcher<CreateRoomMutation, CreateRoomMutationVariables>(CreateRoomDocument, variables)(),
+      options
+    );
+export const LoginDocument = `
+    mutation Login($options: LoginInput!) {
+  login(options: $options) {
+    errors {
+      ...RegularError
+    }
+    user {
+      ...UserItem
+    }
+  }
+}
+    ${RegularErrorFragmentDoc}
+${UserItemFragmentDoc}`;
+export const useLoginMutation = <
+      TError = unknown,
+      TContext = unknown
+    >(options?: UseMutationOptions<LoginMutation, TError, LoginMutationVariables, TContext>) =>
+    useMutation<LoginMutation, TError, LoginMutationVariables, TContext>(
+      ['Login'],
+      (variables?: LoginMutationVariables) => fetcher<LoginMutation, LoginMutationVariables>(LoginDocument, variables)(),
       options
     );
 export const LogoutDocument = `

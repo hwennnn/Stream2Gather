@@ -1,10 +1,12 @@
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { FC } from "react";
 import { MeQueryKey } from "../constants/query";
 import { useLogoutMutation, useMeQuery } from "../generated/graphql";
 
 const Navbar: FC = () => {
+    const router = useRouter();
     const queryClient = useQueryClient();
 
     const { data, isFetching, isError } = useMeQuery(
@@ -23,6 +25,7 @@ const Navbar: FC = () => {
         let result = await mutateAsync({});
         if (result.logout === true) {
             queryClient.invalidateQueries({ queryKey: MeQueryKey });
+            router.push("/");
         }
     };
 
@@ -37,7 +40,7 @@ const Navbar: FC = () => {
 
                 {isLoggedIn && (
                     <div className="flex flex-row space-x-6 items-center">
-                        <div className="title-smaller font-semibold text-black dark:text-white">
+                        <div className="title-smaller font-semibold text-secondary dark:text-secondary-dark">
                             {data?.me?.username}
                         </div>
 

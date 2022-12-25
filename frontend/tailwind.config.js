@@ -19,6 +19,7 @@ module.exports = {
         'secondary': '#4A72D5',
         'secondary-dark': '#82aaff',
         'tertiary': '#929ac9',
+        "github-black": "#323332",
       },
       fontFamily: {
         'mont': "Montserrat",

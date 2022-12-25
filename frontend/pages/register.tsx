@@ -3,6 +3,8 @@ import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
 import { FC, useState } from "react";
 import { createWithEmailPassword } from "../auth/firebaseAuth";
+import GithubSocialButton from "../components/GithubSocialButton";
+import GoogleSocialButton from "../components/GoogleSocialButton";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
@@ -32,7 +34,7 @@ const Register: FC<{}> = () => {
 
     return (
         <Layout title="Register">
-            <div className="max-w-lg mx-auto">
+            <div className="max-w-xl mx-auto p-6">
                 <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
                     Register an Account
                 </h1>
@@ -157,19 +159,39 @@ const Register: FC<{}> = () => {
 
                             <button
                                 type="submit"
-                                className={"btn-blue mx-auto"}
+                                className="btn-blue mx-auto w-full"
                                 disabled={isSubmitting}
                             >
                                 {isSubmitting ? <LoadingSpinner /> : "Submit"}
                             </button>
 
                             {errorMessage && (
-                                <>
-                                    <div className="mt-1 text-red-500 title-smaller">
-                                        {errorMessage}
-                                    </div>
-                                </>
+                                <div className="mt-1 text-red-500 title-smaller">
+                                    {errorMessage}
+                                </div>
                             )}
+
+                            <div className="flex flex-row h-2 mt-6 items-center">
+                                <div className="flex-[4] h-[1px] bg-white"></div>
+                                <div className="flex-1 text-center font-semibold text-white">
+                                    Or
+                                </div>
+                                <div className="flex-[4] h-[1px] bg-white"></div>
+                            </div>
+
+                            <div className="flex flex-col space-y-4 mt-6">
+                                <GoogleSocialButton
+                                    onClick={() => {
+                                        console.log("clicked");
+                                    }}
+                                />
+
+                                <GithubSocialButton
+                                    onClick={() => {
+                                        console.log("clicked");
+                                    }}
+                                />
+                            </div>
                         </Form>
                     )}
                 </Formik>

@@ -3,6 +3,8 @@ import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
 import { FC, useState } from "react";
 import { loginWithEmailPassword } from "../auth/firebaseAuth";
+import GithubSocialButton from "../components/GithubSocialButton";
+import GoogleSocialButton from "../components/GoogleSocialButton";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
@@ -29,7 +31,7 @@ const Login: FC<{}> = () => {
 
     return (
         <Layout title="Login">
-            <div className="max-w-lg mx-auto">
+            <div className="max-w-xl mx-auto p-6">
                 <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
                     Login
                 </h1>
@@ -126,7 +128,7 @@ const Login: FC<{}> = () => {
 
                             <button
                                 type="submit"
-                                className={"btn-blue mx-auto"}
+                                className="btn-blue mx-auto w-full"
                                 disabled={isSubmitting}
                             >
                                 {isSubmitting ? <LoadingSpinner /> : "Submit"}
@@ -139,6 +141,30 @@ const Login: FC<{}> = () => {
                                     </div>
                                 </>
                             )}
+
+                            <div className="flex flex-row h-2 mt-6 items-center">
+                                <div className="flex-[4] h-[1px] bg-white"></div>
+                                <div className="flex-1 text-center font-semibold text-white">
+                                    Or
+                                </div>
+                                <div className="flex-[4] h-[1px] bg-white"></div>
+                            </div>
+
+                            <div className="flex flex-col space-y-4 mt-6">
+                                <GoogleSocialButton
+                                    title="Sign in with Google"
+                                    onClick={() => {
+                                        console.log("clicked");
+                                    }}
+                                />
+
+                                <GithubSocialButton
+                                    title="Sign in with Github"
+                                    onClick={() => {
+                                        console.log("clicked");
+                                    }}
+                                />
+                            </div>
                         </Form>
                     )}
                 </Formik>

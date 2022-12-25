@@ -16,7 +16,9 @@ const Layout: React.FC<PropsWithChildren<LayoutProps>> = ({
     return (
         <div className="mx-auto w-full">
             <Head>
-                <title>{title ?? "Stream2Gather"}</title>
+                <title>
+                    {title ? `${title} - Stream2Gather` : "Stream2Gather"}
+                </title>
                 <meta
                     name="description"
                     content={

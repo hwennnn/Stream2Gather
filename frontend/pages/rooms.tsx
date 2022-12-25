@@ -188,7 +188,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
     };
 
     return (
-        <Layout>
+        <Layout title="Room">
             <div className="flex flex-col tablet:flex-row w-full">
                 <div className="w-full tablet:w-3/4">
                     <div className="relative pt-[56.25%]">

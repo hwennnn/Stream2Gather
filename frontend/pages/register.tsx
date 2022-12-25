@@ -29,7 +29,7 @@ const Register: FC<{}> = () => {
     const { mutateAsync } = useRegisterMutation();
 
     return (
-        <Layout>
+        <Layout title="Register">
             <div className="max-w-lg mx-auto">
                 <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
                     Register an Account

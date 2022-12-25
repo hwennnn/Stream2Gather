@@ -296,6 +296,10 @@ export const useMeQuery = <
       fetcher<MeQuery, MeQueryVariables>(MeDocument, variables),
       options
     );
+
+useMeQuery.getKey = (variables?: MeQueryVariables) => variables === undefined ? ['Me'] : ['Me', variables];
+;
+
 export const RoomDocument = `
     query Room($id: String!) {
   room(id: $id) {
@@ -338,6 +342,10 @@ export const useRoomQuery = <
       fetcher<RoomQuery, RoomQueryVariables>(RoomDocument, variables),
       options
     );
+
+useRoomQuery.getKey = (variables: RoomQueryVariables) => ['Room', variables];
+;
+
 export const RoomsDocument = `
     query Rooms {
   rooms {
@@ -371,6 +379,10 @@ export const useRoomsQuery = <
       fetcher<RoomsQuery, RoomsQueryVariables>(RoomsDocument, variables),
       options
     );
+
+useRoomsQuery.getKey = (variables?: RoomsQueryVariables) => variables === undefined ? ['Rooms'] : ['Rooms', variables];
+;
+
 export const UsersWithRelationsDocument = `
     query UsersWithRelations($options: UserRelationsInput!) {
   usersWithRelations(options: $options) {
@@ -396,3 +408,6 @@ export const useUsersWithRelationsQuery = <
       fetcher<UsersWithRelationsQuery, UsersWithRelationsQueryVariables>(UsersWithRelationsDocument, variables),
       options
     );
+
+useUsersWithRelationsQuery.getKey = (variables: UsersWithRelationsQueryVariables) => ['UsersWithRelations', variables];
+;

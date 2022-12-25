@@ -1,7 +1,10 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
+import { useRouter } from "next/router";
 import { FC } from "react";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
+import { MeQueryKey } from "../constants/query";
 import { useRegisterMutation } from "../generated/graphql";
 import { validateFormEmail } from "../utils/validateEmail";
 import { validateFormPassword } from "../utils/validatePassword";
@@ -14,6 +17,9 @@ interface RegisterFormValues {
 }
 
 const Register: FC<{}> = () => {
+    const queryClient = useQueryClient();
+    const router = useRouter();
+
     const initialValues: RegisterFormValues = {
         email: "",
         password: "",
@@ -57,13 +63,17 @@ const Register: FC<{}> = () => {
                     }}
                     onSubmit={async (values, { setSubmitting }) => {
                         console.log(values);
-                        await mutateAsync({
+                        const result = await mutateAsync({
                             options: {
                                 email: values.email,
                                 username: values.username,
                             },
                         });
                         setSubmitting(false);
+                        console.log(result.register);
+
+                        queryClient.invalidateQueries({ queryKey: MeQueryKey });
+                        router.push("/");
                     }}
                 >
                     {({ isSubmitting }) => (

@@ -21,6 +21,7 @@ const config: CodegenConfig = {
                         credentials: "include",
                     },
                 },
+                exposeQueryKeys: true,
             },
         },
     },

@@ -1,18 +1,28 @@
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { FC } from "react";
+import { MeQueryKey } from "../constants/query";
 import { useLogoutMutation, useMeQuery } from "../generated/graphql";
 
-const Navbar = () => {
-    const { data, isLoading, isError } = useMeQuery();
+const Navbar: FC = () => {
+    const queryClient = useQueryClient();
 
-    const { mutateAsync } = useLogoutMutation();
+    const { data, isFetching, isError } = useMeQuery(
+        {},
+        {
+            cacheTime: Infinity,
+            staleTime: Infinity,
+        }
+    );
 
-    const isLoggedIn =
-        !isLoading && !isError && data?.me !== null && data?.me !== undefined;
+    const { mutateAsync } = useLogoutMutation({});
+
+    const isLoggedIn = !isError && data?.me !== null && data?.me !== undefined;
 
     const logout = async () => {
         let result = await mutateAsync({});
         if (result.logout === true) {
-            window.location.reload();
+            queryClient.invalidateQueries({ queryKey: MeQueryKey });
         }
     };
 
@@ -25,7 +35,7 @@ const Navbar = () => {
                     </div>
                 </Link>
 
-                {isLoggedIn === true && (
+                {isLoggedIn && (
                     <div className="flex flex-row space-x-6 items-center">
                         <div className="title-smaller font-semibold text-black dark:text-white">
                             {data?.me?.username}
@@ -37,7 +47,7 @@ const Navbar = () => {
                     </div>
                 )}
 
-                {isLoggedIn === false && (
+                {!isFetching && !isLoggedIn && (
                     <div className="flex flex-row space-x-6 items-center">
                         <Link href="/login">
                             <div className="btn-underline">Login</div>

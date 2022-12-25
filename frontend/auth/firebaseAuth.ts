@@ -9,7 +9,7 @@ interface EmailPasswordArgs {
     password: string;
 }
 
-export const createWithEmailPassword = async ({
+export const registerWithEmailPassword = async ({
     email,
     password,
 }: EmailPasswordArgs): Promise<string> => {

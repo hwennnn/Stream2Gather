@@ -2,7 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
 import { FC, useState } from "react";
-import { createWithEmailPassword } from "../auth/firebaseAuth";
+import { registerWithEmailPassword } from "../auth/firebaseAuth";
 import GithubSocialButton from "../components/GithubSocialButton";
 import GoogleSocialButton from "../components/GoogleSocialButton";
 import Layout from "../components/Layout";
@@ -71,7 +71,7 @@ const Register: FC<{}> = () => {
                         const { email, username, password } = values;
 
                         try {
-                            let token = await createWithEmailPassword({
+                            let token = await registerWithEmailPassword({
                                 email,
                                 password,
                             });

@@ -1,12 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import type { AppProps } from "next/app";
+import { __prod__ } from "../constants/config";
 import "../styles/globals.css";
 
 const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
-            refetchOnWindowFocus: false,
+            refetchOnWindowFocus: __prod__,
         },
     },
 });

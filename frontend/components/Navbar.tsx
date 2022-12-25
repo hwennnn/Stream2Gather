@@ -12,7 +12,6 @@ const Navbar: FC = () => {
     const { data, isFetching, isError } = useMeQuery(
         {},
         {
-            cacheTime: Infinity,
             staleTime: Infinity,
         }
     );

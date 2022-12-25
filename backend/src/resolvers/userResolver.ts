@@ -14,13 +14,16 @@ import {
     Root,
 } from "type-graphql";
 import { FieldError } from "./types";
+import { verifyFirebaseToken } from "../utils/verifyFirebaseToken";
 
 @InputType()
-class UsernameEmailInput {
+class RegisterInput {
     @Field()
     email: string;
     @Field()
     username: string;
+    @Field()
+    token: string;
 }
 
 @InputType()
@@ -94,13 +97,17 @@ export class UserResolver {
 
     @Mutation(() => UserResponse)
     async register(
-        @Arg("options") options: UsernameEmailInput,
+        @Arg("options") options: RegisterInput,
         @Ctx() { req }: MyContext
     ): Promise<UserResponse> {
         let user;
 
         try {
+            console.log(options);
+            const uid = await verifyFirebaseToken(options.token);
+            console.log("decoded uid", uid);
             user = await User.create({
+                id: uid,
                 username: options.username,
                 email: options.email,
             }).save();
@@ -116,6 +123,15 @@ export class UserResolver {
                     ],
                 };
             }
+
+            return {
+                errors: [
+                    {
+                        field: "unknown",
+                        message: "error creating user",
+                    },
+                ],
+            };
         }
 
         // store user id session

@@ -6,7 +6,7 @@ import {
     Entity,
     ManyToMany,
     OneToMany,
-    PrimaryGeneratedColumn,
+    PrimaryColumn,
     UpdateDateColumn,
 } from "typeorm";
 import { Room } from "./Room";
@@ -15,7 +15,7 @@ import { Room } from "./Room";
 @Entity()
 export class User extends BaseEntity {
     @Field()
-    @PrimaryGeneratedColumn("uuid")
+    @PrimaryColumn()
     id!: string;
 
     @Field()

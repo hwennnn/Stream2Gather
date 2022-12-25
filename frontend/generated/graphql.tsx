@@ -54,7 +54,7 @@ export type MutationDeleteRoomArgs = {
 
 
 export type MutationRegisterArgs = {
-  options: UsernameEmailInput;
+  options: RegisterInput;
 };
 
 export type Query = {
@@ -80,6 +80,12 @@ export type QueryUserArgs = {
 
 export type QueryUsersWithRelationsArgs = {
   options: UserRelationsInput;
+};
+
+export type RegisterInput = {
+  email: Scalars['String'];
+  token: Scalars['String'];
+  username: Scalars['String'];
 };
 
 export type Room = {
@@ -140,11 +146,6 @@ export type UserResponse = {
   user?: Maybe<User>;
 };
 
-export type UsernameEmailInput = {
-  email: Scalars['String'];
-  username: Scalars['String'];
-};
-
 export type VideoInfo = {
   __typename?: 'VideoInfo';
   author: Scalars['String'];
@@ -170,7 +171,7 @@ export type LogoutMutationVariables = Exact<{ [key: string]: never; }>;
 export type LogoutMutation = { __typename?: 'Mutation', logout: boolean };
 
 export type RegisterMutationVariables = Exact<{
-  options: UsernameEmailInput;
+  options: RegisterInput;
 }>;
 
 
@@ -256,18 +257,18 @@ export const useLogoutMutation = <
       options
     );
 export const RegisterDocument = `
-    mutation Register($options: UsernameEmailInput!) {
+    mutation Register($options: RegisterInput!) {
   register(options: $options) {
     errors {
-      field
-      message
+      ...RegularError
     }
     user {
       ...UserItem
     }
   }
 }
-    ${UserItemFragmentDoc}`;
+    ${RegularErrorFragmentDoc}
+${UserItemFragmentDoc}`;
 export const useRegisterMutation = <
       TError = unknown,
       TContext = unknown

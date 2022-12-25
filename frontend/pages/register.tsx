@@ -1,7 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
-import { FC } from "react";
+import { FC, useState } from "react";
+import createWithEmailPassword from "../auth/firebaseAuth";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
@@ -17,6 +18,7 @@ interface RegisterFormValues {
 }
 
 const Register: FC<{}> = () => {
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const queryClient = useQueryClient();
     const router = useRouter();
 
@@ -26,7 +28,7 @@ const Register: FC<{}> = () => {
         username: "",
     };
 
-    const { mutateAsync } = useRegisterMutation();
+    const { mutateAsync } = useRegisterMutation({});
 
     return (
         <Layout title="Register">
@@ -62,18 +64,34 @@ const Register: FC<{}> = () => {
                         return errors;
                     }}
                     onSubmit={async (values, { setSubmitting }) => {
-                        console.log(values);
-                        const result = await mutateAsync({
-                            options: {
-                                email: values.email,
-                                username: values.username,
-                            },
-                        });
-                        setSubmitting(false);
-                        console.log(result.register);
+                        setErrorMessage(null);
 
-                        queryClient.invalidateQueries({ queryKey: MeQueryKey });
-                        router.push("/");
+                        const { email, username, password } = values;
+
+                        try {
+                            let token = await createWithEmailPassword({
+                                email,
+                                password,
+                            });
+
+                            await mutateAsync({
+                                options: {
+                                    token,
+                                    email,
+                                    username,
+                                },
+                            });
+
+                            setSubmitting(false);
+
+                            queryClient.invalidateQueries({
+                                queryKey: MeQueryKey,
+                            });
+
+                            router.push("/");
+                        } catch (error: any) {
+                            setErrorMessage(error.message);
+                        }
                     }}
                 >
                     {({ isSubmitting }) => (
@@ -137,10 +155,6 @@ const Register: FC<{}> = () => {
                                 />
                             </div>
 
-                            {/* <button className="btn-blue">
-                                <LoadingSpinner />
-                            </button> */}
-
                             <button
                                 type="submit"
                                 className={"btn-blue mx-auto"}
@@ -148,6 +162,14 @@ const Register: FC<{}> = () => {
                             >
                                 {isSubmitting ? <LoadingSpinner /> : "Submit"}
                             </button>
+
+                            {errorMessage && (
+                                <>
+                                    <div className="mt-1 text-red-500 title-smaller">
+                                        {errorMessage}
+                                    </div>
+                                </>
+                            )}
                         </Form>
                     )}
                 </Formik>

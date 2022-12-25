@@ -10,6 +10,7 @@ declare global {
       PG_USER: string;
       PG_PASSWORD: string;
       PG_DB: string;
+      FIREBASE_PROJECT_ID: string;
     }
   }
 }

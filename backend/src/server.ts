@@ -8,12 +8,11 @@ import { Server as SocketServer } from "socket.io";
 import initApolloServer from "./apollo";
 import { __prod__ } from "./constants/config";
 import initializeDB from "./db/initializeDb";
-import { Room } from "./entities/Room";
-import { User } from "./entities/User";
 import errorRouter from "./routes/404";
 import router from "./routes/routes";
 import sessionOptions from "./session/session";
 import setUpIo from "./socket";
+import { initializeFirebase } from "./utils/initializeFirebase";
 
 export const corsOptions: CorsOptions = {
     origin: process.env.CORS_ORIGIN,
@@ -25,9 +24,9 @@ export class ApiServer {
     public io: SocketServer | null = null;
 
     async initialize(port = process.env.PORT) {
+        initializeFirebase();
+
         await initializeDB();
-        // Room.clear();
-        // User.clear();
 
         const app = express();
         const redis = new Redis(process.env.REDIS_ADDRESS as string);

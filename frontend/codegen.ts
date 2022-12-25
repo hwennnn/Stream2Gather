@@ -1,8 +1,9 @@
 import type { CodegenConfig } from "@graphql-codegen/cli";
+import "dotenv-safe/config";
 
 const config: CodegenConfig = {
     overwrite: true,
-    schema: "http://localhost:8080/graphql",
+    schema: process.env.APOLLO_SERVER_URL,
     documents: "graphql/**/*.graphql",
     generates: {
         "generated/graphql.tsx": {
@@ -13,7 +14,7 @@ const config: CodegenConfig = {
             ],
             config: {
                 fetcher: {
-                    endpoint: "http://localhost:8080/graphql",
+                    endpoint: process.env.APOLLO_SERVER_URL,
                     fetchParams: {
                         headers: {
                             "Content-Type": "application/json",

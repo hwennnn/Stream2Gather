@@ -1,12 +1,21 @@
 import {
     createUserWithEmailAndPassword,
+    GithubAuthProvider,
+    GoogleAuthProvider,
     signInWithEmailAndPassword,
+    signInWithPopup,
 } from "firebase/auth";
 import { auth } from "./firebase";
 
 interface EmailPasswordArgs {
     email: string;
     password: string;
+}
+
+interface FirebaseAuthResult {
+    userToken: string;
+    username: string | null;
+    email: string | null;
 }
 
 export const registerWithEmailPassword = async ({
@@ -50,6 +59,50 @@ export const loginWithEmailPassword = async ({
             throw Error("User disabled");
         }
 
+        throw Error("Something went wrong");
+    }
+};
+
+export const signInWithGoogle = async (): Promise<FirebaseAuthResult> => {
+    const provider = new GoogleAuthProvider();
+
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const userToken = await result.user.getIdToken();
+
+        return {
+            userToken,
+            username: user.displayName,
+            email: user.email,
+        };
+    } catch (error: any) {
+        throw Error(error.message);
+    }
+};
+
+export const signInWithGithub = async (): Promise<FirebaseAuthResult> => {
+    const provider = new GithubAuthProvider();
+
+    try {
+        const result = await signInWithPopup(auth, provider);
+        const user = result.user;
+        const userToken = await result.user.getIdToken();
+
+        return {
+            userToken,
+            username: user.displayName,
+            email: user.email,
+        };
+    } catch (error: any) {
+        throw Error(error.message);
+    }
+};
+
+export const firebaseLogout = async (): Promise<void> => {
+    try {
+        await auth.signOut();
+    } catch (error: any) {
         throw Error("Something went wrong");
     }
 };

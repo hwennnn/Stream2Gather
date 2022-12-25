@@ -12,10 +12,11 @@ import {
     ObjectType,
     FieldResolver,
     Root,
+    UseMiddleware,
 } from "type-graphql";
 import { FieldError } from "./types";
 import { verifyFirebaseToken } from "../utils/verifyFirebaseToken";
-
+import { isAuth } from "../middleware/isAuth";
 @InputType()
 class RegisterInput {
     @Field()
@@ -150,9 +151,7 @@ export class UserResolver {
         let user;
 
         try {
-            console.log(options);
             const uid = await verifyFirebaseToken(options.token);
-            console.log("decoded uid", uid);
             user = await User.create({
                 id: uid,
                 username: options.username,
@@ -189,6 +188,7 @@ export class UserResolver {
     }
 
     @Mutation(() => Boolean)
+    @UseMiddleware(isAuth)
     logout(@Ctx() { req, res }: MyContext) {
         return new Promise((resolve) =>
             req.session.destroy((err: any) => {
@@ -203,4 +203,16 @@ export class UserResolver {
             })
         );
     }
+
+    // @Mutation(() => Boolean)
+    // @UseMiddleware(isAuth)
+    // async verifyEmail(@Ctx() { req }: MyContext): Promise<boolean> {
+    //     const uid = req.session.userId;
+    //     await admin.auth().updateUser(uid!, { emailVerified: true });
+
+    //     return admin
+    //         .auth()
+    //         .getUser(uid!)
+    //         .then((user) => user.emailVerified);
+    // }
 }

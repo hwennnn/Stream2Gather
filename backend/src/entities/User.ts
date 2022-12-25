@@ -23,8 +23,8 @@ export class User extends BaseEntity {
     username!: string;
 
     @Field()
-    @Column({ unique: true })
-    email!: string;
+    @Column()
+    email: string;
 
     @Field(() => String)
     @CreateDateColumn()

@@ -2,7 +2,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
 import { FC, useState } from "react";
-import { registerWithEmailPassword } from "../auth/firebaseAuth";
+import {
+    registerWithEmailPassword,
+    signInWithGithub,
+    signInWithGoogle,
+} from "../auth/firebaseAuth";
 import GithubSocialButton from "../components/GithubSocialButton";
 import GoogleSocialButton from "../components/GoogleSocialButton";
 import Layout from "../components/Layout";
@@ -31,6 +35,21 @@ const Register: FC<{}> = () => {
     };
 
     const { mutateAsync } = useRegisterMutation({});
+
+    const registerWithGoogle = async () => {
+        const { userToken, username, email } = await signInWithGoogle();
+        console.log(userToken, username, email);
+    };
+
+    const registerWithGithub = async () => {
+        try {
+            setErrorMessage(null);
+            const { userToken, username, email } = await signInWithGithub();
+            console.log(userToken, username, email);
+        } catch (error: any) {
+            setErrorMessage(error.message);
+        }
+    };
 
     return (
         <Layout title="Register">
@@ -181,15 +200,11 @@ const Register: FC<{}> = () => {
 
                             <div className="flex flex-col space-y-4 mt-6">
                                 <GoogleSocialButton
-                                    onClick={() => {
-                                        console.log("clicked");
-                                    }}
+                                    onClick={() => registerWithGoogle()}
                                 />
 
                                 <GithubSocialButton
-                                    onClick={() => {
-                                        console.log("clicked");
-                                    }}
+                                    onClick={() => registerWithGithub()}
                                 />
                             </div>
                         </Form>

@@ -1,6 +1,6 @@
-import React from 'react';
+import { FC } from 'react';
 
-const LoadingSpinner: React.FC = () => {
+const LoadingSpinner: FC = () => {
   return (
     <div role="status">
       <svg

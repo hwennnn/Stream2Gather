@@ -1,12 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import React from 'react';
+import { FC } from 'react';
 import { firebaseLogout } from '../auth/firebaseAuth';
 import { MeQueryKey } from '../constants/query';
 import { useLogoutMutation, useMeQuery } from '../generated/graphql';
 
-const Navbar: React.FC = () => {
+const Navbar: FC = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 

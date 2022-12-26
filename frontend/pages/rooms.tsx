@@ -23,9 +23,12 @@ import {
 import { getFormattedTime } from '../helpers/time-helper';
 import useRoomStore from '../store/useRoomStore';
 
-const ReactPlayer = dynamic(() => import('../components/VideoPlayer'), {
-  ssr: false
-});
+const ReactPlayer = dynamic(
+  async () => await import('../components/VideoPlayer'),
+  {
+    ssr: false
+  }
+);
 
 interface Props {
   id: string | string[] | undefined;
@@ -38,7 +41,7 @@ const socket = io(`${process.env.SERVER_URL}`, {
   reconnectionAttempts: Infinity
 });
 
-const Rooms: NextPage<Props> = ({ id }) => {
+const Rooms: NextPage<Props> = ({ id }: Props) => {
   const playing = useRoomStore((state) => state.playing);
   const isMuted = useRoomStore((state) => state.isMuted);
   const playingUrl = useRoomStore((state) => state.playingUrl);
@@ -56,7 +59,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
   const playerRef = useRef<any>();
   const progressBarRef = useRef<any>();
 
-  const onPlayerReady = () => {
+  const onPlayerReady = (): void => {
     // setPlaying(true);
     setIsMuted(true);
 
@@ -116,24 +119,22 @@ const Rooms: NextPage<Props> = ({ id }) => {
   };
 
   const updateProgress = ({
-    played,
     playedSeconds
   }: {
-    played: number;
     playedSeconds: number;
-  }) => {
+  }): void => {
     setPlayedSeconds(playedSeconds);
   };
 
-  const updateDuration = (duration: number) => {
+  const updateDuration = (duration: number): void => {
     setDuration(duration);
   };
 
-  const play = () => {
+  const play = (): void => {
     setPlaying(true);
 
-    let isPlaying = true;
-    let timestamp = playerRef.current.getCurrentTime();
+    const isPlaying = true;
+    const timestamp = playerRef.current.getCurrentTime();
     const data = {
       roomId: id,
       isPlaying,
@@ -143,11 +144,11 @@ const Rooms: NextPage<Props> = ({ id }) => {
     socket.emit(REQ_STREAMING_EVENTS, data);
   };
 
-  const pause = () => {
+  const pause = (): void => {
     setPlaying(false);
 
-    let isPlaying = false;
-    let timestamp = playerRef.current.getCurrentTime();
+    const isPlaying = false;
+    const timestamp = playerRef.current.getCurrentTime();
     const data = {
       roomId: id,
       isPlaying,
@@ -157,7 +158,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
     socket.emit(REQ_STREAMING_EVENTS, data);
   };
 
-  const seek = (event: any) => {
+  const seek = (event: any): void => {
     const x = event.pageX - progressBarRef.current.getBoundingClientRect().left;
     const bw = progressBarRef.current.scrollWidth;
     const timestamp = (x / bw) * duration;
@@ -165,7 +166,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
     setPlaying(true);
     playerRef.current.seekTo(timestamp, 'seconds');
 
-    let isPlaying = true;
+    const isPlaying = true;
     const data = {
       roomId: id,
       isPlaying,
@@ -175,9 +176,9 @@ const Rooms: NextPage<Props> = ({ id }) => {
     socket.emit(REQ_STREAMING_EVENTS, data);
   };
 
-  const handleClickFullscreen = () => {
+  const handleClickFullscreen = async (): Promise<void> => {
     if (screenfull.isEnabled) {
-      screenfull.request(playerRef.current.wrapper);
+      await screenfull.request(playerRef.current.wrapper);
     }
   };
 
@@ -236,7 +237,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
               <div
                 className="h-3 bg-gray-400"
                 style={{
-                  width: (playedSeconds / duration) * 100 + '%'
+                  width: `${(playedSeconds / duration) * 100}'%'`
                 }}
               ></div>
             </div>
@@ -251,7 +252,7 @@ const Rooms: NextPage<Props> = ({ id }) => {
 
             <button
               className="ml-5 mr-2"
-              onClick={() => handleClickFullscreen()}
+              onClick={async () => await handleClickFullscreen()}
             >
               <BsFullscreen color={'white'} size={24} />
             </button>

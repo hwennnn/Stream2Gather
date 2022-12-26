@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import React, { PropsWithChildren } from 'react';
+import { FC, PropsWithChildren } from 'react';
 import Navbar from './Navbar';
 
 interface LayoutProps {
@@ -8,7 +8,7 @@ interface LayoutProps {
   children: React.ReactNode;
 }
 
-const Layout: React.FC<PropsWithChildren<LayoutProps>> = ({
+const Layout: FC<PropsWithChildren<LayoutProps>> = ({
   title,
   description,
   children

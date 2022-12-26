@@ -12,7 +12,7 @@ const queryClient = new QueryClient({
   }
 });
 
-export default function App({ Component, pageProps }: AppProps) {
+export default function App({ Component, pageProps }: AppProps): JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <Component {...pageProps} />;

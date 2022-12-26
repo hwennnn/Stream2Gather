@@ -1,38 +1,38 @@
 export const validatePassword = (password: string): boolean => {
-    // min 12 letter password, with at least a symbol,
-    // upper and lower case letters and a number
-    let passwordReg = /^(?=.*\d)(?=.*[!@#$%^&*])(?=.*[a-z])(?=.*[A-Z]).{12,}$/;
+  // min 12 letter password, with at least a symbol,
+  // upper and lower case letters and a number
+  const passwordReg = /^(?=.*\d)(?=.*[!@#$%^&*])(?=.*[a-z])(?=.*[A-Z]).{12,}$/;
 
-    return passwordReg.test(password) === true;
+  return passwordReg.test(password);
 };
 
 interface ValidateFormPasswordArgs {
-    password: string;
-    validateComplexity?: boolean;
+  password: string;
+  validateComplexity?: boolean;
 }
 
 export const validateFormPassword = ({
-    password,
-    validateComplexity = true,
+  password,
+  validateComplexity = true
 }: ValidateFormPasswordArgs): string | undefined => {
-    if (password === "") {
-        return "Required";
-    } else if (validateComplexity && !validatePassword(password)) {
-        return "Invalid password. Must be at least 12 characters long, with at least a symbol, upper and lower case letters and a number";
-    } else {
-        return undefined;
-    }
+  if (password === '') {
+    return 'Required';
+  } else if (validateComplexity && !validatePassword(password)) {
+    return 'Invalid password. Must be at least 12 characters long, with at least a symbol, upper and lower case letters and a number';
+  } else {
+    return undefined;
+  }
 };
 
 export const validateConfirmedPassword = (
-    password: string,
-    confirmedPassowrd: string
+  password: string,
+  confirmedPassowrd: string
 ): string | undefined => {
-    if (confirmedPassowrd === "") {
-        return "Required";
-    } else if (password !== confirmedPassowrd) {
-        return "Passwords do not match";
-    } else {
-        return undefined;
-    }
+  if (confirmedPassowrd === '') {
+    return 'Required';
+  } else if (password !== confirmedPassowrd) {
+    return 'Passwords do not match';
+  } else {
+    return undefined;
+  }
 };

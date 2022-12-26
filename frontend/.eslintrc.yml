@@ -4,6 +4,7 @@ env:
 extends:
   - plugin:react/recommended
   - standard-with-typescript
+  - plugin:react/jsx-runtime
 overrides: []
 parserOptions:
   project: ./tsconfig.json
@@ -19,4 +20,5 @@ rules: {
   '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
   "@typescript-eslint/space-before-function-paren": "off",
   "@typescript-eslint/indent": "off",
+  "multiline-ternary": "off",
 }

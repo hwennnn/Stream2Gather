@@ -1,0 +1,21 @@
+env:
+  browser: true
+  es2021: true
+extends:
+  - plugin:react/recommended
+  - standard-with-typescript
+overrides: []
+parserOptions:
+  project: ./tsconfig.json
+  ecmaVersion: latest
+  sourceType: module
+plugins:
+  - react
+rules: {
+  semi: "off",
+  "@typescript-eslint/semi": "off",
+  "@typescript-eslint/member-delimiter-style": "off",
+  "@typescript-eslint/type-annotation-spacing": "off",
+  '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+  "@typescript-eslint/space-before-function-paren": "off",
+}

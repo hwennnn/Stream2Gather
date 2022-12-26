@@ -1,39 +1,39 @@
-import Head from "next/head";
-import { PropsWithChildren } from "react";
-import Navbar from "./Navbar";
+import Head from 'next/head';
+import React, { PropsWithChildren } from 'react';
+import Navbar from './Navbar';
 
 interface LayoutProps {
-    title?: string;
-    description?: string;
-    children: React.ReactNode;
+  title?: string;
+  description?: string;
+  children: React.ReactNode;
 }
 
 const Layout: React.FC<PropsWithChildren<LayoutProps>> = ({
-    title,
-    description,
-    children,
+  title,
+  description,
+  children
 }) => {
-    return (
-        <div className="mx-auto w-full">
-            <Head>
-                <title>
-                    {title ? `${title} - Stream2Gather` : "Stream2Gather"}
-                </title>
-                <meta
-                    name="description"
-                    content={
-                        description ??
-                        "A platform to watch videos in sync with your friends"
-                    }
-                />
-                <link rel="icon" href="/favicon.ico" />
-            </Head>
+  return (
+    <div className="mx-auto w-full">
+      <Head>
+        <title>
+          {title !== undefined ? `${title} - Stream2Gather` : 'Stream2Gather'}
+        </title>
+        <meta
+          name="description"
+          content={
+            description ??
+            'A platform to watch videos in sync with your friends'
+          }
+        />
+        <link rel="icon" href="/favicon.ico" />
+      </Head>
 
-            <Navbar />
+      <Navbar />
 
-            {children}
-        </div>
-    );
+      {children}
+    </div>
+  );
 };
 
 export default Layout;

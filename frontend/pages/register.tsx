@@ -12,7 +12,10 @@ import GoogleSocialButton from "../components/GoogleSocialButton";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
-import { useRegisterMutation } from "../generated/graphql";
+import {
+    useRegisterMutation,
+    useSocialLoginMutation,
+} from "../generated/graphql";
 import { validateFormEmail } from "../utils/validateEmail";
 import {
     validateConfirmedPassword,
@@ -41,11 +44,27 @@ const Register: FC<{}> = () => {
 
     const { mutateAsync } = useRegisterMutation({});
 
+    const socialLogin = useSocialLoginMutation({});
+
     const registerWithGoogle = async () => {
         try {
             setErrorMessage(null);
             const { userToken, username, email } = await signInWithGoogle();
-            console.log(userToken, username, email);
+            console.log(username, email);
+
+            await socialLogin.mutateAsync({
+                options: {
+                    token: userToken,
+                    email,
+                    username,
+                },
+            });
+
+            queryClient.invalidateQueries({
+                queryKey: MeQueryKey,
+            });
+
+            router.push("/");
         } catch (error: any) {
             setErrorMessage(error.message);
         }
@@ -55,7 +74,22 @@ const Register: FC<{}> = () => {
         try {
             setErrorMessage(null);
             const { userToken, username, email } = await signInWithGithub();
-            console.log(userToken, username, email);
+
+            await socialLogin.mutateAsync({
+                options: {
+                    token: userToken,
+                    email,
+                    username,
+                },
+            });
+
+            console.log(username, email);
+
+            queryClient.invalidateQueries({
+                queryKey: MeQueryKey,
+            });
+
+            router.push("/");
         } catch (error: any) {
             setErrorMessage(error.message);
         }

@@ -2,13 +2,17 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from "formik";
 import { useRouter } from "next/router";
 import { FC, useState } from "react";
-import { loginWithEmailPassword } from "../auth/firebaseAuth";
+import {
+    loginWithEmailPassword,
+    signInWithGithub,
+    signInWithGoogle,
+} from "../auth/firebaseAuth";
 import GithubSocialButton from "../components/GithubSocialButton";
 import GoogleSocialButton from "../components/GoogleSocialButton";
 import Layout from "../components/Layout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
-import { useLoginMutation } from "../generated/graphql";
+import { useLoginMutation, useSocialLoginMutation } from "../generated/graphql";
 import { validateFormEmail } from "../utils/validateEmail";
 import { validateFormPassword } from "../utils/validatePassword";
 
@@ -28,6 +32,57 @@ const Login: FC<{}> = () => {
     };
 
     const { mutateAsync } = useLoginMutation({});
+
+    const socialLogin = useSocialLoginMutation({});
+
+    const loginWithGoogle = async () => {
+        try {
+            setErrorMessage(null);
+            const { userToken, username, email } = await signInWithGoogle();
+            console.log(username, email);
+
+            await socialLogin.mutateAsync({
+                options: {
+                    token: userToken,
+                    email,
+                    username,
+                },
+            });
+
+            queryClient.invalidateQueries({
+                queryKey: MeQueryKey,
+            });
+
+            router.push("/");
+        } catch (error: any) {
+            setErrorMessage(error.message);
+        }
+    };
+
+    const loginWithGithub = async () => {
+        try {
+            setErrorMessage(null);
+            const { userToken, username, email } = await signInWithGithub();
+
+            await socialLogin.mutateAsync({
+                options: {
+                    token: userToken,
+                    email,
+                    username,
+                },
+            });
+
+            console.log(username, email);
+
+            queryClient.invalidateQueries({
+                queryKey: MeQueryKey,
+            });
+
+            router.push("/");
+        } catch (error: any) {
+            setErrorMessage(error.message);
+        }
+    };
 
     return (
         <Layout title="Login">
@@ -154,16 +209,12 @@ const Login: FC<{}> = () => {
                             <div className="flex flex-col space-y-4 mt-6">
                                 <GoogleSocialButton
                                     title="Sign in with Google"
-                                    onClick={() => {
-                                        console.log("clicked");
-                                    }}
+                                    onClick={() => loginWithGoogle()}
                                 />
 
                                 <GithubSocialButton
                                     title="Sign in with Github"
-                                    onClick={() => {
-                                        console.log("clicked");
-                                    }}
+                                    onClick={() => loginWithGithub()}
                                 />
                             </div>
                         </Form>

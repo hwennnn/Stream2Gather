@@ -1,0 +1,10 @@
+mutation SocialLogin($options: RegisterInput!) {
+  socialLogin(options: $options) {
+    errors{
+      ...RegularError
+    }
+    user {
+      ...UserItem
+    }
+  }
+}

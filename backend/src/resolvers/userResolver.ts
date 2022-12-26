@@ -19,10 +19,10 @@ import { verifyFirebaseToken } from "../utils/verifyFirebaseToken";
 import { isAuth } from "../middleware/isAuth";
 @InputType()
 class RegisterInput {
-    @Field()
-    email: string;
-    @Field()
-    username: string;
+    @Field({ nullable: true })
+    email?: string;
+    @Field({ nullable: true })
+    username?: string;
     @Field()
     token: string;
 }
@@ -175,6 +175,53 @@ export class UserResolver {
                     {
                         field: "unknown",
                         message: "error creating user",
+                    },
+                ],
+            };
+        }
+
+        // store user id session
+        // this will set a cookie on the user
+        // keep them logged in
+        req.session.userId = user?.id;
+        return { user };
+    }
+
+    @Mutation(() => UserResponse)
+    async socialLogin(
+        @Arg("options") options: RegisterInput,
+        @Ctx() { req }: MyContext
+    ): Promise<UserResponse> {
+        let user;
+
+        try {
+            const uid = await verifyFirebaseToken(options.token);
+            user = await User.findOne({ where: { id: uid } });
+            if (user === null) {
+                user = await User.create({
+                    id: uid,
+                    username: options.username,
+                    email: options.email,
+                }).save();
+            }
+            console.log(user);
+        } catch (err) {
+            if (err.code === "23505") {
+                return {
+                    errors: [
+                        {
+                            field: "email",
+                            message: "email already taken",
+                        },
+                    ],
+                };
+            }
+
+            return {
+                errors: [
+                    {
+                        field: "unknown",
+                        message: "error during login",
                     },
                 ],
             };

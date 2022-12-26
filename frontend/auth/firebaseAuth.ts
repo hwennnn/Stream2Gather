@@ -82,9 +82,10 @@ export const signInWithGoogle = async (): Promise<FirebaseAuthResult> => {
             error.code === "auth/popup-closed-by-user"
         ) {
             // DO NOTHING
+            throw Error();
+        } else {
+            throw Error("Something went wrong");
         }
-
-        throw Error("Something went wrong");
     }
 };
 
@@ -107,9 +108,10 @@ export const signInWithGithub = async (): Promise<FirebaseAuthResult> => {
             error.code === "auth/popup-closed-by-user"
         ) {
             // DO NOTHING
+            throw Error();
+        } else {
+            throw Error("Something went wrong");
         }
-
-        throw Error("Something went wrong");
     }
 };
 

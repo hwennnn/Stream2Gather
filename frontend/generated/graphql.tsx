@@ -50,6 +50,7 @@ export type Mutation = {
   login: UserResponse;
   logout: Scalars['Boolean'];
   register: UserResponse;
+  socialLogin: UserResponse;
 };
 
 
@@ -64,6 +65,11 @@ export type MutationLoginArgs = {
 
 
 export type MutationRegisterArgs = {
+  options: RegisterInput;
+};
+
+
+export type MutationSocialLoginArgs = {
   options: RegisterInput;
 };
 
@@ -93,9 +99,9 @@ export type QueryUsersWithRelationsArgs = {
 };
 
 export type RegisterInput = {
-  email: Scalars['String'];
+  email?: InputMaybe<Scalars['String']>;
   token: Scalars['String'];
-  username: Scalars['String'];
+  username?: InputMaybe<Scalars['String']>;
 };
 
 export type Room = {
@@ -138,11 +144,11 @@ export type User = {
   __typename?: 'User';
   createdAt: Scalars['String'];
   createdRooms?: Maybe<Array<Room>>;
-  email: Scalars['String'];
+  email?: Maybe<Scalars['String']>;
   id: Scalars['String'];
   rooms?: Maybe<Array<Room>>;
   updatedAt: Scalars['String'];
-  username: Scalars['String'];
+  username?: Maybe<Scalars['String']>;
 };
 
 export type UserRelationsInput = {
@@ -168,7 +174,7 @@ export type VideoInfo = {
 
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
-export type UserItemFragment = { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string };
+export type UserItemFragment = { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string };
 
 export type CreateRoomMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -180,7 +186,7 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string } | null } };
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null } };
 
 export type LogoutMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -192,12 +198,19 @@ export type RegisterMutationVariables = Exact<{
 }>;
 
 
-export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string } | null } };
+export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null } };
+
+export type SocialLoginMutationVariables = Exact<{
+  options: RegisterInput;
+}>;
+
+
+export type SocialLoginMutation = { __typename?: 'Mutation', socialLogin: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null } };
 
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string } | null };
+export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null };
 
 export type RoomQueryVariables = Exact<{
   id: Scalars['String'];
@@ -216,7 +229,7 @@ export type UsersWithRelationsQueryVariables = Exact<{
 }>;
 
 
-export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username: string, email: string, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
+export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
 
 export const RegularErrorFragmentDoc = `
     fragment RegularError on FieldError {
@@ -315,6 +328,28 @@ export const useRegisterMutation = <
     useMutation<RegisterMutation, TError, RegisterMutationVariables, TContext>(
       ['Register'],
       (variables?: RegisterMutationVariables) => fetcher<RegisterMutation, RegisterMutationVariables>(RegisterDocument, variables)(),
+      options
+    );
+export const SocialLoginDocument = `
+    mutation SocialLogin($options: RegisterInput!) {
+  socialLogin(options: $options) {
+    errors {
+      ...RegularError
+    }
+    user {
+      ...UserItem
+    }
+  }
+}
+    ${RegularErrorFragmentDoc}
+${UserItemFragmentDoc}`;
+export const useSocialLoginMutation = <
+      TError = unknown,
+      TContext = unknown
+    >(options?: UseMutationOptions<SocialLoginMutation, TError, SocialLoginMutationVariables, TContext>) =>
+    useMutation<SocialLoginMutation, TError, SocialLoginMutationVariables, TContext>(
+      ['SocialLogin'],
+      (variables?: SocialLoginMutationVariables) => fetcher<SocialLoginMutation, SocialLoginMutationVariables>(SocialLoginDocument, variables)(),
       options
     );
 export const MeDocument = `

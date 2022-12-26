@@ -1,3 +1,3 @@
-import { useMeQuery } from "./../generated/graphql";
+import { useMeQuery } from './../generated/graphql';
 
 export const MeQueryKey = useMeQuery.getKey({});

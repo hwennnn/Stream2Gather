@@ -18,4 +18,5 @@ rules: {
   "@typescript-eslint/type-annotation-spacing": "off",
   '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
   "@typescript-eslint/space-before-function-paren": "off",
+  "@typescript-eslint/indent": "off",
 }

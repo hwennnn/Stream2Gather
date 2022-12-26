@@ -1,0 +1,10 @@
+# Ignore everything:
+/*
+
+# Except src folder:
+!/src
+
+# But ignore thse inside src folder:
+src/graphql
+src/generated
+src/styles

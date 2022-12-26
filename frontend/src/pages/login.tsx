@@ -85,7 +85,7 @@ const Login: NextPage = () => {
   };
 
   return (
-    <Layout title="Login">
+    <Layout title="Login" forLoggedInUser={false}>
       <div className="max-w-xl mx-auto p-6">
         <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
           Login

@@ -96,7 +96,7 @@ const Register: FC<{}> = () => {
   };
 
   return (
-    <Layout title="Register">
+    <Layout title="Register" forLoggedInUser={false}>
       <div className="max-w-xl mx-auto p-6">
         <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
           Register an Account

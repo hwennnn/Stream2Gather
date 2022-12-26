@@ -14,12 +14,16 @@ import LoadingSpinner from "../components/LoadingSpinner";
 import { MeQueryKey } from "../constants/query";
 import { useRegisterMutation } from "../generated/graphql";
 import { validateFormEmail } from "../utils/validateEmail";
-import { validateFormPassword } from "../utils/validatePassword";
+import {
+    validateConfirmedPassword,
+    validateFormPassword,
+} from "../utils/validatePassword";
 import { validateFormUsername } from "../utils/validateUsername";
 
 interface RegisterFormValues {
     email: string;
     password: string;
+    confirmedPassword: string;
     username: string;
 }
 
@@ -31,14 +35,20 @@ const Register: FC<{}> = () => {
     const initialValues: RegisterFormValues = {
         email: "",
         password: "",
+        confirmedPassword: "",
         username: "",
     };
 
     const { mutateAsync } = useRegisterMutation({});
 
     const registerWithGoogle = async () => {
-        const { userToken, username, email } = await signInWithGoogle();
-        console.log(userToken, username, email);
+        try {
+            setErrorMessage(null);
+            const { userToken, username, email } = await signInWithGoogle();
+            console.log(userToken, username, email);
+        } catch (error: any) {
+            setErrorMessage(error.message);
+        }
     };
 
     const registerWithGithub = async () => {
@@ -80,6 +90,16 @@ const Register: FC<{}> = () => {
                         });
                         if (passwordValidation !== undefined) {
                             errors.password = passwordValidation;
+                        }
+
+                        let confirmedPasswordValidation =
+                            validateConfirmedPassword(
+                                values.password,
+                                values.confirmedPassword
+                            );
+                        if (confirmedPasswordValidation !== undefined) {
+                            errors.confirmedPassword =
+                                confirmedPasswordValidation;
                         }
 
                         return errors;
@@ -172,6 +192,26 @@ const Register: FC<{}> = () => {
                                 />
                                 <ErrorMessage
                                     name="password"
+                                    component="div"
+                                    className="mt-1 text-red-500 title-smaller"
+                                />
+                            </div>
+
+                            <div className="mb-6">
+                                <label
+                                    htmlFor="confirmedPassword"
+                                    className="block mb-2 title-small text-gray-900 dark:text-white"
+                                >
+                                    Confirm your password
+                                </label>
+                                <Field
+                                    className="bg-gray-50 border border-gray-300 text-gray-900 title-smaller rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                                    type="password"
+                                    name="confirmedPassword"
+                                    placeholder="********"
+                                />
+                                <ErrorMessage
+                                    name="confirmedPassword"
                                     component="div"
                                     className="mt-1 text-red-500 title-smaller"
                                 />

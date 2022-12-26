@@ -23,3 +23,16 @@ export const validateFormPassword = ({
         return undefined;
     }
 };
+
+export const validateConfirmedPassword = (
+    password: string,
+    confirmedPassowrd: string
+): string | undefined => {
+    if (confirmedPassowrd === "") {
+        return "Required";
+    } else if (password !== confirmedPassowrd) {
+        return "Passwords do not match";
+    } else {
+        return undefined;
+    }
+};

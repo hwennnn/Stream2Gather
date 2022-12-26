@@ -77,7 +77,14 @@ export const signInWithGoogle = async (): Promise<FirebaseAuthResult> => {
             email: user.email,
         };
     } catch (error: any) {
-        throw Error(error.message);
+        if (
+            error.code === "auth/cancelled-popup-request" ||
+            error.code === "auth/popup-closed-by-user"
+        ) {
+            // DO NOTHING
+        }
+
+        throw Error("Something went wrong");
     }
 };
 
@@ -95,7 +102,14 @@ export const signInWithGithub = async (): Promise<FirebaseAuthResult> => {
             email: user.email,
         };
     } catch (error: any) {
-        throw Error(error.message);
+        if (
+            error.code === "auth/cancelled-popup-request" ||
+            error.code === "auth/popup-closed-by-user"
+        ) {
+            // DO NOTHING
+        }
+
+        throw Error("Something went wrong");
     }
 };
 

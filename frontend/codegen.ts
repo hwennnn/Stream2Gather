@@ -4,9 +4,9 @@ import 'dotenv-safe/config';
 const config: CodegenConfig = {
   overwrite: true,
   schema: process.env.APOLLO_SERVER_URL,
-  documents: 'graphql/**/*.graphql',
+  documents: 'src/graphql/**/*.graphql',
   generates: {
-    'generated/graphql.tsx': {
+    'src/generated/graphql.tsx': {
       plugins: [
         'typescript',
         'typescript-operations',

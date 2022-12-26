@@ -10,6 +10,8 @@ declare global {
       FIREBASE_MESSAGING_SENDER_ID: string;
       FIREBASE_APP_ID: string;
       FIREBASE_MEASUREMENT_ID: string;
+      DISABLE_NEW_JSX_TRANSFORM: string;
+      COOKIE_NAME: string;
     }
   }
 }

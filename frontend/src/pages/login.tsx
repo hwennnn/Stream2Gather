@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from 'formik';
+import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { FC, useState } from 'react';
+import { useState } from 'react';
 import {
   loginWithEmailPassword,
   signInWithGithub,
@@ -21,7 +22,7 @@ interface LoginFormValues {
   password: string;
 }
 
-const Login: FC<{}> = () => {
+const Login: NextPage = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();

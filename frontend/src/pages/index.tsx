@@ -1,7 +1,8 @@
+import { NextPage } from 'next';
 import Layout from '../components/Layout';
 import styles from '../styles/Home.module.css';
 
-export default function Home(): JSX.Element {
+const Home: NextPage = () => {
   return (
     <Layout>
       <main className={styles.main}>
@@ -46,4 +47,6 @@ export default function Home(): JSX.Element {
       </main>
     </Layout>
   );
-}
+};
+
+export default Home;

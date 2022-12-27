@@ -1,11 +1,11 @@
-import "reflect-metadata";
-import "dotenv-safe/config";
+import 'dotenv-safe/config';
+import 'reflect-metadata';
 
-import { ApiServer } from "./server";
+import { ApiServer } from './server';
 
 const apiServer = new ApiServer();
 apiServer.initialize().catch((err) => {
-    console.error(err);
+  console.error(err);
 });
 
 export default apiServer;

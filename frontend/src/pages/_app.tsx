@@ -4,7 +4,7 @@ import type { AppProps } from 'next/app';
 import { isProd } from '../constants/config';
 import '../styles/globals.css';
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: isProd

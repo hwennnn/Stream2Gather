@@ -60,7 +60,6 @@ export default class BaseAPI {
 
   protected async delete<T>(
     url: string,
-
     config?: AxiosRequestConfig
   ): Promise<any> {
     return await this.requestWrapper(

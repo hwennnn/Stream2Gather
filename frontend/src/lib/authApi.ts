@@ -1,6 +1,5 @@
+import { apiVersion } from '../constants/config';
 import BaseApi from './baseApi';
-
-const apiVersion: string = 'v1';
 
 class AuthApi extends BaseApi {
   async isAuth(cookies: any): Promise<boolean> {

@@ -4,22 +4,19 @@ import { useRouter } from 'next/router';
 import { FC } from 'react';
 import { firebaseLogout } from '../../auth/firebaseAuth';
 import { MeQueryKey } from '../../constants/query';
-import { useLogoutMutation, useMeQuery } from '../../generated/graphql';
+import { useAuth } from '../../contexts/AuthContext';
+
+import { useLogoutMutation } from '../../generated/graphql';
 
 const Navbar: FC = () => {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data, isFetching, isError } = useMeQuery(
-    {},
-    {
-      staleTime: Infinity
-    }
-  );
+  const { user } = useAuth();
 
   const { mutateAsync } = useLogoutMutation({});
 
-  const isLoggedIn = !isError && data?.me !== null && data?.me !== undefined;
+  const isLoggedIn = user !== undefined && user !== null;
 
   const logout = async (): Promise<void> => {
     const result = await mutateAsync({});
@@ -42,7 +39,7 @@ const Navbar: FC = () => {
         {isLoggedIn && (
           <div className="flex flex-row space-x-6 items-center">
             <div className="title-smaller font-semibold text-secondary dark:text-secondary-dark">
-              {data?.me?.username}
+              {user.username}
             </div>
 
             <div onClick={async () => await logout()} className="btn-underline">
@@ -51,7 +48,7 @@ const Navbar: FC = () => {
           </div>
         )}
 
-        {!isFetching && !isLoggedIn && (
+        {!isLoggedIn && (
           <div className="flex flex-row space-x-6 items-center">
             <Link href="/login">
               <div className="btn-underline">Login</div>

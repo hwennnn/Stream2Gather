@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from 'formik';
-import { GetServerSideProps, NextPage } from 'next';
+import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import {
@@ -8,7 +8,6 @@ import {
   signInWithGithub,
   signInWithGoogle
 } from '../auth/firebaseAuth';
-import { isAuthenticated } from '../auth/isAuth';
 import GithubSocialButton from '../components/common/buttons/GithubSocialButton';
 import GoogleSocialButton from '../components/common/buttons/GoogleSocialButton';
 import Layout from '../components/common/Layout';
@@ -220,24 +219,6 @@ const Login: NextPage = () => {
       </div>
     </Layout>
   );
-};
-
-export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const isAuth = await isAuthenticated(req.cookies);
-
-  // redirect to home page if user is already logged in
-  if (isAuth) {
-    return {
-      redirect: {
-        destination: '/',
-        permanent: false
-      }
-    };
-  }
-
-  return {
-    props: {}
-  };
 };
 
 export default Login;

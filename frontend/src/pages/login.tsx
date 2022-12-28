@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ErrorMessage, Field, Form, Formik, FormikErrors } from 'formik';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   loginWithEmailPassword,
   signInWithGithub,
@@ -13,6 +13,7 @@ import GoogleSocialButton from '../components/common/buttons/GoogleSocialButton'
 import Layout from '../components/common/Layout';
 import LoadingSpinner from '../components/common/loading/LoadingSpinner';
 import { MeQueryKey } from '../constants/query';
+import { useAuth } from '../contexts/AuthContext';
 import { useLoginMutation, useSocialLoginMutation } from '../generated/graphql';
 import { validateFormEmail } from '../utils/validateEmail';
 import { validateFormPassword } from '../utils/validatePassword';
@@ -23,6 +24,7 @@ interface LoginFormValues {
 }
 
 const Login: NextPage = () => {
+  const { user } = useAuth();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -35,6 +37,12 @@ const Login: NextPage = () => {
   const { mutateAsync } = useLoginMutation({});
 
   const socialLogin = useSocialLoginMutation({});
+
+  useEffect(() => {
+    if (user !== null && user !== undefined) {
+      void router.push('/');
+    }
+  });
 
   const invalidateMeQueryAndRedirect = async (): Promise<void> => {
     await queryClient.invalidateQueries({

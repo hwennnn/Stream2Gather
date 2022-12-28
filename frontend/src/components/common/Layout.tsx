@@ -5,7 +5,6 @@ import Navbar from './Navbar';
 interface LayoutProps {
   title?: string;
   description?: string;
-  children: React.ReactNode;
 }
 
 const Layout: FC<PropsWithChildren<LayoutProps>> = ({

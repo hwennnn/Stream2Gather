@@ -9,10 +9,10 @@ import {
   signInWithGoogle
 } from '../auth/firebaseAuth';
 import { isAuthenticated } from '../auth/isAuth';
-import GithubSocialButton from '../components/GithubSocialButton';
-import GoogleSocialButton from '../components/GoogleSocialButton';
-import Layout from '../components/Layout';
-import LoadingSpinner from '../components/LoadingSpinner';
+import GithubSocialButton from '../components/common/buttons/GithubSocialButton';
+import GoogleSocialButton from '../components/common/buttons/GoogleSocialButton';
+import Layout from '../components/common/Layout';
+import LoadingSpinner from '../components/common/loading/LoadingSpinner';
 import { MeQueryKey } from '../constants/query';
 import { useLoginMutation, useSocialLoginMutation } from '../generated/graphql';
 import { validateFormEmail } from '../utils/validateEmail';

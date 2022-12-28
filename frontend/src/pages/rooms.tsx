@@ -11,7 +11,7 @@ import { NextPage } from 'next';
 import dynamic from 'next/dynamic';
 import screenfull from 'screenfull';
 import { io } from 'socket.io-client';
-import Layout from '../components/Layout';
+import Layout from '../components/common/Layout';
 import {
   REQ_JOIN_ROOM,
   REQ_STREAMING_EVENTS,
@@ -24,7 +24,7 @@ import { getFormattedTime } from '../helpers/time-helper';
 import useRoomStore from '../store/useRoomStore';
 
 const ReactPlayer = dynamic(
-  async () => await import('../components/VideoPlayer'),
+  async () => await import('../components/rooms/VideoPlayer'),
   {
     ssr: false
   }

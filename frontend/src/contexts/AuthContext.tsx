@@ -1,5 +1,5 @@
 import React, { PropsWithChildren, useContext } from 'react';
-import LoadingSpinner from '../components/common/loading/LoadingSpinner';
+import { Loading } from '../components/common/loading/Loading';
 import { MeQuery, useMeQuery, User } from '../generated/graphql';
 
 export default interface AuthContextInterface {
@@ -19,7 +19,7 @@ const AuthProvider: React.FC<PropsWithChildren> = (props) => {
   );
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <Loading />;
   }
 
   if (isError) {

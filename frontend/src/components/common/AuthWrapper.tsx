@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { FC, PropsWithChildren, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { shouldRedirect } from '../../utils/shouldRedirect';
-import LoadingSpinner from './loading/LoadingSpinner';
+import { Loading } from './loading/Loading';
 
 const AuthWrapper: FC<PropsWithChildren> = ({ children }) => {
   const { user } = useAuth();
@@ -19,11 +19,7 @@ const AuthWrapper: FC<PropsWithChildren> = ({ children }) => {
     }
   }, [redirect, redirectPath, router]);
 
-  return (
-    <div className="mx-auto w-full">
-      {redirect ? <LoadingSpinner /> : children}
-    </div>
-  );
+  return <>{redirect ? <Loading /> : children}</>;
 };
 
 export default AuthWrapper;

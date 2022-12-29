@@ -12,7 +12,7 @@ const GithubSocialButton: FC<GithubSocialButtonProps> = ({
   return (
     <div
       {...props}
-      className="flex flex-row bg-black cursor-pointer p-3 rounded-lg items-center"
+      className="flex flex-row bg-black hover:bg-opacity-50 cursor-pointer p-3 rounded-lg items-center"
     >
       <SiGithub className="text-2xl" color="white" />
       <span className="-ml-5 flex-1 font-medium title-smaller text-white text-center">

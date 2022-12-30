@@ -6,7 +6,12 @@ import { Loading } from '../components/common/loading/Loading';
 import { Player } from '../components/rooms/Player';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoomQuery } from '../generated/graphql';
-import { joinRoom, listenEvent } from '../lib/roomSocketService';
+import {
+  joinRoom,
+  listenEvent,
+  subscribeUserJoined,
+  subscribeUserLeft
+} from '../lib/roomSocketService';
 import { setRoomInfo } from '../store/useRoomStore';
 
 interface Props {
@@ -25,7 +30,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const { isLoading: isRoomLoading } = useRoomQuery(
-    { id: '1' },
+    { id: roomId },
     {
       onSuccess: (data) => {
         setRoomInfo(data);
@@ -35,9 +40,11 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
 
   useEffect(() => {
     if (socket !== null) {
-      listenEvent(socket);
-
       joinRoom(socket, roomId, user?.id);
+      subscribeUserJoined(socket);
+      subscribeUserLeft(socket);
+
+      listenEvent(socket);
 
       return (): void => {
         socket.disconnect();

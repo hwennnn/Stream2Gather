@@ -4,6 +4,8 @@ import {
   CONNECT,
   REQ_JOIN_ROOM,
   REQ_STREAMING_EVENTS,
+  RES_MEMBER_LEFT,
+  RES_NEW_MEMBER,
   RES_STREAMING_EVENTS
 } from '../constants/socket';
 import { setPlaying } from '../store/useRoomStore';
@@ -54,4 +56,12 @@ export const subscribeStreamEvent = (
     setPlaying(isPlaying);
     playerRef.current.seekTo(playedSeconds, 'seconds');
   });
+};
+
+export const subscribeUserJoined = (socket: Socket): void => {
+  socket.on(RES_NEW_MEMBER, (_data) => {});
+};
+
+export const subscribeUserLeft = (socket: Socket): void => {
+  socket.on(RES_MEMBER_LEFT, (_data) => {});
 };

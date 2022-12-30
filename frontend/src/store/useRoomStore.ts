@@ -19,13 +19,17 @@ interface RoomState {
   };
 }
 
-const useRoomStore = create<RoomState>()((set) => ({
+const initialRoomData = {
   playing: false,
-  isMuted: false,
+  isMuted: true,
   playingUrl: 'https://youtu.be/Y8JFxS1HlDo',
   playedSeconds: 0,
   duration: 0,
-  playedTimestampUpdatedAt: '0',
+  playedTimestampUpdatedAt: '0'
+};
+
+const useRoomStore = create<RoomState>()((set) => ({
+  ...initialRoomData,
   actions: {
     setRoomInfo: (data: RoomQuery) => {
       const roomInfo = data.room?.roomInfo;

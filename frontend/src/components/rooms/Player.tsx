@@ -13,8 +13,9 @@ import {
   REQ_STREAMING_EVENTS,
   RES_STREAMING_EVENTS
 } from '../../constants/socket';
-import { useRoomSocket } from '../../contexts/RoomSocketContext';
+
 import { getFormattedTime } from '../../helpers/time-helper';
+import { useRoomSocket } from '../../pages/room';
 import useRoomStore, {
   setDuration,
   setIsMuted,

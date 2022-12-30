@@ -1,16 +1,90 @@
 import { NextPage } from 'next';
-import RoomComponent from '../components/rooms/RoomComponent';
-import { RoomSocketProvider } from '../contexts/RoomSocketContext';
+import React, { useContext, useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
+import Layout from '../components/common/Layout';
+import { Loading } from '../components/common/loading/Loading';
+import { Player } from '../components/rooms/Player';
+import { CONNECT, REQ_JOIN_ROOM } from '../constants/socket';
+import { useAuth } from '../contexts/AuthContext';
+import { useRoomQuery } from '../generated/graphql';
+import { setRoomInfo } from '../store/useRoomStore';
 
 interface Props {
   roomId: string;
 }
 
+export interface RoomSocketContextInterface {
+  roomSocket: Socket;
+}
+
+const RoomSocketContext = React.createContext<
+  RoomSocketContextInterface | undefined
+>(undefined);
+
 const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
+  const { user } = useAuth();
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const { isLoading: isRoomLoading } = useRoomQuery(
+    { id: '1' },
+    {
+      onSuccess: (data) => {
+        setRoomInfo(data);
+      }
+    }
+  );
+
+  useEffect(() => {
+    if (socket !== null) {
+      socket.on(CONNECT, () => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Room socket connected!', socket.id);
+        }
+      });
+
+      socket.emit(REQ_JOIN_ROOM, {
+        roomId,
+        uid: user?.id
+      });
+
+      const listener = (eventName: string, ...args: any): void => {
+        console.log(eventName, args);
+      };
+
+      if (process.env.NODE_ENV !== 'production') {
+        socket.onAny(listener);
+      }
+
+      return (): void => {
+        socket.disconnect();
+      };
+    }
+
+    return (): void => {};
+  }, [roomId, socket, user?.id]);
+
+  useEffect(() => {
+    setSocket(
+      io(`${process.env.SERVER_URL}`, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity
+      })
+    );
+  }, []);
+
   return (
-    <RoomSocketProvider>
-      <RoomComponent roomId={roomId} />
-    </RoomSocketProvider>
+    <Layout>
+      {isRoomLoading || socket === null ? (
+        <Loading />
+      ) : (
+        <>
+          <RoomSocketContext.Provider value={{ roomSocket: socket }}>
+            <Player roomId={roomId} />
+          </RoomSocketContext.Provider>
+        </>
+      )}
+    </Layout>
   );
 };
 
@@ -23,11 +97,19 @@ RoomPage.getInitialProps = async ({ res, query }) => {
       res.end();
     }
 
-    // to satisfy the type checker
+    // to satisfy the type checker (NOT MEANINGFUL)
     return { roomId: '' };
   }
 
   return { roomId };
+};
+
+export const useRoomSocket = (): RoomSocketContextInterface => {
+  const context = useContext(RoomSocketContext);
+  if (context === undefined) {
+    throw new Error('useRoomSocket must be used within a RoomSocketProvider');
+  }
+  return context;
 };
 
 export default RoomPage;

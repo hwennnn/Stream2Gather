@@ -2,6 +2,7 @@ import create from 'zustand';
 import { RoomQuery } from './../generated/graphql';
 
 interface RoomState {
+  roomId: string;
   playing: boolean;
   isMuted: boolean;
   playingUrl: string;
@@ -20,6 +21,7 @@ interface RoomState {
 }
 
 const initialRoomData = {
+  roomId: '',
   playing: false,
   isMuted: true,
   playingUrl: 'https://youtu.be/Y8JFxS1HlDo',
@@ -34,9 +36,11 @@ const useRoomStore = create<RoomState>()((set) => ({
     setRoomInfo: (data: RoomQuery) => {
       const roomInfo = data.room?.roomInfo;
       set({
+        roomId: data.room?.id,
         playing: roomInfo?.isPlaying,
         playingUrl: roomInfo?.currentUrl,
-        playedSeconds: roomInfo?.playedSeconds
+        playedSeconds: roomInfo?.playedSeconds,
+        playedTimestampUpdatedAt: roomInfo?.playedTimestampUpdatedAt
       });
     },
     setPlaying: (playing) => set({ playing }),

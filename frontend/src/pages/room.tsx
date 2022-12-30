@@ -4,9 +4,9 @@ import { io, Socket } from 'socket.io-client';
 import Layout from '../components/common/Layout';
 import { Loading } from '../components/common/loading/Loading';
 import { Player } from '../components/rooms/Player';
-import { CONNECT, REQ_JOIN_ROOM } from '../constants/socket';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoomQuery } from '../generated/graphql';
+import { joinRoom, listenEvent } from '../lib/roomSocketService';
 import { setRoomInfo } from '../store/useRoomStore';
 
 interface Props {
@@ -35,24 +35,9 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
 
   useEffect(() => {
     if (socket !== null) {
-      socket.on(CONNECT, () => {
-        if (process.env.NODE_ENV !== 'production') {
-          console.log('Room socket connected!', socket.id);
-        }
-      });
+      listenEvent(socket);
 
-      socket.emit(REQ_JOIN_ROOM, {
-        roomId,
-        uid: user?.id
-      });
-
-      const listener = (eventName: string, ...args: any): void => {
-        console.log(eventName, args);
-      };
-
-      if (process.env.NODE_ENV !== 'production') {
-        socket.onAny(listener);
-      }
+      joinRoom(socket, roomId, user?.id);
 
       return (): void => {
         socket.disconnect();
@@ -74,13 +59,13 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
   }, []);
 
   return (
-    <Layout>
+    <Layout title="Room">
       {isRoomLoading || socket === null ? (
         <Loading />
       ) : (
         <>
           <RoomSocketContext.Provider value={{ roomSocket: socket }}>
-            <Player roomId={roomId} />
+            <Player />
           </RoomSocketContext.Provider>
         </>
       )}

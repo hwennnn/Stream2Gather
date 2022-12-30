@@ -2,7 +2,7 @@ require("dotenv-safe").config();
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: process.env !== "production",
   swcMinify: true,
   env: {
     SERVER_URL: process.env.SERVER_URL,

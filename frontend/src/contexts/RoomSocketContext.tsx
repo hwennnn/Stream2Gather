@@ -1,5 +1,11 @@
-import React, { PropsWithChildren, useContext, useEffect } from 'react';
+import React, {
+  PropsWithChildren,
+  useContext,
+  useEffect,
+  useState
+} from 'react';
 import { io, Socket } from 'socket.io-client';
+import { Loading } from '../components/common/loading/Loading';
 import { CONNECT } from '../constants/socket';
 
 export default interface RoomSocketContextInterface {
@@ -10,43 +16,47 @@ const RoomSocketContext = React.createContext<
   RoomSocketContextInterface | undefined
 >(undefined);
 
-interface RoomSocketProviderType {
-  children: React.ReactNode;
-}
-
-const RoomSocketProvider: React.FC<
-  PropsWithChildren<RoomSocketProviderType>
-> = ({ children }) => {
-  const socket = io(`${process.env.SERVER_URL}`, {
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    reconnectionAttempts: Infinity
-  });
-
-  console.log(socket.connected, socket.id, process.env.SERVER_URL);
+const RoomSocketProvider: React.FC<PropsWithChildren> = ({ children }) => {
+  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
-    socket.on(CONNECT, () => {
+    setSocket(
+      io(`${process.env.SERVER_URL}`, {
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: Infinity
+      })
+    );
+  }, []);
+
+  useEffect(() => {
+    if (socket !== null) {
+      socket.on(CONNECT, () => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Room socket connected!', socket.id);
+        }
+      });
+
+      const listener = (eventName: string, ...args: any): void => {
+        console.log(eventName, args);
+      };
+
       if (process.env.NODE_ENV !== 'production') {
-        console.log('Room socket connected!');
+        socket.onAny(listener);
       }
-    });
 
-    const listener = (eventName: string, ...args: any): void => {
-      console.log(eventName, args);
-    };
-
-    if (process.env.NODE_ENV !== 'production') {
-      socket.onAny(listener);
+      return (): void => {
+        socket.disconnect();
+      };
     }
 
-    return (): void => {
-      socket.disconnect();
-    };
+    return (): void => {};
   }, [socket]);
 
-  return (
+  return socket === null ? (
+    <Loading />
+  ) : (
     <RoomSocketContext.Provider value={{ roomSocket: socket }}>
       {children}
     </RoomSocketContext.Provider>

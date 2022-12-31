@@ -6,6 +6,9 @@ export const REQ_JOIN_ROOM = 'req_join_room';
 // From frontend: I want to play/pause/seek to spefic timestamp
 export const REQ_STREAMING_EVENTS = 'req_streaming_events';
 
+// From frontend: I starts to play the video
+export const REQ_PLAY_VIDEO = 'req_play_video';
+
 // From backend: There is a new message in the group
 export const RES_MESSAGE = 'res_messages';
 

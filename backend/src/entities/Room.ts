@@ -32,14 +32,14 @@ export class Room extends BaseEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Field(() => User)
+  @Field(() => User, { nullable: true })
   @ManyToOne(() => User, (user) => user.createdRooms, {
     cascade: true,
     onDelete: 'CASCADE'
   })
   creator!: User;
 
-  @Field(() => [User])
+  @Field(() => [User], { nullable: true })
   @ManyToMany(() => User, (members) => members.rooms, {
     cascade: true,
     onDelete: 'CASCADE'

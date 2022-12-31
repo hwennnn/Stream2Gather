@@ -77,7 +77,7 @@ export const defaultRoomInfo: RoomInfo = {
   currentUrl: defaultVideoInfo.url,
   playingIndex: 0,
   playedSeconds: 0.0,
-  playedTimestampUpdatedAt: new Date().getTime().toString(),
+  playedTimestampUpdatedAt: '0',
   isPlaying: true,
   playlist: [defaultVideoInfo]
 };

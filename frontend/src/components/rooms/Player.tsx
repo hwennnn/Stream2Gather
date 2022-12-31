@@ -1,7 +1,10 @@
 import dynamic from 'next/dynamic';
 import { FC, useRef } from 'react';
 import shallow from 'zustand/shallow';
-import { subscribeStreamEvent } from '../../lib/roomSocketService';
+import {
+  startPlayingVideo,
+  subscribeStreamEvent
+} from '../../lib/roomSocketService';
 import { useRoomSocket } from '../../pages/room';
 import useRoomStore, {
   setDuration,
@@ -19,11 +22,12 @@ const ReactPlayer = dynamic(
 
 export const Player: FC = () => {
   const { roomSocket: socket } = useRoomSocket();
-  const { playing, isMuted, playingUrl } = useRoomStore(
+  const { playing, isMuted, playingIndex, playlist } = useRoomStore(
     (state) => ({
       playing: state.playing,
       isMuted: state.isMuted,
-      playingUrl: state.playingUrl
+      playingIndex: state.playingIndex,
+      playlist: state.playlist
     }),
     shallow
   );
@@ -41,13 +45,21 @@ export const Player: FC = () => {
     // Getting non-reactive values from the store
     const { playedSeconds, playedTimestampUpdatedAt } = useRoomStore.getState();
 
+    const shouldStartPlaying = !playing && playedTimestampUpdatedAt === '0';
+
     if (playing) {
       const currentTimestamp =
         playedSeconds +
-        (Date.now() - Number.parseInt(playedTimestampUpdatedAt)) / 1000;
+        (playedTimestampUpdatedAt === '0'
+          ? 0
+          : (Date.now() - Number.parseInt(playedTimestampUpdatedAt)) / 1000);
 
       setPlaying(true);
       playerRef.current.seekTo(currentTimestamp, 'seconds');
+    } else if (shouldStartPlaying) {
+      startPlayingVideo(socket);
+      setPlaying(true);
+      playerRef.current.seekTo(playedSeconds, 'seconds');
     } else {
       setPlaying(false);
       playerRef.current.seekTo(playedSeconds, 'seconds');
@@ -80,7 +92,7 @@ export const Player: FC = () => {
           onDuration={(duration: number) => updateDuration(duration)}
           muted={isMuted}
           playing={playing}
-          url={playingUrl}
+          url={playlist[playingIndex].url}
           config={{
             youtube: {
               playerVars: {

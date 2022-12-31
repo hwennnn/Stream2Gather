@@ -56,7 +56,7 @@ export class ApiServer {
       },
       pingTimeout: 60000
     });
-    setUpIo(io, redis);
+    await setUpIo(io, redis);
 
     app.use(errorRouter);
 

@@ -108,10 +108,10 @@ export type Room = {
   __typename?: 'Room';
   activeMembers: Array<RoomMember>;
   createdAt: Scalars['String'];
-  creator: User;
+  creator?: Maybe<User>;
   id: Scalars['String'];
   isPublic: Scalars['Boolean'];
-  members: Array<User>;
+  members?: Maybe<Array<User>>;
   roomInfo: RoomInfo;
   updatedAt: Scalars['String'];
 };
@@ -179,7 +179,7 @@ export type UserItemFragment = { __typename?: 'User', id: string, username?: str
 export type CreateRoomMutationVariables = Exact<{ [key: string]: never; }>;
 
 
-export type CreateRoomMutation = { __typename?: 'Mutation', createRoom: { __typename?: 'RoomResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, room?: { __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, creator: { __typename?: 'User', id: string } } | null } };
+export type CreateRoomMutation = { __typename?: 'Mutation', createRoom: { __typename?: 'RoomResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, room?: { __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, creator?: { __typename?: 'User', id: string } | null } | null } };
 
 export type LoginMutationVariables = Exact<{
   options: LoginInput;
@@ -222,7 +222,7 @@ export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id
 export type RoomsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RoomsQuery = { __typename?: 'Query', rooms: Array<{ __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, roomInfo: { __typename?: 'RoomInfo', playedSeconds: number, isPlaying: boolean, playedTimestampUpdatedAt: string, currentUrl: string }, creator: { __typename?: 'User', id: string }, activeMembers: Array<{ __typename?: 'RoomMember', socketId: string }> }> };
+export type RoomsQuery = { __typename?: 'Query', rooms: Array<{ __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, roomInfo: { __typename?: 'RoomInfo', playedSeconds: number, isPlaying: boolean, playedTimestampUpdatedAt: string, currentUrl: string }, creator?: { __typename?: 'User', id: string } | null, activeMembers: Array<{ __typename?: 'RoomMember', socketId: string }> }> };
 
 export type UsersWithRelationsQueryVariables = Exact<{
   options: UserRelationsInput;

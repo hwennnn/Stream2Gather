@@ -3,6 +3,7 @@ import { Socket } from 'socket.io-client';
 import {
   CONNECT,
   REQ_JOIN_ROOM,
+  REQ_PLAY_VIDEO,
   REQ_STREAMING_EVENTS,
   RES_MEMBER_LEFT,
   RES_NEW_MEMBER,
@@ -73,5 +74,12 @@ export const subscribeUserLeft = (socket: Socket): void => {
   socket.on(RES_MEMBER_LEFT, (data) => {
     const { socketId } = data;
     removeActiveMember(socketId);
+  });
+};
+
+export const startPlayingVideo = (socket: Socket): void => {
+  socket.emit(REQ_PLAY_VIDEO, {
+    playedTimestampUpdatedAt: new Date().getTime().toString(),
+    isPlaying: true
   });
 };

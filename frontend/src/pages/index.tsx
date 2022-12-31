@@ -1,7 +1,7 @@
 import { NextPage } from 'next';
 import Layout from '../components/common/Layout';
-import AuthenticatedApp from '../components/home/AuthenticatedApp';
-import UnauthenticatedApp from '../components/home/UnauthenticatedApp';
+import AuthenticatedApp from '../components/home/Authenticated/AuthenticatedApp';
+import UnauthenticatedApp from '../components/home/Unauthenticated/UnauthenticatedApp';
 import { useAuth } from '../contexts/AuthContext';
 
 const Home: NextPage = () => {

@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { FC } from 'react';
-import { useCreateRoomMutation } from '../../generated/graphql';
-import { PrimaryButton } from '../common/buttons/PrimaryButton';
+import { useCreateRoomMutation } from '../../../generated/graphql';
+import { PrimaryButton } from '../../common/buttons/PrimaryButton';
 
 const AuthenticatedApp: FC = () => {
   const router = useRouter();

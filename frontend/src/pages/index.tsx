@@ -1,13 +1,17 @@
 import { NextPage } from 'next';
 import Layout from '../components/common/Layout';
-import styles from '../styles/Home.module.css';
+import AuthenticatedApp from '../components/home/AuthenticatedApp';
+import UnauthenticatedApp from '../components/home/UnauthenticatedApp';
+import { useAuth } from '../contexts/AuthContext';
 
 const Home: NextPage = () => {
+  const { user } = useAuth();
+
+  const isAuthenticated = user !== null && user !== undefined;
+
   return (
     <Layout>
-      <main className={styles.main}>
-        <h1 className={styles.title}>Welcome to Stream2Gather</h1>
-      </main>
+      {isAuthenticated ? <AuthenticatedApp /> : <UnauthenticatedApp />}
     </Layout>
   );
 };

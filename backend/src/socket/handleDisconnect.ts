@@ -13,7 +13,7 @@ export const handleDisconnect = (
   return async (): Promise<void> => {
     const currentRoomId = socket.roomId;
 
-    if (!currentRoomId) {
+    if (currentRoomId === undefined) {
       return;
     }
 
@@ -23,7 +23,7 @@ export const handleDisconnect = (
       socketID: socket.id
     };
 
-    await redisRoomHelper.removeRoomMember(currentRoomId!, socket.id);
+    await redisRoomHelper.removeRoomMember(currentRoomId, socket.id);
     await redisHelper.publish(RES_MEMBER_LEFT, payload);
   };
 };

@@ -29,24 +29,27 @@ class RoomResponse {
 @Resolver(Room)
 export class RoomResolver {
   @FieldResolver(() => RoomInfo)
-  async roomInfo(@Root() room: Room, @Ctx() { redisRoomHelper }: MyContext) {
+  async roomInfo(
+    @Root() room: Room,
+    @Ctx() { redisRoomHelper }: MyContext
+  ): Promise<RoomInfo> {
     const resultFromRedis = await redisRoomHelper.getRoomInfo(room.id);
 
     return resultFromRedis ?? defaultRoomInfo;
   }
 
-  @FieldResolver(() => [RoomMember], { nullable: true })
+  @FieldResolver(() => [RoomMember])
   async activeMembers(
     @Root() room: Room,
     @Ctx() { redisRoomHelper }: MyContext
-  ) {
+  ): Promise<RoomMember[]> {
     return await redisRoomHelper.getActiveMembers(room.id);
   }
 
   @Query(() => Room, { nullable: true })
   async room(@Arg('id') id: string): Promise<Room | null> {
     try {
-      return Room.findOne({
+      return await Room.findOne({
         where: { id }
       });
     } catch (err) {
@@ -58,7 +61,7 @@ export class RoomResolver {
 
   @Query(() => [Room])
   async rooms(): Promise<Room[]> {
-    return Room.find({ relations: { members: true, creator: true } });
+    return await Room.find({ relations: { members: true, creator: true } });
   }
 
   @Mutation(() => RoomResponse)
@@ -66,11 +69,11 @@ export class RoomResolver {
   async createRoom(
     @Ctx() { req, redisRoomHelper }: MyContext
   ): Promise<RoomResponse> {
-    const uid: string = req.session.userId!;
+    const uid: string = req.session.userId as string;
     const user = await User.findOne({ where: { id: uid } });
 
     if (user !== null) {
-      let room = await Room.create({
+      const room = await Room.create({
         creator: user,
         members: [user]
       }).save();

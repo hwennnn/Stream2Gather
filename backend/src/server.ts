@@ -6,7 +6,7 @@ import { createServer, Server } from 'http';
 import Redis from 'ioredis';
 import { Server as SocketServer } from 'socket.io';
 import initApolloServer from './apollo';
-import { __prod__ } from './constants/config';
+import { isProd } from './constants/config';
 import initializeDB from './db/initializeDb';
 import errorRouter from './routes/404';
 import authRouter from './routes/authRouter';
@@ -24,19 +24,19 @@ export class ApiServer {
   public httpServer: Server | null = null;
   public io: SocketServer | null = null;
 
-  async initialize(port = process.env.PORT) {
+  async initialize(port = process.env.PORT): Promise<void> {
     initializeFirebase();
 
     await initializeDB();
 
     const app = express();
-    const redis = new Redis(process.env.REDIS_ADDRESS as string);
+    const redis = new Redis(process.env.REDIS_ADDRESS);
 
-    app.set('trust proxy', !__prod__);
+    app.set('trust proxy', !isProd);
     app.use(
       helmet({
-        crossOriginEmbedderPolicy: __prod__,
-        contentSecurityPolicy: __prod__
+        crossOriginEmbedderPolicy: isProd,
+        contentSecurityPolicy: isProd
       })
     );
     app.use(cors(corsOptions));
@@ -61,7 +61,7 @@ export class ApiServer {
     app.use(errorRouter);
 
     httpServer.listen(port, () => {
-      if (!__prod__) {
+      if (!isProd) {
         console.log(`Server listening on port ${port}...`);
       }
     });

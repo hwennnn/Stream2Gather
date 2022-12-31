@@ -8,26 +8,31 @@ import {
   RES_STREAMING_EVENTS
 } from './../constants/socket';
 
-function addRedisSubscriber(subscriber_key: string, io: Server) {
-  var client = new Redis(process.env.REDIS_ADDRESS as string);
+const addRedisSubscriber = async (
+  subscriberKey: string,
+  io: Server
+): Promise<Redis> => {
+  const client = new Redis(process.env.REDIS_ADDRESS);
 
-  client.subscribe(subscriber_key);
+  await client.subscribe(subscriberKey);
   client.on(REDIS_PUB_MESSAGE, function (_channel, message) {
     message = JSON.parse(message);
     const { roomId, receiverSocketId } = message;
     // console.log(_channel, roomId ?? receiverSocketId, message);
     if (receiverSocketId !== undefined && receiverSocketId !== null) {
-      io.to(receiverSocketId).emit(subscriber_key, message);
+      io.to(receiverSocketId).emit(subscriberKey, message);
     } else if (roomId !== undefined && roomId !== null) {
-      io.to(roomId).emit(subscriber_key, message);
+      io.to(roomId).emit(subscriberKey, message);
     }
   });
 
   return client;
-}
+};
 
-export default function initRedisSubscribers(io: Server) {
-  var redisSubscribers = new Map<String, Redis>();
+const initRedisSubscribers = async (
+  io: Server
+): Promise<Map<String, Redis>> => {
+  const redisSubscribers = new Map<String, Redis>();
   const channels = [
     RES_MESSAGE,
     RES_NEW_MEMBER,
@@ -36,8 +41,10 @@ export default function initRedisSubscribers(io: Server) {
   ];
 
   for (const channel of channels) {
-    redisSubscribers.set(channel, addRedisSubscriber(channel, io));
+    redisSubscribers.set(channel, await addRedisSubscriber(channel, io));
   }
 
   return redisSubscribers;
-}
+};
+
+export default initRedisSubscribers;

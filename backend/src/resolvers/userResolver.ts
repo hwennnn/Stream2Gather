@@ -21,8 +21,10 @@ import { FieldError } from './types';
 class RegisterInput {
   @Field({ nullable: true })
   email?: string;
+
   @Field({ nullable: true })
   username?: string;
+
   @Field()
   token: string;
 }
@@ -37,6 +39,7 @@ class LoginInput {
 class UserRelationsInput {
   @Field()
   rooms: boolean = false;
+
   @Field()
   createdRooms: boolean = false;
 }
@@ -50,10 +53,10 @@ class UserResponse {
   user?: User;
 }
 
-const formatRelations = (relations: UserRelationsInput) => {
+const formatRelations = (relations: UserRelationsInput): UserRelationsInput => {
   const formattedRelations = {
-    rooms: relations.rooms === true,
-    createdRooms: relations.createdRooms === true
+    rooms: relations.rooms,
+    createdRooms: relations.createdRooms
   };
 
   return formattedRelations;
@@ -62,7 +65,7 @@ const formatRelations = (relations: UserRelationsInput) => {
 @Resolver(User)
 export class UserResolver {
   @FieldResolver(() => String)
-  email(@Root() user: User, @Ctx() { req }: MyContext) {
+  email(@Root() user: User, @Ctx() { req }: MyContext): string {
     // this is the current user and its ok to show them their own email
     if (req.session.userId === user.id) {
       return user.email;
@@ -74,11 +77,11 @@ export class UserResolver {
   @Query(() => User, { nullable: true })
   async me(@Ctx() { req }: MyContext): Promise<User | null> {
     // you are not logged in
-    if (!req.session.userId) {
+    if (req.session.userId === undefined) {
       return null;
     }
 
-    return User.findOne({
+    return await User.findOne({
       where: { id: req.session.userId },
       relations: { rooms: true, createdRooms: true }
     });
@@ -86,12 +89,12 @@ export class UserResolver {
 
   @Query(() => User, { nullable: true })
   async user(@Arg('id') id: string): Promise<User | null> {
-    return User.findOne({ where: { id }, relations: { rooms: true } });
+    return await User.findOne({ where: { id }, relations: { rooms: true } });
   }
 
   @Query(() => [User])
   async users(): Promise<User[]> {
-    return User.find({ relations: { rooms: true } });
+    return await User.find({ relations: { rooms: true } });
   }
 
   @Query(() => [User])
@@ -99,7 +102,7 @@ export class UserResolver {
     @Arg('options') options: UserRelationsInput
   ): Promise<User[]> {
     console.log(formatRelations(options));
-    return User.find({ relations: formatRelations(options) });
+    return await User.find({ relations: formatRelations(options) });
   }
 
   @Mutation(() => UserResponse)
@@ -236,11 +239,11 @@ export class UserResolver {
 
   @Mutation(() => Boolean)
   @UseMiddleware(isAuth)
-  async logout(@Ctx() { req, res }: MyContext) {
-    return new Promise((resolve) =>
+  async logout(@Ctx() { req, res }: MyContext): Promise<any> {
+    return await new Promise((resolve) =>
       req.session.destroy((err: any) => {
         res.clearCookie(COOKIE_NAME);
-        if (err) {
+        if (err !== undefined || err !== null) {
           console.log(err);
           resolve(false);
           return;

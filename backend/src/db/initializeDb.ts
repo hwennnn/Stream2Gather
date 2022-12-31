@@ -1,7 +1,7 @@
-import { AppDataSource } from "./dataSource";
+import { AppDataSource } from './dataSource';
 
-const initializeDB = async () => {
-    await AppDataSource.initialize();
+const initializeDB = async (): Promise<void> => {
+  await AppDataSource.initialize();
 };
 
 export default initializeDB;

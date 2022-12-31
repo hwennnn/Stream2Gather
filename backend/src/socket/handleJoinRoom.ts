@@ -19,13 +19,13 @@ export const handleJoinRoom = (
 ): JoinRoomFunction => {
   return async ({ uid, roomId }): Promise<void> => {
     const member: RoomMember = {
-      uid: uid,
+      uid,
       socketId: socket.id,
-      roomId: roomId
+      roomId
     };
     console.log(`${socket.id} has joined the room with id ${roomId}`);
 
-    socket.join(roomId);
+    await socket.join(roomId);
     socket.roomId = roomId;
 
     await redisRoomHelper.updateRoomMember(roomId, socket.id, member);

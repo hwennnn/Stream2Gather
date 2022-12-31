@@ -1,16 +1,18 @@
-// @ts-ignore
-import { SessionData } from "express-session";
-// @ts-ignore
-import { Socket } from "socket.io";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
-declare module "express-session" {
-    interface SessionData {
-        userId?: string;
-    }
+// @ts-expect-error
+import { SessionData } from 'express-session';
+// @ts-expect-error
+import { Socket } from 'socket.io';
+
+declare module 'express-session' {
+  interface SessionData {
+    userId?: string;
+  }
 }
 
-declare module "socket.io" {
-    interface Socket {
-        roomId?: string;
-    }
+declare module 'socket.io' {
+  interface Socket {
+    roomId?: string;
+  }
 }

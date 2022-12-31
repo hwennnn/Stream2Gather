@@ -13,11 +13,11 @@ import { handleJoinRoom } from './handleJoinRoom';
 import { handleStreamingEvents } from './handleStreamingEvents';
 import initRedisSubscribers from './initRedisSubscribers';
 
-const setUpIo = (io: SocketServer, redis: Redis): void => {
+const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
   const redisHelper = new RedisHelper(redis);
   const redisRoomHelper = new RedisRoomHelper(redis);
 
-  initRedisSubscribers(io);
+  await initRedisSubscribers(io);
 
   io.on(CONNECT, (socket) => {
     console.log(`Socket ${socket.id} has connected`);

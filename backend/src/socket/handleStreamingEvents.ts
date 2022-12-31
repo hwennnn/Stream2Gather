@@ -1,38 +1,44 @@
-import { RES_STREAMING_EVENTS } from "./../constants/socket";
-import RedisHelper from "../utils/redisHelper";
-import RedisRoomHelper from "../utils/redisRoomHelper";
+import RedisHelper from '../utils/redisHelper';
+import RedisRoomHelper from '../utils/redisRoomHelper';
+import { RES_STREAMING_EVENTS } from './../constants/socket';
 
-type StreamRoomFunction = ({
-    roomId,
-    isPlaying,
-    timestamp,
+type StreamEventFunction = ({
+  roomId,
+  isPlaying,
+  timestamp
 }: {
-    roomId: string;
-    isPlaying: boolean;
-    timestamp: number;
+  roomId: string;
+  isPlaying: boolean;
+  timestamp: number;
 }) => Promise<void>;
 
 export const handleStreamingEvents = (
-    redisHelper: RedisHelper,
-    redisRoomHelper: RedisRoomHelper
-): StreamRoomFunction => {
-    return async ({ roomId, isPlaying, timestamp }): Promise<void> => {
-        console.log(`video-events: ${roomId}, ${isPlaying}, ${timestamp}`);
-        const roomInfo = (await redisRoomHelper.getRoomInfo(roomId))!;
+  redisHelper: RedisHelper,
+  redisRoomHelper: RedisRoomHelper
+): StreamEventFunction => {
+  return async ({ roomId, isPlaying, timestamp }): Promise<void> => {
+    console.log(
+      `video-events: ${roomId}, ${isPlaying ? 'play' : 'stop'}, ${timestamp}`
+    );
+    const roomInfo = await redisRoomHelper.getRoomInfo(roomId);
 
-        roomInfo.playedSeconds = timestamp;
-        roomInfo.playedTimestampUpdatedAt = new Date().getTime().toString();
-        roomInfo.isPlaying = isPlaying;
+    if (roomInfo === null) {
+      return;
+    }
 
-        const payload = {
-            roomId,
-            playedSeconds: roomInfo.playedSeconds,
-            playedTimestampUpdatedAt: roomInfo.playedTimestampUpdatedAt,
-            isPlaying: roomInfo.isPlaying,
-        };
+    roomInfo.playedSeconds = timestamp;
+    roomInfo.playedTimestampUpdatedAt = new Date().getTime().toString();
+    roomInfo.isPlaying = isPlaying;
 
-        await redisRoomHelper.setRoomInfo(roomId, roomInfo);
-
-        await redisHelper.publish(RES_STREAMING_EVENTS, payload);
+    const payload = {
+      roomId,
+      playedSeconds: roomInfo.playedSeconds,
+      playedTimestampUpdatedAt: roomInfo.playedTimestampUpdatedAt,
+      isPlaying: roomInfo.isPlaying
     };
+
+    await redisRoomHelper.setRoomInfo(roomId, roomInfo);
+
+    await redisHelper.publish(RES_STREAMING_EVENTS, payload);
+  };
 };

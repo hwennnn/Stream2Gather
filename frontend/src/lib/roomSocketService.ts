@@ -8,7 +8,12 @@ import {
   RES_NEW_MEMBER,
   RES_STREAMING_EVENTS
 } from '../constants/socket';
-import { setPlaying } from '../store/useRoomStore';
+import { RoomMember } from '../generated/graphql';
+import {
+  addActiveMember,
+  removeActiveMember,
+  setPlaying
+} from '../store/useRoomStore';
 
 export interface StreamEvent {
   roomId: string;
@@ -59,9 +64,14 @@ export const subscribeStreamEvent = (
 };
 
 export const subscribeUserJoined = (socket: Socket): void => {
-  socket.on(RES_NEW_MEMBER, (_data) => {});
+  socket.on(RES_NEW_MEMBER, (member: RoomMember) => {
+    addActiveMember(member);
+  });
 };
 
 export const subscribeUserLeft = (socket: Socket): void => {
-  socket.on(RES_MEMBER_LEFT, (_data) => {});
+  socket.on(RES_MEMBER_LEFT, (data) => {
+    const { socketId } = data;
+    removeActiveMember(socketId);
+  });
 };

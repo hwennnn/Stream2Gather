@@ -25,6 +25,8 @@ interface RoomState {
     setDuration: (duration: number) => void;
     setPlayingIndex: (playingIndex: number) => void;
     setPlaylist: (playlist: VideoInfo[]) => void;
+    addActiveMember: (member: RoomMember) => void;
+    removeActiveMember: (socketId: string) => void;
   };
 }
 
@@ -65,7 +67,20 @@ const useRoomStore = create<RoomState>()((set) => ({
     setPlayedSeconds: (playedSeconds) => set({ playedSeconds }),
     setDuration: (duration) => set({ duration }),
     setPlayingIndex: (playingIndex) => set({ playingIndex }),
-    setPlaylist: (playlist) => set({ playlist })
+    setPlaylist: (playlist) => set({ playlist }),
+    addActiveMember: (member) =>
+      set((state) => {
+        const activeMembers = [...state.activeMembers, member];
+        return { activeMembers };
+      }),
+    removeActiveMember: (socketId) =>
+      set((state) => {
+        const activeMembers = state.activeMembers.filter(
+          (m) => m.socketId !== socketId
+        );
+        console.log('removeActiveMember', socketId, activeMembers);
+        return { activeMembers };
+      })
   }
 }));
 
@@ -77,7 +92,9 @@ export const {
   setPlayedSeconds,
   setDuration,
   setPlayingIndex,
-  setPlaylist
+  setPlaylist,
+  addActiveMember,
+  removeActiveMember
 } = useRoomStore.getState().actions;
 
 export default useRoomStore;

@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import Layout from '../components/common/Layout';
 import { Loading } from '../components/common/loading/Loading';
 import { Player } from '../components/rooms/Player';
+import RoomSection from '../components/rooms/RoomSection';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoomQuery } from '../generated/graphql';
 import {
@@ -72,7 +73,10 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
       ) : (
         <>
           <RoomSocketContext.Provider value={{ roomSocket: socket }}>
-            <Player />
+            <div className="flex flex-col tablet:flex-row w-full">
+              <Player />
+              <RoomSection />
+            </div>
           </RoomSocketContext.Provider>
         </>
       )}

@@ -20,7 +20,7 @@ export const handleDisconnect = (
     console.log(`${socket.id} has left the room with id ${currentRoomId}`);
     const payload = {
       roomId: currentRoomId,
-      socketID: socket.id
+      socketId: socket.id
     };
 
     await redisRoomHelper.removeRoomMember(currentRoomId, socket.id);

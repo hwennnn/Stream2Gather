@@ -20,7 +20,6 @@ const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
   await initRedisSubscribers(io);
 
   io.on(CONNECT, (socket) => {
-    console.log(`Socket ${socket.id} has connected`);
     socket.on(
       REQ_JOIN_ROOM,
       handleJoinRoom(socket, redisHelper, redisRoomHelper)

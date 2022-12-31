@@ -17,12 +17,10 @@ query Room($id: String!) {
         thumbnailUrl
       }
     }
-    createdAt
-    creator {
-      id
-    }
     activeMembers {
       socketId
+      roomId
+      uid
     }
   }
 }

@@ -32,12 +32,12 @@ export class Room extends BaseEntity {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @Field(() => User, { nullable: true })
+  @Field(() => User)
   @ManyToOne(() => User, (user) => user.createdRooms, {
     cascade: true,
     onDelete: 'CASCADE'
   })
-  creator: User;
+  creator!: User;
 
   @Field(() => [User])
   @ManyToMany(() => User, (members) => members.rooms, {
@@ -52,6 +52,6 @@ export class Room extends BaseEntity {
   roomInfo: RoomInfo;
 
   // Fetch from redis
-  @Field(() => [RoomMember], { nullable: true })
+  @Field(() => [RoomMember])
   activeMembers: RoomMember[];
 }

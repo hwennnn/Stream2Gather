@@ -12,7 +12,7 @@ import {
   subscribeUserJoined,
   subscribeUserLeft
 } from '../lib/roomSocketService';
-import { setRoomInfo } from '../store/useRoomStore';
+import { setRoom } from '../store/useRoomStore';
 
 interface Props {
   roomId: string;
@@ -33,7 +33,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
     { id: roomId },
     {
       onSuccess: (data) => {
-        setRoomInfo(data);
+        setRoom(data);
       }
     }
   );

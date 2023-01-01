@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import useRoomStore from '../../store/useRoomStore';
+import useRoomStore from '../../../store/useRoomStore';
 
 const RoomSection: FC = () => {
   const activeMembers = useRoomStore((state) => state.activeMembers);

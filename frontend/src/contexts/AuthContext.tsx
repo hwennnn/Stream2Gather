@@ -33,7 +33,6 @@ const AuthProvider: React.FC<PropsWithChildren> = (props) => {
 
   return (
     <AuthContext.Provider value={{ user: data.me }} {...props}>
-      {' '}
       {props.children}
     </AuthContext.Provider>
   );

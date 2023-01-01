@@ -19,7 +19,7 @@ export default function App({ Component, pageProps }: AppProps): JSX.Element {
     <QueryClientProvider client={queryClient}>
       <AppProviders>
         <AuthWrapper>
-          <Component {...pageProps} />;
+          <Component {...pageProps} />
           <ReactQueryDevtools initialIsOpen={false} />
         </AuthWrapper>
       </AppProviders>

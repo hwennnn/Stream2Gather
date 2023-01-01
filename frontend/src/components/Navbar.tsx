@@ -86,23 +86,29 @@ const LoginItems: FC = () => {
       flex={{ base: 1, md: 0 }}
       justify={'flex-end'}
       direction={'row'}
+      alignItems={'center'}
       spacing={6}
     >
-      <Button fontSize={'md'} fontWeight={400} variant={'link'}>
-        <Link href="/login">Login</Link>
-      </Button>
-      <Button
-        display={{ base: 'none', md: 'inline-flex' }}
-        fontSize={'md'}
-        fontWeight={600}
-        color={'white'}
-        bg={'secondary'}
-        _hover={{
-          opacity: 0.8
-        }}
-      >
-        <Link href="/register">Register</Link>
-      </Button>
+      <Link href="/login">
+        <Button fontSize={'md'} fontWeight={400} variant={'link'}>
+          Login
+        </Button>
+      </Link>
+
+      <Link href="/register">
+        <Button
+          display={{ base: 'none', md: 'inline-flex' }}
+          fontSize={'md'}
+          fontWeight={600}
+          color={'white'}
+          bg={'secondary'}
+          _hover={{
+            opacity: 0.8
+          }}
+        >
+          Register
+        </Button>
+      </Link>
     </Stack>
   );
 };

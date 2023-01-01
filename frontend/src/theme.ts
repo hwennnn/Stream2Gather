@@ -7,7 +7,7 @@ const theme = extendTheme({
     useSystemColorMode: false
   },
   fonts: {
-    heading: 'Inter',
+    heading: "'Inter', sans-serif",
     body: "'Montserrat', sans-serif"
   },
   colors: {

@@ -35,15 +35,16 @@ const UnauthenticatedApp: FC = () => {
           }
         </Text>
         <Stack spacing={6} direction={'row'}>
-          <Button
-            borderRadius={'lg'}
-            px={6}
-            colorScheme={'orange'}
-            bg={'tertiary'}
-            _hover={{ opacity: 0.8 }}
-          >
-            <Link href="/register">Get started</Link>
-          </Button>
+          <Link href="/register">
+            <Button
+              borderRadius={'lg'}
+              px={6}
+              bg={'tertiary'}
+              _hover={{ opacity: 0.8 }}
+            >
+              Get started
+            </Button>
+          </Link>
         </Stack>
 
         {/* <Flex w={'full'}>

@@ -1,5 +1,5 @@
+import { Button } from '@chakra-ui/react';
 import { FC, useState } from 'react';
-import LoadingSpinner from '../loading/LoadingSpinner';
 
 interface ButtonProps {
   title: string;
@@ -18,17 +18,12 @@ export const PrimaryButton: FC<ButtonProps> = ({ title, onClick }) => {
   };
 
   return (
-    <div
-      className="w-max bg-secondary hover:bg-opacity-50 cursor-pointer px-4 py-3 rounded-lg"
+    <Button
+      colorScheme="blue"
+      isLoading={isButtonLoading}
       onClick={handleClick}
     >
-      {isButtonLoading ? (
-        <LoadingSpinner />
-      ) : (
-        <span className="flex font-medium title-smaller text-white justify-center">
-          {title}
-        </span>
-      )}
-    </div>
+      {title}
+    </Button>
   );
 };

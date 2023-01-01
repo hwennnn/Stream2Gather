@@ -243,7 +243,7 @@ export class UserResolver {
     return await new Promise((resolve) =>
       req.session.destroy((err: any) => {
         res.clearCookie(COOKIE_NAME);
-        if (err !== undefined || err !== null) {
+        if (err !== undefined && err !== null) {
           console.log(err);
           resolve(false);
           return;

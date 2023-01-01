@@ -1,3 +1,4 @@
+import { Box, Button, Flex, HStack, Spacer, Text } from '@chakra-ui/react';
 import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -7,6 +8,8 @@ import { MeQueryKey } from '../constants/query';
 import { useAuth } from '../contexts/AuthContext';
 
 import { useLogoutMutation } from '../generated/graphql';
+import { PrimaryButton } from './ui/buttons/PrimaryButton';
+import { ThemeToggler } from './ui/theme/ThemeToggler';
 
 const Navbar: FC = () => {
   const router = useRouter();
@@ -28,39 +31,47 @@ const Navbar: FC = () => {
   };
 
   return (
-    <div className="flex flex-col">
-      <div className="flex flex-row items-center justify-between py-4 px-8">
+    <Flex direction="row" px="8" py="4">
+      <Box>
+        {/* ADD APP ICON HERE */}
         <Link href="/">
-          <div className="laptop:mt-0 cursor-pointer title-smaller font-bold text-black dark:text-white items-center navbar-link">
+          <Text fontSize="xl" fontWeight="bold">
             Stream2Gather
-          </div>
+          </Text>
         </Link>
+      </Box>
 
+      <Spacer />
+
+      <HStack spacing="12px">
+        <ThemeToggler />
         {isLoggedIn && (
-          <div className="flex flex-row space-x-6 items-center">
-            <div className="title-smaller font-semibold text-secondary dark:text-secondary-dark">
-              {user.username}
-            </div>
+          <>
+            <Text fontSize="l" fontWeight={'semibold'}>
+              {user?.username}
+            </Text>
 
-            <div onClick={async () => await logout()} className="btn-underline">
-              Logout
-            </div>
-          </div>
+            <PrimaryButton title="Logout" onClick={logout} />
+          </>
         )}
 
         {!isLoggedIn && (
-          <div className="flex flex-row space-x-6 items-center">
+          <>
             <Link href="/login">
-              <div className="btn-underline">Login</div>
+              <Button minWidth={'100px'} size="md" colorScheme="blue">
+                Login
+              </Button>
             </Link>
 
             <Link href="/register">
-              <div className="btn-underline">Register</div>
+              <Button minWidth={'100px'} size="md" colorScheme="blue">
+                Register
+              </Button>
             </Link>
-          </div>
+          </>
         )}
-      </div>
-    </div>
+      </HStack>
+    </Flex>
   );
 };
 

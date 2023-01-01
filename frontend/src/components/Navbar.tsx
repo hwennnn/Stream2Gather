@@ -66,7 +66,9 @@ const UserMenu: FC = () => {
         </Center>
         <br />
         <Center>
-          <Text fontSize={'md'}>{user?.username ?? ''}</Text>
+          <Text fontSize={'md'} fontWeight={'semibold'}>
+            {user?.username ?? ''}
+          </Text>
         </Center>
         <br />
         <MenuDivider />
@@ -86,12 +88,12 @@ const LoginItems: FC = () => {
       direction={'row'}
       spacing={6}
     >
-      <Button fontSize={'sm'} fontWeight={400} variant={'link'}>
+      <Button fontSize={'md'} fontWeight={400} variant={'link'}>
         <Link href="/login">Sign In</Link>
       </Button>
       <Button
         display={{ base: 'none', md: 'inline-flex' }}
-        fontSize={'sm'}
+        fontSize={'md'}
         fontWeight={600}
         color={'white'}
         bg={'secondary'}
@@ -125,8 +127,8 @@ const Navbar: FC = () => {
             <Link href="/">
               <Text
                 fontFamily={'heading'}
-                fontWeight={'semibold'}
-                fontSize={'l'}
+                fontWeight={'bold'}
+                fontSize={'lg'}
                 color={useColorModeValue('gray.800', 'white')}
               >
                 Stream2Gather

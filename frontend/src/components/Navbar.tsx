@@ -89,7 +89,7 @@ const LoginItems: FC = () => {
       spacing={6}
     >
       <Button fontSize={'md'} fontWeight={400} variant={'link'}>
-        <Link href="/login">Sign In</Link>
+        <Link href="/login">Login</Link>
       </Button>
       <Button
         display={{ base: 'none', md: 'inline-flex' }}
@@ -101,7 +101,7 @@ const LoginItems: FC = () => {
           opacity: 0.8
         }}
       >
-        <Link href="/register">Sign Up</Link>
+        <Link href="/register">Register</Link>
       </Button>
     </Stack>
   );
@@ -138,7 +138,7 @@ const Navbar: FC = () => {
 
           <Flex alignItems={'center'}>
             <Stack direction={'row'} spacing={7}>
-              <Button onClick={toggleColorMode}>
+              <Button background={'none'} onClick={toggleColorMode}>
                 {colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
               </Button>
 

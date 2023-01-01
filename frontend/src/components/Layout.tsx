@@ -16,7 +16,9 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({
     <div className="mx-auto w-full">
       <Head>
         <title>
-          {title !== undefined ? `${title} - Stream2Gather` : 'Stream2Gather'}
+          {title !== undefined
+            ? `${title} - Stream2Gather`
+            : 'Stream2Gather | Stay Connected made easier'}
         </title>
         <meta
           name="description"

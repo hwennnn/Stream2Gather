@@ -8,10 +8,10 @@ import {
   signInWithGithub,
   signInWithGoogle
 } from '../auth/firebaseAuth';
-import GithubSocialButton from '../components/common/buttons/GithubSocialButton';
-import GoogleSocialButton from '../components/common/buttons/GoogleSocialButton';
-import Layout from '../components/common/Layout';
-import LoadingSpinner from '../components/common/loading/LoadingSpinner';
+import Layout from '../components/Layout';
+import GithubSocialButton from '../components/ui/buttons/GithubSocialButton';
+import GoogleSocialButton from '../components/ui/buttons/GoogleSocialButton';
+import LoadingSpinner from '../components/ui/loading/LoadingSpinner';
 import { MeQueryKey } from '../constants/query';
 import { useAuth } from '../contexts/AuthContext';
 import { useLoginMutation, useSocialLoginMutation } from '../generated/graphql';

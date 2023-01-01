@@ -1,5 +1,5 @@
 import React, { PropsWithChildren, useContext } from 'react';
-import { Loading } from '../components/common/loading/Loading';
+import { Loading } from '../components/ui/loading/Loading';
 import { MeQuery, useMeQuery, User } from '../generated/graphql';
 
 export default interface AuthContextInterface {

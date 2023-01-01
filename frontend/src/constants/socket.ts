@@ -3,6 +3,9 @@ export const CONNECT = 'connect';
 // From frontend: I want to join a room
 export const REQ_JOIN_ROOM = 'req_join_room';
 
+// From frontend: I already left a room
+export const REQ_LEFT_ROOM = 'req_left_room';
+
 // From frontend: I want to play/pause/seek to spefic timestamp
 export const REQ_STREAMING_EVENTS = 'req_streaming_events';
 

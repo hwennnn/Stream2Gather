@@ -3,6 +3,7 @@ import { Socket } from 'socket.io-client';
 import {
   CONNECT,
   REQ_JOIN_ROOM,
+  REQ_LEFT_ROOM,
   REQ_PLAY_VIDEO,
   REQ_STREAMING_EVENTS,
   RES_MEMBER_LEFT,
@@ -30,6 +31,12 @@ export const joinRoom = (
   socket.emit(REQ_JOIN_ROOM, {
     roomId,
     uid
+  });
+};
+
+export const leftRoom = (socket: Socket, roomId: string): void => {
+  socket.emit(REQ_LEFT_ROOM, {
+    roomId
   });
 };
 
@@ -77,8 +84,12 @@ export const subscribeUserLeft = (socket: Socket): void => {
   });
 };
 
-export const startPlayingVideo = (socket: Socket): void => {
+export const startPlayingVideo = (
+  socket: Socket,
+  currentTimestamp: number
+): void => {
   socket.emit(REQ_PLAY_VIDEO, {
+    playedSeconds: currentTimestamp,
     playedTimestampUpdatedAt: new Date().getTime().toString(),
     isPlaying: true
   });

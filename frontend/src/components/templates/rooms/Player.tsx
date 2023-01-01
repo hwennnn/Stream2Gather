@@ -54,7 +54,7 @@ export const Player: FC = () => {
       setPlaying(true);
       playerRef.current.seekTo(currentTimestamp, 'seconds');
     } else if (shouldStartPlaying) {
-      startPlayingVideo(socket);
+      startPlayingVideo(socket, playedSeconds);
       setPlaying(true);
       playerRef.current.seekTo(playedSeconds, 'seconds');
     } else {

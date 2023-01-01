@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRoomQuery } from '../generated/graphql';
 import {
   joinRoom,
+  leftRoom,
   listenEvent,
   subscribeUserJoined,
   subscribeUserLeft
@@ -48,6 +49,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
       listenEvent(socket);
 
       return (): void => {
+        leftRoom(socket, roomId);
         socket.disconnect();
       };
     }

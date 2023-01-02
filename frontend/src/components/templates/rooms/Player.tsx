@@ -76,7 +76,7 @@ export const Player: FC = () => {
   };
 
   return (
-    <Box width={{ base: '100%', md: '75%' }}>
+    <Box width={{ base: '100%', lg: '70%' }}>
       <Box position="relative" pt={'56.25%'}>
         <ReactPlayer
           style={{ position: 'absolute', top: 0, left: 0 }}

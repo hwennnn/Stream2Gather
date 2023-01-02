@@ -7,7 +7,7 @@ const RoomSection: FC = () => {
 
   return (
     <>
-      <Box width={{ base: '100%', md: '25%' }} bg={'gray.700'}>
+      <Box width={{ base: '100%', lg: '30%' }} bg={'gray.700'}>
         {activeMembers.map((member) => (
           <div key={member.uid}>{member.username}</div>
         ))}

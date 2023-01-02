@@ -75,7 +75,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
         <>
           <RoomSocketContext.Provider value={{ roomSocket: socket }}>
             <Flex
-              flexDirection={{ base: 'column', md: 'row' }}
+              flexDirection={{ base: 'column', lg: 'row' }}
               maxW="120em"
               mx="auto"
             >

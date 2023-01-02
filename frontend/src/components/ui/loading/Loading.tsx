@@ -1,20 +1,19 @@
-import { Player } from '@lottiefiles/react-lottie-player';
+import { Flex } from '@chakra-ui/react';
 import { FC } from 'react';
 import FadeIn from 'react-fade-in';
-import playButtonAnimation from './lottie-playbutton.json';
+import { PlayLoadingAnimation } from './PlayLoadingAnimation';
 
 export const Loading: FC = () => {
   return (
-    <div className="flex w-screen h-screen items-center justify-center">
+    <Flex
+      width="100vw"
+      height="100vh"
+      alignItems="center"
+      justifyContent="center"
+    >
       <FadeIn>
-        <Player
-          className="flex w-60 h-60 items-center justify-center overflow-hidden"
-          src={playButtonAnimation}
-          speed={2}
-          loop={true}
-          autoplay={true}
-        />
+        <PlayLoadingAnimation />
       </FadeIn>
-    </div>
+    </Flex>
   );
 };

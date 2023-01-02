@@ -1,3 +1,4 @@
+import { Box } from '@chakra-ui/react';
 import Head from 'next/head';
 import { FC, PropsWithChildren } from 'react';
 import Navbar from './Navbar';
@@ -13,7 +14,7 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({
   children
 }) => {
   return (
-    <div className="mx-auto w-full">
+    <Box width="full" mx="auto">
       <Head>
         <title>
           {title !== undefined
@@ -33,7 +34,7 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({
       <Navbar />
 
       {children}
-    </div>
+    </Box>
   );
 };
 

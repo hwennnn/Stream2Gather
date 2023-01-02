@@ -96,7 +96,13 @@ export const Player: FC = () => {
         }}
       >
         <ReactPlayer
-          style={{ position: 'absolute', top: 0, left: 0 }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            pointerEvents: 'none',
+            userSelect: 'none'
+          }}
           width="100%"
           height="100%"
           // onPlay={() => play()}

@@ -1,3 +1,4 @@
+import { Box } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
 import { FC, useRef } from 'react';
 import shallow from 'zustand/shallow';
@@ -30,7 +31,6 @@ export const Player: FC = () => {
   );
 
   const playerRef = useRef<any>();
-  const progressBarRef = useRef<any>();
 
   const onPlayerReady = (): void => {
     // subscribe to streaming events
@@ -76,10 +76,10 @@ export const Player: FC = () => {
   };
 
   return (
-    <div className="w-full tablet:w-3/4">
-      <div className="relative pt-[56.25%]">
+    <Box width={{ base: '100%', md: '75%' }}>
+      <Box position="relative" pt={'56.25%'}>
         <ReactPlayer
-          className="absolute top-0 left-0"
+          style={{ position: 'absolute', top: 0, left: 0 }}
           width="100%"
           height="100%"
           // onPlay={() => play()}
@@ -103,8 +103,8 @@ export const Player: FC = () => {
           }}
           playerref={playerRef}
         />
-      </div>
-      <PlayerControl playerRef={playerRef} progressBarRef={progressBarRef} />
-    </div>
+      </Box>
+      <PlayerControl playerRef={playerRef} />
+    </Box>
   );
 };

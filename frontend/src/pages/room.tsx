@@ -1,3 +1,4 @@
+import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import React, { useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
@@ -73,10 +74,14 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
       ) : (
         <>
           <RoomSocketContext.Provider value={{ roomSocket: socket }}>
-            <div className="flex flex-col tablet:flex-row w-full">
+            <Flex
+              flexDirection={{ base: 'column', md: 'row' }}
+              maxW="120em"
+              mx="auto"
+            >
               <Player />
               <RoomSection />
-            </div>
+            </Flex>
           </RoomSocketContext.Provider>
         </>
       )}

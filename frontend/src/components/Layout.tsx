@@ -34,7 +34,7 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({
 
       <Navbar />
 
-      <Box flex="1" px="4" mt="20">
+      <Box flex="1" mt="72px">
         {children}
       </Box>
 

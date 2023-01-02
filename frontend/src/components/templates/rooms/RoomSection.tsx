@@ -1,3 +1,4 @@
+import { Box } from '@chakra-ui/react';
 import { FC } from 'react';
 import useRoomStore from '../../../store/useRoomStore';
 
@@ -6,11 +7,11 @@ const RoomSection: FC = () => {
 
   return (
     <>
-      <div className="w-full tablet:w-1/4 bg-gray-600">
+      <Box width={{ base: '100%', md: '25%' }} bg={'gray.700'}>
         {activeMembers.map((member) => (
           <div key={member.uid}>{member.uid}</div>
         ))}
-      </div>
+      </Box>
     </>
   );
 };

@@ -26,7 +26,7 @@ const AuthenticatedApp: FC = () => {
   }
 
   return (
-    <Flex justify="center">
+    <Flex justify="center" mt="10">
       <PrimaryButton
         title="Create a Room"
         onClick={async () => await createRoom()}

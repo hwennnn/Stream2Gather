@@ -1,3 +1,11 @@
+import {
+  Box,
+  Flex,
+  Slider,
+  SliderFilledTrack,
+  SliderThumb,
+  SliderTrack
+} from '@chakra-ui/react';
 import { FC, MutableRefObject } from 'react';
 import {
   BsFullscreen,
@@ -13,18 +21,15 @@ import { emitStreamEvent, StreamEvent } from '../../../lib/roomSocketService';
 import { useRoomSocket } from '../../../pages/room';
 import useRoomStore, {
   setIsMuted,
+  setPlayedSeconds,
   setPlaying
 } from '../../../store/useRoomStore';
 
 interface PlayerControlProps {
   playerRef: MutableRefObject<any>;
-  progressBarRef: MutableRefObject<any>;
 }
 
-const PlayerControl: FC<PlayerControlProps> = ({
-  playerRef,
-  progressBarRef
-}) => {
+const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   const { roomSocket: socket } = useRoomSocket();
 
   const { roomId, playing, isMuted, playedSeconds, duration } = useRoomStore(
@@ -64,10 +69,11 @@ const PlayerControl: FC<PlayerControlProps> = ({
     emitStreamEvent(socket, payload);
   };
 
-  const seek = (event: any): void => {
-    const x = event.pageX - progressBarRef.current.getBoundingClientRect().left;
-    const bw = progressBarRef.current.scrollWidth;
-    const timestamp = (x / bw) * duration;
+  const seek = (value: number): void => {
+    const timestamp = (value / 100) * duration;
+    // optimistically update the playedSeconds store
+    setPlayedSeconds(timestamp);
+
     setPlaying(true);
     playerRef.current.seekTo(timestamp, 'seconds');
 
@@ -86,49 +92,50 @@ const PlayerControl: FC<PlayerControlProps> = ({
   };
 
   return (
-    <div className="flex col items-center p-2 bg-gray-800">
-      <button className="mr-5" onClick={() => setPlaying(!playing)}>
+    <Flex direction="row" alignItems="center" p="2" bg="gray.800">
+      <Box mr="5" onClick={() => setPlaying(!playing)}>
         {playing ? (
           <BsPause onClick={pause} size={32} color={'white'} />
         ) : (
           <BsPlay onClick={play} size={32} color={'white'} />
         )}
-      </button>
+      </Box>
 
-      <div className="mr-5 text-white">
+      <Box mr="5" textColor="white">
         {getFormattedTime(playedSeconds)}
         {' / '}
         {getFormattedTime(duration)}
-      </div>
+      </Box>
 
-      <div
-        ref={progressBarRef}
-        onClick={seek}
-        className="flex-1 h-3 rounded-sm border-black bg-white"
-      >
-        <div
-          className="h-3 rounded-l-sm rounded-r-sm bg-gray-400"
-          style={{
-            width: `${(playedSeconds / duration) * 100}%`
+      <Box flex="1">
+        <Slider
+          mt="2"
+          aria-label="slider-ex-1"
+          value={(playedSeconds / duration) * 100}
+          defaultValue={0}
+          onChange={(value) => {
+            seek(value);
           }}
-        ></div>
-      </div>
+        >
+          <SliderTrack>
+            <SliderFilledTrack />
+          </SliderTrack>
+          <SliderThumb />
+        </Slider>
+      </Box>
 
-      <button className="ml-5" onClick={() => setIsMuted(!isMuted)}>
+      <Box ml="5" onClick={() => setIsMuted(!isMuted)}>
         {!isMuted ? (
           <BsVolumeUp color={'white'} size={32} />
         ) : (
           <BsVolumeMute color={'white'} size={32} />
         )}
-      </button>
+      </Box>
 
-      <button
-        className="ml-5 mr-2"
-        onClick={async () => await handleClickFullscreen()}
-      >
+      <Box ml="5" mr="2" onClick={async () => await handleClickFullscreen()}>
         <BsFullscreen color={'white'} size={24} />
-      </button>
-    </div>
+      </Box>
+    </Flex>
   );
 };
 

@@ -128,7 +128,13 @@ const Navbar: FC = () => {
         px={4}
         py={1}
       >
-        <Flex h={16} alignItems={'center'} justifyContent={'space-between'}>
+        <Flex
+          h={16}
+          alignItems={'center'}
+          justifyContent={'space-between'}
+          mx="auto"
+          maxW="120em"
+        >
           <Flex justifyItems={'center'} alignItems="center" direction={'row'}>
             <Logo mr="2" height="10" />
             <Link href="/">

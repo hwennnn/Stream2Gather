@@ -5,6 +5,7 @@ interface RoomState {
   roomId: string;
   isPublic: boolean;
   isMuted: boolean;
+  volume: number;
   activeMembers: RoomMember[];
 
   // Room Info
@@ -20,6 +21,7 @@ interface RoomState {
     setRoom: (data: RoomQuery) => void;
     setPlaying: (playing: boolean) => void;
     setIsMuted: (isMuted: boolean) => void;
+    setVolume: (volume: number) => void;
     setPlayingUrl: (playingUrl: string) => void;
     setPlayedSeconds: (playedSeconds: number) => void;
     setDuration: (duration: number) => void;
@@ -35,6 +37,7 @@ const initialRoomData = {
   isPublic: false,
   playing: false,
   isMuted: true,
+  volume: 100,
   playingUrl: 'https://youtu.be/Y8JFxS1HlDo',
   playedSeconds: 0,
   duration: 0,
@@ -63,6 +66,7 @@ const useRoomStore = create<RoomState>()((set) => ({
     },
     setPlaying: (playing) => set({ playing }),
     setIsMuted: (isMuted) => set({ isMuted }),
+    setVolume: (volume) => set({ volume }),
     setPlayingUrl: (playingUrl) => set({ playingUrl }),
     setPlayedSeconds: (playedSeconds) => set({ playedSeconds }),
     setDuration: (duration) => set({ duration }),
@@ -87,6 +91,7 @@ export const {
   setRoom,
   setPlaying,
   setIsMuted,
+  setVolume,
   setPlayingUrl,
   setPlayedSeconds,
   setDuration,

@@ -2,13 +2,14 @@ import {
   Box,
   Flex,
   HStack,
+  SlideFade,
   Slider,
   SliderFilledTrack,
   SliderThumb,
   SliderTrack,
   Spacer
 } from '@chakra-ui/react';
-import { FC, MutableRefObject } from 'react';
+import { FC, MutableRefObject, useState } from 'react';
 import {
   BsFullscreen,
   BsPause,
@@ -24,7 +25,8 @@ import { useRoomSocket } from '../../../pages/room';
 import useRoomStore, {
   setIsMuted,
   setPlayedSeconds,
-  setPlaying
+  setPlaying,
+  setVolume
 } from '../../../store/useRoomStore';
 
 interface PlayerControlProps {
@@ -37,17 +39,20 @@ const PlayerControl: FC<PlayerControlProps> = ({
   playerWrapperRef
 }) => {
   const { roomSocket: socket } = useRoomSocket();
+  const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
-  const { roomId, playing, isMuted, playedSeconds, duration } = useRoomStore(
-    (state) => ({
-      roomId: state.roomId,
-      playing: state.playing,
-      isMuted: state.isMuted,
-      playedSeconds: state.playedSeconds,
-      duration: state.duration
-    }),
-    shallow
-  );
+  const { roomId, playing, isMuted, volume, playedSeconds, duration } =
+    useRoomStore(
+      (state) => ({
+        roomId: state.roomId,
+        playing: state.playing,
+        isMuted: state.isMuted,
+        volume: state.volume,
+        playedSeconds: state.playedSeconds,
+        duration: state.duration
+      }),
+      shallow
+    );
 
   const play = (): void => {
     setPlaying(true);
@@ -132,13 +137,48 @@ const PlayerControl: FC<PlayerControlProps> = ({
           )}
         </Box>
 
-        <Box onClick={() => setIsMuted(!isMuted)}>
-          {!isMuted ? (
-            <BsVolumeUp color={'white'} size={32} />
-          ) : (
-            <BsVolumeMute color={'white'} size={32} />
+        <HStack
+          spacing={3}
+          onMouseOver={() => {
+            if (isVolumeHovered) return;
+            setIsVolumeHovered(true);
+          }}
+          onMouseLeave={() => {
+            if (!isVolumeHovered) return;
+            setTimeout(() => {
+              setIsVolumeHovered(false);
+            }, 200);
+          }}
+        >
+          <Box onClick={() => setIsMuted(!isMuted)}>
+            {!isMuted && volume > 0 ? (
+              <BsVolumeUp color={'white'} size={32} />
+            ) : (
+              <BsVolumeMute color={'white'} size={32} />
+            )}
+          </Box>
+
+          {isVolumeHovered && (
+            <SlideFade in={isVolumeHovered}>
+              <Slider
+                mt="2"
+                width={'40px'}
+                aria-label="slider-ex-2"
+                colorScheme="pink"
+                value={isMuted ? 0 : volume}
+                defaultValue={100}
+                onChange={(value) => {
+                  setVolume(value);
+                }}
+              >
+                <SliderTrack>
+                  <SliderFilledTrack />
+                </SliderTrack>
+                <SliderThumb />
+              </Slider>
+            </SlideFade>
           )}
-        </Box>
+        </HStack>
 
         <Box textColor="white">
           {getFormattedTime(playedSeconds)}

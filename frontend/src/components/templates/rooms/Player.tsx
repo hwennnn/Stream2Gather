@@ -20,10 +20,11 @@ const ReactPlayer = dynamic(async () => await import('./ReactPlayerWrapper'), {
 
 export const Player: FC = () => {
   const { roomSocket: socket } = useRoomSocket();
-  const { playing, isMuted, playingIndex, playlist } = useRoomStore(
+  const { playing, isMuted, volume, playingIndex, playlist } = useRoomStore(
     (state) => ({
       playing: state.playing,
       isMuted: state.isMuted,
+      volume: state.volume,
       playingIndex: state.playingIndex,
       playlist: state.playlist
     }),
@@ -84,9 +85,11 @@ export const Player: FC = () => {
         position="relative"
         pt={'56.25%'}
         onMouseOver={() => {
+          if (isHovered) return;
           setIsHovered(true);
         }}
         onMouseLeave={() => {
+          if (!isHovered) return;
           setTimeout(() => {
             setIsHovered(false);
           }, 200);
@@ -103,6 +106,7 @@ export const Player: FC = () => {
           onDuration={(duration: number) => updateDuration(duration)}
           muted={isMuted}
           playing={playing}
+          volume={volume}
           url={playlist[playingIndex].url}
           config={{
             youtube: {

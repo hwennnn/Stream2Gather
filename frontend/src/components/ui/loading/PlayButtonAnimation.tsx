@@ -15,4 +15,4 @@ const RawLoadingAnimation: FC<Props> = ({ width = 15 }) => {
   );
 };
 
-export const PlayLoadingAnimation = memo(RawLoadingAnimation);
+export const PlayButtonAnimation = memo(RawLoadingAnimation);

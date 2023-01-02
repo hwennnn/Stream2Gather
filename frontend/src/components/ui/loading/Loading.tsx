@@ -1,18 +1,14 @@
 import { Flex } from '@chakra-ui/react';
 import { FC } from 'react';
 import FadeIn from 'react-fade-in';
-import { PlayLoadingAnimation } from './PlayLoadingAnimation';
+
+import { PlayButtonAnimation } from './PlayButtonAnimation';
 
 export const Loading: FC = () => {
   return (
-    <Flex
-      width="100vw"
-      height="100vh"
-      alignItems="center"
-      justifyContent="center"
-    >
+    <Flex h="100vh" width="100vw" alignItems="center" justifyContent="center">
       <FadeIn>
-        <PlayLoadingAnimation />
+        <PlayButtonAnimation />
       </FadeIn>
     </Flex>
   );

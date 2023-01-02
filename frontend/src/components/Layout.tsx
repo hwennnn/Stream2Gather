@@ -1,6 +1,7 @@
-import { Box } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import Head from 'next/head';
 import { FC, PropsWithChildren } from 'react';
+import Footer from './Footer';
 import Navbar from './Navbar';
 
 interface LayoutProps {
@@ -14,7 +15,7 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({
   children
 }) => {
   return (
-    <Box width="full" mx="auto">
+    <Flex direction={'column'} h="100vh" width="full" mx="auto">
       <Head>
         <title>
           {title !== undefined
@@ -33,8 +34,12 @@ const Layout: FC<PropsWithChildren<LayoutProps>> = ({
 
       <Navbar />
 
-      {children}
-    </Box>
+      <Box flex="1" px="4" mt="20">
+        {children}
+      </Box>
+
+      <Footer />
+    </Flex>
   );
 };
 

@@ -119,6 +119,9 @@ const Navbar: FC = () => {
   return (
     <>
       <Box
+        as="header"
+        position="fixed"
+        w="full"
         bg="bg-surface"
         boxShadow={useColorModeValue('sm', 'sm-dark')}
         px={4}

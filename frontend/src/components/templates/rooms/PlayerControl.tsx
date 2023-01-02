@@ -4,7 +4,8 @@ import {
   Slider,
   SliderFilledTrack,
   SliderThumb,
-  SliderTrack
+  SliderTrack,
+  useColorModeValue
 } from '@chakra-ui/react';
 import { FC, MutableRefObject } from 'react';
 import {
@@ -92,7 +93,12 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   };
 
   return (
-    <Flex direction="row" alignItems="center" p="2" bg="gray.800">
+    <Flex
+      direction="row"
+      alignItems="center"
+      p="2"
+      bg={useColorModeValue('gray.600', 'gray.800')}
+    >
       <Box mr="5" onClick={() => setPlaying(!playing)}>
         {playing ? (
           <BsPause onClick={pause} size={32} color={'white'} />
@@ -111,7 +117,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
         <Slider
           mt="2"
           aria-label="slider-ex-1"
-          value={(playedSeconds / duration) * 100}
+          value={duration === 0 ? 0 : (playedSeconds / duration) * 100}
           defaultValue={0}
           onChange={(value) => {
             seek(value);

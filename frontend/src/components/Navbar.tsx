@@ -48,10 +48,9 @@ const UserMenu: FC = () => {
         minW={0}
       >
         <Avatar
+          name={user?.username}
           size={'sm'}
-          src={`https://avatars.dicebear.com/api/pixel-art/${
-            user?.username ?? ''
-          }.svg`}
+          src={user?.displayPhoto ?? undefined}
         />
       </MenuButton>
 
@@ -59,10 +58,9 @@ const UserMenu: FC = () => {
         <br />
         <Center>
           <Avatar
-            size={'2xl'}
-            src={`https://avatars.dicebear.com/api/pixel-art/${
-              user?.username ?? ''
-            }.svg`}
+            name={user?.username}
+            size={'xl'}
+            src={user?.displayPhoto ?? undefined}
           />
         </Center>
         <br />

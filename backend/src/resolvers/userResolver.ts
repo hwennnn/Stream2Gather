@@ -19,11 +19,14 @@ import { verifyFirebaseToken } from '../utils/verifyFirebaseToken';
 import { FieldError } from './types';
 @InputType()
 class RegisterInput {
+  @Field()
+  username: string;
+
   @Field({ nullable: true })
   email?: string;
 
   @Field({ nullable: true })
-  username?: string;
+  displayPhoto?: string;
 
   @Field()
   token: string;
@@ -158,7 +161,8 @@ export class UserResolver {
       user = await User.create({
         id: uid,
         username: options.username,
-        email: options.email
+        email: options.email,
+        displayPhoto: options.displayPhoto
       }).save();
       console.log(user);
     } catch (err) {
@@ -200,11 +204,13 @@ export class UserResolver {
     try {
       const uid = await verifyFirebaseToken(options.token);
       user = await User.findOne({ where: { id: uid } });
+
       if (user === null) {
         user = await User.create({
           id: uid,
           username: options.username,
-          email: options.email
+          email: options.email,
+          displayPhoto: options.displayPhoto
         }).save();
       }
       console.log(user);

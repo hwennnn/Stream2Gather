@@ -73,14 +73,19 @@ const OAuthButtonGroup: FC = () => {
 
     try {
       setToastMessage(null);
-      const { userToken, username, email } = await signInWithProvider(name);
-      console.log(username, email);
+      const { userToken, username, email, displayPhoto } =
+        await signInWithProvider(name);
+
+      if (username === null) {
+        throw Error('Username is not provided');
+      }
 
       await mutateAsync({
         options: {
           token: userToken,
           email,
-          username
+          username,
+          displayPhoto
         }
       });
 

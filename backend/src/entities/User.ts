@@ -18,13 +18,17 @@ export class User extends BaseEntity {
   @PrimaryColumn()
   id!: string;
 
-  @Field({ nullable: true })
-  @Column({ nullable: true })
+  @Field()
+  @Column()
   username: string;
 
   @Field({ nullable: true })
   @Column({ nullable: true })
   email: string;
+
+  @Field({ nullable: true })
+  @Column({ nullable: true })
+  displayPhoto: string;
 
   @Field(() => String)
   @CreateDateColumn()

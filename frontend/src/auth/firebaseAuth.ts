@@ -19,6 +19,7 @@ interface FirebaseAuthResult {
   userToken: string;
   username: string | null;
   email: string | null;
+  displayPhoto: string | null;
 }
 
 export const registerWithEmailPassword = async ({
@@ -89,7 +90,8 @@ export const signInWithProvider = async (
     return {
       userToken,
       username: user.displayName,
-      email: user.email
+      email: user.email,
+      displayPhoto: user.photoURL
     };
   } catch (error: any) {
     console.log(error);

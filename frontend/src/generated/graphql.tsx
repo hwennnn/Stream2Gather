@@ -99,9 +99,10 @@ export type QueryUsersWithRelationsArgs = {
 };
 
 export type RegisterInput = {
+  displayPhoto?: InputMaybe<Scalars['String']>;
   email?: InputMaybe<Scalars['String']>;
   token: Scalars['String'];
-  username?: InputMaybe<Scalars['String']>;
+  username: Scalars['String'];
 };
 
 export type Room = {
@@ -144,11 +145,12 @@ export type User = {
   __typename?: 'User';
   createdAt: Scalars['String'];
   createdRooms?: Maybe<Array<Room>>;
+  displayPhoto?: Maybe<Scalars['String']>;
   email?: Maybe<Scalars['String']>;
   id: Scalars['String'];
   rooms?: Maybe<Array<Room>>;
   updatedAt: Scalars['String'];
-  username?: Maybe<Scalars['String']>;
+  username: Scalars['String'];
 };
 
 export type UserRelationsInput = {
@@ -174,7 +176,7 @@ export type VideoInfo = {
 
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
-export type UserItemFragment = { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string };
+export type UserItemFragment = { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string };
 
 export type CreateRoomMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -186,7 +188,7 @@ export type LoginMutationVariables = Exact<{
 }>;
 
 
-export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null } };
+export type LoginMutation = { __typename?: 'Mutation', login: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string } | null } };
 
 export type LogoutMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -198,19 +200,19 @@ export type RegisterMutationVariables = Exact<{
 }>;
 
 
-export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null } };
+export type RegisterMutation = { __typename?: 'Mutation', register: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string } | null } };
 
 export type SocialLoginMutationVariables = Exact<{
   options: RegisterInput;
 }>;
 
 
-export type SocialLoginMutation = { __typename?: 'Mutation', socialLogin: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null } };
+export type SocialLoginMutation = { __typename?: 'Mutation', socialLogin: { __typename?: 'UserResponse', errors?: Array<{ __typename?: 'FieldError', field: string, message: string }> | null, user?: { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string } | null } };
 
 export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string } | null };
+export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string } | null };
 
 export type RoomQueryVariables = Exact<{
   id: Scalars['String'];
@@ -229,7 +231,7 @@ export type UsersWithRelationsQueryVariables = Exact<{
 }>;
 
 
-export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username?: string | null, email?: string | null, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
+export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
 
 export const RegularErrorFragmentDoc = `
     fragment RegularError on FieldError {
@@ -242,6 +244,7 @@ export const UserItemFragmentDoc = `
   id
   username
   email
+  displayPhoto
   createdAt
   updatedAt
 }

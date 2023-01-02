@@ -2,6 +2,7 @@ fragment UserItem on User {
     id
     username
     email
+    displayPhoto
     createdAt
     updatedAt
 }

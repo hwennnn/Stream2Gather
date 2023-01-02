@@ -3,7 +3,7 @@ export const validatePassword = (password: string): boolean => {
   // upper and lower case letters and a number
   const passwordReg = /^(?=.*\d)(?=.*[!@#$%^&*])(?=.*[a-z])(?=.*[A-Z]).{8,}$/;
 
-  return passwordReg.test(password);
+  return password.length <= 30 && passwordReg.test(password);
 };
 
 interface ValidateFormPasswordArgs {

@@ -133,9 +133,9 @@ const Navbar: FC = () => {
           mx="auto"
           maxW="120em"
         >
-          <Flex justifyItems={'center'} alignItems="center" direction={'row'}>
-            <Logo mr="2" height="10" />
-            <Link href="/">
+          <Link href="/">
+            <Flex justifyItems={'center'} alignItems="center" direction={'row'}>
+              <Logo mr="2" height="10" />
               <Text
                 fontFamily={'heading'}
                 fontWeight={'bold'}
@@ -144,8 +144,8 @@ const Navbar: FC = () => {
               >
                 Stream2Gather
               </Text>
-            </Link>
-          </Flex>
+            </Flex>
+          </Link>
 
           <Flex alignItems={'center'}>
             <Stack direction={'row'} spacing={6}>

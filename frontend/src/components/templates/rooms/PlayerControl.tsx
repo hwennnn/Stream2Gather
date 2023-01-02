@@ -168,6 +168,9 @@ const PlayerControl: FC<PlayerControlProps> = ({
                 value={isMuted ? 0 : volume}
                 defaultValue={100}
                 onChange={(value) => {
+                  if (value > 0 && isMuted) {
+                    setIsMuted(false);
+                  }
                   setVolume(value);
                 }}
               >

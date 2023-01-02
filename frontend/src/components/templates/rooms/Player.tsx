@@ -112,7 +112,7 @@ export const Player: FC = () => {
           onDuration={(duration: number) => updateDuration(duration)}
           muted={isMuted}
           playing={playing}
-          volume={volume}
+          volume={volume / 100}
           url={playlist[playingIndex].url}
           config={{
             youtube: {

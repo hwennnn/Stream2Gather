@@ -123,6 +123,7 @@ const Navbar: FC = () => {
         position="fixed"
         w="full"
         bg="bg-surface"
+        zIndex="1"
         boxShadow={useColorModeValue('sm', 'sm-dark')}
         px={4}
         py={1}

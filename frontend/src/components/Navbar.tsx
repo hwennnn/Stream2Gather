@@ -97,7 +97,7 @@ const LoginItems: FC = () => {
 
       <Link href="/register">
         <Button
-          colorScheme={'blue'}
+          variant="primary"
           display={{ base: 'none', md: 'inline-flex' }}
           fontSize={'md'}
           fontWeight={600}
@@ -118,11 +118,10 @@ const Navbar: FC = () => {
   return (
     <>
       <Box
-        bg={useColorModeValue('gray.100', 'gray.800')}
-        borderBottom={1}
-        borderStyle={'solid'}
-        borderColor={useColorModeValue('gray.200', 'gray.900')}
+        bg="bg-surface"
+        boxShadow={useColorModeValue('sm', 'sm-dark')}
         px={4}
+        py={1}
       >
         <Flex h={16} alignItems={'center'} justifyContent={'space-between'}>
           <Box>

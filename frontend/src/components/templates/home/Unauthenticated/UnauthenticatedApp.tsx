@@ -46,7 +46,7 @@ const UnauthenticatedApp: FC = () => {
         </Text>
         <Stack spacing={6} direction={'row'}>
           <Link href="/register">
-            <Button fontWeight={'600'} colorScheme={'blue'} px={6}>
+            <Button fontWeight={'600'} variant="primary" px={6}>
               Get started
             </Button>
           </Link>

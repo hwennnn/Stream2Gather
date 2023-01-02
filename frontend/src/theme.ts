@@ -15,6 +15,17 @@ const theme = extendTheme(
       githubBlack: '#323332',
       ...proTheme.colors,
       brand: proTheme.colors.blue
+    },
+    components: {
+      Menu: {
+        ...(proTheme.components?.Menu ?? {}),
+        baseStyle: {
+          ...(proTheme.components?.Menu?.baseStyle ?? {})
+          // item: {
+          //   _focus: { bg: 'gray.700' }
+          // }
+        }
+      }
     }
   },
   proTheme

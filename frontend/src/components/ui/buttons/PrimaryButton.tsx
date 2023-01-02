@@ -18,11 +18,7 @@ export const PrimaryButton: FC<ButtonProps> = ({ title, onClick }) => {
   };
 
   return (
-    <Button
-      colorScheme="blue"
-      isLoading={isButtonLoading}
-      onClick={handleClick}
-    >
+    <Button variant="primary" isLoading={isButtonLoading} onClick={handleClick}>
       {title}
     </Button>
   );

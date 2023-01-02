@@ -20,17 +20,13 @@ import { NextPage } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import {
-  loginWithEmailPassword,
-  signInWithGithub,
-  signInWithGoogle
-} from '../auth/firebaseAuth';
+import { loginWithEmailPassword } from '../auth/firebaseAuth';
 import Layout from '../components/Layout';
-import { OAuthButtonGroup } from '../components/templates/auth/OAuthButtonGroup';
+import OAuthButtonGroup from '../components/templates/auth/OAuthButtonGroup';
 import { PasswordField } from '../components/templates/auth/PasswordField';
 import { Logo } from '../components/ui/Logo';
 import { MeQueryKey } from '../constants/query';
-import { useLoginMutation, useSocialLoginMutation } from '../generated/graphql';
+import { useLoginMutation } from '../generated/graphql';
 import { validateFormEmail } from '../utils/validateEmail';
 import { validateFormPassword } from '../utils/validatePassword';
 
@@ -46,17 +42,13 @@ interface LoginToastMessage {
 }
 
 const Login: NextPage = () => {
-  const toast = useToast();
-
   const queryClient = useQueryClient();
   const router = useRouter();
+  const toast = useToast();
   const [toastMessage, setToastMessage] = useState<LoginToastMessage | null>(
     null
   );
-
   const { mutateAsync } = useLoginMutation({});
-
-  const socialLogin = useSocialLoginMutation({});
 
   const invalidateMeQueryAndRedirect = async (): Promise<void> => {
     await queryClient.invalidateQueries({
@@ -64,11 +56,6 @@ const Login: NextPage = () => {
     });
 
     await router.push('/');
-    setToastMessage({
-      title: 'Successfully logged in',
-      description: 'You will now be redirected to the home page.',
-      status: 'success'
-    });
   };
 
   useEffect(() => {
@@ -82,54 +69,6 @@ const Login: NextPage = () => {
       });
     }
   }, [toast, toastMessage]);
-
-  const loginWithGoogle = async (): Promise<void> => {
-    try {
-      setToastMessage(null);
-      const { userToken, username, email } = await signInWithGoogle();
-      console.log(username, email);
-
-      await socialLogin.mutateAsync({
-        options: {
-          token: userToken,
-          email,
-          username
-        }
-      });
-
-      await invalidateMeQueryAndRedirect();
-    } catch (error: any) {
-      setToastMessage({
-        title: 'Error encountered during login',
-        description: error.message,
-        status: 'error'
-      });
-    }
-  };
-
-  const loginWithGithub = async (): Promise<void> => {
-    try {
-      setToastMessage(null);
-      const { userToken, username, email } = await signInWithGithub();
-      console.log(username, email);
-
-      await socialLogin.mutateAsync({
-        options: {
-          token: userToken,
-          email,
-          username
-        }
-      });
-
-      await invalidateMeQueryAndRedirect();
-    } catch (error: any) {
-      setToastMessage({
-        title: 'Error encountered during login',
-        description: error.message,
-        status: 'error'
-      });
-    }
-  };
 
   const formik = useFormik<LoginFormValues>({
     initialValues: {

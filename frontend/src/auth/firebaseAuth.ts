@@ -1,10 +1,13 @@
 import {
+  AuthProvider,
   createUserWithEmailAndPassword,
   GithubAuthProvider,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
-  signInWithPopup
+  signInWithPopup,
+  TwitterAuthProvider
 } from 'firebase/auth';
+import { ProviderName } from './../components/templates/auth/OAuthButtonGroup';
 import { auth } from './firebase';
 
 interface EmailPasswordArgs {
@@ -99,6 +102,40 @@ export const signInWithGithub = async (): Promise<FirebaseAuthResult> => {
       email: user.email
     };
   } catch (error: any) {
+    if (
+      error.code === 'auth/cancelled-popup-request' ||
+      error.code === 'auth/popup-closed-by-user'
+    ) {
+      // DO NOTHING
+      throw Error();
+    } else {
+      throw Error('Something went wrong');
+    }
+  }
+};
+
+export const signInWithProvider = async (
+  name: ProviderName
+): Promise<FirebaseAuthResult> => {
+  const provider: AuthProvider =
+    name === ProviderName.GOOGLE
+      ? new GoogleAuthProvider()
+      : name === ProviderName.GITHUB
+      ? new GithubAuthProvider()
+      : new TwitterAuthProvider();
+
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const user = result.user;
+    const userToken = await result.user.getIdToken();
+
+    return {
+      userToken,
+      username: user.displayName,
+      email: user.email
+    };
+  } catch (error: any) {
+    console.log(error);
     if (
       error.code === 'auth/cancelled-popup-request' ||
       error.code === 'auth/popup-closed-by-user'

@@ -1,11 +1,12 @@
 import {
   Box,
   Flex,
+  HStack,
   Slider,
   SliderFilledTrack,
   SliderThumb,
   SliderTrack,
-  useColorModeValue
+  Spacer
 } from '@chakra-ui/react';
 import { FC, MutableRefObject } from 'react';
 import {
@@ -28,9 +29,13 @@ import useRoomStore, {
 
 interface PlayerControlProps {
   playerRef: MutableRefObject<any>;
+  playerWrapperRef: MutableRefObject<any>;
 }
 
-const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
+const PlayerControl: FC<PlayerControlProps> = ({
+  playerRef,
+  playerWrapperRef
+}) => {
   const { roomSocket: socket } = useRoomSocket();
 
   const { roomId, playing, isMuted, playedSeconds, duration } = useRoomStore(
@@ -70,13 +75,17 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     emitStreamEvent(socket, payload);
   };
 
-  const seek = (value: number): void => {
+  const seeking = (value: number): void => {
     const timestamp = (value / 100) * duration;
     // optimistically update the playedSeconds store
     setPlayedSeconds(timestamp);
 
     setPlaying(true);
     playerRef.current.seekTo(timestamp, 'seconds');
+  };
+
+  const seek = (value: number): void => {
+    const timestamp = (value / 100) * duration;
 
     const payload: StreamEvent = {
       roomId,
@@ -93,34 +102,18 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   };
 
   return (
-    <Flex
-      direction="row"
-      alignItems="center"
-      p="2"
-      bg={useColorModeValue('gray.600', 'gray.800')}
-    >
-      <Box mr="5" onClick={() => setPlaying(!playing)}>
-        {playing ? (
-          <BsPause onClick={pause} size={32} color={'white'} />
-        ) : (
-          <BsPlay onClick={play} size={32} color={'white'} />
-        )}
-      </Box>
-
-      <Box mr="5" textColor="white">
-        {getFormattedTime(playedSeconds)}
-        {' / '}
-        {getFormattedTime(duration)}
-      </Box>
-
+    <Flex w="full" direction={'column'} mb="3">
       <Box flex="1">
         <Slider
           mt="2"
           aria-label="slider-ex-1"
           value={duration === 0 ? 0 : (playedSeconds / duration) * 100}
           defaultValue={0}
-          onChange={(value) => {
+          onChangeEnd={(value) => {
             seek(value);
+          }}
+          onChange={(value) => {
+            seeking(value);
           }}
         >
           <SliderTrack>
@@ -130,17 +123,35 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
         </Slider>
       </Box>
 
-      <Box ml="5" onClick={() => setIsMuted(!isMuted)}>
-        {!isMuted ? (
-          <BsVolumeUp color={'white'} size={32} />
-        ) : (
-          <BsVolumeMute color={'white'} size={32} />
-        )}
-      </Box>
+      <HStack spacing={5} w="full" alignItems="center">
+        <Box onClick={() => setPlaying(!playing)}>
+          {playing ? (
+            <BsPause onClick={pause} size={32} color={'white'} />
+          ) : (
+            <BsPlay onClick={play} size={32} color={'white'} />
+          )}
+        </Box>
 
-      <Box ml="5" mr="2" onClick={async () => await handleClickFullscreen()}>
-        <BsFullscreen color={'white'} size={24} />
-      </Box>
+        <Box onClick={() => setIsMuted(!isMuted)}>
+          {!isMuted ? (
+            <BsVolumeUp color={'white'} size={32} />
+          ) : (
+            <BsVolumeMute color={'white'} size={32} />
+          )}
+        </Box>
+
+        <Box textColor="white">
+          {getFormattedTime(playedSeconds)}
+          {' / '}
+          {getFormattedTime(duration)}
+        </Box>
+
+        <Spacer />
+
+        <Box ml="5" mr="2" onClick={async () => await handleClickFullscreen()}>
+          <BsFullscreen color={'white'} size={24} />
+        </Box>
+      </HStack>
     </Flex>
   );
 };

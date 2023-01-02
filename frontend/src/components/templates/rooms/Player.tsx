@@ -1,6 +1,6 @@
-import { Box } from '@chakra-ui/react';
+import { Box, SlideFade } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
-import { FC, useRef } from 'react';
+import { FC, useRef, useState } from 'react';
 import shallow from 'zustand/shallow';
 import {
   startPlayingVideo,
@@ -29,7 +29,9 @@ export const Player: FC = () => {
     }),
     shallow
   );
+  const [isHovered, setIsHovered] = useState(false);
 
+  const playerWrapperRef = useRef<any>();
   const playerRef = useRef<any>();
 
   const onPlayerReady = (): void => {
@@ -77,7 +79,19 @@ export const Player: FC = () => {
 
   return (
     <Box width={{ base: '100%', lg: '70%' }}>
-      <Box position="relative" pt={'56.25%'}>
+      <Box
+        ref={playerWrapperRef}
+        position="relative"
+        pt={'56.25%'}
+        onMouseOver={() => {
+          setIsHovered(true);
+        }}
+        onMouseLeave={() => {
+          setTimeout(() => {
+            setIsHovered(false);
+          }, 200);
+        }}
+      >
         <ReactPlayer
           style={{ position: 'absolute', top: 0, left: 0 }}
           width="100%"
@@ -97,14 +111,31 @@ export const Player: FC = () => {
                 controls: 0,
                 disablekb: 1,
                 modestbranding: 1,
-                rel: 0
+                rel: 0,
+                fs: 0,
+                hl: 'eng'
               }
             }
           }}
           playerref={playerRef}
         />
+
+        <SlideFade in={isHovered || !playing} offsetY="20px">
+          <Box
+            px="4"
+            w="full"
+            position={'absolute'}
+            left={0}
+            bottom={0}
+            right={0}
+          >
+            <PlayerControl
+              playerRef={playerRef}
+              playerWrapperRef={playerWrapperRef}
+            />
+          </Box>
+        </SlideFade>
       </Box>
-      <PlayerControl playerRef={playerRef} />
     </Box>
   );
 };

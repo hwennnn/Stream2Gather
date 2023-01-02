@@ -38,20 +38,12 @@ const providers: ProviderProps[] = [
   }
 ];
 
-interface LoginToastMessage {
-  title: string;
-  description: string;
-  status: 'error' | 'success';
-}
-
 const OAuthButtonGroup: FC = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const { mutateAsync } = useSocialLoginMutation({});
   const toast = useToast();
-  const [toastMessage, setToastMessage] = useState<LoginToastMessage | null>(
-    null
-  );
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isButtonLoading, setIsButtonLoading] = useState<ProviderName | null>(
     null
   );
@@ -59,10 +51,10 @@ const OAuthButtonGroup: FC = () => {
   useEffect(() => {
     if (toastMessage !== null) {
       toast({
-        title: toastMessage.title,
-        description: toastMessage.description,
-        status: toastMessage.status,
-        duration: toastMessage.status === 'error' ? 4000 : 2000,
+        title: 'Error encountered',
+        description: toastMessage,
+        status: 'error',
+        duration: 4000,
         isClosable: true
       });
     }
@@ -95,11 +87,7 @@ const OAuthButtonGroup: FC = () => {
       await invalidateMeQueryAndRedirect();
     } catch (error: any) {
       setIsButtonLoading(null);
-      setToastMessage({
-        title: 'Error encountered',
-        description: error.message,
-        status: 'error'
-      });
+      setToastMessage(error.message);
     }
   };
 

@@ -35,19 +35,11 @@ interface LoginFormValues {
   password: string;
 }
 
-interface LoginToastMessage {
-  title: string;
-  description: string;
-  status: 'error' | 'success';
-}
-
 const Login: NextPage = () => {
   const queryClient = useQueryClient();
   const router = useRouter();
   const toast = useToast();
-  const [toastMessage, setToastMessage] = useState<LoginToastMessage | null>(
-    null
-  );
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const { mutateAsync } = useLoginMutation({});
 
   const invalidateMeQueryAndRedirect = async (): Promise<void> => {
@@ -61,10 +53,10 @@ const Login: NextPage = () => {
   useEffect(() => {
     if (toastMessage !== null) {
       toast({
-        title: toastMessage.title,
-        description: toastMessage.description,
-        status: toastMessage.status,
-        duration: toastMessage.status === 'error' ? 4000 : 2000,
+        title: 'Error encountered during login',
+        description: toastMessage,
+        status: 'error',
+        duration: 4000,
         isClosable: true
       });
     }
@@ -96,11 +88,7 @@ const Login: NextPage = () => {
 
         await invalidateMeQueryAndRedirect();
       } catch (error: any) {
-        setToastMessage({
-          title: 'Error encountered during login',
-          description: error.message,
-          status: 'error'
-        });
+        setToastMessage(error.message);
       }
     },
     validate: (values) => {

@@ -140,7 +140,7 @@ const Navbar: FC = () => {
                 fontFamily={'heading'}
                 fontWeight={'bold'}
                 fontSize={'lg'}
-                color={useColorModeValue('gray.800', 'white')}
+                color={'accent'}
               >
                 Stream2Gather
               </Text>

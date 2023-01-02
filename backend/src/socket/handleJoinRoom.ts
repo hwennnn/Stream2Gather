@@ -6,9 +6,11 @@ import { RES_NEW_MEMBER } from './../constants/socket';
 
 type JoinRoomFunction = ({
   uid,
+  username,
   roomId
 }: {
   uid: string;
+  username: string;
   roomId: string;
 }) => Promise<void>;
 
@@ -17,13 +19,14 @@ export const handleJoinRoom = (
   redisHelper: RedisHelper,
   redisRoomHelper: RedisRoomHelper
 ): JoinRoomFunction => {
-  return async ({ uid, roomId }): Promise<void> => {
+  return async ({ uid, roomId, username }): Promise<void> => {
     const member: RoomMember = {
-      uid,
       socketId: socket.id,
-      roomId
+      roomId,
+      uid,
+      username
     };
-    console.log(`${socket.id} has joined the room with id ${roomId}`);
+    console.log(`${username} has joined the room with id ${roomId}`);
 
     await socket.join(roomId);
     socket.roomId = roomId;

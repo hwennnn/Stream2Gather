@@ -78,7 +78,6 @@ const useRoomStore = create<RoomState>()((set) => ({
         const activeMembers = state.activeMembers.filter(
           (m) => m.socketId !== socketId
         );
-        console.log('removeActiveMember', socketId, activeMembers);
         return { activeMembers };
       })
   }

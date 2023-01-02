@@ -21,6 +21,7 @@ query Room($id: String!) {
       socketId
       roomId
       uid
+      username
     }
   }
 }

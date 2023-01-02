@@ -9,7 +9,7 @@ import {
   RES_NEW_MEMBER,
   RES_STREAMING_EVENTS
 } from '../constants/socket';
-import { RoomMember } from '../generated/graphql';
+import { RoomMember, User } from '../generated/graphql';
 import {
   addActiveMember,
   removeActiveMember,
@@ -25,11 +25,12 @@ export interface StreamEvent {
 export const joinRoom = (
   socket: Socket,
   roomId: string,
-  uid: string | undefined
+  user: User | null | undefined
 ): void => {
   socket.emit(REQ_JOIN_ROOM, {
     roomId,
-    uid
+    uid: user?.id,
+    username: user?.username
   });
 };
 

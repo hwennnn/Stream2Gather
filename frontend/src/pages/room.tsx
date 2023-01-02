@@ -42,7 +42,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
 
   useEffect(() => {
     if (socket !== null) {
-      joinRoom(socket, roomId, user?.id);
+      joinRoom(socket, roomId, user);
       subscribeUserJoined(socket);
       subscribeUserLeft(socket);
 
@@ -54,7 +54,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
     }
 
     return (): void => {};
-  }, [roomId, socket, user?.id]);
+  }, [roomId, socket, user]);
 
   useEffect(() => {
     setSocket(

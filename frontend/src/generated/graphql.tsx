@@ -133,6 +133,7 @@ export type RoomMember = {
   roomId: Scalars['String'];
   socketId: Scalars['String'];
   uid: Scalars['String'];
+  username: Scalars['String'];
 };
 
 export type RoomResponse = {
@@ -219,7 +220,7 @@ export type RoomQueryVariables = Exact<{
 }>;
 
 
-export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playedSeconds: number, isPlaying: boolean, playedTimestampUpdatedAt: string, currentUrl: string, playingIndex: number, playlist: Array<{ __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string }> }, activeMembers: Array<{ __typename?: 'RoomMember', socketId: string, roomId: string, uid: string }> } | null };
+export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playedSeconds: number, isPlaying: boolean, playedTimestampUpdatedAt: string, currentUrl: string, playingIndex: number, playlist: Array<{ __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string }> }, activeMembers: Array<{ __typename?: 'RoomMember', socketId: string, roomId: string, uid: string, username: string }> } | null };
 
 export type RoomsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -402,6 +403,7 @@ export const RoomDocument = `
       socketId
       roomId
       uid
+      username
     }
   }
 }

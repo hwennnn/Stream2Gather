@@ -12,6 +12,9 @@ export class RoomMember {
   uid: string;
 
   @Field()
+  username: string;
+
+  @Field()
   socketId: string;
 
   @Field()

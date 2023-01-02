@@ -62,67 +62,24 @@ export const loginWithEmailPassword = async ({
   }
 };
 
-export const signInWithGoogle = async (): Promise<FirebaseAuthResult> => {
-  const provider = new GoogleAuthProvider();
-
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    const userToken = await result.user.getIdToken();
-
-    return {
-      userToken,
-      username: user.displayName,
-      email: user.email
-    };
-  } catch (error: any) {
-    if (
-      error.code === 'auth/cancelled-popup-request' ||
-      error.code === 'auth/popup-closed-by-user'
-    ) {
-      // DO NOTHING
-      throw Error();
-    } else {
-      throw Error('Something went wrong');
-    }
-  }
-};
-
-export const signInWithGithub = async (): Promise<FirebaseAuthResult> => {
-  const provider = new GithubAuthProvider();
-
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
-    const userToken = await result.user.getIdToken();
-
-    return {
-      userToken,
-      username: user.displayName,
-      email: user.email
-    };
-  } catch (error: any) {
-    if (
-      error.code === 'auth/cancelled-popup-request' ||
-      error.code === 'auth/popup-closed-by-user'
-    ) {
-      // DO NOTHING
-      throw Error();
-    } else {
-      throw Error('Something went wrong');
-    }
-  }
-};
-
 export const signInWithProvider = async (
   name: ProviderName
 ): Promise<FirebaseAuthResult> => {
-  const provider: AuthProvider =
-    name === ProviderName.GOOGLE
-      ? new GoogleAuthProvider()
-      : name === ProviderName.GITHUB
-      ? new GithubAuthProvider()
-      : new TwitterAuthProvider();
+  let provider: AuthProvider | null = null;
+
+  switch (name) {
+    case ProviderName.GOOGLE:
+      provider = new GoogleAuthProvider();
+      break;
+    case ProviderName.GITHUB:
+      provider = new GithubAuthProvider();
+      break;
+    case ProviderName.TWITTER:
+      provider = new TwitterAuthProvider();
+      break;
+    default:
+      throw Error('Provider cannot be found');
+  }
 
   try {
     const result = await signInWithPopup(auth, provider);

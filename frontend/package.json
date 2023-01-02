@@ -12,10 +12,11 @@
     },
     "dependencies": {
         "@chakra-ui/icons": "^2.0.15",
+        "@chakra-ui/pro-theme": "^0.0.57",
         "@chakra-ui/react": "^2.4.6",
         "@emotion/react": "^11",
         "@emotion/styled": "^11",
-        "@fontsource/montserrat": "^4.5.13",
+        "@fontsource/inter": "^4.5.14",
         "@lottiefiles/react-lottie-player": "^3.5.0",
         "@tanstack/react-query": "^4.20.4",
         "@tanstack/react-query-devtools": "^4.20.4",

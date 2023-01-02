@@ -90,21 +90,17 @@ const LoginItems: FC = () => {
       spacing={6}
     >
       <Link href="/login">
-        <Button fontSize={'md'} fontWeight={400} variant={'link'}>
+        <Button fontSize={'md'} fontWeight={500} variant={'link'}>
           Login
         </Button>
       </Link>
 
       <Link href="/register">
         <Button
+          colorScheme={'blue'}
           display={{ base: 'none', md: 'inline-flex' }}
           fontSize={'md'}
           fontWeight={600}
-          color={'white'}
-          bg={'secondary'}
-          _hover={{
-            opacity: 0.8
-          }}
         >
           Register
         </Button>
@@ -122,7 +118,7 @@ const Navbar: FC = () => {
   return (
     <>
       <Box
-        bg={useColorModeValue('gray.100', 'primary')}
+        bg={useColorModeValue('gray.100', 'gray.800')}
         borderBottom={1}
         borderStyle={'solid'}
         borderColor={useColorModeValue('gray.200', 'gray.900')}

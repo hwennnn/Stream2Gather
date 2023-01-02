@@ -1,4 +1,11 @@
-import { Button, Container, Heading, Stack, Text } from '@chakra-ui/react';
+import {
+  Button,
+  Container,
+  Heading,
+  Stack,
+  Text,
+  useColorModeValue
+} from '@chakra-ui/react';
 import Link from 'next/link';
 import { FC } from 'react';
 
@@ -17,7 +24,10 @@ const UnauthenticatedApp: FC = () => {
           lineHeight={'110%'}
         >
           Stay Connected{' '}
-          <Text as={'span'} color={'secondary'}>
+          <Text
+            as={'span'}
+            color={useColorModeValue('secondary', 'secondaryDark')}
+          >
             made easier.
           </Text>
         </Heading>
@@ -36,12 +46,7 @@ const UnauthenticatedApp: FC = () => {
         </Text>
         <Stack spacing={6} direction={'row'}>
           <Link href="/register">
-            <Button
-              borderRadius={'lg'}
-              px={6}
-              bg={'tertiary'}
-              _hover={{ opacity: 0.8 }}
-            >
+            <Button fontWeight={'600'} colorScheme={'blue'} px={6}>
               Get started
             </Button>
           </Link>

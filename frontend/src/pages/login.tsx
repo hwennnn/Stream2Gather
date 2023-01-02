@@ -1,6 +1,23 @@
+import {
+  Box,
+  Button,
+  Container,
+  Divider,
+  FormControl,
+  FormLabel,
+  Heading,
+  HStack,
+  Input,
+  Stack,
+  Text,
+  useBreakpointValue,
+  useColorModeValue,
+  useToast
+} from '@chakra-ui/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ErrorMessage, Field, Form, Formik, FormikErrors } from 'formik';
+import { FormikErrors, useFormik } from 'formik';
 import { NextPage } from 'next';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import {
@@ -9,11 +26,10 @@ import {
   signInWithGoogle
 } from '../auth/firebaseAuth';
 import Layout from '../components/Layout';
-import GithubSocialButton from '../components/ui/buttons/GithubSocialButton';
-import GoogleSocialButton from '../components/ui/buttons/GoogleSocialButton';
-import LoadingSpinner from '../components/ui/loading/LoadingSpinner';
+import { OAuthButtonGroup } from '../components/templates/auth/OAuthButtonGroup';
+import { PasswordField } from '../components/templates/auth/PasswordField';
+import { Logo } from '../components/ui/Logo';
 import { MeQueryKey } from '../constants/query';
-import { useAuth } from '../contexts/AuthContext';
 import { useLoginMutation, useSocialLoginMutation } from '../generated/graphql';
 import { validateFormEmail } from '../utils/validateEmail';
 import { validateFormPassword } from '../utils/validatePassword';
@@ -23,26 +39,24 @@ interface LoginFormValues {
   password: string;
 }
 
+interface LoginToastMessage {
+  title: string;
+  description: string;
+  status: 'error' | 'success';
+}
+
 const Login: NextPage = () => {
-  const { user } = useAuth();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
+
   const queryClient = useQueryClient();
   const router = useRouter();
-
-  const initialValues: LoginFormValues = {
-    email: '',
-    password: ''
-  };
+  const [toastMessage, setToastMessage] = useState<LoginToastMessage | null>(
+    null
+  );
 
   const { mutateAsync } = useLoginMutation({});
 
   const socialLogin = useSocialLoginMutation({});
-
-  useEffect(() => {
-    if (user !== null && user !== undefined) {
-      void router.push('/');
-    }
-  });
 
   const invalidateMeQueryAndRedirect = async (): Promise<void> => {
     await queryClient.invalidateQueries({
@@ -50,11 +64,28 @@ const Login: NextPage = () => {
     });
 
     await router.push('/');
+    setToastMessage({
+      title: 'Successfully logged in',
+      description: 'You will now be redirected to the home page.',
+      status: 'success'
+    });
   };
+
+  useEffect(() => {
+    if (toastMessage !== null) {
+      toast({
+        title: toastMessage.title,
+        description: toastMessage.description,
+        status: toastMessage.status,
+        duration: toastMessage.status === 'error' ? 4000 : 2000,
+        isClosable: true
+      });
+    }
+  }, [toast, toastMessage]);
 
   const loginWithGoogle = async (): Promise<void> => {
     try {
-      setErrorMessage(null);
+      setToastMessage(null);
       const { userToken, username, email } = await signInWithGoogle();
       console.log(username, email);
 
@@ -68,13 +99,17 @@ const Login: NextPage = () => {
 
       await invalidateMeQueryAndRedirect();
     } catch (error: any) {
-      setErrorMessage(error.message);
+      setToastMessage({
+        title: 'Error encountered during login',
+        description: error.message,
+        status: 'error'
+      });
     }
   };
 
   const loginWithGithub = async (): Promise<void> => {
     try {
-      setErrorMessage(null);
+      setToastMessage(null);
       const { userToken, username, email } = await signInWithGithub();
       console.log(username, email);
 
@@ -88,143 +123,152 @@ const Login: NextPage = () => {
 
       await invalidateMeQueryAndRedirect();
     } catch (error: any) {
-      setErrorMessage(error.message);
+      setToastMessage({
+        title: 'Error encountered during login',
+        description: error.message,
+        status: 'error'
+      });
     }
   };
 
+  const formik = useFormik<LoginFormValues>({
+    initialValues: {
+      email: '',
+      password: ''
+    },
+    onSubmit: async (values, { setSubmitting }) => {
+      setToastMessage(null);
+
+      const { email, password } = values;
+
+      try {
+        const token = await loginWithEmailPassword({
+          email,
+          password
+        });
+
+        await mutateAsync({
+          options: {
+            token
+          }
+        });
+
+        setSubmitting(false);
+
+        await invalidateMeQueryAndRedirect();
+      } catch (error: any) {
+        setToastMessage({
+          title: 'Error encountered during login',
+          description: error.message,
+          status: 'error'
+        });
+      }
+    },
+    validate: (values) => {
+      const errors: FormikErrors<LoginFormValues> = {};
+
+      const emailValidation = validateFormEmail(values.email);
+      if (emailValidation !== undefined) {
+        errors.email = emailValidation;
+      }
+
+      const passwordValidation = validateFormPassword({
+        password: values.password,
+        validateComplexity: false
+      });
+      if (passwordValidation !== undefined) {
+        errors.password = passwordValidation;
+      }
+
+      return errors;
+    }
+  });
+
   return (
     <Layout title="Login">
-      <div className="max-w-xl mx-auto p-6">
-        <h1 className="mt-10 title-larger font-bold text-gray-900 dark:text-white">
-          Login
-        </h1>
+      <Container
+        maxW="lg"
+        py={{ base: '12', md: '24' }}
+        px={{ base: '0', sm: '8' }}
+      >
+        <Stack spacing="8">
+          <Stack spacing="6">
+            <Logo />
+            <Stack spacing={{ base: '2', md: '3' }} textAlign="center">
+              <Heading size={useBreakpointValue({ base: 'xs', md: 'sm' })}>
+                Log in to your account
+              </Heading>
+              <HStack spacing="1" justify="center">
+                <Text color="muted">{"Don't have an account?"}</Text>
+                <Link href="/register">
+                  <Button variant="link" colorScheme="blue">
+                    Register
+                  </Button>
+                </Link>
+              </HStack>
+            </Stack>
+          </Stack>
+          <Box
+            py={{ base: '0', sm: '8' }}
+            px={{ base: '4', sm: '10' }}
+            bg={useBreakpointValue({ base: 'transparent', sm: 'bg-surface' })}
+            boxShadow={{ base: 'none', sm: useColorModeValue('md', 'md-dark') }}
+            borderRadius={{ base: 'none', sm: 'xl' }}
+          >
+            <form onSubmit={formik.handleSubmit}>
+              <Stack spacing="6">
+                <Stack spacing="5">
+                  <FormControl>
+                    <FormLabel htmlFor="email">Email</FormLabel>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="name@gmail.com"
+                      onChange={formik.handleChange}
+                      value={formik.values.email}
+                    />
+                    <Text mt={2} color="error">
+                      {formik.errors.email}
+                    </Text>
+                  </FormControl>
+                  <PasswordField
+                    aria-errormessage={formik.errors.password}
+                    placeholder="********"
+                    onChange={formik.handleChange}
+                    value={formik.values.password}
+                  />
+                </Stack>
 
-        <Formik
-          initialValues={initialValues}
-          validate={(values) => {
-            const errors: FormikErrors<LoginFormValues> = {};
+                <HStack justify="space-between">
+                  {/* <Checkbox defaultChecked>Remember me</Checkbox> */}
+                  <Button variant="link" colorScheme="blue" size="sm">
+                    Forgot password?
+                  </Button>
+                </HStack>
 
-            const emailValidation = validateFormEmail(values.email);
-            if (emailValidation !== undefined) {
-              errors.email = emailValidation;
-            }
-
-            const passwordValidation = validateFormPassword({
-              password: values.password,
-              validateComplexity: false
-            });
-            if (passwordValidation !== undefined) {
-              errors.password = passwordValidation;
-            }
-
-            return errors;
-          }}
-          onSubmit={async (values, { setSubmitting }) => {
-            setErrorMessage(null);
-
-            const { email, password } = values;
-
-            try {
-              const token = await loginWithEmailPassword({
-                email,
-                password
-              });
-
-              await mutateAsync({
-                options: {
-                  token
-                }
-              });
-
-              setSubmitting(false);
-
-              await invalidateMeQueryAndRedirect();
-            } catch (error: any) {
-              setErrorMessage(error.message);
-            }
-          }}
-        >
-          {({ isSubmitting }) => (
-            <Form className="mt-10">
-              <div className="mb-6">
-                <label
-                  htmlFor="email"
-                  className="block mb-2 title-small text-gray-900 dark:text-white"
-                >
-                  Your email
-                </label>
-                <Field
-                  className="bg-gray-50 border border-gray-300 text-gray-900 title-smaller rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                  type="email"
-                  name="email"
-                  placeholder="name@email.com"
-                />
-                <ErrorMessage
-                  name="email"
-                  component="div"
-                  className="mt-1 text-red-500 title-smaller"
-                />
-              </div>
-
-              <div className="mb-6">
-                <label
-                  htmlFor="password"
-                  className="block mb-2 title-small text-gray-900 dark:text-white"
-                >
-                  Your password
-                </label>
-                <Field
-                  className="bg-gray-50 border border-gray-300 text-gray-900 title-smaller rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                  type="password"
-                  name="password"
-                  placeholder="********"
-                />
-                <ErrorMessage
-                  name="password"
-                  component="div"
-                  className="mt-1 text-red-500 title-smaller"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="btn-blue mx-auto w-full"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? <LoadingSpinner /> : 'Submit'}
-              </button>
-
-              {errorMessage !== null && (
-                <>
-                  <div className="mt-1 text-red-500 title-smaller">
-                    {errorMessage}
-                  </div>
-                </>
-              )}
-
-              <div className="flex flex-row h-2 mt-6 items-center">
-                <div className="flex-[4] h-[1px] bg-white"></div>
-                <div className="flex-1 text-center font-semibold text-white">
-                  Or
-                </div>
-                <div className="flex-[4] h-[1px] bg-white"></div>
-              </div>
-
-              <div className="flex flex-col space-y-4 mt-6">
-                <GoogleSocialButton
-                  title="Sign in with Google"
-                  onClick={async () => await loginWithGoogle()}
-                />
-
-                <GithubSocialButton
-                  title="Sign in with Github"
-                  onClick={async () => await loginWithGithub()}
-                />
-              </div>
-            </Form>
-          )}
-        </Formik>
-      </div>
+                <Stack spacing="6">
+                  <Button
+                    isLoading={formik.isSubmitting}
+                    type="submit"
+                    variant="primary"
+                  >
+                    Sign in
+                  </Button>
+                  <HStack>
+                    <Divider />
+                    <Text fontSize="sm" whiteSpace="nowrap" color="muted">
+                      or continue with
+                    </Text>
+                    <Divider />
+                  </HStack>
+                  <OAuthButtonGroup />
+                </Stack>
+              </Stack>
+            </form>
+          </Box>
+        </Stack>
+      </Container>
     </Layout>
   );
 };

@@ -41,7 +41,7 @@ const UnauthenticatedApp: FC = () => {
             "Stay connected with your loved ones even when you can't be together in \
             person with our online platform. Our platform allows you to watch entertaining \
             videos on various streaming services in sync, creating a seamless and immersive \
-            viewing experience as if you were in real person."
+            viewing experience."
           }
         </Text>
         <Stack spacing={6} direction={'row'}>

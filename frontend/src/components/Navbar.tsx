@@ -23,6 +23,7 @@ import { MeQueryKey } from '../constants/query';
 import { useAuth } from '../contexts/AuthContext';
 import { useLogoutMutation } from '../generated/graphql';
 import { queryClient } from '../pages/_app';
+import { Logo } from './ui/Logo';
 
 const UserMenu: FC = () => {
   const { user } = useAuth();
@@ -91,7 +92,7 @@ const LoginItems: FC = () => {
     >
       <Link href="/login">
         <Button fontSize={'md'} fontWeight={500} variant={'link'}>
-          Login
+          Log In
         </Button>
       </Link>
 
@@ -124,7 +125,8 @@ const Navbar: FC = () => {
         py={1}
       >
         <Flex h={16} alignItems={'center'} justifyContent={'space-between'}>
-          <Box>
+          <Flex justifyItems={'center'} alignItems="center" direction={'row'}>
+            <Logo mr="2" height="10" />
             <Link href="/">
               <Text
                 fontFamily={'heading'}
@@ -135,11 +137,11 @@ const Navbar: FC = () => {
                 Stream2Gather
               </Text>
             </Link>
-          </Box>
+          </Flex>
 
           <Flex alignItems={'center'}>
-            <Stack direction={'row'} spacing={7}>
-              <Button background={'none'} onClick={toggleColorMode}>
+            <Stack direction={'row'} spacing={6}>
+              <Button p={2} background={'none'} onClick={toggleColorMode}>
                 {colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
               </Button>
 

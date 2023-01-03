@@ -33,7 +33,8 @@
     "@typescript-eslint/space-before-function-paren": "off",
     "@typescript-eslint/indent": "off",
     "multiline-ternary": "off",
-    "module-resolver/use-alias": 2
+    "module-resolver/use-alias": 2,
+    "@typescript-eslint/restrict-template-expressions": "off"
   },
   "settings": {
     "import/resolver": {

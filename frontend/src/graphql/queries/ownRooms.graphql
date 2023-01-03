@@ -1,15 +1,7 @@
 query OwnRooms {
   ownRooms {
     rooms {
-      id
-      isPublic
-      createdAt
-      updatedAt
-      roomInfo {
-        isPlaying
-        currentUrl
-        playedSeconds
-      }
+      ...OwnRoomItem
     }
   }
 }

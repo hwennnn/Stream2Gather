@@ -1,11 +1,11 @@
 import { CircleLoading } from '@app/components/common/loading/CircleLoading';
 import { RoomCard } from '@app/components/home/Authenticated/RoomCard';
-import { useOwnRoomsQuery } from '@app/generated/graphql';
+import { OwnRoomItemFragment, useOwnRoomsQuery } from '@app/generated/graphql';
 import { Grid } from '@chakra-ui/react';
 import { FC, useState } from 'react';
 
 export const RoomGrid: FC = () => {
-  const [rooms, setRooms] = useState<any[]>([]);
+  const [rooms, setRooms] = useState<OwnRoomItemFragment[]>([]);
 
   const { isLoading } = useOwnRoomsQuery(
     {},

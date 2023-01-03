@@ -1,0 +1,11 @@
+fragment OwnRoomItem on Room {
+  id
+  isPublic
+  createdAt
+  updatedAt
+  roomInfo {
+    isPlaying
+    currentUrl
+    playedSeconds
+  }
+}

@@ -176,6 +176,8 @@ export type VideoInfo = {
   url: Scalars['String'];
 };
 
+export type OwnRoomItemFragment = { __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, updatedAt: string, roomInfo: { __typename?: 'RoomInfo', isPlaying: boolean, currentUrl: string, playedSeconds: number } };
+
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
 export type UserItemFragment = { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string };
@@ -240,6 +242,19 @@ export type UsersWithRelationsQueryVariables = Exact<{
 
 export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
 
+export const OwnRoomItemFragmentDoc = `
+    fragment OwnRoomItem on Room {
+  id
+  isPublic
+  createdAt
+  updatedAt
+  roomInfo {
+    isPlaying
+    currentUrl
+    playedSeconds
+  }
+}
+    `;
 export const RegularErrorFragmentDoc = `
     fragment RegularError on FieldError {
   field
@@ -389,19 +404,11 @@ export const OwnRoomsDocument = `
     query OwnRooms {
   ownRooms {
     rooms {
-      id
-      isPublic
-      createdAt
-      updatedAt
-      roomInfo {
-        isPlaying
-        currentUrl
-        playedSeconds
-      }
+      ...OwnRoomItem
     }
   }
 }
-    `;
+    ${OwnRoomItemFragmentDoc}`;
 export const useOwnRoomsQuery = <
       TData = OwnRoomsQuery,
       TError = unknown

@@ -1,3 +1,4 @@
+import { OwnRoomItemFragment } from '@app/generated/graphql';
 import {
   Button,
   Card,
@@ -12,7 +13,7 @@ import Link from 'next/link';
 import { FC } from 'react';
 
 interface RoomCardProps {
-  room: any;
+  room: OwnRoomItemFragment;
 }
 
 export const RoomCard: FC<RoomCardProps> = ({ room }) => {
@@ -26,8 +27,8 @@ export const RoomCard: FC<RoomCardProps> = ({ room }) => {
         /> */}
 
         <Stack mt="6" spacing="3">
-          <Heading size="md">{`Room ${room.id as string}`}</Heading>
-          <Text>{`Playing ${room.roomInfo.currentUrl as string}`}</Text>
+          <Heading size="md">{`Room ${room.id}`}</Heading>
+          <Text>{`Playing ${room.roomInfo.currentUrl}`}</Text>
         </Stack>
       </CardBody>
       <Divider />

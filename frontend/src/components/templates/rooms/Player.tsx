@@ -138,6 +138,7 @@ export const Player: FC = () => {
             left={0}
             bottom={0}
             right={0}
+            style={{ backgroundColor: 'rgba(1,1,1,0.005)' }}
           >
             <PlayerControl
               playerRef={playerRef}

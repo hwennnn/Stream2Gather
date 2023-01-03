@@ -2,20 +2,20 @@ import {
   Box,
   Flex,
   HStack,
-  SlideFade,
   Slider,
   SliderFilledTrack,
   SliderThumb,
   SliderTrack,
-  Spacer
+  Spacer,
+  Text
 } from '@chakra-ui/react';
 import { FC, MutableRefObject, useState } from 'react';
 import {
   BsFullscreen,
-  BsPause,
-  BsPlay,
-  BsVolumeMute,
-  BsVolumeUp
+  BsPauseFill,
+  BsPlayFill,
+  BsVolumeMuteFill,
+  BsVolumeUpFill
 } from 'react-icons/bs';
 import screenfull from 'screenfull';
 import shallow from 'zustand/shallow';
@@ -131,9 +131,9 @@ const PlayerControl: FC<PlayerControlProps> = ({
       <HStack spacing={5} w="full" alignItems="center">
         <Box onClick={() => setPlaying(!playing)}>
           {playing ? (
-            <BsPause onClick={pause} size={32} color={'white'} />
+            <BsPauseFill onClick={pause} size={32} color={'white'} />
           ) : (
-            <BsPlay onClick={play} size={32} color={'white'} />
+            <BsPlayFill onClick={play} size={32} color={'white'} />
           )}
         </Box>
 
@@ -152,42 +152,40 @@ const PlayerControl: FC<PlayerControlProps> = ({
         >
           <Box onClick={() => setIsMuted(!isMuted)}>
             {!isMuted && volume > 0 ? (
-              <BsVolumeUp color={'white'} size={32} />
+              <BsVolumeUpFill color={'white'} size={32} />
             ) : (
-              <BsVolumeMute color={'white'} size={32} />
+              <BsVolumeMuteFill color={'white'} size={32} />
             )}
           </Box>
 
-          {isVolumeHovered && (
-            <SlideFade in={isVolumeHovered}>
-              <Slider
-                mt="2"
-                width={'40px'}
-                aria-label="slider-ex-2"
-                colorScheme="pink"
-                value={isMuted ? 0 : volume}
-                defaultValue={100}
-                onChange={(value) => {
-                  if (value > 0 && isMuted) {
-                    setIsMuted(false);
-                  }
-                  setVolume(value);
-                }}
-              >
-                <SliderTrack>
-                  <SliderFilledTrack />
-                </SliderTrack>
-                <SliderThumb />
-              </Slider>
-            </SlideFade>
-          )}
+          <Slider
+            mt="2"
+            width={'50px'}
+            aria-label="slider-ex-2"
+            colorScheme={'red'}
+            value={isMuted ? 0 : volume}
+            defaultValue={100}
+            onChange={(value) => {
+              if (value > 0 && isMuted) {
+                setIsMuted(false);
+              }
+              setVolume(value);
+            }}
+          >
+            <SliderTrack>
+              <SliderFilledTrack />
+            </SliderTrack>
+            <SliderThumb />
+          </Slider>
         </HStack>
 
-        <Box textColor="white">
-          {getFormattedTime(playedSeconds)}
-          {' / '}
-          {getFormattedTime(duration)}
-        </Box>
+        <Text
+          userSelect={'none'}
+          fontSize={'sm'}
+          textColor="white"
+        >{`${getFormattedTime(playedSeconds)} / ${getFormattedTime(
+          duration
+        )}`}</Text>
 
         <Spacer />
 

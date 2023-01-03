@@ -18,12 +18,12 @@ import {
 import Link from 'next/link';
 import router from 'next/router';
 import { FC } from 'react';
-import { firebaseLogout } from '../auth/firebaseAuth';
-import { MeQueryKey } from '../constants/query';
-import { useAuth } from '../contexts/AuthContext';
-import { useLogoutMutation } from '../generated/graphql';
-import { queryClient } from '../pages/_app';
-import { Logo } from './ui/Logo';
+import { firebaseLogout } from '../../../auth/firebaseAuth';
+import { MeQueryKey } from '../../../constants/query';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useLogoutMutation } from '../../../generated/graphql';
+import { queryClient } from '../../../pages/_app';
+import { Logo } from '../../common/Logo';
 
 const UserMenu: FC = () => {
   const { user } = useAuth();

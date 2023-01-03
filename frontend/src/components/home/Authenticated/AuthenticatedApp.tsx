@@ -4,9 +4,9 @@ import { FC } from 'react';
 import {
   useCreateRoomMutation,
   useRoomsQuery
-} from '../../../../generated/graphql';
-import { PrimaryButton } from '../../../ui/buttons/PrimaryButton';
-import { CircleLoading } from '../../../ui/loading/CircleLoading';
+} from '../../../generated/graphql';
+import { PrimaryButton } from '../../common/buttons/PrimaryButton';
+import { CircleLoading } from '../../common/loading/CircleLoading';
 
 const AuthenticatedApp: FC = () => {
   const router = useRouter();

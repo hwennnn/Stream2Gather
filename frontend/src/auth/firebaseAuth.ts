@@ -7,7 +7,7 @@ import {
   signInWithPopup,
   TwitterAuthProvider
 } from 'firebase/auth';
-import { ProviderName } from './../components/templates/auth/OAuthButtonGroup';
+import { ProviderName } from './../components/auth/OAuthButtonGroup';
 import { auth } from './firebase';
 
 interface EmailPasswordArgs {

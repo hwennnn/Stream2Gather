@@ -2,10 +2,10 @@ import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import React, { useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import Layout from '../components/Layout';
-import { Player } from '../components/templates/rooms/Player';
-import RoomSection from '../components/templates/rooms/RoomSection';
-import { Loading } from '../components/ui/loading/Loading';
+import Layout from '../components/common/layouts/Layout';
+import { Loading } from '../components/common/loading/Loading';
+import { Player } from '../components/rooms/Player';
+import RoomSection from '../components/rooms/RoomSection';
 import { useAuth } from '../contexts/AuthContext';
 import { useRoomQuery } from '../generated/graphql';
 import {

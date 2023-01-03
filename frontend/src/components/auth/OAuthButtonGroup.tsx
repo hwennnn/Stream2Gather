@@ -7,9 +7,9 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import { FC, useEffect, useState } from 'react';
-import { signInWithProvider } from '../../../auth/firebaseAuth';
-import { MeQueryKey } from '../../../constants/query';
-import { useSocialLoginMutation } from '../../../generated/graphql';
+import { signInWithProvider } from '../../auth/firebaseAuth';
+import { MeQueryKey } from '../../constants/query';
+import { useSocialLoginMutation } from '../../generated/graphql';
 import { GitHubIcon, GoogleIcon, TwitterIcon } from './ProviderIcons';
 
 export enum ProviderName {

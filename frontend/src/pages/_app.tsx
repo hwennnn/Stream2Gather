@@ -3,7 +3,7 @@ import '@fontsource/inter/variable.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import type { AppProps } from 'next/app';
-import AuthWrapper from '../components/AuthWrapper';
+import AuthWrapper from '../components/common/layouts/AuthWrapper';
 import { isProd } from '../constants/config';
 import AppProviders from '../contexts/AppProvider';
 import '../styles/globals.css';

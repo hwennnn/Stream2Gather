@@ -19,15 +19,15 @@ import {
 } from 'react-icons/bs';
 import screenfull from 'screenfull';
 import shallow from 'zustand/shallow';
-import { getFormattedTime } from '../../../helpers/time-helper';
-import { emitStreamEvent, StreamEvent } from '../../../lib/roomSocketService';
-import { useRoomSocket } from '../../../pages/room';
+import { getFormattedTime } from '../../helpers/time-helper';
+import { emitStreamEvent, StreamEvent } from '../../lib/roomSocketService';
+import { useRoomSocket } from '../../pages/room';
 import useRoomStore, {
   setIsMuted,
   setPlayedSeconds,
   setPlaying,
   setVolume
-} from '../../../store/useRoomStore';
+} from '../../store/useRoomStore';
 
 interface PlayerControlProps {
   playerRef: MutableRefObject<any>;

@@ -5,13 +5,13 @@ import shallow from 'zustand/shallow';
 import {
   startPlayingVideo,
   subscribeStreamEvent
-} from '../../../lib/roomSocketService';
-import { useRoomSocket } from '../../../pages/room';
+} from '../../lib/roomSocketService';
+import { useRoomSocket } from '../../pages/room';
 import useRoomStore, {
   setDuration,
   setPlayedSeconds,
   setPlaying
-} from '../../../store/useRoomStore';
+} from '../../store/useRoomStore';
 import PlayerControl from './PlayerControl';
 
 const ReactPlayer = dynamic(async () => await import('./ReactPlayerWrapper'), {

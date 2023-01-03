@@ -1,9 +1,9 @@
 import { useRouter } from 'next/router';
 import { FC, PropsWithChildren, useEffect } from 'react';
-import { isServer } from '../constants/config';
-import { useAuth } from '../contexts/AuthContext';
-import { shouldRedirect } from '../utils/shouldRedirect';
-import { Loading } from './ui/loading/Loading';
+import { isServer } from '../../../constants/config';
+import { useAuth } from '../../../contexts/AuthContext';
+import { shouldRedirect } from '../../../utils/shouldRedirect';
+import { Loading } from '../../common/loading/Loading';
 
 const AuthWrapper: FC<PropsWithChildren> = ({ children }) => {
   const { user } = useAuth();

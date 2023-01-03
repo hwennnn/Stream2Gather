@@ -76,6 +76,7 @@ export type MutationSocialLoginArgs = {
 export type Query = {
   __typename?: 'Query';
   me?: Maybe<User>;
+  ownRooms?: Maybe<User>;
   room?: Maybe<Room>;
   rooms: Array<Room>;
   user?: Maybe<User>;
@@ -214,6 +215,11 @@ export type MeQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string } | null };
+
+export type OwnRoomsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type OwnRoomsQuery = { __typename?: 'Query', ownRooms?: { __typename?: 'User', rooms?: Array<{ __typename?: 'Room', id: string, isPublic: boolean, createdAt: string, updatedAt: string, roomInfo: { __typename?: 'RoomInfo', isPlaying: boolean, currentUrl: string, playedSeconds: number } }> | null } | null };
 
 export type RoomQueryVariables = Exact<{
   id: Scalars['String'];
@@ -377,6 +383,39 @@ export const useMeQuery = <
     );
 
 useMeQuery.getKey = (variables?: MeQueryVariables) => variables === undefined ? ['Me'] : ['Me', variables];
+;
+
+export const OwnRoomsDocument = `
+    query OwnRooms {
+  ownRooms {
+    rooms {
+      id
+      isPublic
+      createdAt
+      updatedAt
+      roomInfo {
+        isPlaying
+        currentUrl
+        playedSeconds
+      }
+    }
+  }
+}
+    `;
+export const useOwnRoomsQuery = <
+      TData = OwnRoomsQuery,
+      TError = unknown
+    >(
+      variables?: OwnRoomsQueryVariables,
+      options?: UseQueryOptions<OwnRoomsQuery, TError, TData>
+    ) =>
+    useQuery<OwnRoomsQuery, TError, TData>(
+      variables === undefined ? ['OwnRooms'] : ['OwnRooms', variables],
+      fetcher<OwnRoomsQuery, OwnRoomsQueryVariables>(OwnRoomsDocument, variables),
+      options
+    );
+
+useOwnRoomsQuery.getKey = (variables?: OwnRoomsQueryVariables) => variables === undefined ? ['OwnRooms'] : ['OwnRooms', variables];
 ;
 
 export const RoomDocument = `

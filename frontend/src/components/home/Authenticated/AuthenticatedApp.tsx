@@ -1,7 +1,8 @@
 import { PrimaryButton } from '@app/components/common/buttons/PrimaryButton';
 import { CircleLoading } from '@app/components/common/loading/CircleLoading';
+import { RoomGrid } from '@app/components/home/Authenticated/RoomGrid';
 import { useCreateRoomMutation, useRoomsQuery } from '@app/generated/graphql';
-import { Flex } from '@chakra-ui/react';
+import { VStack } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
 import { FC } from 'react';
 
@@ -23,12 +24,14 @@ const AuthenticatedApp: FC = () => {
   }
 
   return (
-    <Flex justify="center" mt="10">
+    <VStack justify="center" mt="10">
       <PrimaryButton
         title="Create a Room"
         onClick={async () => await createRoom()}
       />
-    </Flex>
+
+      <RoomGrid />
+    </VStack>
   );
 };
 

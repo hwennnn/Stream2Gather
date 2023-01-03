@@ -271,4 +271,15 @@ export class UserResolver {
   //         .getUser(uid!)
   //         .then((user) => user.emailVerified);
   // }
+
+  @Query(() => User, { nullable: true })
+  @UseMiddleware(isAuth)
+  async ownRooms(@Ctx() { req }: MyContext): Promise<User | null> {
+    const uid: string = req.session.userId as string;
+
+    return await User.findOne({
+      where: { id: uid },
+      relations: { rooms: true }
+    });
+  }
 }

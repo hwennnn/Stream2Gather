@@ -1,7 +1,7 @@
 import { Loading } from '@app/components/common/loading/Loading';
+import { isServer } from '@app/constants/config';
 import { useAuth } from '@app/contexts/AuthContext';
 import { shouldRedirect } from '@app/utils/shouldRedirect';
-import { isServer } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import { FC, PropsWithChildren, useEffect } from 'react';
 

@@ -82,10 +82,6 @@ export default class BaseAPI {
         return data;
       }
 
-      if ('error' in response.data) {
-        throw new Error(response.data.error);
-      }
-
       throw new Error('Something went wrong!');
     } catch (error: any) {
       if (error.response !== undefined) {

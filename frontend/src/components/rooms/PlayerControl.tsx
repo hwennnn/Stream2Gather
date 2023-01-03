@@ -34,10 +34,7 @@ interface PlayerControlProps {
   playerWrapperRef: MutableRefObject<any>;
 }
 
-const PlayerControl: FC<PlayerControlProps> = ({
-  playerRef,
-  playerWrapperRef
-}) => {
+const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   const { roomSocket: socket } = useRoomSocket();
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 

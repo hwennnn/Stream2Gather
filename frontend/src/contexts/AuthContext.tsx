@@ -1,6 +1,7 @@
+import { Loading } from '@app/components/common/loading/Loading';
+import { MeQuery, useMeQuery, User } from '@app/generated/graphql';
+
 import React, { PropsWithChildren, useContext } from 'react';
-import { Loading } from '../components/common/loading/Loading';
-import { MeQuery, useMeQuery, User } from '../generated/graphql';
 
 export default interface AuthContextInterface {
   user: User | null | undefined;

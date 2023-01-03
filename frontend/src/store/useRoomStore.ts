@@ -1,5 +1,5 @@
+import { RoomMember, RoomQuery, VideoInfo } from '@app/generated/graphql';
 import create from 'zustand';
-import { RoomMember, RoomQuery, VideoInfo } from './../generated/graphql';
 
 interface RoomState {
   roomId: string;

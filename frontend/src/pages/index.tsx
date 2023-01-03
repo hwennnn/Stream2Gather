@@ -1,9 +1,8 @@
+import Layout from '@app/components/common/layouts/Layout';
+import AuthenticatedApp from '@app/components/home/Authenticated/AuthenticatedApp';
+import UnauthenticatedApp from '@app/components/home/Unauthenticated/UnauthenticatedApp';
+import { useAuth } from '@app/contexts/AuthContext';
 import { NextPage } from 'next';
-import Layout from '../components/common/layouts/Layout';
-import AuthenticatedApp from '../components/home/Authenticated/AuthenticatedApp';
-import UnauthenticatedApp from '../components/home/Unauthenticated/UnauthenticatedApp';
-
-import { useAuth } from '../contexts/AuthContext';
 
 const Home: NextPage = () => {
   const { user } = useAuth();

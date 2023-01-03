@@ -1,3 +1,13 @@
+import { registerWithEmailPassword } from '@app/auth/firebaseAuth';
+import OAuthButtonGroup from '@app/components/auth/OAuthButtonGroup';
+import { PasswordField } from '@app/components/auth/PasswordField';
+import Layout from '@app/components/common/layouts/Layout';
+import { Logo } from '@app/components/common/Logo';
+import { MeQueryKey } from '@app/constants/query';
+import { useRegisterMutation } from '@app/generated/graphql';
+import { validateFormEmail } from '@app/utils/validateEmail';
+import { validateFormPassword } from '@app/utils/validatePassword';
+import { validateFormUsername } from '@app/utils/validateUsername';
 import {
   Box,
   Button,
@@ -20,16 +30,6 @@ import { NextPage } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { registerWithEmailPassword } from '../auth/firebaseAuth';
-import OAuthButtonGroup from '../components/auth/OAuthButtonGroup';
-import { PasswordField } from '../components/auth/PasswordField';
-import Layout from '../components/common/layouts/Layout';
-import { Logo } from '../components/common/Logo';
-import { MeQueryKey } from '../constants/query';
-import { useRegisterMutation } from '../generated/graphql';
-import { validateFormEmail } from '../utils/validateEmail';
-import { validateFormPassword } from '../utils/validatePassword';
-import { validateFormUsername } from '../utils/validateUsername';
 
 interface RegisterFormValues {
   username: string;

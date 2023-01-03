@@ -31,7 +31,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
-    "incremental": true
+    "incremental": true,
+    "baseUrl": "./",
+    "paths": {
+      "@app/*": [
+        "src/*"
+      ],
+    }
   },
   "include": [
     "next-env.d.ts",

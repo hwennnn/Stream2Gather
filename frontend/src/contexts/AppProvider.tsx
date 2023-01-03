@@ -1,6 +1,5 @@
+import { AuthProvider } from '@app/contexts/AuthContext';
 import React, { PropsWithChildren } from 'react';
-
-import { AuthProvider } from './AuthContext';
 
 const AppProviders: React.FunctionComponent<PropsWithChildren> = ({
   children

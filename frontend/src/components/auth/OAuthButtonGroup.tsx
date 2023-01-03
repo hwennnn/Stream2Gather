@@ -1,3 +1,11 @@
+import { signInWithProvider } from '@app/auth/firebaseAuth';
+import {
+  GitHubIcon,
+  GoogleIcon,
+  TwitterIcon
+} from '@app/components/auth/ProviderIcons';
+import { MeQueryKey } from '@app/constants/query';
+import { useSocialLoginMutation } from '@app/generated/graphql';
 import {
   Button,
   ButtonGroup,
@@ -5,12 +13,9 @@ import {
   VisuallyHidden
 } from '@chakra-ui/react';
 import { useQueryClient } from '@tanstack/react-query';
+
 import { useRouter } from 'next/router';
 import { FC, useEffect, useState } from 'react';
-import { signInWithProvider } from '../../auth/firebaseAuth';
-import { MeQueryKey } from '../../constants/query';
-import { useSocialLoginMutation } from '../../generated/graphql';
-import { GitHubIcon, GoogleIcon, TwitterIcon } from './ProviderIcons';
 
 export enum ProviderName {
   GOOGLE = 'Google',

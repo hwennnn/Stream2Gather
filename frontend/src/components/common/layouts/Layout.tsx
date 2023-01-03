@@ -1,8 +1,8 @@
+import Footer from '@app/components/common/layouts/Footer';
+import Navbar from '@app/components/common/layouts/Navbar';
 import { Box, Flex } from '@chakra-ui/react';
 import Head from 'next/head';
 import { FC, PropsWithChildren } from 'react';
-import Footer from './Footer';
-import Navbar from './Navbar';
 
 interface LayoutProps {
   title?: string;

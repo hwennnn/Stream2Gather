@@ -1,20 +1,20 @@
-import { Flex } from '@chakra-ui/react';
-import { NextPage } from 'next';
-import React, { useContext, useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
-import Layout from '../components/common/layouts/Layout';
-import { Loading } from '../components/common/loading/Loading';
-import { Player } from '../components/rooms/Player';
-import RoomSection from '../components/rooms/RoomSection';
-import { useAuth } from '../contexts/AuthContext';
-import { useRoomQuery } from '../generated/graphql';
+import Layout from '@app/components/common/layouts/Layout';
+import { Loading } from '@app/components/common/loading/Loading';
+import { Player } from '@app/components/rooms/Player';
+import RoomSection from '@app/components/rooms/RoomSection';
+import { useAuth } from '@app/contexts/AuthContext';
+import { useRoomQuery } from '@app/generated/graphql';
 import {
   joinRoom,
   listenEvent,
   subscribeUserJoined,
   subscribeUserLeft
-} from '../lib/roomSocketService';
-import { setRoom } from '../store/useRoomStore';
+} from '@app/lib/roomSocketService';
+import { setRoom } from '@app/store/useRoomStore';
+import { Flex } from '@chakra-ui/react';
+import { NextPage } from 'next';
+import React, { useContext, useEffect, useState } from 'react';
+import { io, Socket } from 'socket.io-client';
 
 interface Props {
   roomId: string;

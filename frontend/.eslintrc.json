@@ -16,7 +16,8 @@
     "sourceType": "module"
   },
   "plugins": [
-    "react"
+    "react",
+    "module-resolver"
   ],
   "rules": {
     "semi": "off",
@@ -31,6 +32,12 @@
     ],
     "@typescript-eslint/space-before-function-paren": "off",
     "@typescript-eslint/indent": "off",
-    "multiline-ternary": "off"
+    "multiline-ternary": "off",
+    "module-resolver/use-alias": 2
+  },
+  "settings": {
+    "import/resolver": {
+      "babel-module": {}
+    }
   }
 }

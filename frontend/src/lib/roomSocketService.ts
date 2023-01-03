@@ -1,5 +1,3 @@
-import { MutableRefObject } from 'react';
-import { Socket } from 'socket.io-client';
 import {
   CONNECT,
   REQ_JOIN_ROOM,
@@ -8,13 +6,15 @@ import {
   RES_MEMBER_LEFT,
   RES_NEW_MEMBER,
   RES_STREAMING_EVENTS
-} from '../constants/socket';
-import { RoomMember, User } from '../generated/graphql';
+} from '@app/constants/socket';
+import { RoomMember, User } from '@app/generated/graphql';
 import {
   addActiveMember,
   removeActiveMember,
   setPlaying
-} from '../store/useRoomStore';
+} from '@app/store/useRoomStore';
+import { MutableRefObject } from 'react';
+import { Socket } from 'socket.io-client';
 
 export interface StreamEvent {
   roomId: string;

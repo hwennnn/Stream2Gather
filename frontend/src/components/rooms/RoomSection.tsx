@@ -1,6 +1,6 @@
+import useRoomStore from '@app/store/useRoomStore';
 import { Box } from '@chakra-ui/react';
 import { FC } from 'react';
-import useRoomStore from '../../../store/useRoomStore';
 
 const RoomSection: FC = () => {
   const activeMembers = useRoomStore((state) => state.activeMembers);

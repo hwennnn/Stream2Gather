@@ -1,5 +1,5 @@
+import { Hero } from '@app/components/home/Unauthenticated/Hero';
 import { FC } from 'react';
-import { Hero } from './Hero';
 
 const UnauthenticatedApp: FC = () => {
   return <Hero />;

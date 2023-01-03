@@ -1,8 +1,7 @@
+import { PlayButtonAnimation } from '@app/components/common/loading/PlayButtonAnimation';
 import { Flex } from '@chakra-ui/react';
 import { FC } from 'react';
 import FadeIn from 'react-fade-in';
-
-import { PlayButtonAnimation } from './PlayButtonAnimation';
 
 export const Loading: FC = () => {
   return (

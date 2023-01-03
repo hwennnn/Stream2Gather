@@ -1,3 +1,12 @@
+import { loginWithEmailPassword } from '@app/auth/firebaseAuth';
+import OAuthButtonGroup from '@app/components/auth/OAuthButtonGroup';
+import { PasswordField } from '@app/components/auth/PasswordField';
+import Layout from '@app/components/common/layouts/Layout';
+import { Logo } from '@app/components/common/Logo';
+import { MeQueryKey } from '@app/constants/query';
+import { useLoginMutation } from '@app/generated/graphql';
+import { validateFormEmail } from '@app/utils/validateEmail';
+import { validateFormPassword } from '@app/utils/validatePassword';
 import {
   Box,
   Button,
@@ -20,15 +29,6 @@ import { NextPage } from 'next';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { loginWithEmailPassword } from '../auth/firebaseAuth';
-import OAuthButtonGroup from '../components/auth/OAuthButtonGroup';
-import { PasswordField } from '../components/auth/PasswordField';
-import Layout from '../components/common/layouts/Layout';
-import { Logo } from '../components/common/Logo';
-import { MeQueryKey } from '../constants/query';
-import { useLoginMutation } from '../generated/graphql';
-import { validateFormEmail } from '../utils/validateEmail';
-import { validateFormPassword } from '../utils/validatePassword';
 
 interface LoginFormValues {
   email: string;

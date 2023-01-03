@@ -1,3 +1,5 @@
+import { auth } from '@app/auth/firebase';
+import { ProviderName } from '@app/components/auth/OAuthButtonGroup';
 import {
   AuthProvider,
   createUserWithEmailAndPassword,
@@ -7,8 +9,6 @@ import {
   signInWithPopup,
   TwitterAuthProvider
 } from 'firebase/auth';
-import { ProviderName } from './../components/auth/OAuthButtonGroup';
-import { auth } from './firebase';
 
 interface EmailPasswordArgs {
   email: string;

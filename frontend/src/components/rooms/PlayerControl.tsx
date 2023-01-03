@@ -1,3 +1,12 @@
+import { getFormattedTime } from '@app/helpers/time-helper';
+import { emitStreamEvent, StreamEvent } from '@app/lib/roomSocketService';
+import { useRoomSocket } from '@app/pages/room';
+import useRoomStore, {
+  setIsMuted,
+  setPlayedSeconds,
+  setPlaying,
+  setVolume
+} from '@app/store/useRoomStore';
 import {
   Box,
   Flex,
@@ -19,15 +28,6 @@ import {
 } from 'react-icons/bs';
 import screenfull from 'screenfull';
 import shallow from 'zustand/shallow';
-import { getFormattedTime } from '../../helpers/time-helper';
-import { emitStreamEvent, StreamEvent } from '../../lib/roomSocketService';
-import { useRoomSocket } from '../../pages/room';
-import useRoomStore, {
-  setIsMuted,
-  setPlayedSeconds,
-  setPlaying,
-  setVolume
-} from '../../store/useRoomStore';
 
 interface PlayerControlProps {
   playerRef: MutableRefObject<any>;

@@ -1,12 +1,9 @@
+import { PrimaryButton } from '@app/components/common/buttons/PrimaryButton';
+import { CircleLoading } from '@app/components/common/loading/CircleLoading';
+import { useCreateRoomMutation, useRoomsQuery } from '@app/generated/graphql';
 import { Flex } from '@chakra-ui/react';
 import { useRouter } from 'next/router';
 import { FC } from 'react';
-import {
-  useCreateRoomMutation,
-  useRoomsQuery
-} from '../../../generated/graphql';
-import { PrimaryButton } from '../../common/buttons/PrimaryButton';
-import { CircleLoading } from '../../common/loading/CircleLoading';
 
 const AuthenticatedApp: FC = () => {
   const router = useRouter();

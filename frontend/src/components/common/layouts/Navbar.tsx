@@ -1,3 +1,9 @@
+import { firebaseLogout } from '@app/auth/firebaseAuth';
+import { Logo } from '@app/components/common/Logo';
+import { MeQueryKey } from '@app/constants/query';
+import { useAuth } from '@app/contexts/AuthContext';
+import { useLogoutMutation } from '@app/generated/graphql';
+import { queryClient } from '@app/pages/_app';
 import { MoonIcon, SunIcon } from '@chakra-ui/icons';
 import {
   Avatar,
@@ -18,12 +24,6 @@ import {
 import Link from 'next/link';
 import router from 'next/router';
 import { FC } from 'react';
-import { firebaseLogout } from '../../../auth/firebaseAuth';
-import { MeQueryKey } from '../../../constants/query';
-import { useAuth } from '../../../contexts/AuthContext';
-import { useLogoutMutation } from '../../../generated/graphql';
-import { queryClient } from '../../../pages/_app';
-import { Logo } from '../../common/Logo';
 
 const UserMenu: FC = () => {
   const { user } = useAuth();

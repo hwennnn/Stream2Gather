@@ -1,22 +1,25 @@
-import { Box, SlideFade } from '@chakra-ui/react';
-import dynamic from 'next/dynamic';
-import { FC, useRef, useState } from 'react';
-import shallow from 'zustand/shallow';
+import PlayerControl from '@app/components/rooms/PlayerControl';
 import {
   startPlayingVideo,
   subscribeStreamEvent
-} from '../../lib/roomSocketService';
-import { useRoomSocket } from '../../pages/room';
+} from '@app/lib/roomSocketService';
+import { useRoomSocket } from '@app/pages/room';
 import useRoomStore, {
   setDuration,
   setPlayedSeconds,
   setPlaying
-} from '../../store/useRoomStore';
-import PlayerControl from './PlayerControl';
+} from '@app/store/useRoomStore';
+import { Box, SlideFade } from '@chakra-ui/react';
+import dynamic from 'next/dynamic';
+import { FC, useRef, useState } from 'react';
+import shallow from 'zustand/shallow';
 
-const ReactPlayer = dynamic(async () => await import('./ReactPlayerWrapper'), {
-  ssr: false
-});
+const ReactPlayer = dynamic(
+  async () => await import('@app/components/rooms/ReactPlayerWrapper'),
+  {
+    ssr: false
+  }
+);
 
 export const Player: FC = () => {
   const { roomSocket: socket } = useRoomSocket();

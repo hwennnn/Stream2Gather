@@ -2,7 +2,7 @@ import {
   nonAuthRoutes,
   protectedRoutes,
   publicRoutes
-} from './../constants/route';
+} from '@app/constants/route';
 
 export interface IRedirect {
   redirect: boolean;

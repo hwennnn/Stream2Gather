@@ -24,6 +24,21 @@ export const RES_ROOM_INFO = 'res_room_info';
 // From backend: This are new streaming events
 export const RES_STREAMING_EVENTS = 'res_streaming_events';
 
+// From backend: You have successfully joined the room
+export const RES_JOINED_ROOM = 'res_joined_room';
+
+// From backend: The room you requested does not exist
+export const RES_ROOM_DOES_NOT_EXIST = 'res_room_does_not_exist';
+
+// From backend: The room you requested is inactive
+export const RES_ROOM_INACTIVE = 'res_room_inactive';
+
+// From backend: You have no permission to join the room
+export const RES_ROOM_NO_PERMISSION = 'res_room_no_permission';
+
+// From backend: You have failed to join the room
+export const RES_JOIN_ROOM_FAILED = 'res_join_room_failed';
+
 // From redis publisher: There is a new message in the channel
 export const REDIS_PUB_MESSAGE = 'message';
 

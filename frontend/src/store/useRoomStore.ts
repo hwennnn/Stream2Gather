@@ -40,7 +40,7 @@ interface RoomState {
   actions: {
     setRoom: (data: FullRoomItemFragment) => void;
     resetRoom: () => void;
-    setJoiningStatus: (status: RoomJoiningStatus) => void;
+    setRoomJoiningStatus: (status: RoomJoiningStatus) => void;
     setPlaying: (playing: boolean) => void;
     setIsMuted: (isMuted: boolean) => void;
     setVolume: (volume: number) => void;
@@ -96,7 +96,7 @@ const useRoomStore = create<RoomState>()((set) => ({
       });
     },
     resetRoom: () => set({ ...initialRoomData }),
-    setJoiningStatus: (status) => set({ status }),
+    setRoomJoiningStatus: (status) => set({ status }),
     setPlaying: (playing) => set({ playing }),
     setIsMuted: (isMuted) => set({ isMuted }),
     setVolume: (volume) => set({ volume }),
@@ -123,7 +123,7 @@ const useRoomStore = create<RoomState>()((set) => ({
 export const {
   setRoom,
   resetRoom,
-  setJoiningStatus,
+  setRoomJoiningStatus,
   setPlaying,
   setIsMuted,
   setVolume,

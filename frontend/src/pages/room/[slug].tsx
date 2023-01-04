@@ -3,17 +3,8 @@ import { Loading } from '@app/components/common/loading/Loading';
 import { Player } from '@app/components/rooms/Player';
 import RoomSection from '@app/components/rooms/RoomSection';
 import { useAuth } from '@app/contexts/AuthContext';
-import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
-import {
-  joinRoom,
-  listenEvent,
-  subscribeUserJoined,
-  subscribeUserLeft
-} from '@app/lib/roomSocketService';
-import useRoomStore, {
-  RoomJoiningStatus,
-  setRoom
-} from '@app/store/useRoomStore';
+import { initSocketForRoom, joinRoom } from '@app/lib/roomSocketService';
+import useRoomStore, { RoomJoiningStatus } from '@app/store/useRoomStore';
 import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
@@ -29,28 +20,17 @@ const RoomSocketContext = React.createContext<
 >(undefined);
 
 const RoomPage: NextPage = () => {
-  const { slug } = useRouter().query;
-  const roomSlug = slug as string;
+  const { slug: querySlug } = useRouter().query;
+  const slug = querySlug as string;
 
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const joiningStatus = useRoomStore((state) => state.status);
-  const { isLoading: isRoomLoading } = useRoomQuery(
-    { slug: roomSlug },
-    {
-      onSuccess: (data) => {
-        setRoom(data.room as FullRoomItemFragment);
-      }
-    }
-  );
 
   useEffect(() => {
     if (socket !== null) {
-      joinRoom(socket, roomSlug, user);
-      subscribeUserJoined(socket);
-      subscribeUserLeft(socket);
-
-      listenEvent(socket);
+      joinRoom(socket, slug, user);
+      initSocketForRoom(socket);
 
       return (): void => {
         socket.disconnect();
@@ -58,7 +38,7 @@ const RoomPage: NextPage = () => {
     }
 
     return (): void => {};
-  }, [roomSlug, socket, user]);
+  }, [slug, socket, user]);
 
   useEffect(() => {
     setSocket(
@@ -71,26 +51,22 @@ const RoomPage: NextPage = () => {
     );
   }, []);
 
+  if (socket === null || joiningStatus !== RoomJoiningStatus.SUCCESS) {
+    return <Loading />;
+  }
+
   return (
     <Layout title="Room">
-      {isRoomLoading ||
-      socket === null ||
-      joiningStatus !== RoomJoiningStatus.SUCCESS ? (
-        <Loading />
-      ) : (
-        <>
-          <RoomSocketContext.Provider value={{ roomSocket: socket }}>
-            <Flex
-              flexDirection={{ base: 'column', lg: 'row' }}
-              maxW="120em"
-              mx="auto"
-            >
-              <Player />
-              <RoomSection />
-            </Flex>
-          </RoomSocketContext.Provider>
-        </>
-      )}
+      <RoomSocketContext.Provider value={{ roomSocket: socket }}>
+        <Flex
+          flexDirection={{ base: 'column', lg: 'row' }}
+          maxW="120em"
+          mx="auto"
+        >
+          <Player />
+          <RoomSection />
+        </Flex>
+      </RoomSocketContext.Provider>
     </Layout>
   );
 };

@@ -1,10 +1,16 @@
 import Layout from '@app/components/common/layouts/Layout';
 import { Loading } from '@app/components/common/loading/Loading';
+import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
+import RoomInactive from '@app/components/rooms/errors/RoomInactive';
 import { Player } from '@app/components/rooms/Player';
 import RoomSection from '@app/components/rooms/RoomSection';
 import { useAuth } from '@app/contexts/AuthContext';
-import { initSocketForRoom, joinRoom } from '@app/lib/roomSocketService';
-import useRoomStore, { RoomJoiningStatus } from '@app/store/useRoomStore';
+import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
+import { initSocketForRoom } from '@app/lib/roomSocketService';
+import useRoomStore, {
+  RoomJoiningStatus,
+  setRoom
+} from '@app/store/useRoomStore';
 import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
@@ -20,39 +26,62 @@ const RoomSocketContext = React.createContext<
 >(undefined);
 
 const RoomPage: NextPage = () => {
-  const { slug: querySlug } = useRouter().query;
-  const slug = querySlug as string;
+  const { slug } = useRouter().query;
 
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const joiningStatus = useRoomStore((state) => state.status);
+  const { isLoading: isRoomQueryLoading } = useRoomQuery(
+    { slug: slug as string },
+    {
+      onSuccess: (data) => {
+        if (data.room !== null && data.room !== undefined) {
+          setRoom(data.room as FullRoomItemFragment);
+        }
+      }
+    }
+  );
 
   useEffect(() => {
-    if (socket !== null) {
-      joinRoom(socket, slug, user);
-      initSocketForRoom(socket);
+    let newSocket: Socket | null = null;
 
-      return (): void => {
-        socket.disconnect();
-      };
+    newSocket = io(`${process.env.SERVER_URL}`, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: Infinity
+    });
+
+    if (
+      typeof slug === 'string' &&
+      user?.id !== undefined &&
+      user?.username !== undefined
+    ) {
+      initSocketForRoom(newSocket, slug, user?.id, user?.username);
     }
 
-    return (): void => {};
-  }, [slug, socket, user]);
+    setSocket(newSocket);
 
-  useEffect(() => {
-    setSocket(
-      io(`${process.env.SERVER_URL}`, {
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: Infinity
-      })
-    );
-  }, []);
+    return (): void => {
+      newSocket?.disconnect();
+      setSocket(null);
+    };
+  }, [slug, user?.id, user?.username]);
 
-  if (socket === null || joiningStatus !== RoomJoiningStatus.SUCCESS) {
+  if (
+    socket === null ||
+    joiningStatus === RoomJoiningStatus.LOADING ||
+    isRoomQueryLoading
+  ) {
     return <Loading />;
+  }
+
+  if (joiningStatus === RoomJoiningStatus.INACTIVE) {
+    return <RoomInactive />;
+  }
+
+  if (joiningStatus === RoomJoiningStatus.DOES_NOT_EXIST) {
+    return <RoomDoesNotExist />;
   }
 
   return (

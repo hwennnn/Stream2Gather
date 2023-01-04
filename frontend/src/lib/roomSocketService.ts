@@ -12,13 +12,12 @@ import {
   RES_ROOM_NO_PERMISSION,
   RES_STREAMING_EVENTS
 } from '@app/constants/socket';
-import { FullRoomItemFragment, RoomMember, User } from '@app/generated/graphql';
+import { RoomMember } from '@app/generated/graphql';
 import {
   addActiveMember,
   removeActiveMember,
   RoomJoiningStatus,
   setPlaying,
-  setRoom,
   setRoomJoiningStatus
 } from '@app/store/useRoomStore';
 import { MutableRefObject } from 'react';
@@ -30,15 +29,16 @@ export interface StreamEvent {
   timestamp: number;
 }
 
-export const joinRoom = (
+const handleJoinRoom = (
   socket: Socket,
   slug: string,
-  user: User | null | undefined
+  uid: string,
+  username: string
 ): void => {
   socket.emit(REQ_JOIN_ROOM, {
     slug,
-    uid: user?.id,
-    username: user?.username
+    uid,
+    username
   });
 };
 
@@ -82,15 +82,14 @@ const listenEvent = (socket: Socket): void => {
 };
 
 const handleJoinedRoom = (socket: Socket): void => {
-  socket.on(RES_JOINED_ROOM, (data: FullRoomItemFragment) => {
+  socket.on(RES_JOINED_ROOM, () => {
     setRoomJoiningStatus(RoomJoiningStatus.SUCCESS);
-    setRoom(data);
   });
 };
 
 const handleRoomDoesNotExist = (socket: Socket): void => {
   socket.on(RES_ROOM_DOES_NOT_EXIST, () => {
-    setRoomJoiningStatus(RoomJoiningStatus.ROOM_DOES_NOT_EXIST);
+    setRoomJoiningStatus(RoomJoiningStatus.DOES_NOT_EXIST);
   });
 };
 
@@ -125,8 +124,14 @@ const handleMemberLeft = (socket: Socket): void => {
   });
 };
 
-export const initSocketForRoom = (socket: Socket): void => {
+export const initSocketForRoom = (
+  socket: Socket,
+  slug: string,
+  uid: string,
+  username: string
+): void => {
   listenEvent(socket);
+  handleJoinRoom(socket, slug, uid, username);
   handleJoinedRoom(socket);
   handleRoomDoesNotExist(socket);
   handleRoomInactive(socket);

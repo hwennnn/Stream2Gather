@@ -4,6 +4,7 @@ import { RoomMember } from '../models/RedisModel';
 import RedisHelper from '../utils/redisHelper';
 import RedisRoomHelper from '../utils/redisRoomHelper';
 import {
+  RES_JOINED_ROOM,
   RES_NEW_MEMBER,
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
@@ -60,6 +61,8 @@ export const handleJoinRoom = (
 
     await socket.join(roomId);
     socket.roomId = roomId;
+
+    socket.emit(RES_JOINED_ROOM);
 
     await redisRoomHelper.updateRoomMember(roomId, socket.id, member);
     await redisHelper.publish(RES_NEW_MEMBER, member);

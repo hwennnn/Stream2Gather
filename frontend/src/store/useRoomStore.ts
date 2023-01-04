@@ -8,7 +8,7 @@ import create from 'zustand';
 export enum RoomJoiningStatus {
   LOADING,
   SUCCESS,
-  ROOM_DOES_NOT_EXIST,
+  DOES_NOT_EXIST,
   INACTIVE,
   NO_PERMISSION,
   FAILED // Error Base Case

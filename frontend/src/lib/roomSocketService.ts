@@ -24,11 +24,11 @@ export interface StreamEvent {
 
 export const joinRoom = (
   socket: Socket,
-  roomId: string,
+  slug: string,
   user: User | null | undefined
 ): void => {
   socket.emit(REQ_JOIN_ROOM, {
-    roomId,
+    slug,
     uid: user?.id,
     username: user?.username
   });

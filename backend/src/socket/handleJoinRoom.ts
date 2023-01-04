@@ -1,4 +1,5 @@
 import { Socket } from 'socket.io';
+import { Room } from '../entities/Room';
 import { RoomMember } from '../models/RedisModel';
 import RedisHelper from '../utils/redisHelper';
 import RedisRoomHelper from '../utils/redisRoomHelper';
@@ -7,11 +8,11 @@ import { RES_NEW_MEMBER } from './../constants/socket';
 type JoinRoomFunction = ({
   uid,
   username,
-  roomId
+  roomSlug
 }: {
   uid: string;
   username: string;
-  roomId: string;
+  roomSlug: string;
 }) => Promise<void>;
 
 export const handleJoinRoom = (
@@ -19,7 +20,15 @@ export const handleJoinRoom = (
   redisHelper: RedisHelper,
   redisRoomHelper: RedisRoomHelper
 ): JoinRoomFunction => {
-  return async ({ uid, roomId, username }): Promise<void> => {
+  return async ({ uid, roomSlug, username }): Promise<void> => {
+    const room = await Room.findOne({ where: { slug: roomSlug } });
+
+    if (room === null) {
+      throw new Error('Room not found');
+    }
+
+    const roomId = room.id;
+
     const member: RoomMember = {
       socketId: socket.id,
       roomId,

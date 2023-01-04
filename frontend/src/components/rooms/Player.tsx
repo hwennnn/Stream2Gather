@@ -3,7 +3,7 @@ import {
   startPlayingVideo,
   subscribeStreamEvent
 } from '@app/lib/roomSocketService';
-import { useRoomSocket } from '@app/pages/room';
+import { useRoomSocket } from '@app/pages/room/[slug]';
 import useRoomStore, {
   setDuration,
   setPlayedSeconds,

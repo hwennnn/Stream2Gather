@@ -3,7 +3,7 @@ import { Loading } from '@app/components/common/loading/Loading';
 import { Player } from '@app/components/rooms/Player';
 import RoomSection from '@app/components/rooms/RoomSection';
 import { useAuth } from '@app/contexts/AuthContext';
-import { useRoomQuery } from '@app/generated/graphql';
+import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
 import {
   joinRoom,
   listenEvent,
@@ -13,12 +13,9 @@ import {
 import { setRoom } from '@app/store/useRoomStore';
 import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
+import { useRouter } from 'next/router';
 import React, { useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-
-interface Props {
-  roomId: string;
-}
 
 export interface RoomSocketContextInterface {
   roomSocket: Socket;
@@ -28,21 +25,24 @@ const RoomSocketContext = React.createContext<
   RoomSocketContextInterface | undefined
 >(undefined);
 
-const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
+const RoomPage: NextPage = () => {
+  const { slug } = useRouter().query;
+  const roomSlug = slug as string;
+
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const { isLoading: isRoomLoading } = useRoomQuery(
-    { id: roomId },
+    { slug: roomSlug },
     {
       onSuccess: (data) => {
-        setRoom(data);
+        setRoom(data.room as FullRoomItemFragment);
       }
     }
   );
 
   useEffect(() => {
     if (socket !== null) {
-      joinRoom(socket, roomId, user);
+      joinRoom(socket, roomSlug, user);
       subscribeUserJoined(socket);
       subscribeUserLeft(socket);
 
@@ -54,7 +54,7 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
     }
 
     return (): void => {};
-  }, [roomId, socket, user]);
+  }, [roomSlug, socket, user]);
 
   useEffect(() => {
     setSocket(
@@ -87,22 +87,6 @@ const RoomPage: NextPage<Props> = ({ roomId }: Props) => {
       )}
     </Layout>
   );
-};
-
-RoomPage.getInitialProps = async ({ res, query }) => {
-  const { id: roomId } = query;
-
-  if (typeof roomId !== 'string') {
-    if (res !== undefined) {
-      res.writeHead(307, { Location: '/' });
-      res.end();
-    }
-
-    // to satisfy the type checker (NOT MEANINGFUL)
-    return { roomId: '' };
-  }
-
-  return { roomId };
 };
 
 export const useRoomSocket = (): RoomSocketContextInterface => {

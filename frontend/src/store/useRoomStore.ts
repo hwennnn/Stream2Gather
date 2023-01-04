@@ -1,32 +1,45 @@
-import { RoomMember, RoomQuery, VideoInfo } from '@app/generated/graphql';
+import {
+  FullRoomItemFragment,
+  RoomMember,
+  VideoInfo
+} from '@app/generated/graphql';
 import create from 'zustand';
 
 interface RoomState {
   roomId: string;
+  roomSlug: string;
+
+  isActive: boolean;
   isPublic: boolean;
+  isTemporary: boolean;
+  activeMembers: RoomMember[];
+
   isMuted: boolean;
   volume: number;
-  activeMembers: RoomMember[];
+  duration: number;
 
   // Room Info
   playing: boolean;
-  playingUrl: string;
   playedSeconds: number;
-  duration: number;
   playedTimestampUpdatedAt: string;
+
   playingIndex: number;
   playlist: VideoInfo[];
+  currentVideo: VideoInfo | undefined;
 
   actions: {
-    setRoom: (data: RoomQuery) => void;
+    setRoom: (data: FullRoomItemFragment) => void;
+    resetRoom: () => void;
     setPlaying: (playing: boolean) => void;
     setIsMuted: (isMuted: boolean) => void;
     setVolume: (volume: number) => void;
-    setPlayingUrl: (playingUrl: string) => void;
+
     setPlayedSeconds: (playedSeconds: number) => void;
     setDuration: (duration: number) => void;
     setPlayingIndex: (playingIndex: number) => void;
     setPlaylist: (playlist: VideoInfo[]) => void;
+    setCurrentVideo: (currentvideo: VideoInfo) => void;
+
     addActiveMember: (member: RoomMember) => void;
     removeActiveMember: (socketId: string) => void;
   };
@@ -34,44 +47,51 @@ interface RoomState {
 
 const initialRoomData = {
   roomId: '',
+  roomSlug: '',
+  isActive: true,
+  isTemporary: true,
   isPublic: false,
-  playing: false,
+  activeMembers: [],
   isMuted: true,
   volume: 100,
-  playingUrl: 'https://youtu.be/Y8JFxS1HlDo',
-  playedSeconds: 0,
   duration: 0,
+  playing: false,
+  playedSeconds: 0,
   playedTimestampUpdatedAt: '0',
   playingIndex: 0,
   playlist: [],
-  activeMembers: []
+  currentVideo: undefined
 };
 
 const useRoomStore = create<RoomState>()((set) => ({
   ...initialRoomData,
   actions: {
-    setRoom: (data: RoomQuery) => {
-      const roomInfo = data.room?.roomInfo;
+    setRoom: (data: FullRoomItemFragment) => {
+      const roomInfo = data.roomInfo;
       set({
-        roomId: data.room?.id,
-        activeMembers: data.room?.activeMembers,
-        isPublic: data.room?.isPublic,
-        playing: roomInfo?.isPlaying,
-        playingUrl: roomInfo?.currentUrl,
-        playedSeconds: roomInfo?.playedSeconds,
-        playedTimestampUpdatedAt: roomInfo?.playedTimestampUpdatedAt,
-        playingIndex: roomInfo?.playingIndex,
-        playlist: roomInfo?.playlist
+        roomId: data.id,
+        roomSlug: data.slug,
+        isActive: data.isActive,
+        isTemporary: data.isTemporary,
+        isPublic: data.isPublic,
+        activeMembers: data.activeMembers,
+        playing: roomInfo.isPlaying,
+        playedSeconds: roomInfo.playedSeconds,
+        playedTimestampUpdatedAt: roomInfo.playedTimestampUpdatedAt,
+        playingIndex: roomInfo.playingIndex,
+        playlist: roomInfo.playlist,
+        currentVideo: roomInfo.playlist[roomInfo.playingIndex]
       });
     },
+    resetRoom: () => set({ ...initialRoomData }),
     setPlaying: (playing) => set({ playing }),
     setIsMuted: (isMuted) => set({ isMuted }),
     setVolume: (volume) => set({ volume }),
-    setPlayingUrl: (playingUrl) => set({ playingUrl }),
     setPlayedSeconds: (playedSeconds) => set({ playedSeconds }),
     setDuration: (duration) => set({ duration }),
     setPlayingIndex: (playingIndex) => set({ playingIndex }),
     setPlaylist: (playlist) => set({ playlist }),
+    setCurrentVideo: (currentVideo) => set({ currentVideo }),
     addActiveMember: (member) =>
       set((state) => {
         const activeMembers = [...state.activeMembers, member];
@@ -92,7 +112,6 @@ export const {
   setPlaying,
   setIsMuted,
   setVolume,
-  setPlayingUrl,
   setPlayedSeconds,
   setDuration,
   setPlayingIndex,

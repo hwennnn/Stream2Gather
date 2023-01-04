@@ -1,6 +1,6 @@
 import { getFormattedTime } from '@app/helpers/time-helper';
 import { emitStreamEvent, StreamEvent } from '@app/lib/roomSocketService';
-import { useRoomSocket } from '@app/pages/room';
+import { useRoomSocket } from '@app/pages/room/[slug]';
 import useRoomStore, {
   setIsMuted,
   setPlayedSeconds,

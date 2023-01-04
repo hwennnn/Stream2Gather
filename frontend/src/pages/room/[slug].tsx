@@ -10,7 +10,10 @@ import {
   subscribeUserJoined,
   subscribeUserLeft
 } from '@app/lib/roomSocketService';
-import { setRoom } from '@app/store/useRoomStore';
+import useRoomStore, {
+  RoomJoiningStatus,
+  setRoom
+} from '@app/store/useRoomStore';
 import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
@@ -31,6 +34,7 @@ const RoomPage: NextPage = () => {
 
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
+  const joiningStatus = useRoomStore((state) => state.status);
   const { isLoading: isRoomLoading } = useRoomQuery(
     { slug: roomSlug },
     {
@@ -69,7 +73,9 @@ const RoomPage: NextPage = () => {
 
   return (
     <Layout title="Room">
-      {isRoomLoading || socket === null ? (
+      {isRoomLoading ||
+      socket === null ||
+      joiningStatus !== RoomJoiningStatus.SUCCESS ? (
         <Loading />
       ) : (
         <>

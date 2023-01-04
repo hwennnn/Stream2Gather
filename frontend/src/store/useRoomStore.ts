@@ -5,9 +5,19 @@ import {
 } from '@app/generated/graphql';
 import create from 'zustand';
 
+export enum RoomJoiningStatus {
+  LOADING,
+  SUCCESS,
+  ROOM_DOES_NOT_EXIST,
+  INACTIVE,
+  NO_PERMISSION,
+  FAILED // Error Base Case
+}
+
 interface RoomState {
   roomId: string;
   roomSlug: string;
+  status: RoomJoiningStatus;
 
   isActive: boolean;
   isPublic: boolean;
@@ -30,6 +40,7 @@ interface RoomState {
   actions: {
     setRoom: (data: FullRoomItemFragment) => void;
     resetRoom: () => void;
+    setJoiningStatus: (status: RoomJoiningStatus) => void;
     setPlaying: (playing: boolean) => void;
     setIsMuted: (isMuted: boolean) => void;
     setVolume: (volume: number) => void;
@@ -48,6 +59,7 @@ interface RoomState {
 const initialRoomData = {
   roomId: '',
   roomSlug: '',
+  status: RoomJoiningStatus.LOADING,
   isActive: true,
   isTemporary: true,
   isPublic: false,
@@ -84,6 +96,7 @@ const useRoomStore = create<RoomState>()((set) => ({
       });
     },
     resetRoom: () => set({ ...initialRoomData }),
+    setJoiningStatus: (status) => set({ status }),
     setPlaying: (playing) => set({ playing }),
     setIsMuted: (isMuted) => set({ isMuted }),
     setVolume: (volume) => set({ volume }),
@@ -109,6 +122,8 @@ const useRoomStore = create<RoomState>()((set) => ({
 
 export const {
   setRoom,
+  resetRoom,
+  setJoiningStatus,
   setPlaying,
   setIsMuted,
   setVolume,
@@ -116,6 +131,7 @@ export const {
   setDuration,
   setPlayingIndex,
   setPlaylist,
+  setCurrentVideo,
   addActiveMember,
   removeActiveMember
 } = useRoomStore.getState().actions;

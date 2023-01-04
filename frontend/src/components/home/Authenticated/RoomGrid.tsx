@@ -1,11 +1,11 @@
 import { CircleLoading } from '@app/components/common/loading/CircleLoading';
 import { RoomCard } from '@app/components/home/Authenticated/RoomCard';
-import { OwnRoomItemFragment, useOwnRoomsQuery } from '@app/generated/graphql';
+import { FullRoomItemFragment, useOwnRoomsQuery } from '@app/generated/graphql';
 import { Grid } from '@chakra-ui/react';
 import { FC, useState } from 'react';
 
 export const RoomGrid: FC = () => {
-  const [rooms, setRooms] = useState<OwnRoomItemFragment[]>([]);
+  const [rooms, setRooms] = useState<FullRoomItemFragment[]>([]);
 
   const { isLoading } = useOwnRoomsQuery(
     {},
@@ -20,10 +20,8 @@ export const RoomGrid: FC = () => {
     return <CircleLoading />;
   }
 
-  console.log(rooms);
-
   return (
-    <Grid pt={10} px="4" w="100%" templateColumns="repeat(3, 1fr)" gap={6}>
+    <Grid pt={10} px="4" templateColumns="repeat(3, 1fr)" gap={6}>
       {rooms.map((room) => (
         <RoomCard key={room.id} room={room} />
       ))}

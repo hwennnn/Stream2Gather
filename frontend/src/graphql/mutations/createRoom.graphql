@@ -4,12 +4,7 @@ mutation CreateRoom {
       ...RegularError
     }
     room {
-      id
-      isPublic
-      createdAt
-      creator {
-        id
-      }
+      ...RoomItem
     }
   }
 }

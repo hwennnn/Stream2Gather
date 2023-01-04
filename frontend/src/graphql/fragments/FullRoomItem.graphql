@@ -1,0 +1,18 @@
+fragment FullRoomItem on Room {
+  ...RoomItem
+  roomInfo {
+    playingIndex
+    playlist {
+      ...VideoItem
+    }
+    currentVideo {
+      ...VideoItem
+    }
+    isPlaying
+    playedSeconds
+    playedTimestampUpdatedAt
+  }
+  activeMembers {
+    ...ActiveMember
+  }
+}

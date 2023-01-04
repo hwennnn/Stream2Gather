@@ -1,0 +1,6 @@
+fragment ActiveMember on RoomMember {
+  uid
+  username
+  socketId
+  roomId
+}

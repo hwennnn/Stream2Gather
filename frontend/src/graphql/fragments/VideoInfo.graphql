@@ -1,0 +1,8 @@
+fragment VideoItem on VideoInfo {
+  id
+  url
+  title
+  author
+  platform
+  thumbnailUrl
+}

@@ -1,0 +1,7 @@
+fragment RoomItem on Room {
+  id
+  slug
+  isActive
+  isTemporary
+  isPublic
+}

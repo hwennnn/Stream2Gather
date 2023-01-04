@@ -7,6 +7,7 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
+  PrimaryColumn,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
@@ -19,6 +20,18 @@ export class Room extends BaseEntity {
   @Field()
   @PrimaryGeneratedColumn('increment')
   id!: string;
+
+  @Field()
+  @PrimaryColumn()
+  slug!: string;
+
+  @Field()
+  @Column({ default: true })
+  isActive: boolean;
+
+  @Field()
+  @Column({ default: true })
+  isTemporary: boolean;
 
   @Field()
   @Column({ default: false })
@@ -39,6 +52,7 @@ export class Room extends BaseEntity {
   })
   creator!: User;
 
+  // historical members
   @Field(() => [User], { nullable: true })
   @ManyToMany(() => User, (members) => members.rooms, {
     cascade: true,

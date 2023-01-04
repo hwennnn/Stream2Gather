@@ -33,6 +33,7 @@
     "helmet": "^4.6.0",
     "ioredis": "^5.2.4",
     "pg": "^8.4.0",
+    "random-word-slugs": "^0.1.6",
     "reflect-metadata": "^0.1.13",
     "socket.io": "^4.5.4",
     "type-graphql": "^2.0.0-beta.1",

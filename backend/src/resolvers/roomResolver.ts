@@ -1,3 +1,4 @@
+import { generateSlug } from 'random-word-slugs';
 import {
   Arg,
   Ctx,
@@ -47,10 +48,10 @@ export class RoomResolver {
   }
 
   @Query(() => Room, { nullable: true })
-  async room(@Arg('id') id: string): Promise<Room | null> {
+  async room(@Arg('slug') slug: string): Promise<Room | null> {
     try {
       return await Room.findOne({
-        where: { id }
+        where: { slug }
       });
     } catch (err) {
       console.log(err);
@@ -71,9 +72,19 @@ export class RoomResolver {
   ): Promise<RoomResponse> {
     const uid: string = req.session.userId as string;
     const user = await User.findOne({ where: { id: uid } });
+    let slug = generateSlug();
+    let foundRoom = null;
+
+    do {
+      foundRoom = await Room.findOne({ where: { slug } });
+      if (foundRoom !== null) {
+        slug = generateSlug();
+      }
+    } while (foundRoom !== null);
 
     if (user !== null) {
       const room = await Room.create({
+        slug,
         creator: user,
         members: [user]
       }).save();

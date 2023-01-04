@@ -1,7 +1,22 @@
 query OwnRooms {
   ownRooms {
     rooms {
-      ...OwnRoomItem
+      ...RoomItem
+      roomInfo {
+        playingIndex
+        playlist {
+          ...VideoItem
+        }
+        currentVideo {
+          ...VideoItem
+        }
+        isPlaying
+        playedSeconds
+        playedTimestampUpdatedAt
+      }
+      activeMembers {
+        ...ActiveMember
+      }
     }
   }
 }

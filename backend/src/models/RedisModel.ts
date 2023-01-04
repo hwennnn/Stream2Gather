@@ -22,30 +22,6 @@ export class RoomMember {
 }
 
 @ObjectType()
-export class RoomInfo {
-  @Field()
-  id: string;
-
-  @Field()
-  currentUrl: string;
-
-  @Field(() => Int)
-  playingIndex: number;
-
-  @Field(() => Float)
-  playedSeconds: number;
-
-  @Field()
-  playedTimestampUpdatedAt: string;
-
-  @Field()
-  isPlaying: boolean;
-
-  @Field(() => [VideoInfo])
-  playlist: VideoInfo[];
-}
-
-@ObjectType()
 export class VideoInfo {
   @Field(() => String)
   platform: VideoPlatform;
@@ -66,21 +42,46 @@ export class VideoInfo {
   author: string;
 }
 
+@ObjectType()
+export class RoomInfo {
+  @Field()
+  id: string;
+
+  @Field(() => Int)
+  playingIndex: number;
+
+  @Field(() => [VideoInfo])
+  playlist: VideoInfo[];
+
+  @Field(() => VideoInfo)
+  currentVideo: VideoInfo;
+
+  @Field(() => Float)
+  playedSeconds: number;
+
+  @Field()
+  playedTimestampUpdatedAt: string;
+
+  @Field()
+  isPlaying: boolean;
+}
+
 export const defaultVideoInfo: VideoInfo = {
   platform: VideoPlatform.YOUTUBE,
   id: 'Y8JFxS1HlDo',
   url: 'https://youtu.be/Y8JFxS1HlDo',
-  thumbnailUrl: '',
-  title: '',
-  author: ''
+  thumbnailUrl:
+    'https://i.ytimg.com/vi/Y8JFxS1HlDo/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLC-uG2HGv8aRjumCC5fcOUQ1ZXzUg',
+  title: "IVE 아이브 'LOVE DIVE' MV",
+  author: 'starshipTV'
 };
 
 export const defaultRoomInfo: RoomInfo = {
   id: '',
-  currentUrl: defaultVideoInfo.url,
   playingIndex: 0,
+  playlist: [defaultVideoInfo],
+  currentVideo: defaultVideoInfo,
   playedSeconds: 0.0,
   playedTimestampUpdatedAt: '0',
-  isPlaying: true,
-  playlist: [defaultVideoInfo]
+  isPlaying: true
 };

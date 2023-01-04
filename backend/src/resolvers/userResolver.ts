@@ -131,7 +131,7 @@ export class UserResolver {
       };
     }
 
-    if (user === null) {
+    if (user === null || user.id === undefined) {
       return {
         errors: [
           {
@@ -145,7 +145,7 @@ export class UserResolver {
     // store user id session
     // this will set a cookie on the user
     // keep them logged in
-    req.session.userId = user?.id;
+    req.session.userId = user.id;
     return { user };
   }
 
@@ -187,10 +187,21 @@ export class UserResolver {
       };
     }
 
+    if (user === null || user.id === undefined) {
+      return {
+        errors: [
+          {
+            field: 'unknown',
+            message: 'could not find the user'
+          }
+        ]
+      };
+    }
+
     // store user id session
     // this will set a cookie on the user
     // keep them logged in
-    req.session.userId = user?.id;
+    req.session.userId = user.id;
     return { user };
   }
 
@@ -236,10 +247,21 @@ export class UserResolver {
       };
     }
 
+    if (user === null || user.id === undefined) {
+      return {
+        errors: [
+          {
+            field: 'unknown',
+            message: 'could not find the user'
+          }
+        ]
+      };
+    }
+
     // store user id session
     // this will set a cookie on the user
     // keep them logged in
-    req.session.userId = user?.id;
+    req.session.userId = user.id;
     return { user };
   }
 

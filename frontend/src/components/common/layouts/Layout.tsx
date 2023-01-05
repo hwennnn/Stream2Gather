@@ -1,4 +1,4 @@
-import Footer from '@app/components/common/layouts/Footer';
+import { Footer } from '@app/components/common/layouts/Footer';
 import Navbar from '@app/components/common/layouts/Navbar';
 import { Box, Flex } from '@chakra-ui/react';
 import Head from 'next/head';

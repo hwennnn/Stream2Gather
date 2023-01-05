@@ -33,6 +33,9 @@ export const RES_ROOM_DOES_NOT_EXIST = 'res_room_does_not_exist';
 // From backend: The room you requested is inactive
 export const RES_ROOM_INACTIVE = 'res_room_inactive';
 
+// From backend: You are already in the room
+export const RES_ROOM_ALREADY_JOINED = 'res_room_already_joined';
+
 // From backend: You have no permission to join the room
 export const RES_ROOM_NO_PERMISSION = 'res_room_no_permission';
 

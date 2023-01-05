@@ -1,5 +1,6 @@
 import Layout from '@app/components/common/layouts/Layout';
 import { Loading } from '@app/components/common/loading/Loading';
+import RoomAlreadyJoined from '@app/components/rooms/errors/RoomAlreadyJoined';
 import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
 import RoomNoPermission from '@app/components/rooms/errors/RoomNoPermission';
@@ -87,6 +88,10 @@ const RoomPage: NextPage = () => {
 
   if (joiningStatus === RoomJoiningStatus.DOES_NOT_EXIST) {
     return <RoomDoesNotExist />;
+  }
+
+  if (joiningStatus === RoomJoiningStatus.ALREADY_IN_ROOM) {
+    return <RoomAlreadyJoined />;
   }
 
   return (

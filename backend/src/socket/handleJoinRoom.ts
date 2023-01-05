@@ -6,6 +6,7 @@ import RedisRoomHelper from '../utils/redisRoomHelper';
 import {
   RES_JOINED_ROOM,
   RES_NEW_MEMBER,
+  RES_ROOM_ALREADY_JOINED,
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
   RES_ROOM_NO_PERMISSION
@@ -46,6 +47,13 @@ export const handleJoinRoom = (
 
     if (!room.isActive) {
       socket.emit(RES_ROOM_INACTIVE);
+      return;
+    }
+
+    const activeMembers = await redisRoomHelper.getActiveMembers(room.id);
+
+    if (activeMembers.some((m) => m.uid === uid)) {
+      socket.emit(RES_ROOM_ALREADY_JOINED);
       return;
     }
 

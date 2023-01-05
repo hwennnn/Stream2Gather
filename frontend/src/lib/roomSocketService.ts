@@ -7,6 +7,7 @@ import {
   RES_JOIN_ROOM_FAILED,
   RES_MEMBER_LEFT,
   RES_NEW_MEMBER,
+  RES_ROOM_ALREADY_JOINED,
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
   RES_ROOM_NO_PERMISSION,
@@ -105,6 +106,12 @@ const handleRoomNoPermission = (socket: Socket): void => {
   });
 };
 
+const handleAlreadyInRoom = (socket: Socket): void => {
+  socket.on(RES_ROOM_ALREADY_JOINED, () => {
+    setRoomJoiningStatus(RoomJoiningStatus.ALREADY_IN_ROOM);
+  });
+};
+
 const handleJoinRoomFailed = (socket: Socket): void => {
   socket.on(RES_JOIN_ROOM_FAILED, () => {
     setRoomJoiningStatus(RoomJoiningStatus.FAILED);
@@ -136,6 +143,7 @@ export const initSocketForRoom = (
   handleRoomDoesNotExist(socket);
   handleRoomInactive(socket);
   handleRoomNoPermission(socket);
+  handleAlreadyInRoom(socket);
   handleJoinRoomFailed(socket);
   handleNewMember(socket);
   handleMemberLeft(socket);

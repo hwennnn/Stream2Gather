@@ -1,7 +1,7 @@
+import { COOKIE_NAME, isProd } from '@src/constants/config';
 import connectRedis from 'connect-redis';
 import session, { SessionOptions } from 'express-session';
 import { Redis } from 'ioredis';
-import { COOKIE_NAME, isProd } from '../constants/config';
 
 const RedisStore = connectRedis(session);
 

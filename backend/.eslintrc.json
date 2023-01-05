@@ -5,6 +5,9 @@
   },
   "extends": "standard-with-typescript",
   "overrides": [],
+  "plugins": [
+    "module-resolver"
+  ],
   "parserOptions": {
     "project": "./tsconfig.json",
     "ecmaVersion": "latest",
@@ -23,6 +26,12 @@
     ],
     "@typescript-eslint/space-before-function-paren": "off",
     "@typescript-eslint/indent": "off",
-    "multiline-ternary": "off"
+    "multiline-ternary": "off",
+    "module-resolver/use-alias": 2
+  },
+  "settings": {
+    "import/resolver": {
+      "babel-module": {}
+    }
   }
 }

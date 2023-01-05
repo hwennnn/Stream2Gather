@@ -1,6 +1,6 @@
-import RedisHelper from '../utils/redisHelper';
-import RedisRoomHelper from '../utils/redisRoomHelper';
-import { RES_STREAMING_EVENTS } from './../constants/socket';
+import { RES_STREAMING_EVENTS } from '@src/constants/socket';
+import RedisHelper from '@src/utils/redisHelper';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
 
 type StreamEventFunction = ({
   roomId,

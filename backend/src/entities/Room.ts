@@ -1,3 +1,5 @@
+import { User } from '@src/entities/User';
+import { RoomInfo, RoomMember } from '@src/models/RedisModel';
 import { Field, ObjectType } from 'type-graphql';
 import {
   BaseEntity,
@@ -11,8 +13,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
-import { RoomInfo, RoomMember } from '../models/RedisModel';
-import { User } from './User';
 
 @ObjectType()
 @Entity()

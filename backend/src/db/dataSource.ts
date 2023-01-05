@@ -1,6 +1,6 @@
+import { Room } from '@src/entities/Room';
+import { User } from '@src/entities/User';
 import { DataSource } from 'typeorm';
-import { Room } from '../entities/Room';
-import { User } from '../entities/User';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',

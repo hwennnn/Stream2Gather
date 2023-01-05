@@ -1,8 +1,3 @@
-import { Socket } from 'socket.io';
-import { Room } from '../entities/Room';
-import { RoomMember } from '../models/RedisModel';
-import RedisHelper from '../utils/redisHelper';
-import RedisRoomHelper from '../utils/redisRoomHelper';
 import {
   RES_JOINED_ROOM,
   RES_NEW_MEMBER,
@@ -10,7 +5,12 @@ import {
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
   RES_ROOM_NO_PERMISSION
-} from './../constants/socket';
+} from '@src/constants/socket';
+import { Room } from '@src/entities/Room';
+import { RoomMember } from '@src/models/RedisModel';
+import RedisHelper from '@src/utils/redisHelper';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
+import { Socket } from 'socket.io';
 
 type JoinRoomFunction = ({
   uid,

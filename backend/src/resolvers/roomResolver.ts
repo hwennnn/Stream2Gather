@@ -1,3 +1,9 @@
+import { Room } from '@src/entities/Room';
+import { User } from '@src/entities/User';
+import { isAuth } from '@src/middleware/isAuth';
+import { defaultRoomInfo, RoomInfo, RoomMember } from '@src/models/RedisModel';
+import { FieldError } from '@src/resolvers/types';
+import { MyContext } from '@src/types';
 import { generateSlug } from 'random-word-slugs';
 import {
   Arg,
@@ -11,12 +17,6 @@ import {
   Root,
   UseMiddleware
 } from 'type-graphql';
-import { Room } from '../entities/Room';
-import { User } from '../entities/User';
-import { MyContext } from '../types';
-import { isAuth } from './../middleware/isAuth';
-import { defaultRoomInfo, RoomInfo, RoomMember } from './../models/RedisModel';
-import { FieldError } from './types';
 
 @ObjectType()
 class RoomResponse {

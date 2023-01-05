@@ -5,18 +5,18 @@ import {
   ApolloServerPluginLandingPageLocalDefault,
   ApolloServerPluginLandingPageProductionDefault
 } from '@apollo/server/plugin/landingPage/default';
+import { isProd } from '@src/constants/config';
+import { RoomResolver } from '@src/resolvers/roomResolver';
+import { UserResolver } from '@src/resolvers/userResolver';
+import { corsOptions } from '@src/server';
+import { MyContext } from '@src/types';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
 import { json } from 'body-parser';
 import cors from 'cors';
 import express from 'express';
 import { Server } from 'http';
 import Redis from 'ioredis';
 import { buildSchema } from 'type-graphql';
-import { isProd } from '../constants/config';
-import { RoomResolver } from '../resolvers/roomResolver';
-import { UserResolver } from '../resolvers/userResolver';
-import { corsOptions } from '../server';
-import { MyContext } from '../types';
-import RedisRoomHelper from '../utils/redisRoomHelper';
 
 const initApolloServer = async (
   app: express.Application,

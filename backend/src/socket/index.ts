@@ -1,19 +1,19 @@
-import { Redis } from 'ioredis';
-import { Server as SocketServer } from 'socket.io';
-import RedisHelper from '../utils/redisHelper';
-import RedisRoomHelper from '../utils/redisRoomHelper';
 import {
   CONNECT,
   DISCONNECT,
   REQ_JOIN_ROOM,
   REQ_PLAY_VIDEO,
   REQ_STREAMING_EVENTS
-} from './../constants/socket';
-import { handleDisconnect } from './handleDisconnect';
-import { handleJoinRoom } from './handleJoinRoom';
-import { handlePlayVideo } from './handlePlayVideo';
-import { handleStreamingEvents } from './handleStreamingEvents';
-import initRedisSubscribers from './initRedisSubscribers';
+} from '@src/constants/socket';
+import { handleDisconnect } from '@src/socket/handleDisconnect';
+import { handleJoinRoom } from '@src/socket/handleJoinRoom';
+import { handlePlayVideo } from '@src/socket/handlePlayVideo';
+import { handleStreamingEvents } from '@src/socket/handleStreamingEvents';
+import initRedisSubscribers from '@src/socket/initRedisSubscribers';
+import RedisHelper from '@src/utils/redisHelper';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
+import { Redis } from 'ioredis';
+import { Server as SocketServer } from 'socket.io';
 
 const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
   const redisHelper = new RedisHelper(redis);

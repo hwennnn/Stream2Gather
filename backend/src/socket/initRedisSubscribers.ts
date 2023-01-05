@@ -1,12 +1,12 @@
-import Redis from 'ioredis';
-import { Server } from 'socket.io';
-import { REDIS_PUB_MESSAGE } from '../constants/socket';
 import {
+  REDIS_PUB_MESSAGE,
   RES_MEMBER_LEFT,
   RES_MESSAGE,
   RES_NEW_MEMBER,
   RES_STREAMING_EVENTS
-} from './../constants/socket';
+} from '@src/constants/socket';
+import Redis from 'ioredis';
+import { Server } from 'socket.io';
 
 const addRedisSubscriber = async (
   subscriberKey: string,

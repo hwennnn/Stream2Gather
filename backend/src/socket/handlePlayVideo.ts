@@ -1,6 +1,5 @@
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
 import { Socket } from 'socket.io';
-
-import RedisRoomHelper from '../utils/redisRoomHelper';
 
 type PlayVideoFunction = ({
   isPlaying,

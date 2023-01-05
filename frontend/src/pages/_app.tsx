@@ -1,4 +1,5 @@
 import AuthWrapper from '@app/components/common/layouts/AuthWrapper';
+import ErrorBoundary from '@app/components/ErrorBoundary';
 import { isProd } from '@app/constants/config';
 import AppProviders from '@app/contexts/AppProvider';
 import theme from '@app/lib/theme';
@@ -20,12 +21,14 @@ export default function App({ Component, pageProps }: AppProps): JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <ChakraProvider theme={theme}>
-        <AppProviders>
-          <AuthWrapper>
-            <Component {...pageProps} />
-            <ReactQueryDevtools initialIsOpen={false} />
-          </AuthWrapper>
-        </AppProviders>
+        <ErrorBoundary>
+          <AppProviders>
+            <AuthWrapper>
+              <Component {...pageProps} />
+              <ReactQueryDevtools initialIsOpen={false} />
+            </AuthWrapper>
+          </AppProviders>
+        </ErrorBoundary>
       </ChakraProvider>
     </QueryClientProvider>
   );

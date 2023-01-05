@@ -13,9 +13,9 @@ const AuthenticatedApp: FC = () => {
 
   const createRoom = async (): Promise<void> => {
     const result = await mutateAsync({});
-    const roomId = result.createRoom?.room?.id;
-    if (roomId !== undefined) {
-      await router.push(`/room?id=${roomId}`);
+    const slug = result.createRoom?.room?.slug;
+    if (slug !== undefined) {
+      await router.push(`/room/${slug}`);
     }
   };
 

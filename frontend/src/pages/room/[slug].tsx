@@ -2,6 +2,7 @@ import Layout from '@app/components/common/layouts/Layout';
 import { Loading } from '@app/components/common/loading/Loading';
 import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
+import RoomNoPermission from '@app/components/rooms/errors/RoomNoPermission';
 import { Player } from '@app/components/rooms/Player';
 import RoomSection from '@app/components/rooms/RoomSection';
 import { useAuth } from '@app/contexts/AuthContext';
@@ -74,6 +75,10 @@ const RoomPage: NextPage = () => {
     isRoomQueryLoading
   ) {
     return <Loading />;
+  }
+
+  if (joiningStatus === RoomJoiningStatus.NO_PERMISSION) {
+    return <RoomNoPermission />;
   }
 
   if (joiningStatus === RoomJoiningStatus.INACTIVE) {

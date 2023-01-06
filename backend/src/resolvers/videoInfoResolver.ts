@@ -31,4 +31,17 @@ export class VideoInfoResolver {
 
     return [];
   }
+
+  @Query(() => [VideoInfo])
+  async youtubeTrendingVideos(): Promise<VideoInfo[]> {
+    try {
+      const result = await videoInfoApi.getYoutubeTrendingVideos();
+
+      return result;
+    } catch (err) {
+      console.log(err);
+    }
+
+    return [];
+  }
 }

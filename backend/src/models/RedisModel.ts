@@ -67,12 +67,12 @@ export class RoomInfo {
 }
 
 export const defaultVideoInfo: VideoInfo = {
-  id: 'Y8JFxS1HlDo',
+  id: 'seJJs-vZBDo',
   platform: VideoPlatform.YOUTUBE,
-  title: "IVE 아이브 'LOVE DIVE' MV",
-  author: 'starshipTV',
-  url: 'https://youtu.be/Y8JFxS1HlDo',
-  thumbnailUrl: 'https://i.ytimg.com/vi/Y8JFxS1HlDo/mqdefault.jpg'
+  title: 'waltuh, put your d away waltuh',
+  author: 'Moonatik',
+  url: 'https://youtu.be/seJJs-vZBDo',
+  thumbnailUrl: 'https://i.ytimg.com/vi/seJJs-vZBDo/mqdefault.jpg'
 };
 
 export const defaultRoomInfo: RoomInfo = {

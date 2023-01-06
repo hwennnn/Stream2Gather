@@ -1,12 +1,15 @@
 import BaseApi from '../lib/baseApi';
 import { VideoInfo, VideoPlatform } from '../models/RedisModel';
-
-const YT_API_KEY = process.env.YOUTUBE_DATA_API_KEY;
+import {
+  queryYoutubeTrendingVideosURL,
+  queryYoutubeVideoInfoURL,
+  queryYoutubeVideoSearchURL
+} from './../constants/videos';
 
 class VideoInfoApi extends BaseApi {
   async getYoutubeVideoInfo(videoId: string): Promise<VideoInfo | null> {
     try {
-      const requestUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${YT_API_KEY}`;
+      const requestUrl = queryYoutubeVideoInfoURL(videoId);
 
       const result = await this.get(requestUrl);
       const data = result.items[0].snippet;
@@ -19,8 +22,6 @@ class VideoInfoApi extends BaseApi {
         author: data.channelTitle,
         thumbnailUrl: data.thumbnails.medium.url
       };
-
-      console.log(videoInfo);
 
       return videoInfo;
     } catch (err) {}
@@ -35,7 +36,7 @@ class VideoInfoApi extends BaseApi {
     const videoInfos: VideoInfo[] = [];
 
     try {
-      const requestUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=${maxResults}&q=${keyword}&type=video&key=${YT_API_KEY}`;
+      const requestUrl = queryYoutubeVideoSearchURL(keyword, maxResults);
 
       const resultList = await this.get(requestUrl);
 
@@ -51,7 +52,36 @@ class VideoInfoApi extends BaseApi {
           thumbnailUrl: videoData.snippet.thumbnails.medium.url
         };
 
-        // console.log(videoInfo);
+        videoInfos.push(videoInfo);
+      }
+
+      return videoInfos;
+    } catch (err) {}
+
+    return videoInfos;
+  }
+
+  async getYoutubeTrendingVideos(
+    maxResults: number = 15
+  ): Promise<VideoInfo[]> {
+    const videoInfos: VideoInfo[] = [];
+
+    try {
+      const requestUrl = queryYoutubeTrendingVideosURL(maxResults);
+
+      const resultList = await this.get(requestUrl);
+      console.log(resultList);
+      const dataList = resultList.items;
+
+      for (const videoData of dataList) {
+        const videoInfo: VideoInfo = {
+          id: videoData.id,
+          platform: VideoPlatform.YOUTUBE,
+          url: `https://youtu.be/${videoData.id}`,
+          title: videoData.snippet.title,
+          author: videoData.snippet.channelTitle,
+          thumbnailUrl: videoData.snippet.thumbnails.medium.url
+        };
 
         videoInfos.push(videoInfo);
       }

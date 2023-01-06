@@ -11,6 +11,7 @@ declare global {
       PG_PASSWORD: string;
       PG_DB: string;
       FIREBASE_PROJECT_ID: string;
+      YOUTUBE_DATA_API_KEY: string;
     }
   }
 }

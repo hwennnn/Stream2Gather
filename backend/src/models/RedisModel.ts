@@ -67,13 +67,12 @@ export class RoomInfo {
 }
 
 export const defaultVideoInfo: VideoInfo = {
-  platform: VideoPlatform.YOUTUBE,
   id: 'Y8JFxS1HlDo',
-  url: 'https://youtu.be/Y8JFxS1HlDo',
-  thumbnailUrl:
-    'https://i.ytimg.com/vi/Y8JFxS1HlDo/hq720.jpg?sqp=-oaymwEcCNAFEJQDSFXyq4qpAw4IARUAAIhCGAFwAcABBg==&rs=AOn4CLC-uG2HGv8aRjumCC5fcOUQ1ZXzUg',
+  platform: VideoPlatform.YOUTUBE,
   title: "IVE 아이브 'LOVE DIVE' MV",
-  author: 'starshipTV'
+  author: 'starshipTV',
+  url: 'https://youtu.be/Y8JFxS1HlDo',
+  thumbnailUrl: 'https://i.ytimg.com/vi/Y8JFxS1HlDo/mqdefault.jpg'
 };
 
 export const defaultRoomInfo: RoomInfo = {

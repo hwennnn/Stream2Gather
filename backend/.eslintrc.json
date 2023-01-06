@@ -23,6 +23,7 @@
     ],
     "@typescript-eslint/space-before-function-paren": "off",
     "@typescript-eslint/indent": "off",
-    "multiline-ternary": "off"
+    "multiline-ternary": "off",
+    "@typescript-eslint/restrict-template-expressions": "off"
   }
 }

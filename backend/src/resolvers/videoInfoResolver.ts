@@ -18,4 +18,17 @@ export class VideoInfoResolver {
 
     return null;
   }
+
+  @Query(() => [VideoInfo])
+  async youtubeVideos(@Arg('keyword') keyword: string): Promise<VideoInfo[]> {
+    try {
+      const result = await videoInfoApi.searchYoutubeVideos(keyword);
+
+      return result;
+    } catch (err) {
+      console.log(err);
+    }
+
+    return [];
+  }
 }

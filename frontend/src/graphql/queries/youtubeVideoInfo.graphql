@@ -1,0 +1,5 @@
+query YoutubeVideoInfo($videoId: String!) {
+  youtubeVideoInfo(videoId: $videoId) {
+    ...VideoItem
+  }
+}

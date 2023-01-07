@@ -82,74 +82,72 @@ export const Player: FC = () => {
   };
 
   return (
-    <Box width={{ base: '100%', lg: '100%' }}>
-      <Box
-        ref={playerWrapperRef}
-        position="relative"
-        pt={'56.25%'}
-        onMouseOver={() => {
-          if (isHovered) return;
-          setIsHovered(true);
+    <Box
+      ref={playerWrapperRef}
+      position="relative"
+      pt={'56.25%'}
+      onMouseOver={() => {
+        if (isHovered) return;
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => {
+        if (!isHovered) return;
+        setTimeout(() => {
+          setIsHovered(false);
+        }, 200);
+      }}
+    >
+      <ReactPlayer
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          pointerEvents: 'none',
+          userSelect: 'none'
         }}
-        onMouseLeave={() => {
-          if (!isHovered) return;
-          setTimeout(() => {
-            setIsHovered(false);
-          }, 200);
-        }}
-      >
-        <ReactPlayer
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            pointerEvents: 'none',
-            userSelect: 'none'
-          }}
-          width="100%"
-          height="100%"
-          // onPlay={() => play()}
-          // onPause={() => pause()}
-          onReady={() => onPlayerReady()}
-          onProgress={(callback: any) => updateProgress(callback)}
-          onDuration={(duration: number) => updateDuration(duration)}
-          muted={isMuted}
-          playing={playing}
-          volume={volume / 100}
-          url={playlist[playingIndex].url}
-          config={{
-            youtube: {
-              playerVars: {
-                showinfo: 0,
-                controls: 0,
-                disablekb: 1,
-                modestbranding: 1,
-                rel: 0,
-                fs: 0,
-                hl: 'eng'
-              }
+        width="100%"
+        height="100%"
+        // onPlay={() => play()}
+        // onPause={() => pause()}
+        onReady={() => onPlayerReady()}
+        onProgress={(callback: any) => updateProgress(callback)}
+        onDuration={(duration: number) => updateDuration(duration)}
+        muted={isMuted}
+        playing={playing}
+        volume={volume / 100}
+        url={playlist[playingIndex].url}
+        config={{
+          youtube: {
+            playerVars: {
+              showinfo: 0,
+              controls: 0,
+              disablekb: 1,
+              modestbranding: 1,
+              rel: 0,
+              fs: 0,
+              hl: 'eng'
             }
-          }}
-          playerref={playerRef}
-        />
+          }
+        }}
+        playerref={playerRef}
+      />
 
-        <SlideFade in={isHovered || !playing} offsetY="20px">
-          <Box
-            px="4"
-            w="full"
-            position={'absolute'}
-            left={0}
-            bottom={0}
-            right={0}
-            style={{ backgroundColor: 'rgba(1,1,1,0.005)' }}
-          >
-            <PlayerControl
-              playerRef={playerRef}
-              playerWrapperRef={playerWrapperRef}
-            />
-          </Box>
-        </SlideFade>
-      </Box>
+      <SlideFade in={isHovered || !playing} offsetY="20px">
+        <Box
+          px="4"
+          w="full"
+          position={'absolute'}
+          left={0}
+          bottom={0}
+          right={0}
+          style={{ backgroundColor: 'rgba(1,1,1,0.005)' }}
+        >
+          <PlayerControl
+            playerRef={playerRef}
+            playerWrapperRef={playerWrapperRef}
+          />
+        </Box>
+      </SlideFade>
     </Box>
   );
 };

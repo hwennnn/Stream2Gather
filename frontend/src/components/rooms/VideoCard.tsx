@@ -1,5 +1,11 @@
 import { VideoInfo } from '@app/generated/graphql';
-import { HStack, Image, Text, VStack } from '@chakra-ui/react';
+import {
+  HStack,
+  Image,
+  Text,
+  useColorModeValue,
+  VStack
+} from '@chakra-ui/react';
 import { FC } from 'react';
 
 interface VideoCardProps {
@@ -19,14 +25,18 @@ export const VideoCard: FC<VideoCardProps> = ({ video, isPlaying }) => {
 
       <VStack align="flex-start" w="full">
         <Text
-          color={'gray.50'}
+          color={useColorModeValue('gray.700', 'gray.50')}
           lineHeight={'shorter'}
           fontSize={'sm'}
           noOfLines={2}
         >
           {video.title}
         </Text>
-        <Text color="gray.200" fontSize="xs" noOfLines={1}>
+        <Text
+          color={useColorModeValue('gray.600', 'gray.200')}
+          fontSize="xs"
+          noOfLines={1}
+        >
           {video.author}
         </Text>
       </VStack>

@@ -23,6 +23,7 @@ const RoomSection: FC = () => {
         bg="bg-surface"
         boxShadow={useColorModeValue('sm', 'sm-dark')}
         p="2"
+        h="100vh"
       >
         <Tabs variant="enclosed" isFitted>
           <TabList>

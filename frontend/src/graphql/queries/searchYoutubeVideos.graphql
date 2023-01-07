@@ -1,0 +1,5 @@
+query SearchYoutubeVideos($keyword: String!) {
+  youtubeVideos(keyword: $keyword) {
+    ...VideoItem
+  }
+}

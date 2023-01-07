@@ -82,6 +82,9 @@ export type Query = {
   user?: Maybe<User>;
   users: Array<User>;
   usersWithRelations: Array<User>;
+  youtubeTrendingVideos: Array<VideoInfo>;
+  youtubeVideoInfo?: Maybe<VideoInfo>;
+  youtubeVideos: Array<VideoInfo>;
 };
 
 
@@ -97,6 +100,16 @@ export type QueryUserArgs = {
 
 export type QueryUsersWithRelationsArgs = {
   options: UserRelationsInput;
+};
+
+
+export type QueryYoutubeVideoInfoArgs = {
+  videoId: Scalars['String'];
+};
+
+
+export type QueryYoutubeVideosArgs = {
+  keyword: Scalars['String'];
 };
 
 export type RegisterInput = {
@@ -181,7 +194,7 @@ export type VideoInfo = {
 
 export type ActiveMemberFragment = { __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string };
 
-export type FullRoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> };
+export type FullRoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> };
 
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
@@ -189,7 +202,7 @@ export type RoomItemFragment = { __typename?: 'Room', id: string, slug: string, 
 
 export type UserItemFragment = { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string };
 
-export type VideoItemFragment = { __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string };
+export type VideoItemFragment = { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string };
 
 export type CreateRoomMutationVariables = Exact<{ [key: string]: never; }>;
 
@@ -230,19 +243,26 @@ export type MeQuery = { __typename?: 'Query', me?: { __typename?: 'User', id: st
 export type OwnRoomsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type OwnRoomsQuery = { __typename?: 'Query', ownRooms?: { __typename?: 'User', rooms?: Array<{ __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> }> | null } | null };
+export type OwnRoomsQuery = { __typename?: 'Query', ownRooms?: { __typename?: 'User', rooms?: Array<{ __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> }> | null } | null };
 
 export type RoomQueryVariables = Exact<{
   slug: Scalars['String'];
 }>;
 
 
-export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> } | null };
+export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> } | null };
 
 export type RoomsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RoomsQuery = { __typename?: 'Query', rooms: Array<{ __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, url: string, title: string, author: string, platform: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> }> };
+export type RoomsQuery = { __typename?: 'Query', rooms: Array<{ __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> }> };
+
+export type SearchYoutubeVideosQueryVariables = Exact<{
+  keyword: Scalars['String'];
+}>;
+
+
+export type SearchYoutubeVideosQuery = { __typename?: 'Query', youtubeVideos: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }> };
 
 export type UsersWithRelationsQueryVariables = Exact<{
   options: UserRelationsInput;
@@ -250,6 +270,18 @@ export type UsersWithRelationsQueryVariables = Exact<{
 
 
 export type UsersWithRelationsQuery = { __typename?: 'Query', usersWithRelations: Array<{ __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string, createdRooms?: Array<{ __typename?: 'Room', id: string }> | null, rooms?: Array<{ __typename?: 'Room', id: string }> | null }> };
+
+export type YoutubeTrendingVideosQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type YoutubeTrendingVideosQuery = { __typename?: 'Query', youtubeTrendingVideos: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }> };
+
+export type YoutubeVideoInfoQueryVariables = Exact<{
+  videoId: Scalars['String'];
+}>;
+
+
+export type YoutubeVideoInfoQuery = { __typename?: 'Query', youtubeVideoInfo?: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } | null };
 
 export const RoomItemFragmentDoc = `
     fragment RoomItem on Room {
@@ -263,10 +295,10 @@ export const RoomItemFragmentDoc = `
 export const VideoItemFragmentDoc = `
     fragment VideoItem on VideoInfo {
   id
-  url
+  platform
   title
   author
-  platform
+  url
   thumbnailUrl
 }
     `;
@@ -529,6 +561,29 @@ export const useRoomsQuery = <
 useRoomsQuery.getKey = (variables?: RoomsQueryVariables) => variables === undefined ? ['Rooms'] : ['Rooms', variables];
 ;
 
+export const SearchYoutubeVideosDocument = `
+    query SearchYoutubeVideos($keyword: String!) {
+  youtubeVideos(keyword: $keyword) {
+    ...VideoItem
+  }
+}
+    ${VideoItemFragmentDoc}`;
+export const useSearchYoutubeVideosQuery = <
+      TData = SearchYoutubeVideosQuery,
+      TError = unknown
+    >(
+      variables: SearchYoutubeVideosQueryVariables,
+      options?: UseQueryOptions<SearchYoutubeVideosQuery, TError, TData>
+    ) =>
+    useQuery<SearchYoutubeVideosQuery, TError, TData>(
+      ['SearchYoutubeVideos', variables],
+      fetcher<SearchYoutubeVideosQuery, SearchYoutubeVideosQueryVariables>(SearchYoutubeVideosDocument, variables),
+      options
+    );
+
+useSearchYoutubeVideosQuery.getKey = (variables: SearchYoutubeVideosQueryVariables) => ['SearchYoutubeVideos', variables];
+;
+
 export const UsersWithRelationsDocument = `
     query UsersWithRelations($options: UserRelationsInput!) {
   usersWithRelations(options: $options) {
@@ -556,4 +611,50 @@ export const useUsersWithRelationsQuery = <
     );
 
 useUsersWithRelationsQuery.getKey = (variables: UsersWithRelationsQueryVariables) => ['UsersWithRelations', variables];
+;
+
+export const YoutubeTrendingVideosDocument = `
+    query YoutubeTrendingVideos {
+  youtubeTrendingVideos {
+    ...VideoItem
+  }
+}
+    ${VideoItemFragmentDoc}`;
+export const useYoutubeTrendingVideosQuery = <
+      TData = YoutubeTrendingVideosQuery,
+      TError = unknown
+    >(
+      variables?: YoutubeTrendingVideosQueryVariables,
+      options?: UseQueryOptions<YoutubeTrendingVideosQuery, TError, TData>
+    ) =>
+    useQuery<YoutubeTrendingVideosQuery, TError, TData>(
+      variables === undefined ? ['YoutubeTrendingVideos'] : ['YoutubeTrendingVideos', variables],
+      fetcher<YoutubeTrendingVideosQuery, YoutubeTrendingVideosQueryVariables>(YoutubeTrendingVideosDocument, variables),
+      options
+    );
+
+useYoutubeTrendingVideosQuery.getKey = (variables?: YoutubeTrendingVideosQueryVariables) => variables === undefined ? ['YoutubeTrendingVideos'] : ['YoutubeTrendingVideos', variables];
+;
+
+export const YoutubeVideoInfoDocument = `
+    query YoutubeVideoInfo($videoId: String!) {
+  youtubeVideoInfo(videoId: $videoId) {
+    ...VideoItem
+  }
+}
+    ${VideoItemFragmentDoc}`;
+export const useYoutubeVideoInfoQuery = <
+      TData = YoutubeVideoInfoQuery,
+      TError = unknown
+    >(
+      variables: YoutubeVideoInfoQueryVariables,
+      options?: UseQueryOptions<YoutubeVideoInfoQuery, TError, TData>
+    ) =>
+    useQuery<YoutubeVideoInfoQuery, TError, TData>(
+      ['YoutubeVideoInfo', variables],
+      fetcher<YoutubeVideoInfoQuery, YoutubeVideoInfoQueryVariables>(YoutubeVideoInfoDocument, variables),
+      options
+    );
+
+useYoutubeVideoInfoQuery.getKey = (variables: YoutubeVideoInfoQueryVariables) => ['YoutubeVideoInfo', variables];
 ;

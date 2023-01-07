@@ -5,6 +5,7 @@ import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
 import RoomNoPermission from '@app/components/rooms/errors/RoomNoPermission';
 import { Player } from '@app/components/rooms/Player';
+import { RoomBelowSection } from '@app/components/rooms/RoomBelowSection';
 import RoomSection from '@app/components/rooms/RoomSection';
 import { useAuth } from '@app/contexts/AuthContext';
 import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
@@ -14,7 +15,7 @@ import useRoomStore, {
   RoomJoiningStatus,
   setRoom
 } from '@app/store/useRoomStore';
-import { Flex } from '@chakra-ui/react';
+import { Box, Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import React, { useContext, useEffect, useState } from 'react';
@@ -106,7 +107,11 @@ const RoomPage: NextPage = () => {
           px="4"
           pt="24px"
         >
-          <Player />
+          <Box width={{ base: '100%', lg: '100%' }}>
+            <Player />
+            <RoomBelowSection />
+          </Box>
+
           <RoomSection />
         </Flex>
       </RoomSocketContext.Provider>

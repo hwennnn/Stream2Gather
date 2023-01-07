@@ -101,6 +101,8 @@ const RoomPage: NextPage = () => {
           flexDirection={{ base: 'column', lg: 'row' }}
           maxW="120em"
           mx="auto"
+          px="4"
+          pt="24px"
         >
           <Player />
           <RoomSection />

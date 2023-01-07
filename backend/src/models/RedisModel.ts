@@ -67,12 +67,12 @@ export class RoomInfo {
 }
 
 export const defaultVideoInfo: VideoInfo = {
-  id: 'seJJs-vZBDo',
+  id: 'iId5WDsYxZ4',
   platform: VideoPlatform.YOUTUBE,
-  title: 'waltuh, put your d away waltuh',
-  author: 'Moonatik',
-  url: 'https://youtu.be/seJJs-vZBDo',
-  thumbnailUrl: 'https://i.ytimg.com/vi/seJJs-vZBDo/mqdefault.jpg'
+  title: 'Better Call Saul Commercial HD Best Quality',
+  author: 'asinglepeach',
+  url: 'https://youtu.be/iId5WDsYxZ4',
+  thumbnailUrl: 'https://i.ytimg.com/vi/iId5WDsYxZ4/mqdefault.jpg'
 };
 
 export const defaultRoomInfo: RoomInfo = {

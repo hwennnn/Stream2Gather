@@ -31,7 +31,7 @@ class VideoInfoApi extends BaseApi {
 
   async searchYoutubeVideos(
     keyword: string,
-    maxResults: number = 15
+    maxResults: number = 25
   ): Promise<VideoInfo[]> {
     const videoInfos: VideoInfo[] = [];
 
@@ -62,7 +62,7 @@ class VideoInfoApi extends BaseApi {
   }
 
   async getYoutubeTrendingVideos(
-    maxResults: number = 15
+    maxResults: number = 25
   ): Promise<VideoInfo[]> {
     const videoInfos: VideoInfo[] = [];
 

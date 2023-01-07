@@ -159,7 +159,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
             mt="2"
             width={'50px'}
             aria-label="slider-ex-2"
-            colorScheme={'red'}
+            colorScheme={'brand'}
             value={isMuted ? 0 : volume}
             defaultValue={100}
             onChange={(value) => {

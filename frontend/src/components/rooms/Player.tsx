@@ -82,7 +82,7 @@ export const Player: FC = () => {
   };
 
   return (
-    <Box width={{ base: '100%', lg: '70%' }}>
+    <Box width={{ base: '100%', lg: '100%' }}>
       <Box
         ref={playerWrapperRef}
         position="relative"

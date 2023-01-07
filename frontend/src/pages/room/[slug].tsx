@@ -10,6 +10,7 @@ import { useAuth } from '@app/contexts/AuthContext';
 import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
 import { initSocketForRoom } from '@app/lib/roomSocketService';
 import useRoomStore, {
+  resetRoom,
   RoomJoiningStatus,
   setRoom
 } from '@app/store/useRoomStore';
@@ -37,6 +38,7 @@ const RoomPage: NextPage = () => {
     { slug: slug as string },
     {
       onSuccess: (data) => {
+        resetRoom();
         if (data.room !== null && data.room !== undefined) {
           setRoom(data.room as FullRoomItemFragment);
         }

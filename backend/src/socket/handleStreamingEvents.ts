@@ -1,30 +1,29 @@
+import { Socket } from 'socket.io';
 import RedisHelper from '../utils/redisHelper';
 import RedisRoomHelper from '../utils/redisRoomHelper';
 import { RES_STREAMING_EVENTS } from './../constants/socket';
 
 type StreamEventFunction = ({
-  roomId,
   isPlaying,
   timestamp
 }: {
-  roomId: string;
   isPlaying: boolean;
   timestamp: number;
 }) => Promise<void>;
 
 export const handleStreamingEvents = (
+  socket: Socket,
   redisHelper: RedisHelper,
   redisRoomHelper: RedisRoomHelper
 ): StreamEventFunction => {
-  return async ({ roomId, isPlaying, timestamp }): Promise<void> => {
-    console.log(
-      `video-events: ${roomId}, ${isPlaying ? 'play' : 'stop'}, ${timestamp}`
-    );
+  return async ({ isPlaying, timestamp }): Promise<void> => {
+    const roomId = socket.roomId;
+
+    if (roomId === undefined) return;
+
     const roomInfo = await redisRoomHelper.getRoomInfo(roomId);
 
-    if (roomInfo === null) {
-      return;
-    }
+    if (roomInfo === null) return;
 
     roomInfo.playedSeconds = timestamp;
     roomInfo.playedTimestampUpdatedAt = new Date().getTime().toString();

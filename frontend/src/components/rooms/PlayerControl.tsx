@@ -38,18 +38,16 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   const { roomSocket: socket } = useRoomSocket();
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
-  const { roomId, playing, isMuted, volume, playedSeconds, duration } =
-    useRoomStore(
-      (state) => ({
-        roomId: state.roomId,
-        playing: state.playing,
-        isMuted: state.isMuted,
-        volume: state.volume,
-        playedSeconds: state.playedSeconds,
-        duration: state.duration
-      }),
-      shallow
-    );
+  const { playing, isMuted, volume, playedSeconds, duration } = useRoomStore(
+    (state) => ({
+      playing: state.playing,
+      isMuted: state.isMuted,
+      volume: state.volume,
+      playedSeconds: state.playedSeconds,
+      duration: state.duration
+    }),
+    shallow
+  );
 
   const play = (): void => {
     setPlaying(true);
@@ -57,7 +55,6 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     const timestamp = playerRef.current.getCurrentTime();
 
     const payload: StreamEvent = {
-      roomId,
       isPlaying,
       timestamp
     };
@@ -70,7 +67,6 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     const timestamp = playerRef.current.getCurrentTime();
 
     const payload: StreamEvent = {
-      roomId,
       isPlaying,
       timestamp
     };
@@ -90,7 +86,6 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     const timestamp = (value / 100) * duration;
 
     const payload: StreamEvent = {
-      roomId,
       isPlaying: true,
       timestamp
     };

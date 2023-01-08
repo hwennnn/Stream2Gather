@@ -39,7 +39,7 @@ const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
 
     socket.on(
       REQ_STREAMING_EVENTS,
-      handleStreamingEvents(redisHelper, redisRoomHelper)
+      handleStreamingEvents(socket, redisHelper, redisRoomHelper)
     );
 
     socket.on(

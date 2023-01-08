@@ -33,7 +33,6 @@ import { MutableRefObject } from 'react';
 import { Socket } from 'socket.io-client';
 
 export interface StreamEvent {
-  roomId: string;
   isPlaying: boolean;
   timestamp: number;
 }
@@ -68,7 +67,6 @@ export const subscribeStreamEvent = (
   playerRef: MutableRefObject<any>
 ): void => {
   socket.on(RES_STREAMING_EVENTS, (videoEvent) => {
-    // console.log(RES_STREAMING_EVENTS, videoEvent);
     const { isPlaying, playedSeconds } = videoEvent;
 
     setPlaying(isPlaying);

@@ -34,7 +34,7 @@ export class Room extends BaseEntity {
   isTemporary: boolean;
 
   @Field()
-  @Column({ default: false })
+  @Column({ default: true })
   isPublic: boolean;
 
   @Field(() => String)

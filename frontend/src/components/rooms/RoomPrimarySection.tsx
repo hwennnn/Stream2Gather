@@ -6,20 +6,19 @@ import { FC } from 'react';
 
 const RoomPrimarySection: FC = () => {
   return (
-    <>
-      <Box
-        width="full"
-        mr={{
-          base: '0',
-          lg: 'calc(24rem + 24px)',
-          xl: 'calc(28rem + 24px)'
-        }}
-      >
-        <Player />
-        <RoomBelowSection />
-        <Footer px="0" />
-      </Box>
-    </>
+    <Box
+      w="100%"
+      mr={{
+        base: '0',
+        lg: 'calc(24rem + 24px)',
+        xl: 'calc(28rem + 24px)'
+      }}
+    >
+      <Player />
+
+      <RoomBelowSection />
+      <Footer px="0" />
+    </Box>
   );
 };
 

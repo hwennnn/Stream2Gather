@@ -104,7 +104,6 @@ const RoomPage: NextPage = () => {
           mx="auto"
           px="4"
           pt="24px"
-          width="full"
         >
           <RoomPrimarySection />
           <RoomSecondarySection />

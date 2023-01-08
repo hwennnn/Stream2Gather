@@ -17,9 +17,15 @@ import { BsFillPlayFill } from 'react-icons/bs';
 
 interface QueryVideoCardProps {
   video: VideoInfo;
+  onClickPlay?: () => void;
+  onClickAdd?: () => void;
 }
 
-export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
+export const QueryVideoCard: FC<QueryVideoCardProps> = ({
+  video,
+  onClickPlay,
+  onClickAdd
+}) => {
   return (
     <>
       <Card w="full">
@@ -54,10 +60,10 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
 
         <CardFooter px="0" pb="0" pt="2">
           <Flex w="full" justify="space-between" flexWrap="wrap">
-            <Button borderRadius="md" flex="1" mr="2">
+            <Button onClick={onClickPlay} borderRadius="md" flex="1" mr="1">
               <Icon w={6} h={6} as={BsFillPlayFill} />
             </Button>
-            <Button borderRadius="md" flex="1">
+            <Button onClick={onClickAdd} borderRadius="md" flex="1">
               <Icon w={6} h={6} as={BiAddToQueue} />
             </Button>
           </Flex>

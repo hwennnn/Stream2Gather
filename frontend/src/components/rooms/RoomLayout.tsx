@@ -17,7 +17,7 @@ const RoomLayout: FC<PropsWithChildren> = ({ children }) => {
 
       <Navbar />
 
-      <Box mx="auto" maxWidth="120em" flex="1" mt="72px">
+      <Box mx="auto" width="100vw" maxWidth="120em" flex="1" mt="72px">
         {children}
       </Box>
     </Flex>

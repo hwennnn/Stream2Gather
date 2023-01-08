@@ -1,6 +1,7 @@
 export enum RoomInfoType {
   ADD_TO_QUEUE = 'ADD_TO_QUEUE',
-  UPDATE_PLAYLIST = 'UPDATE_PLAYLIST'
+  UPDATE_PLAYLIST = 'UPDATE_PLAYLIST',
+  RESET_QUEUE = 'RESET_QUEUE'
 }
 
 export const CONNECT = 'connect';
@@ -19,6 +20,9 @@ export const REQ_ADD_TO_PLAYLIST = 'req_add_to_playlist';
 
 // From frontend: I want to add a video to the playlist
 export const REQ_PLAY_NEW_VIDEO = 'req_play_new_video';
+
+// From frontend: I want to reset the queue
+export const REQ_RESET_QUEUE = 'req_reset_queue';
 
 // From backend: There is a new message in the group
 export const RES_MESSAGE = 'res_messages';

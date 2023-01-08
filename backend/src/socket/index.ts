@@ -9,6 +9,7 @@ import {
   REQ_JOIN_ROOM,
   REQ_PLAY_NEW_VIDEO,
   REQ_PLAY_VIDEO,
+  REQ_RESET_QUEUE,
   REQ_STREAMING_EVENTS
 } from './../constants/socket';
 import { handleAddToPlaylist } from './handleAddToPlaylist';
@@ -16,6 +17,7 @@ import { handleDisconnect } from './handleDisconnect';
 import { handleJoinRoom } from './handleJoinRoom';
 import { handlePlayNewVideo } from './handlePlayNewVideo';
 import { handlePlayVideo } from './handlePlayVideo';
+import { handleResetQueue } from './handleResetQueue';
 import { handleStreamingEvents } from './handleStreamingEvents';
 import initRedisSubscribers from './initRedisSubscribers';
 
@@ -42,6 +44,8 @@ const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
       REQ_ADD_TO_PLAYLIST,
       handleAddToPlaylist(socket, redisRoomHelper)
     );
+
+    socket.on(REQ_RESET_QUEUE, handleResetQueue(socket, redisRoomHelper));
 
     socket.on(REQ_PLAY_NEW_VIDEO, handlePlayNewVideo(socket, redisRoomHelper));
 

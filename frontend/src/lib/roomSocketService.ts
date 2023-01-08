@@ -4,6 +4,7 @@ import {
   REQ_JOIN_ROOM,
   REQ_PLAY_NEW_VIDEO,
   REQ_PLAY_VIDEO,
+  REQ_RESET_QUEUE,
   REQ_STREAMING_EVENTS,
   RES_JOINED_ROOM,
   RES_JOIN_ROOM_FAILED,
@@ -82,6 +83,10 @@ export const playNewVideo = (socket: Socket, videoInfo: VideoInfo): void => {
   socket.emit(REQ_PLAY_NEW_VIDEO, { videoInfo });
 };
 
+export const resetQueue = (socket: Socket): void => {
+  socket.emit(REQ_RESET_QUEUE);
+};
+
 const listenEvent = (socket: Socket): void => {
   if (process.env.NODE_ENV !== 'production') {
     socket.on(CONNECT, () => {
@@ -151,6 +156,7 @@ const handleRoomInfoUpdate = (socket: Socket): void => {
       case RoomInfoType.ADD_TO_QUEUE:
         addToPlaylist(data.videoInfo);
         break;
+      case RoomInfoType.RESET_QUEUE:
       case RoomInfoType.UPDATE_PLAYLIST:
         updateRoomInfo(data.roomInfo);
         break;

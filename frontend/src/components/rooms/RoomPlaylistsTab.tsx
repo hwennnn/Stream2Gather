@@ -1,10 +1,14 @@
 import { VideoCard } from '@app/components/rooms/VideoCard';
+import { resetQueue } from '@app/lib/roomSocketService';
+import { useRoomSocket } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
-import { VStack } from '@chakra-ui/react';
+import { Button, VStack } from '@chakra-ui/react';
 import { FC } from 'react';
+import { SlRefresh } from 'react-icons/sl';
 import shallow from 'zustand/shallow';
 
 export const RoomPlaylistsTab: FC = () => {
+  const { roomSocket } = useRoomSocket();
   const { playingIndex, playlist } = useRoomStore(
     (state) => ({
       playingIndex: state.playingIndex,
@@ -12,6 +16,10 @@ export const RoomPlaylistsTab: FC = () => {
     }),
     shallow
   );
+
+  const handleResetQueue = (): void => {
+    resetQueue(roomSocket);
+  };
 
   return (
     <VStack
@@ -26,6 +34,13 @@ export const RoomPlaylistsTab: FC = () => {
           isPlaying={index === playingIndex}
         />
       ))}
+      <Button
+        onClick={() => handleResetQueue()}
+        leftIcon={<SlRefresh />}
+        py="4"
+      >
+        Reset Queue
+      </Button>
     </VStack>
   );
 };

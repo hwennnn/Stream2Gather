@@ -4,7 +4,6 @@ import { MeQueryKey } from '@app/constants/query';
 import { useAuth } from '@app/contexts/AuthContext';
 import { useLogoutMutation } from '@app/generated/graphql';
 import { queryClient } from '@app/pages/_app';
-import { MoonIcon, SunIcon } from '@chakra-ui/icons';
 import {
   Avatar,
   Box,
@@ -24,6 +23,7 @@ import {
 import Link from 'next/link';
 import router from 'next/router';
 import { FC } from 'react';
+import { RiMoonClearFill, RiSunLine } from 'react-icons/ri';
 
 const UserMenu: FC = () => {
   const { user } = useAuth();
@@ -150,7 +150,7 @@ const Navbar: FC = () => {
           <Flex alignItems={'center'}>
             <Stack direction={'row'} spacing={6}>
               <Button p={2} background={'none'} onClick={toggleColorMode}>
-                {colorMode === 'light' ? <MoonIcon /> : <SunIcon />}
+                {colorMode === 'light' ? <RiMoonClearFill /> : <RiSunLine />}
               </Button>
 
               {isLoggedIn ? <UserMenu /> : <LoginItems />}

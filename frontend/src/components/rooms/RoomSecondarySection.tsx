@@ -37,7 +37,7 @@ const RoomSecondarySection: FC = () => {
         </TabList>
 
         <TabPanels>
-          <TabPanel px="1">
+          <TabPanel px="0">
             <RoomPlaylistsTab />
           </TabPanel>
 

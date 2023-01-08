@@ -2,7 +2,7 @@ import { VideoCard } from '@app/components/rooms/VideoCard';
 import { resetQueue } from '@app/lib/roomSocketService';
 import { useRoomSocket } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
-import { Button, VStack } from '@chakra-ui/react';
+import { Box, Button, VStack } from '@chakra-ui/react';
 import { FC } from 'react';
 import { SlRefresh } from 'react-icons/sl';
 import shallow from 'zustand/shallow';
@@ -23,9 +23,9 @@ export const RoomPlaylistsTab: FC = () => {
 
   return (
     <VStack
-      spacing={3}
       h={{ base: '614px', lg: 'calc(100vh - 188px)' }}
       overflowY="scroll"
+      spacing={0}
     >
       {playlist.map((video, index) => (
         <VideoCard
@@ -34,13 +34,16 @@ export const RoomPlaylistsTab: FC = () => {
           isPlaying={index === playingIndex}
         />
       ))}
-      <Button
-        onClick={() => handleResetQueue()}
-        leftIcon={<SlRefresh />}
-        py="4"
-      >
-        Reset Queue
-      </Button>
+
+      <Box mt="4">
+        <Button
+          onClick={() => handleResetQueue()}
+          leftIcon={<SlRefresh />}
+          py="4"
+        >
+          Reset Queue
+        </Button>
+      </Box>
     </VStack>
   );
 };

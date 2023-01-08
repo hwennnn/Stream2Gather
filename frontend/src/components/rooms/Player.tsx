@@ -12,7 +12,7 @@ import useRoomStore, {
 } from '@app/store/useRoomStore';
 import { Box, SlideFade } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
-import { FC, useRef, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import shallow from 'zustand/shallow';
 
 const ReactPlayer = dynamic(
@@ -24,26 +24,43 @@ const ReactPlayer = dynamic(
 
 export const Player: FC = () => {
   const { roomSocket: socket } = useRoomSocket();
-  const { playing, isMuted, volume, playingIndex, playlist } = useRoomStore(
+  const { playing, isMuted, volume } = useRoomStore(
     (state) => ({
       playing: state.playing,
       isMuted: state.isMuted,
-      volume: state.volume,
-      playingIndex: state.playingIndex,
-      playlist: state.playlist
+      volume: state.volume
     }),
     shallow
   );
 
+  const { currentVideo } = useRoomStore(
+    (state) => ({
+      currentVideo: state.currentVideo
+    }),
+    (prev, next) => prev.currentVideo?.url === next.currentVideo?.url
+  );
+
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
   const playerWrapperRef = useRef<any>();
   const playerRef = useRef<any>();
 
+  useEffect(() => {
+    if (isPlayerReady) {
+      console.log('url has changed', currentVideo?.url);
+      if (playerRef.current !== null) {
+        playerRef.current.seekTo(0, 'seconds');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentVideo?.url]);
+
   const onPlayerReady = (): void => {
     // subscribe to streaming events
     subscribeStreamEvent(socket, playerRef);
     initialisePlayer();
+    setIsPlayerReady(true);
   };
 
   const initialisePlayer = (): void => {
@@ -80,6 +97,7 @@ export const Player: FC = () => {
   };
 
   const updateDuration = (duration: number): void => {
+    console.log('duration', duration);
     setDuration(duration);
   };
 
@@ -122,7 +140,7 @@ export const Player: FC = () => {
         muted={isMuted}
         playing={playing}
         volume={volume / 100}
-        url={playlist[playingIndex].url}
+        url={currentVideo?.url}
         config={{
           youtube: {
             playerVars: {

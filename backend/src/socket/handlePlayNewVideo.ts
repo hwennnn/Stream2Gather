@@ -29,7 +29,7 @@ export const handlePlayNewVideo = (
 
     roomInfo.currentVideo = videoInfo;
     roomInfo.playedSeconds = 0;
-    roomInfo.playedTimestampUpdatedAt = '0';
+    roomInfo.playedTimestampUpdatedAt = new Date().getTime().toString();
     roomInfo.isPlaying = true;
 
     await redisRoomHelper.setRoomInfo(roomId, roomInfo);

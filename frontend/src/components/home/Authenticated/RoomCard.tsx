@@ -10,7 +10,7 @@ import {
   Stack,
   Text
 } from '@chakra-ui/react';
-import Link from 'next/link';
+import NextLink from 'next/link';
 import { FC } from 'react';
 
 interface RoomCardProps {
@@ -45,8 +45,14 @@ export const RoomCard: FC<RoomCardProps> = ({ room }) => {
       <Divider />
 
       <CardFooter w="full">
-        <Button mx="auto" variant="solid" colorScheme="blue">
-          <Link href={`room/${room.slug}`}>Join Room</Link>
+        <Button
+          mx="auto"
+          as={NextLink}
+          href={`room/${room.slug}`}
+          variant="solid"
+          colorScheme="blue"
+        >
+          Join Room
         </Button>
       </CardFooter>
     </Card>

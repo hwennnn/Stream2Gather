@@ -5,11 +5,15 @@ import {
   Card,
   CardBody,
   CardFooter,
+  Flex,
+  Icon,
   Image,
   Text,
   useColorModeValue
 } from '@chakra-ui/react';
 import { FC } from 'react';
+import { BiAddToQueue } from 'react-icons/bi';
+import { BsFillPlayFill } from 'react-icons/bs';
 
 interface QueryVideoCardProps {
   video: VideoInfo;
@@ -26,7 +30,7 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
             <Text
               color={useColorModeValue('gray.700', 'gray.50')}
               lineHeight={'shorter'}
-              fontSize={'sm'}
+              fontSize={'xs'}
               noOfLines={3}
             >
               {video.title}
@@ -35,7 +39,7 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
             <Text
               mt="2"
               color={useColorModeValue('gray.600', 'gray.200')}
-              fontSize="xs"
+              fontSize="11px"
               noOfLines={1}
             >
               {video.author}
@@ -43,9 +47,15 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
           </Box>
         </CardBody>
 
-        <CardFooter px="2" justify="space-between" flexWrap="wrap">
-          <Button size="sm">Play</Button>
-          <Button size="sm">Add to Queue</Button>
+        <CardFooter px="0" pb="0" pt="2">
+          <Flex w="full" justify="space-between" flexWrap="wrap">
+            <Button borderRadius="md" flex="1" mr="2">
+              <Icon w={6} h={6} as={BsFillPlayFill} />
+            </Button>
+            <Button borderRadius="md" flex="1">
+              <Icon w={6} h={6} as={BiAddToQueue} />
+            </Button>
+          </Flex>
         </CardFooter>
       </Card>
     </>

@@ -19,11 +19,11 @@ const RoomSection: FC = () => {
         borderRadius="lg"
         mt={{ base: '6', lg: '0' }}
         ml={{ lg: '24px' }}
-        width={{ base: '100%', sm: 'sm', md: 'md', lg: 'lg' }}
+        width={{ base: '100%', lg: 'lg' }}
         bg="bg-surface"
         boxShadow={useColorModeValue('sm', 'sm-dark')}
         p="2"
-        h="100vh"
+        h={'100vh'}
       >
         <Tabs variant="enclosed" isFitted>
           <TabList>

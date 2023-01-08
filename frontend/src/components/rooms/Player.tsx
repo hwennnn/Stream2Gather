@@ -119,6 +119,8 @@ export const Player: FC = () => {
         config={{
           youtube: {
             playerVars: {
+              cc_load_policy: 0,
+              iv_load_policy: 3,
               showinfo: 0,
               controls: 0,
               disablekb: 1,

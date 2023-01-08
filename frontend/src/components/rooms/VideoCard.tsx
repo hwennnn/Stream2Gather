@@ -13,7 +13,7 @@ interface VideoCardProps {
   isPlaying: boolean;
 }
 
-export const VideoCard: FC<VideoCardProps> = ({ video, isPlaying }) => {
+export const VideoCard: FC<VideoCardProps> = ({ video }) => {
   return (
     <HStack alignItems="flex-start" w="full">
       <Image

@@ -14,10 +14,14 @@ export const RoomPlaylistsTab: FC = () => {
   );
 
   return (
-    <VStack>
+    <VStack
+      spacing={3}
+      h={{ base: '614px', lg: 'calc(100vh - 188px)' }}
+      overflowY="scroll"
+    >
       {playlist.map((video, index) => (
         <VideoCard
-          key={video.id}
+          key={`${index}${video.id}`}
           video={video}
           isPlaying={index === playingIndex}
         />

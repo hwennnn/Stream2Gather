@@ -3,12 +3,15 @@ import {
   useYoutubeTrendingVideosQuery,
   VideoInfo
 } from '@app/generated/graphql';
+import { addToPlayList, playNewVideo } from '@app/lib/roomSocketService';
+import { useRoomSocket } from '@app/pages/room/[slug]';
 import { Box, Button, Grid, Text } from '@chakra-ui/react';
 import { FC, useEffect, useState } from 'react';
 
 const showLimit = 8;
 
 export const TrendingVideosSection: FC = () => {
+  const { roomSocket } = useRoomSocket();
   const [fetchedVideos, setFetchedVideos] = useState<VideoInfo[]>([]);
   const [showMore, setShowMore] = useState(false);
 
@@ -33,6 +36,14 @@ export const TrendingVideosSection: FC = () => {
     }
   }, [fetchedVideos, isLoading, showMore]);
 
+  const onClickAddToQueue = (videoInfo: VideoInfo): void => {
+    addToPlayList(roomSocket, videoInfo);
+  };
+
+  const onClickPlayVideo = (videoInfo: VideoInfo): void => {
+    playNewVideo(roomSocket, videoInfo);
+  };
+
   if (isLoading) {
     return <Box />;
   }
@@ -50,8 +61,13 @@ export const TrendingVideosSection: FC = () => {
         }}
         gap={6}
       >
-        {trendingVideos.map((video) => (
-          <QueryVideoCard key={video.id} video={video} />
+        {trendingVideos.map((video, index) => (
+          <QueryVideoCard
+            key={`${index}${video.id}`}
+            video={video}
+            onClickAdd={() => onClickAddToQueue(video)}
+            onClickPlay={() => onClickPlayVideo(video)}
+          />
         ))}
       </Grid>
 

@@ -1,6 +1,8 @@
 import {
   CONNECT,
+  REQ_ADD_TO_PLAYLIST,
   REQ_JOIN_ROOM,
+  REQ_PLAY_NEW_VIDEO,
   REQ_PLAY_VIDEO,
   REQ_STREAMING_EVENTS,
   RES_JOINED_ROOM,
@@ -10,16 +12,20 @@ import {
   RES_ROOM_ALREADY_JOINED,
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
+  RES_ROOM_INFO,
   RES_ROOM_NO_PERMISSION,
-  RES_STREAMING_EVENTS
+  RES_STREAMING_EVENTS,
+  RoomInfoType
 } from '@app/constants/socket';
-import { RoomMember } from '@app/generated/graphql';
+import { RoomMember, VideoInfo } from '@app/generated/graphql';
 import {
   addActiveMember,
+  addToPlaylist,
   removeActiveMember,
   RoomJoiningStatus,
   setPlaying,
-  setRoomJoiningStatus
+  setRoomJoiningStatus,
+  updateRoomInfo
 } from '@app/store/useRoomStore';
 import { MutableRefObject } from 'react';
 import { Socket } from 'socket.io-client';
@@ -66,6 +72,14 @@ export const subscribeStreamEvent = (
     setPlaying(isPlaying);
     playerRef.current.seekTo(playedSeconds, 'seconds');
   });
+};
+
+export const addToPlayList = (socket: Socket, videoInfo: VideoInfo): void => {
+  socket.emit(REQ_ADD_TO_PLAYLIST, { videoInfo });
+};
+
+export const playNewVideo = (socket: Socket, videoInfo: VideoInfo): void => {
+  socket.emit(REQ_PLAY_NEW_VIDEO, { videoInfo });
 };
 
 const listenEvent = (socket: Socket): void => {
@@ -131,6 +145,21 @@ const handleMemberLeft = (socket: Socket): void => {
   });
 };
 
+const handleRoomInfoUpdate = (socket: Socket): void => {
+  socket.on(RES_ROOM_INFO, (data) => {
+    switch (data.type) {
+      case RoomInfoType.ADD_TO_QUEUE:
+        addToPlaylist(data.videoInfo);
+        break;
+      case RoomInfoType.UPDATE_PLAYLIST:
+        updateRoomInfo(data.roomInfo);
+        break;
+      default:
+        break;
+    }
+  });
+};
+
 export const initSocketForRoom = (
   socket: Socket,
   slug: string,
@@ -147,4 +176,5 @@ export const initSocketForRoom = (
   handleJoinRoomFailed(socket);
   handleNewMember(socket);
   handleMemberLeft(socket);
+  handleRoomInfoUpdate(socket);
 };

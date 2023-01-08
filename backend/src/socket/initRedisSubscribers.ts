@@ -1,10 +1,11 @@
 import Redis from 'ioredis';
 import { Server } from 'socket.io';
-import { REDIS_PUB_MESSAGE } from '../constants/socket';
 import {
+  REDIS_PUB_MESSAGE,
   RES_MEMBER_LEFT,
   RES_MESSAGE,
   RES_NEW_MEMBER,
+  RES_ROOM_INFO,
   RES_STREAMING_EVENTS
 } from './../constants/socket';
 
@@ -37,7 +38,8 @@ const initRedisSubscribers = async (
     RES_MESSAGE,
     RES_NEW_MEMBER,
     RES_MEMBER_LEFT,
-    RES_STREAMING_EVENTS
+    RES_STREAMING_EVENTS,
+    RES_ROOM_INFO
   ];
 
   for (const channel of channels) {

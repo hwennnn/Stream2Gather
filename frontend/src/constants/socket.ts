@@ -1,3 +1,8 @@
+export enum RoomInfoType {
+  ADD_TO_QUEUE = 'ADD_TO_QUEUE',
+  UPDATE_PLAYLIST = 'UPDATE_PLAYLIST'
+}
+
 export const CONNECT = 'connect';
 
 // From frontend: I want to join a room
@@ -8,6 +13,12 @@ export const REQ_STREAMING_EVENTS = 'req_streaming_events';
 
 // From frontend: I starts to play the video
 export const REQ_PLAY_VIDEO = 'req_play_video';
+
+// From frontend: I want to add a video to the playlist
+export const REQ_ADD_TO_PLAYLIST = 'req_add_to_playlist';
+
+// From frontend: I want to add a video to the playlist
+export const REQ_PLAY_NEW_VIDEO = 'req_play_new_video';
 
 // From backend: There is a new message in the group
 export const RES_MESSAGE = 'res_messages';

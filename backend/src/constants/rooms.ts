@@ -1,0 +1,4 @@
+export enum RoomInfoType {
+  ADD_TO_QUEUE = 'ADD_TO_QUEUE',
+  UPDATE_PLAYLIST = 'UPDATE_PLAYLIST'
+}

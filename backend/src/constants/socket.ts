@@ -6,8 +6,14 @@ export const REQ_JOIN_ROOM = 'req_join_room';
 // From frontend: I want to play/pause/seek to spefic timestamp
 export const REQ_STREAMING_EVENTS = 'req_streaming_events';
 
-// From frontend: I starts to play the video
+// From frontend: I start to play the video
 export const REQ_PLAY_VIDEO = 'req_play_video';
+
+// From frontend: I want to add a video to the playlist
+export const REQ_ADD_TO_PLAYLIST = 'req_add_to_playlist';
+
+// From frontend: I want to add a video to the playlist
+export const REQ_PLAY_NEW_VIDEO = 'req_play_new_video';
 
 // From backend: There is a new message in the group
 export const RES_MESSAGE = 'res_messages';
@@ -18,7 +24,7 @@ export const RES_NEW_MEMBER = 'res_new_member';
 // From backend: There is a member left the group
 export const RES_MEMBER_LEFT = 'res_member_left';
 
-// From backend: This is the room info you requested
+// From backend: This is an update inside the room info
 export const RES_ROOM_INFO = 'res_room_info';
 
 // From backend: This are new streaming events

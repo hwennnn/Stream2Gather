@@ -70,7 +70,7 @@ class VideoInfoApi extends BaseApi {
       const requestUrl = queryYoutubeTrendingVideosURL(maxResults);
 
       const resultList = await this.get(requestUrl);
-      
+
       const dataList = resultList.items;
 
       for (const videoData of dataList) {

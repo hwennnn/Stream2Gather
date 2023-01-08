@@ -13,7 +13,7 @@ interface VideoCardProps {
   isPlaying: boolean;
 }
 
-export const VideoCard: FC<VideoCardProps> = ({ video }) => {
+export const VideoCard: FC<VideoCardProps> = ({ video, isPlaying }) => {
   return (
     <HStack alignItems="flex-start" w="full">
       <Image
@@ -25,7 +25,10 @@ export const VideoCard: FC<VideoCardProps> = ({ video }) => {
 
       <VStack align="flex-start" w="full">
         <Text
-          color={useColorModeValue('gray.700', 'gray.50')}
+          color={useColorModeValue(
+            isPlaying ? 'secondary' : 'gray.700',
+            isPlaying ? 'secondaryDark' : 'gray.50'
+          )}
           lineHeight={'shorter'}
           fontSize={'sm'}
           noOfLines={2}
@@ -33,7 +36,10 @@ export const VideoCard: FC<VideoCardProps> = ({ video }) => {
           {video.title}
         </Text>
         <Text
-          color={useColorModeValue('gray.600', 'gray.200')}
+          color={useColorModeValue(
+            isPlaying ? 'primary' : 'gray.600',
+            isPlaying ? 'tertiary' : 'gray.200'
+          )}
           fontSize="xs"
           noOfLines={1}
         >

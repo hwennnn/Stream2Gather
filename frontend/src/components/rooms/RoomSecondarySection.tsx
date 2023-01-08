@@ -12,19 +12,6 @@ import {
 } from '@chakra-ui/react';
 import { FC } from 'react';
 
-// position={{ base: 'relative', lg: 'fixed' }}
-// float={{ base: 'none', lg: 'right' }}
-// ml={{ lg: '70%' }}
-// mr={{ lg: '16px' }}
-// borderRadius="lg"
-// mt={{ base: '6', lg: '0' }}
-// // ml={{ lg: '24px' }}
-// maxWidth={{ base: '100%', lg: 'lg' }}
-// bg="bg-surface"
-// boxShadow={useColorModeValue('sm', 'sm-dark')}
-// p="2"
-// h="calc(100vh - 110px)"
-
 const RoomSecondarySection: FC = () => {
   return (
     <Box
@@ -40,7 +27,7 @@ const RoomSecondarySection: FC = () => {
       bg="bg-surface"
       boxShadow={useColorModeValue('sm', 'sm-dark')}
       p="2"
-      h="calc(100vh - 104px)"
+      h={{ base: '700px', lg: 'calc(100vh - 104px)' }}
     >
       <Tabs variant="enclosed" isFitted>
         <TabList>
@@ -50,7 +37,7 @@ const RoomSecondarySection: FC = () => {
         </TabList>
 
         <TabPanels>
-          <TabPanel>
+          <TabPanel px="1">
             <RoomPlaylistsTab />
           </TabPanel>
 

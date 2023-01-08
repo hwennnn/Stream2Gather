@@ -5,6 +5,7 @@ import {
 } from '@app/lib/roomSocketService';
 import { useRoomSocket } from '@app/pages/room/[slug]';
 import useRoomStore, {
+  playNextVideo,
   setDuration,
   setPlayedSeconds,
   setPlaying
@@ -33,6 +34,7 @@ export const Player: FC = () => {
     }),
     shallow
   );
+
   const [isHovered, setIsHovered] = useState(false);
 
   const playerWrapperRef = useRef<any>();
@@ -81,6 +83,10 @@ export const Player: FC = () => {
     setDuration(duration);
   };
 
+  const onVideoEnded = (): void => {
+    playNextVideo();
+  };
+
   return (
     <Box
       ref={playerWrapperRef}
@@ -112,6 +118,7 @@ export const Player: FC = () => {
         onReady={() => onPlayerReady()}
         onProgress={(callback: any) => updateProgress(callback)}
         onDuration={(duration: number) => updateDuration(duration)}
+        onEnded={() => onVideoEnded()}
         muted={isMuted}
         playing={playing}
         volume={volume / 100}

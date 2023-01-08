@@ -2,6 +2,7 @@ import {
   CONNECT,
   REQ_ADD_TO_PLAYLIST,
   REQ_JOIN_ROOM,
+  REQ_PLAY_EXISTING_VIDEO,
   REQ_PLAY_NEW_VIDEO,
   REQ_PLAY_VIDEO,
   REQ_RESET_QUEUE,
@@ -87,6 +88,13 @@ export const resetQueue = (socket: Socket): void => {
   socket.emit(REQ_RESET_QUEUE);
 };
 
+export const playExistingVideo = (
+  socket: Socket,
+  playingIndex: number
+): void => {
+  socket.emit(REQ_PLAY_EXISTING_VIDEO, { playingIndex });
+};
+
 const listenEvent = (socket: Socket): void => {
   if (process.env.NODE_ENV !== 'production') {
     socket.on(CONNECT, () => {
@@ -158,6 +166,7 @@ const handleRoomInfoUpdate = (socket: Socket): void => {
         break;
       case RoomInfoType.RESET_QUEUE:
       case RoomInfoType.UPDATE_PLAYLIST:
+      case RoomInfoType.UPDATE_PLAYING_INDEX:
         updateRoomInfo(data.roomInfo);
         break;
       default:

@@ -30,12 +30,13 @@ export const RoomPlaylistsTab: FC = () => {
       {playlist.map((video, index) => (
         <VideoCard
           key={`${index}${video.id}`}
+          index={index}
           video={video}
           isPlaying={index === playingIndex}
         />
       ))}
 
-      <Box mt="4">
+      <Box pt="4">
         <Button
           onClick={() => handleResetQueue()}
           leftIcon={<SlRefresh />}

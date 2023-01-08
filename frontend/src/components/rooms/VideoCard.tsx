@@ -1,4 +1,6 @@
 import { VideoInfo } from '@app/generated/graphql';
+import { playExistingVideo } from '@app/lib/roomSocketService';
+import { useRoomSocket } from '@app/pages/room/[slug]';
 import {
   HStack,
   Icon,
@@ -12,10 +14,17 @@ import { BsPlayFill } from 'react-icons/bs';
 
 interface VideoCardProps {
   video: VideoInfo;
+  index: number;
   isPlaying: boolean;
 }
 
-export const VideoCard: FC<VideoCardProps> = ({ video, isPlaying }) => {
+export const VideoCard: FC<VideoCardProps> = ({ video, index, isPlaying }) => {
+  const { roomSocket } = useRoomSocket();
+
+  const onVideoClick = (index: number): void => {
+    playExistingVideo(roomSocket, index);
+  };
+
   return (
     <HStack
       p="2"
@@ -23,8 +32,12 @@ export const VideoCard: FC<VideoCardProps> = ({ video, isPlaying }) => {
       w="full"
       bg={isPlaying ? 'rgba(255, 255, 255, 0.1)' : 'inherit'}
       _hover={{
-        bg: isPlaying ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)'
+        bg: isPlaying
+          ? 'rgba(255, 255, 255, 0.1)'
+          : 'rgba(255, 255, 255, 0.05)',
+        cursor: 'pointer'
       }}
+      onClick={() => onVideoClick(index)}
     >
       <Icon
         color="gray.200"

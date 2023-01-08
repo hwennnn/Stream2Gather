@@ -1,12 +1,11 @@
-import { Footer } from '@app/components/common/layouts/Footer';
 import { Loading } from '@app/components/common/loading/Loading';
 import RoomAlreadyJoined from '@app/components/rooms/errors/RoomAlreadyJoined';
 import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
 import RoomNoPermission from '@app/components/rooms/errors/RoomNoPermission';
-import { RoomBelowSection } from '@app/components/rooms/RoomBelowSection';
 import RoomLayout from '@app/components/rooms/RoomLayout';
-import RoomSection from '@app/components/rooms/RoomSection';
+import RoomPrimarySection from '@app/components/rooms/RoomPrimarySection';
+import RoomSecondarySection from '@app/components/rooms/RoomSecondarySection';
 import { useAuth } from '@app/contexts/AuthContext';
 import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
 import { initSocketForRoom } from '@app/lib/roomSocketService';
@@ -15,7 +14,7 @@ import useRoomStore, {
   RoomJoiningStatus,
   setRoom
 } from '@app/store/useRoomStore';
-import { Box, Flex } from '@chakra-ui/react';
+import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import React, { useContext, useEffect, useState } from 'react';
@@ -105,13 +104,10 @@ const RoomPage: NextPage = () => {
           mx="auto"
           px="4"
           pt="24px"
+          width="full"
         >
-          <Box width={{ base: '100%', lg: '100%' }}>
-            {/* <Player /> */}
-            <RoomBelowSection />
-            <Footer px="0" />
-          </Box>
-          <RoomSection />
+          <RoomPrimarySection />
+          <RoomSecondarySection />
         </Flex>
       </RoomSocketContext.Provider>
     </RoomLayout>

@@ -38,7 +38,7 @@ export const RoomBelowSection: FC = () => {
   }
 
   return (
-    <Box mt="8" display={{ base: 'none', lg: 'block' }}>
+    <Box mt="8">
       <Text fontSize="lg">Trending Videos</Text>
 
       <Grid

@@ -35,7 +35,7 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
             <Text
               color={useColorModeValue('gray.700', 'gray.50')}
               lineHeight={'shorter'}
-              fontSize={'xs'}
+              fontSize={{ base: 'xs', lg: 'sm' }}
               noOfLines={3}
             >
               {video.title}
@@ -44,7 +44,7 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
             <Text
               mt="2"
               color={useColorModeValue('gray.600', 'gray.200')}
-              fontSize="11px"
+              fontSize={{ base: 'sm', lg: '11px' }}
               noOfLines={1}
             >
               {video.author}

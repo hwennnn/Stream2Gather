@@ -121,7 +121,7 @@ const Navbar: FC = () => {
         position="fixed"
         w="full"
         bg="bg-surface"
-        zIndex="1"
+        zIndex="2"
         boxShadow={useColorModeValue('sm', 'sm-dark')}
         py={1}
       >

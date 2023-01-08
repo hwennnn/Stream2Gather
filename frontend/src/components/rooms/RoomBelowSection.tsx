@@ -41,7 +41,15 @@ export const RoomBelowSection: FC = () => {
     <Box mt="8">
       <Text fontSize="lg">Trending Videos</Text>
 
-      <Grid pt={10} templateColumns="repeat(4, 1fr)" gap={6}>
+      <Grid
+        pt={10}
+        templateColumns={{
+          base: 'repeat(2, 1fr)',
+          md: 'repeat(3, 1fr)',
+          xl: 'repeat(4, 1fr)'
+        }}
+        gap={6}
+      >
         {trendingVideos.map((video) => (
           <QueryVideoCard key={video.id} video={video} />
         ))}

@@ -24,7 +24,12 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({ video }) => {
     <>
       <Card w="full">
         <CardBody p="0">
-          <Image src={video.thumbnailUrl} alt={video.title} borderRadius="md" />
+          <Image
+            w="full"
+            src={video.thumbnailUrl}
+            alt={video.title}
+            borderRadius="sm"
+          />
 
           <Box p="2">
             <Text

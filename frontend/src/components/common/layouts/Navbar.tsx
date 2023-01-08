@@ -123,7 +123,6 @@ const Navbar: FC = () => {
         bg="bg-surface"
         zIndex="1"
         boxShadow={useColorModeValue('sm', 'sm-dark')}
-        px={4}
         py={1}
       >
         <Flex
@@ -131,6 +130,7 @@ const Navbar: FC = () => {
           alignItems={'center'}
           justifyContent={'space-between'}
           mx="auto"
+          px={4}
           maxW="120em"
         >
           <Link href="/">

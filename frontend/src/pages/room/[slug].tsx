@@ -1,11 +1,11 @@
-import Layout from '@app/components/common/layouts/Layout';
+import { Footer } from '@app/components/common/layouts/Footer';
 import { Loading } from '@app/components/common/loading/Loading';
 import RoomAlreadyJoined from '@app/components/rooms/errors/RoomAlreadyJoined';
 import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
 import RoomNoPermission from '@app/components/rooms/errors/RoomNoPermission';
-import { Player } from '@app/components/rooms/Player';
 import { RoomBelowSection } from '@app/components/rooms/RoomBelowSection';
+import RoomLayout from '@app/components/rooms/RoomLayout';
 import RoomSection from '@app/components/rooms/RoomSection';
 import { useAuth } from '@app/contexts/AuthContext';
 import { FullRoomItemFragment, useRoomQuery } from '@app/generated/graphql';
@@ -98,24 +98,23 @@ const RoomPage: NextPage = () => {
   }
 
   return (
-    <Layout title="Room">
+    <RoomLayout>
       <RoomSocketContext.Provider value={{ roomSocket: socket }}>
         <Flex
           flexDirection={{ base: 'column', lg: 'row' }}
-          maxW="120em"
           mx="auto"
           px="4"
           pt="24px"
         >
           <Box width={{ base: '100%', lg: '100%' }}>
-            <Player />
+            {/* <Player /> */}
             <RoomBelowSection />
+            <Footer px="0" />
           </Box>
-
           <RoomSection />
         </Flex>
       </RoomSocketContext.Provider>
-    </Layout>
+    </RoomLayout>
   );
 };
 

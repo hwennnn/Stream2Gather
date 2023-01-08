@@ -42,7 +42,7 @@ export const RoomBelowSection: FC = () => {
       <Text fontSize="lg">Trending Videos</Text>
 
       <Grid
-        pt={10}
+        pt={2}
         templateColumns={{
           base: 'repeat(2, 1fr)',
           md: 'repeat(3, 1fr)',

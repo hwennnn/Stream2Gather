@@ -12,6 +12,9 @@ export const REQ_PLAY_VIDEO = 'req_play_video';
 // From frontend: I want to add a video to the playlist
 export const REQ_ADD_TO_PLAYLIST = 'req_add_to_playlist';
 
+// From frontend: I want to remove a video from the playlist
+export const REQ_REMOVE_FROM_PLAYLIST = 'req_remove_from_playlist';
+
 // From frontend: I want to add a video to the playlist
 export const REQ_PLAY_NEW_VIDEO = 'req_play_new_video';
 

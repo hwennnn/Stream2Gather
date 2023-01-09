@@ -129,7 +129,7 @@ const useRoomStore = create<RoomState>()((set) => ({
     updateRoomInfo: (roomInfo) =>
       set((_) => {
         return {
-          playlist: roomInfo.playlist,
+          playlist: [...roomInfo.playlist],
           playing: roomInfo.isPlaying,
           playedSeconds: roomInfo.playedSeconds,
           playedTimestampUpdatedAt: roomInfo.playedTimestampUpdatedAt,

@@ -137,7 +137,6 @@ export const Player: FC = () => {
         playing={playing}
         volume={volume / 100}
         url={currentVideo?.url}
-        progressInterval={500}
         config={{
           youtube: {
             playerVars: {

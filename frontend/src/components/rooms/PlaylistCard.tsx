@@ -1,6 +1,10 @@
 import { VideoInfo } from '@app/generated/graphql';
-import { playExistingVideo } from '@app/lib/roomSocketService';
+import {
+  playExistingVideo,
+  removeFromPlayList
+} from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
+
 import {
   HStack,
   Icon,
@@ -25,8 +29,12 @@ export const PlaylistCard: FC<VideoCardProps> = ({
 }) => {
   const { socket } = useRoomContext();
 
-  const onVideoClick = (index: number): void => {
+  const onClickVideo = (index: number): void => {
     playExistingVideo(socket, index);
+  };
+
+  const onClickRemove = (index: number): void => {
+    removeFromPlayList(socket, index);
   };
 
   return (
@@ -44,12 +52,12 @@ export const PlaylistCard: FC<VideoCardProps> = ({
           isPlaying ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.05)'
         ),
         '#deleteIcon': {
-          opacity: 1
+          opacity: isPlaying ? 0 : 1
         },
         cursor: 'pointer'
       }}
     >
-      <HStack onClick={() => onVideoClick(index)}>
+      <HStack onClick={() => onClickVideo(index)}>
         <Icon
           color={useColorModeValue('black', 'gray.200')}
           opacity={isPlaying ? 1 : 0}
@@ -90,7 +98,7 @@ export const PlaylistCard: FC<VideoCardProps> = ({
         width={5}
         height={5}
         opacity={0}
-        onClick={() => console.log('delete')}
+        onClick={() => onClickRemove(index)}
         color={useColorModeValue('black', 'gray.200')}
         alignSelf="center"
         as={AiOutlineDelete}

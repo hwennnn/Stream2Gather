@@ -6,6 +6,7 @@ import {
   REQ_PLAY_NEW_VIDEO,
   REQ_PLAY_NEXT_VIDEO,
   REQ_PLAY_VIDEO,
+  REQ_REMOVE_FROM_PLAYLIST,
   REQ_RESET_QUEUE,
   REQ_STREAMING_EVENTS,
   RES_JOINED_ROOM,
@@ -77,6 +78,13 @@ export const subscribeStreamEvent = (
 
 export const addToPlayList = (socket: Socket, videoInfo: VideoInfo): void => {
   socket.emit(REQ_ADD_TO_PLAYLIST, { videoInfo });
+};
+
+export const removeFromPlayList = (
+  socket: Socket,
+  removingIndex: number
+): void => {
+  socket.emit(REQ_REMOVE_FROM_PLAYLIST, { removingIndex });
 };
 
 export const playNewVideo = (socket: Socket, videoInfo: VideoInfo): void => {

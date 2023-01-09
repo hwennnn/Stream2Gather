@@ -11,6 +11,7 @@ import {
   REQ_PLAY_NEW_VIDEO,
   REQ_PLAY_NEXT_VIDEO,
   REQ_PLAY_VIDEO,
+  REQ_REMOVE_FROM_PLAYLIST,
   REQ_RESET_QUEUE,
   REQ_STREAMING_EVENTS
 } from './../constants/socket';
@@ -21,6 +22,7 @@ import { handlePlayExistingVideo } from './handlePlayExistingVideo';
 import { handlePlayNewVideo } from './handlePlayNewVideo';
 import { handlePlayNextVideo } from './handlePlayNextVideo';
 import { handlePlayVideo } from './handlePlayVideo';
+import { handleRemoveFromPlaylist } from './handleRemoveFromPlaylist';
 import { handleResetQueue } from './handleResetQueue';
 import { handleStreamingEvents } from './handleStreamingEvents';
 import initRedisSubscribers from './initRedisSubscribers';
@@ -47,6 +49,11 @@ const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
     socket.on(
       REQ_ADD_TO_PLAYLIST,
       handleAddToPlaylist(socket, redisRoomHelper)
+    );
+
+    socket.on(
+      REQ_REMOVE_FROM_PLAYLIST,
+      handleRemoveFromPlaylist(socket, redisRoomHelper)
     );
 
     socket.on(REQ_RESET_QUEUE, handleResetQueue(socket, redisRoomHelper));

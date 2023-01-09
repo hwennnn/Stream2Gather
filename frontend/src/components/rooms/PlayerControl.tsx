@@ -121,7 +121,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
       </Box>
 
       <HStack spacing={5} w="full" alignItems="center">
-        <Box onClick={() => setPlaying(!playing)}>
+        <Box onClick={() => setPlaying(!playing)} cursor="pointer">
           {playing ? (
             <BsPauseFill onClick={pause} size={32} color={'white'} />
           ) : (
@@ -142,7 +142,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
             }, 200);
           }}
         >
-          <Box onClick={() => setIsMuted(!isMuted)}>
+          <Box onClick={() => setIsMuted(!isMuted)} cursor="pointer">
             {!isMuted && volume > 0 ? (
               <BsVolumeUpFill color={'white'} size={32} />
             ) : (
@@ -163,6 +163,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
               }
               setVolume(value);
             }}
+            cursor="pointer"
           >
             <SliderTrack>
               <SliderFilledTrack />
@@ -181,7 +182,12 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
 
         <Spacer />
 
-        <Box ml="5" mr="2" onClick={async () => await handleClickFullscreen()}>
+        <Box
+          ml="5"
+          mr="2"
+          onClick={async () => await handleClickFullscreen()}
+          cursor="pointer"
+        >
           <BsFullscreen color={'white'} size={24} />
         </Box>
       </HStack>

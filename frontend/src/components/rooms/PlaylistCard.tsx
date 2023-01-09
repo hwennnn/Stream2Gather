@@ -18,7 +18,11 @@ interface VideoCardProps {
   isPlaying: boolean;
 }
 
-export const VideoCard: FC<VideoCardProps> = ({ video, index, isPlaying }) => {
+export const PlaylistCard: FC<VideoCardProps> = ({
+  video,
+  index,
+  isPlaying
+}) => {
   const { socket } = useRoomContext();
 
   const onVideoClick = (index: number): void => {

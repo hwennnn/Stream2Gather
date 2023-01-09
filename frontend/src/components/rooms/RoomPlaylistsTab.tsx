@@ -1,4 +1,4 @@
-import { VideoCard } from '@app/components/rooms/VideoCard';
+import { PlaylistCard } from '@app/components/rooms/PlaylistCard';
 import { resetQueue } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
@@ -28,7 +28,7 @@ export const RoomPlaylistsTab: FC = () => {
       spacing={0}
     >
       {playlist.map((video, index) => (
-        <VideoCard
+        <PlaylistCard
           key={`${index}${video.id}`}
           index={index}
           video={video}

@@ -20,13 +20,13 @@ import { useRouter } from 'next/router';
 import React, { useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-export interface RoomSocketContextInterface {
-  roomSocket: Socket;
+export interface RoomContextInterface {
+  socket: Socket;
 }
 
-const RoomSocketContext = React.createContext<
-  RoomSocketContextInterface | undefined
->(undefined);
+const RoomContext = React.createContext<RoomContextInterface | undefined>(
+  undefined
+);
 
 const RoomPage: NextPage = () => {
   const { slug } = useRouter().query;
@@ -98,7 +98,7 @@ const RoomPage: NextPage = () => {
 
   return (
     <RoomLayout>
-      <RoomSocketContext.Provider value={{ roomSocket: socket }}>
+      <RoomContext.Provider value={{ socket }}>
         <Flex
           flexDirection={{ base: 'column', lg: 'row' }}
           mx="auto"
@@ -108,15 +108,15 @@ const RoomPage: NextPage = () => {
           <RoomPrimarySection />
           <RoomSecondarySection />
         </Flex>
-      </RoomSocketContext.Provider>
+      </RoomContext.Provider>
     </RoomLayout>
   );
 };
 
-export const useRoomSocket = (): RoomSocketContextInterface => {
-  const context = useContext(RoomSocketContext);
+export const useRoomContext = (): RoomContextInterface => {
+  const context = useContext(RoomContext);
   if (context === undefined) {
-    throw new Error('useRoomSocket must be used within a RoomSocketProvider');
+    throw new Error('useRoomContext must be used within a RoomSocketProvider');
   }
   return context;
 };

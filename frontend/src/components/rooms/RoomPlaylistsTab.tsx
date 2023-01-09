@@ -1,6 +1,6 @@
 import { VideoCard } from '@app/components/rooms/VideoCard';
 import { resetQueue } from '@app/lib/roomSocketService';
-import { useRoomSocket } from '@app/pages/room/[slug]';
+import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
 import { Box, Button, VStack } from '@chakra-ui/react';
 import { FC } from 'react';
@@ -8,7 +8,7 @@ import { SlRefresh } from 'react-icons/sl';
 import shallow from 'zustand/shallow';
 
 export const RoomPlaylistsTab: FC = () => {
-  const { roomSocket } = useRoomSocket();
+  const { socket } = useRoomContext();
   const { playingIndex, playlist } = useRoomStore(
     (state) => ({
       playingIndex: state.playingIndex,
@@ -18,7 +18,7 @@ export const RoomPlaylistsTab: FC = () => {
   );
 
   const handleResetQueue = (): void => {
-    resetQueue(roomSocket);
+    resetQueue(socket);
   };
 
   return (

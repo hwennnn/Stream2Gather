@@ -1,6 +1,6 @@
 import { VideoInfo } from '@app/generated/graphql';
 import { playExistingVideo } from '@app/lib/roomSocketService';
-import { useRoomSocket } from '@app/pages/room/[slug]';
+import { useRoomContext } from '@app/pages/room/[slug]';
 import {
   HStack,
   Icon,
@@ -19,10 +19,10 @@ interface VideoCardProps {
 }
 
 export const VideoCard: FC<VideoCardProps> = ({ video, index, isPlaying }) => {
-  const { roomSocket } = useRoomSocket();
+  const { socket } = useRoomContext();
 
   const onVideoClick = (index: number): void => {
-    playExistingVideo(roomSocket, index);
+    playExistingVideo(socket, index);
   };
 
   return (

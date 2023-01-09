@@ -4,14 +4,14 @@ import {
   VideoInfo
 } from '@app/generated/graphql';
 import { addToPlayList, playNewVideo } from '@app/lib/roomSocketService';
-import { useRoomSocket } from '@app/pages/room/[slug]';
+import { useRoomContext } from '@app/pages/room/[slug]';
 import { Box, Button, Grid, Text } from '@chakra-ui/react';
 import { FC, useEffect, useState } from 'react';
 
 const showLimit = 8;
 
 export const TrendingVideosSection: FC = () => {
-  const { roomSocket } = useRoomSocket();
+  const { socket } = useRoomContext();
   const [fetchedVideos, setFetchedVideos] = useState<VideoInfo[]>([]);
   const [showMore, setShowMore] = useState(false);
 
@@ -37,11 +37,11 @@ export const TrendingVideosSection: FC = () => {
   }, [fetchedVideos, isLoading, showMore]);
 
   const onClickAddToQueue = (videoInfo: VideoInfo): void => {
-    addToPlayList(roomSocket, videoInfo);
+    addToPlayList(socket, videoInfo);
   };
 
   const onClickPlayVideo = (videoInfo: VideoInfo): void => {
-    playNewVideo(roomSocket, videoInfo);
+    playNewVideo(socket, videoInfo);
   };
 
   if (isLoading) {

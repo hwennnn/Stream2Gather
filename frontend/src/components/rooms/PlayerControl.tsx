@@ -1,6 +1,6 @@
 import { getFormattedTime } from '@app/helpers/time-helper';
 import { emitStreamEvent, StreamEvent } from '@app/lib/roomSocketService';
-import { useRoomSocket } from '@app/pages/room/[slug]';
+import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore, {
   setIsMuted,
   setPlayedSeconds,
@@ -35,7 +35,7 @@ interface PlayerControlProps {
 }
 
 const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
-  const { roomSocket: socket } = useRoomSocket();
+  const { socket } = useRoomContext();
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
   const { playing, isMuted, volume, playedSeconds, duration } = useRoomStore(

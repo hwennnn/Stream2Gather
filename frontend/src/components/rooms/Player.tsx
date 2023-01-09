@@ -1,11 +1,11 @@
 import PlayerControl from '@app/components/rooms/PlayerControl';
 import {
+  playNextVideo,
   startPlayingVideo,
   subscribeStreamEvent
 } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore, {
-  playNextVideo,
   setDuration,
   setPlayedSeconds,
   setPlaying
@@ -90,7 +90,8 @@ export const Player: FC = () => {
   };
 
   const onVideoEnded = (): void => {
-    playNextVideo();
+    const { playingIndex } = useRoomStore.getState();
+    playNextVideo(socket, playingIndex + 1);
   };
 
   return (
@@ -120,10 +121,9 @@ export const Player: FC = () => {
         width="100%"
         height="100%"
         onStart={() => {
-          // console.log('start playing');
           setHasPlayed(true);
+          // always play the video from the start when the video is changed
           if (hasPlayed) {
-            // console.log('onStart, seek to zero');
             playerRef.current.seekTo(0, 'seconds');
           }
         }}

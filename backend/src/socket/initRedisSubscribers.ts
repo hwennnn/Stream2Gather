@@ -19,7 +19,7 @@ const addRedisSubscriber = async (
   client.on(REDIS_PUB_MESSAGE, function (_channel, message) {
     message = JSON.parse(message);
     const { roomId, receiverSocketId } = message;
-    console.log(_channel, roomId ?? receiverSocketId, message);
+    // console.log(_channel, roomId ?? receiverSocketId, message);
     if (receiverSocketId !== undefined && receiverSocketId !== null) {
       io.to(receiverSocketId).emit(subscriberKey, message);
     } else if (roomId !== undefined && roomId !== null) {

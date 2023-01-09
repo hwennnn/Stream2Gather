@@ -28,6 +28,9 @@ export const REQ_RESET_QUEUE = 'req_reset_queue';
 // From frontend: I want to play an existing video in the playlist
 export const REQ_PLAY_EXISTING_VIDEO = 'req_play_existing_video';
 
+// From frontend: The video has ended. I want to play the next video
+export const REQ_PLAY_NEXT_VIDEO = 'req_play_next_video';
+
 // From backend: There is a new message in the group
 export const RES_MESSAGE = 'res_messages';
 

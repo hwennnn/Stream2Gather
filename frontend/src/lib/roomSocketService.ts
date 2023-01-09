@@ -4,6 +4,7 @@ import {
   REQ_JOIN_ROOM,
   REQ_PLAY_EXISTING_VIDEO,
   REQ_PLAY_NEW_VIDEO,
+  REQ_PLAY_NEXT_VIDEO,
   REQ_PLAY_VIDEO,
   REQ_RESET_QUEUE,
   REQ_STREAMING_EVENTS,
@@ -84,6 +85,10 @@ export const playNewVideo = (socket: Socket, videoInfo: VideoInfo): void => {
 
 export const resetQueue = (socket: Socket): void => {
   socket.emit(REQ_RESET_QUEUE);
+};
+
+export const playNextVideo = (socket: Socket, playingIndex: number): void => {
+  socket.emit(REQ_PLAY_NEXT_VIDEO, { playingIndex });
 };
 
 export const playExistingVideo = (

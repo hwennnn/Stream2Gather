@@ -32,6 +32,7 @@ export const Player: FC = () => {
     }),
     shallow
   );
+  const [hasPlayed, setHasPlayed] = useState(false);
 
   const { currentVideo } = useRoomStore(
     (state) => ({
@@ -118,6 +119,14 @@ export const Player: FC = () => {
         }}
         width="100%"
         height="100%"
+        onStart={() => {
+          // console.log('start playing');
+          setHasPlayed(true);
+          if (hasPlayed) {
+            // console.log('onStart, seek to zero');
+            playerRef.current.seekTo(0, 'seconds');
+          }
+        }}
         // onPlay={() => play()}
         // onPause={() => pause()}
         onReady={() => onPlayerReady()}
@@ -128,6 +137,7 @@ export const Player: FC = () => {
         playing={playing}
         volume={volume / 100}
         url={currentVideo?.url}
+        progressInterval={500}
         config={{
           youtube: {
             playerVars: {
@@ -139,7 +149,8 @@ export const Player: FC = () => {
               modestbranding: 1,
               rel: 0,
               fs: 0,
-              hl: 'eng'
+              hl: 'eng',
+              start: 0
             }
           }
         }}

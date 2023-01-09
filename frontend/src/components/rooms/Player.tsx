@@ -149,8 +149,7 @@ export const Player: FC = () => {
               modestbranding: 1,
               rel: 0,
               fs: 0,
-              hl: 'eng',
-              start: 0
+              hl: 'eng'
             }
           }
         }}

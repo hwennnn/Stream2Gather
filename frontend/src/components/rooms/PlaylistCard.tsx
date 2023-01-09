@@ -40,7 +40,7 @@ export const PlaylistCard: FC<VideoCardProps> = ({
   return (
     <HStack
       p="2"
-      alignItems="flex-start"
+      justify="space-between"
       w="full"
       bg={useColorModeValue(
         isPlaying ? 'rgba(0, 0, 0, 0.1)' : 'inherit',

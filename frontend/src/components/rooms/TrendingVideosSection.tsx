@@ -5,10 +5,10 @@ import {
 } from '@app/generated/graphql';
 import { addToPlayList, playNewVideo } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
-import { Box, Button, Grid, Text } from '@chakra-ui/react';
+import { Box, Button, Grid } from '@chakra-ui/react';
 import { FC, useEffect, useState } from 'react';
 
-const showLimit = 8;
+const showLimit = 9;
 
 export const TrendingVideosSection: FC = () => {
   const { socket } = useRoomContext();
@@ -50,8 +50,6 @@ export const TrendingVideosSection: FC = () => {
 
   return (
     <Box>
-      <Text fontSize="lg">Trending Videos</Text>
-
       <Grid
         pt={2}
         templateColumns={{
@@ -71,7 +69,7 @@ export const TrendingVideosSection: FC = () => {
         ))}
       </Grid>
 
-      <Button mt="10" mx="auto" onClick={() => setShowMore(!showMore)}>
+      <Button mt="10" onClick={() => setShowMore(!showMore)}>
         {showMore ? 'Show Less' : 'Show More'}
       </Button>
     </Box>

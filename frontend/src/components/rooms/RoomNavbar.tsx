@@ -104,6 +104,7 @@ const InvitationButton: FC = () => {
         }}
       >
         <Button
+          width="100px"
           disabled={isCopied}
           px="3"
           fontWeight="semibold"
@@ -123,7 +124,7 @@ const SearchBox: FC = () => {
   return (
     <HStack
       display={{ base: 'none', md: 'block' }}
-      width={{ md: '260px', lg: 'xs', xl: 'sm' }}
+      width={{ md: '260px', lg: 'xs', xl: 'sm', '2xl': 'lg' }}
     >
       <form
         onSubmit={(event) => {

@@ -12,8 +12,8 @@ import {
   useColorModeValue
 } from '@chakra-ui/react';
 import { FC } from 'react';
-import { BiAddToQueue } from 'react-icons/bi';
 import { BsFillPlayFill } from 'react-icons/bs';
+import { MdPlaylistAdd } from 'react-icons/md';
 
 interface QueryVideoCardProps {
   video: VideoInfo;
@@ -64,7 +64,7 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({
               <Icon w={6} h={6} as={BsFillPlayFill} />
             </Button>
             <Button onClick={onClickAdd} borderRadius="md" flex="1">
-              <Icon w={6} h={6} as={BiAddToQueue} />
+              <Icon w={6} h={6} as={MdPlaylistAdd} />
             </Button>
           </Flex>
         </CardFooter>

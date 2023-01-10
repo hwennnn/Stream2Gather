@@ -1,7 +1,11 @@
 declare global {
   namespace NodeJS {
     interface ProcessEnv {
+      DISABLE_NEW_JSX_TRANSFORM: string;
+      env: string;
+      NEXT_PUBLIC_BASE_URL: string;
       SERVER_URL: string;
+      COOKIE_NAME: string;
       APOLLO_SERVER_URL: string;
       FIREBASE_API_KEY: string;
       FIREBASE_AUTH_DOMAIN: string;
@@ -10,8 +14,6 @@ declare global {
       FIREBASE_MESSAGING_SENDER_ID: string;
       FIREBASE_APP_ID: string;
       FIREBASE_MEASUREMENT_ID: string;
-      DISABLE_NEW_JSX_TRANSFORM: string;
-      COOKIE_NAME: string;
     }
   }
 }

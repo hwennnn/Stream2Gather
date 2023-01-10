@@ -26,7 +26,9 @@ export const SearchResultSection: FC = () => {
   const { isLoading } = useSearchYoutubeVideosQuery(
     { keyword: searchQuery },
     {
+      enabled: searchQuery.length > 0,
       onSuccess(data) {
+        console.log('fetched');
         setFetchedVideos(data.youtubeVideos);
       }
     }
@@ -49,6 +51,14 @@ export const SearchResultSection: FC = () => {
   const onClickPlayVideo = (videoInfo: VideoInfo): void => {
     playNewVideo(socket, videoInfo);
   };
+
+  if (searchQuery.length === 0) {
+    return (
+      <Box>
+        <Text>No result available.</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box>

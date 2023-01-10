@@ -1,3 +1,4 @@
+import { SearchResultSection } from '@app/components/rooms/SearchResultSection';
 import { TrendingVideosSection } from '@app/components/rooms/TrendingVideosSection';
 import { Box, Tab, TabList, TabPanel, TabPanels, Tabs } from '@chakra-ui/react';
 import { FC } from 'react';
@@ -15,7 +16,7 @@ export const RoomBelowSection: FC = () => {
             <TrendingVideosSection />
           </TabPanel>
           <TabPanel>
-            <p>two!</p>
+            <SearchResultSection />
           </TabPanel>
         </TabPanels>
       </Tabs>

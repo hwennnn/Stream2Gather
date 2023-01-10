@@ -20,7 +20,7 @@ const AuthenticatedApp: FC = () => {
   };
 
   if (isLoading) {
-    return <CircleLoading />;
+    return <CircleLoading showFullScreen={true} />;
   }
 
   return (

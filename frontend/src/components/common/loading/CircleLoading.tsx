@@ -1,10 +1,23 @@
-import { Flex, Spinner } from '@chakra-ui/react';
+import { ChakraProps, Flex, Spinner } from '@chakra-ui/react';
 import { FC } from 'react';
 import FadeIn from 'react-fade-in';
 
-export const CircleLoading: FC = () => {
+interface Props {
+  showFullScreen?: boolean;
+}
+
+export const CircleLoading: FC<ChakraProps> = (
+  props,
+  { showFullScreen = false }: Props
+) => {
   return (
-    <Flex h="full" width="100vw" alignItems="center" justifyContent="center">
+    <Flex
+      h={showFullScreen ? 'full' : 'auto'}
+      width={showFullScreen ? '100vw' : 'auto'}
+      alignItems="center"
+      justifyContent="center"
+      {...props}
+    >
       <FadeIn>
         <Spinner thickness="4px" color="secondary" size="xl" />
       </FadeIn>

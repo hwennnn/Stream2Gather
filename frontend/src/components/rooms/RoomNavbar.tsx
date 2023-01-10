@@ -5,7 +5,7 @@ import { MeQueryKey } from '@app/constants/query';
 import { useAuth } from '@app/contexts/AuthContext';
 import { useLogoutMutation } from '@app/generated/graphql';
 import { queryClient } from '@app/pages/_app';
-import useRoomStore from '@app/store/useRoomStore';
+import useRoomStore, { setSearchQuery } from '@app/store/useRoomStore';
 import { SearchIcon } from '@chakra-ui/icons';
 import {
   Avatar,
@@ -121,6 +121,15 @@ const InvitationButton: FC = () => {
 const SearchBox: FC = () => {
   const [searchValue, setSearchValue] = useState('');
 
+  console.log('rendering searchbox');
+
+  const submitForm = (): void => {
+    console.log('value: ', searchValue);
+    if (searchValue.length > 0) {
+      setSearchQuery(searchValue);
+    }
+  };
+
   return (
     <HStack
       display={{ base: 'none', md: 'block' }}
@@ -128,7 +137,7 @@ const SearchBox: FC = () => {
     >
       <form
         onSubmit={(event) => {
-          console.log('search2', searchValue);
+          submitForm();
           event.preventDefault();
         }}
       >
@@ -142,7 +151,9 @@ const SearchBox: FC = () => {
             maxLength={50}
             placeholder="Search or Paste a Link"
           />
-          <InputRightElement children={<SearchIcon type="submit" />} />
+          <InputRightElement
+            children={<SearchIcon type="submit" onClick={submitForm} />}
+          />
         </InputGroup>
       </form>
     </HStack>

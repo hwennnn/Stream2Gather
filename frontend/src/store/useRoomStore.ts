@@ -39,6 +39,8 @@ interface RoomState {
   playlist: VideoInfo[];
   currentVideo: VideoInfo | undefined;
 
+  searchQuery: string;
+
   actions: {
     setRoom: (data: FullRoomItemFragment) => void;
     resetRoom: () => void;
@@ -57,6 +59,8 @@ interface RoomState {
 
     addActiveMember: (member: RoomMember) => void;
     removeActiveMember: (socketId: string) => void;
+
+    setSearchQuery: (query: string) => void;
   };
 }
 
@@ -76,7 +80,8 @@ const initialRoomData = {
   playedTimestampUpdatedAt: '0',
   playingIndex: 0,
   playlist: [],
-  currentVideo: undefined
+  currentVideo: undefined,
+  searchQuery: ''
 };
 
 const useRoomStore = create<RoomState>()((set) => ({
@@ -136,7 +141,12 @@ const useRoomStore = create<RoomState>()((set) => ({
           playingIndex: roomInfo.playingIndex,
           currentVideo: roomInfo.currentVideo
         };
-      })
+      }),
+    setSearchQuery: (query) => {
+      set({
+        searchQuery: query
+      });
+    }
   }
 }));
 
@@ -155,7 +165,8 @@ export const {
   addActiveMember,
   removeActiveMember,
   addToPlaylist,
-  updateRoomInfo
+  updateRoomInfo,
+  setSearchQuery
 } = useRoomStore.getState().actions;
 
 export default useRoomStore;

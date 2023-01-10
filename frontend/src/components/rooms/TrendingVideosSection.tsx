@@ -1,3 +1,4 @@
+import { CircleLoading } from '@app/components/common/loading/CircleLoading';
 import { QueryVideoCard } from '@app/components/rooms/QueryVideoCard';
 import {
   useYoutubeTrendingVideosQuery,
@@ -45,7 +46,7 @@ export const TrendingVideosSection: FC = () => {
   };
 
   if (isLoading) {
-    return <Box />;
+    return <CircleLoading />;
   }
 
   return (

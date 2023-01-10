@@ -28,7 +28,6 @@ export const SearchResultSection: FC = () => {
     {
       enabled: searchQuery.length > 0,
       onSuccess(data) {
-        console.log('fetched');
         setFetchedVideos(data.youtubeVideos);
       }
     }

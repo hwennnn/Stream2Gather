@@ -1,3 +1,4 @@
+import { decode } from 'html-entities';
 import BaseApi from '../lib/baseApi';
 import { VideoInfo, VideoPlatform } from '../models/RedisModel';
 import {
@@ -18,8 +19,8 @@ class VideoInfoApi extends BaseApi {
         id: videoId,
         platform: VideoPlatform.YOUTUBE,
         url: `https://youtu.be/${videoId}`,
-        title: data.title,
-        author: data.channelTitle,
+        title: decode(data.title),
+        author: decode(data.channelTitle),
         thumbnailUrl: data.thumbnails.medium.url
       };
 
@@ -47,8 +48,8 @@ class VideoInfoApi extends BaseApi {
           id: videoData.id.videoId,
           platform: VideoPlatform.YOUTUBE,
           url: `https://youtu.be/${videoData.id.videoId}`,
-          title: videoData.snippet.title,
-          author: videoData.snippet.channelTitle,
+          title: decode(videoData.snippet.title),
+          author: decode(videoData.snippet.channelTitle),
           thumbnailUrl: videoData.snippet.thumbnails.medium.url
         };
 
@@ -78,8 +79,8 @@ class VideoInfoApi extends BaseApi {
           id: videoData.id,
           platform: VideoPlatform.YOUTUBE,
           url: `https://youtu.be/${videoData.id}`,
-          title: videoData.snippet.title,
-          author: videoData.snippet.channelTitle,
+          title: decode(videoData.snippet.title),
+          author: decode(videoData.snippet.channelTitle),
           thumbnailUrl: videoData.snippet.thumbnails.medium.url
         };
 

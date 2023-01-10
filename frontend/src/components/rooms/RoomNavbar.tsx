@@ -5,7 +5,11 @@ import { MeQueryKey } from '@app/constants/query';
 import { useAuth } from '@app/contexts/AuthContext';
 import { useLogoutMutation } from '@app/generated/graphql';
 import { queryClient } from '@app/pages/_app';
-import useRoomStore, { setSearchQuery } from '@app/store/useRoomStore';
+import useRoomStore, {
+  setCurrentVideoResultTab,
+  setSearchQuery,
+  VideoResultTab
+} from '@app/store/useRoomStore';
 import { SearchIcon } from '@chakra-ui/icons';
 import {
   Avatar,
@@ -121,12 +125,10 @@ const InvitationButton: FC = () => {
 const SearchBox: FC = () => {
   const [searchValue, setSearchValue] = useState('');
 
-  console.log('rendering searchbox');
-
   const submitForm = (): void => {
-    console.log('value: ', searchValue);
     if (searchValue.length > 0) {
       setSearchQuery(searchValue);
+      setCurrentVideoResultTab(VideoResultTab.SEARCH_RESULTS);
     }
   };
 

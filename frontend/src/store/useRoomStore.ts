@@ -16,6 +16,11 @@ export enum RoomJoiningStatus {
   FAILED // Error Base Case
 }
 
+export enum VideoResultTab {
+  TRENDING_VIDEOS = 0,
+  SEARCH_RESULTS = 1
+}
+
 interface RoomState {
   roomId: string;
   roomSlug: string;
@@ -40,6 +45,7 @@ interface RoomState {
   currentVideo: VideoInfo | undefined;
 
   searchQuery: string;
+  currentVideoResultTab: VideoResultTab;
 
   actions: {
     setRoom: (data: FullRoomItemFragment) => void;
@@ -61,6 +67,7 @@ interface RoomState {
     removeActiveMember: (socketId: string) => void;
 
     setSearchQuery: (query: string) => void;
+    setCurrentVideoResultTab: (tab: VideoResultTab) => void;
   };
 }
 
@@ -81,7 +88,8 @@ const initialRoomData = {
   playingIndex: 0,
   playlist: [],
   currentVideo: undefined,
-  searchQuery: ''
+  searchQuery: '',
+  currentVideoResultTab: VideoResultTab.TRENDING_VIDEOS
 };
 
 const useRoomStore = create<RoomState>()((set) => ({
@@ -146,6 +154,11 @@ const useRoomStore = create<RoomState>()((set) => ({
       set({
         searchQuery: query
       });
+    },
+    setCurrentVideoResultTab: (tab) => {
+      set({
+        currentVideoResultTab: tab
+      });
     }
   }
 }));
@@ -166,7 +179,8 @@ export const {
   removeActiveMember,
   addToPlaylist,
   updateRoomInfo,
-  setSearchQuery
+  setSearchQuery,
+  setCurrentVideoResultTab
 } = useRoomStore.getState().actions;
 
 export default useRoomStore;

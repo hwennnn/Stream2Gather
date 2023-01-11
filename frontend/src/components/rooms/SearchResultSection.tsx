@@ -54,7 +54,7 @@ export const SearchResultSection: FC = () => {
   if (searchQuery.length === 0) {
     return (
       <Box>
-        <Text>No result available.</Text>
+        <Text>No results available.</Text>
       </Box>
     );
   }

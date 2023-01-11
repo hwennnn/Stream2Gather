@@ -34,8 +34,11 @@ export class Room extends BaseEntity {
   isTemporary: boolean;
 
   @Field()
-  @Column({ default: true })
+  @Column({ default: false })
   isPublic: boolean;
+
+  @Field({ nullable: true })
+  invitationCode: string;
 
   @Field(() => String)
   @CreateDateColumn()
@@ -44,6 +47,10 @@ export class Room extends BaseEntity {
   @Field(() => String)
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @Field(() => String)
+  @Column()
+  creatorId!: string;
 
   @Field(() => User, { nullable: true })
   @ManyToOne(() => User, (user) => user.createdRooms, {

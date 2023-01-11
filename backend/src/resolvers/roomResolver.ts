@@ -47,6 +47,16 @@ export class RoomResolver {
     return await redisRoomHelper.getActiveMembers(room.id);
   }
 
+  @FieldResolver(() => String, { nullable: true })
+  async invitationCode(
+    @Root() room: Room,
+    @Ctx() { redisRoomHelper }: MyContext
+  ): Promise<string | null> {
+    if (room.isPublic) return null;
+
+    return await redisRoomHelper.getInvitationCode(room.id);
+  }
+
   @Query(() => Room, { nullable: true })
   async room(@Arg('slug') slug: string): Promise<Room | null> {
     try {
@@ -86,6 +96,7 @@ export class RoomResolver {
       const room = await Room.create({
         slug,
         creator: user,
+        creatorId: user.id,
         members: [user]
       }).save();
 

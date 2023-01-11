@@ -102,6 +102,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     <Flex w="full" direction={'column'} mb="3">
       <Box flex="1">
         <Slider
+          focusThumbOnChange={false}
           mt="2"
           aria-label="slider-ex-1"
           value={duration === 0 ? 0 : (playedSeconds / duration) * 100}
@@ -151,6 +152,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
           </Box>
 
           <Slider
+            focusThumbOnChange={false}
             mt="2"
             width={'50px'}
             aria-label="slider-ex-2"

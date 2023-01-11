@@ -4,7 +4,7 @@ import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
 import { Box, Button, VStack } from '@chakra-ui/react';
 import { FC } from 'react';
-import { SlRefresh } from 'react-icons/sl';
+import { VscClearAll } from 'react-icons/vsc';
 import shallow from 'zustand/shallow';
 
 export const RoomPlaylistsTab: FC = () => {
@@ -39,10 +39,10 @@ export const RoomPlaylistsTab: FC = () => {
       <Box pt="4">
         <Button
           onClick={() => handleResetQueue()}
-          leftIcon={<SlRefresh />}
+          leftIcon={<VscClearAll />}
           py="4"
         >
-          Reset Queue
+          Clear Queue
         </Button>
       </Box>
     </VStack>

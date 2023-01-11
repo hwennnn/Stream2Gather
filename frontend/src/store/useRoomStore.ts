@@ -114,7 +114,10 @@ const useRoomStore = create<RoomState>()((set) => ({
         currentVideo: roomInfo.playlist[roomInfo.playingIndex]
       });
     },
-    resetRoom: () => set({ ...initialRoomData }),
+    resetRoom: () =>
+      set((state) => {
+        return { ...initialRoomData, status: state.status };
+      }),
     setRoomJoiningStatus: (status) => set({ status }),
     setPlaying: (playing) => set({ playing }),
     setIsMuted: (isMuted) => set({ isMuted }),

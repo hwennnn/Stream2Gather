@@ -37,6 +37,7 @@ const RoomPage: NextPage = () => {
   const { isLoading: isRoomQueryLoading } = useRoomQuery(
     { slug: slug as string },
     {
+      enabled: joiningStatus === RoomJoiningStatus.SUCCESS,
       onSuccess: (data) => {
         resetRoom();
         if (data.room !== null && data.room !== undefined) {
@@ -78,14 +79,6 @@ const RoomPage: NextPage = () => {
     };
   }, [invitationCode, slug, user?.id, user?.username]);
 
-  if (
-    socket === null ||
-    joiningStatus === RoomJoiningStatus.LOADING ||
-    isRoomQueryLoading
-  ) {
-    return <Loading />;
-  }
-
   if (joiningStatus === RoomJoiningStatus.NO_PERMISSION) {
     return <RoomNoPermission />;
   }
@@ -100,6 +93,14 @@ const RoomPage: NextPage = () => {
 
   if (joiningStatus === RoomJoiningStatus.ALREADY_IN_ROOM) {
     return <RoomAlreadyJoined />;
+  }
+
+  if (
+    socket === null ||
+    joiningStatus === RoomJoiningStatus.LOADING ||
+    isRoomQueryLoading
+  ) {
+    return <Loading />;
   }
 
   return (

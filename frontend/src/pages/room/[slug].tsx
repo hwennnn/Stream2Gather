@@ -29,7 +29,7 @@ const RoomContext = React.createContext<RoomContextInterface | undefined>(
 );
 
 const RoomPage: NextPage = () => {
-  const { slug } = useRouter().query;
+  const { slug, invitationCode } = useRouter().query;
 
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -61,7 +61,13 @@ const RoomPage: NextPage = () => {
       user?.id !== undefined &&
       user?.username !== undefined
     ) {
-      initSocketForRoom(newSocket, slug, user?.id, user?.username);
+      initSocketForRoom(
+        newSocket,
+        slug,
+        user?.id,
+        user?.username,
+        invitationCode as string | undefined
+      );
     }
 
     setSocket(newSocket);
@@ -70,7 +76,7 @@ const RoomPage: NextPage = () => {
       newSocket?.disconnect();
       setSocket(null);
     };
-  }, [slug, user?.id, user?.username]);
+  }, [invitationCode, slug, user?.id, user?.username]);
 
   if (
     socket === null ||

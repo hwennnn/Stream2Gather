@@ -43,12 +43,14 @@ const handleJoinRoom = (
   socket: Socket,
   slug: string,
   uid: string,
-  username: string
+  username: string,
+  invitationCode: string | undefined
 ): void => {
   socket.emit(REQ_JOIN_ROOM, {
     slug,
     uid,
-    username
+    username,
+    invitationCode
   });
 };
 
@@ -190,10 +192,11 @@ export const initSocketForRoom = (
   socket: Socket,
   slug: string,
   uid: string,
-  username: string
+  username: string,
+  invitationCode: string | undefined
 ): void => {
   listenEvent(socket);
-  handleJoinRoom(socket, slug, uid, username);
+  handleJoinRoom(socket, slug, uid, username, invitationCode);
   handleJoinedRoom(socket);
   handleRoomDoesNotExist(socket);
   handleRoomInactive(socket);

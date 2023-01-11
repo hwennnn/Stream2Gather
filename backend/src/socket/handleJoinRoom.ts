@@ -1,5 +1,6 @@
 import { Socket } from 'socket.io';
 import { Room } from '../entities/Room';
+import { User } from '../entities/User';
 import { RoomMember } from '../models/RedisModel';
 import RedisHelper from '../utils/redisHelper';
 import RedisRoomHelper from '../utils/redisRoomHelper';
@@ -15,11 +16,13 @@ import {
 type JoinRoomFunction = ({
   uid,
   username,
-  slug
+  slug,
+  invitationCode
 }: {
   uid: string;
   username: string;
   slug: string;
+  invitationCode: string;
 }) => Promise<void>;
 
 export const handleJoinRoom = (
@@ -27,7 +30,7 @@ export const handleJoinRoom = (
   redisHelper: RedisHelper,
   redisRoomHelper: RedisRoomHelper
 ): JoinRoomFunction => {
-  return async ({ uid, slug, username }): Promise<void> => {
+  return async ({ uid, slug, username, invitationCode }): Promise<void> => {
     const room = await Room.findOne({
       where: { slug },
       relations: {
@@ -37,11 +40,6 @@ export const handleJoinRoom = (
 
     if (room === null) {
       socket.emit(RES_ROOM_DOES_NOT_EXIST);
-      return;
-    }
-
-    if (!room.isPublic && room.members.every((m) => m.id !== uid)) {
-      socket.emit(RES_ROOM_NO_PERMISSION);
       return;
     }
 
@@ -55,6 +53,26 @@ export const handleJoinRoom = (
     if (activeMembers.some((m) => m.uid === uid)) {
       socket.emit(RES_ROOM_ALREADY_JOINED);
       return;
+    }
+
+    if (!room.isPublic && room.members.every((m) => m.id !== uid)) {
+      const invitationCodeFromRedis = await redisRoomHelper.getInvitationCode(
+        room.id
+      );
+      if (invitationCodeFromRedis !== invitationCode) {
+        socket.emit(RES_ROOM_NO_PERMISSION);
+        return;
+      } else {
+        // handle new member in private room logic
+        const user = await User.findOne({ where: { id: uid } });
+        if (user === null) {
+          socket.emit(RES_ROOM_NO_PERMISSION);
+          return;
+        }
+
+        room.members.push(user);
+        await room.save();
+      }
     }
 
     const roomId = room.id;

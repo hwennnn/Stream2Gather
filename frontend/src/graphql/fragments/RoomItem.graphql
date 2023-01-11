@@ -4,4 +4,6 @@ fragment RoomItem on Room {
   isActive
   isTemporary
   isPublic
+  invitationCode
+  creatorId
 }

@@ -30,6 +30,7 @@ interface RoomState {
   isPublic: boolean;
   isTemporary: boolean;
   activeMembers: RoomMember[];
+  invitationCode?: string | null;
 
   isMuted: boolean;
   volume: number;
@@ -103,6 +104,7 @@ const useRoomStore = create<RoomState>()((set) => ({
         isActive: data.isActive,
         isTemporary: data.isTemporary,
         isPublic: data.isPublic,
+        invitationCode: data.invitationCode,
         activeMembers: data.activeMembers,
         playing: roomInfo.isPlaying,
         playedSeconds: roomInfo.playedSeconds,

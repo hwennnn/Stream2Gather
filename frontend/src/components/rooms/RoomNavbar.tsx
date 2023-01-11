@@ -92,9 +92,13 @@ const UserMenu: FC = () => {
 };
 
 const InvitationButton: FC = () => {
-  const { roomSlug } = useRoomStore.getState();
+  const { roomSlug, invitationCode, isPublic } = useRoomStore.getState();
   const [isCopied, setIsCopied] = useState(false);
-  const invitationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/room/${roomSlug}`;
+  let invitationUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/room/${roomSlug}`;
+
+  if (!isPublic) {
+    invitationUrl += `?invitationCode=${invitationCode}`;
+  }
 
   return (
     <Box display={{ base: 'none', md: 'block' }}>

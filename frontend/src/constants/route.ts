@@ -9,5 +9,5 @@ export const ForgotPassword: string = '/forgot-password';
 export const nonAuthRoutes: string[] = [Login, Register, ForgotPassword];
 
 // Accessible by authenticated users only
-export const Room: string = '/room';
+export const Room: string = '/room/[slug]';
 export const protectedRoutes: string[] = [Room];

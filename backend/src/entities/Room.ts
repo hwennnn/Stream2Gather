@@ -68,6 +68,11 @@ export class Room extends BaseEntity {
   @JoinTable()
   members!: User[];
 
+  // uid list of banned users
+  @Field(() => [String])
+  @Column('text', { array: true, default: [] })
+  bannedUsers!: string[];
+
   // Fetch from redis
   @Field(() => RoomInfo)
   roomInfo: RoomInfo;

@@ -96,7 +96,6 @@ export class RoomResolver {
       const room = await Room.create({
         slug,
         creator: user,
-        creatorId: user.id,
         members: [user]
       }).save();
 

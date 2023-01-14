@@ -45,7 +45,7 @@ const RoomSecondarySection: FC = () => {
       p="2"
       h={{ base: '700px', lg: isTheatreMode ? '700px' : 'calc(100vh - 104px)' }}
     >
-      <Tabs variant="enclosed" isFitted>
+      <Tabs defaultIndex={2} variant="enclosed" isFitted>
         <TabList>
           <Tab>Playlists</Tab>
           <Tab>Members</Tab>

@@ -21,14 +21,6 @@ import {
 import { FC, useEffect, useRef, useState } from 'react';
 import { IoMdSend } from 'react-icons/io';
 
-const AlwaysScrollToBottom: FC = () => {
-  const elementRef = useRef<any>();
-  useEffect(() => {
-    elementRef.current?.scrollIntoView();
-  });
-  return <Box ref={elementRef} />;
-};
-
 const MessageComposer: FC = () => {
   const { socket } = useRoomContext();
   const [message, setMessage] = useState('');
@@ -100,10 +92,36 @@ const MessageBox: FC<{ message: RoomMessage; isOwn: boolean }> = ({
   );
 };
 
-export const RoomChatTab: FC = () => {
+const MessageList: FC = () => {
   const { user } = useAuth();
-  const slug = useRoomStore.getState().roomSlug;
   const messages = useRoomStore((state) => state.messages);
+
+  const bottomRef = useRef<any>(null);
+
+  useEffect(() => {
+    const { scrollX, scrollY } = window;
+
+    bottomRef.current?.scrollIntoView();
+
+    window.scrollTo(scrollX, scrollY);
+  }, [messages]);
+
+  return (
+    <VStack w="full" spacing={4}>
+      {messages.map((message) => (
+        <MessageBox
+          key={message.id}
+          message={message}
+          isOwn={message.creatorId === user?.id}
+        />
+      ))}
+      <Box ref={bottomRef} />
+    </VStack>
+  );
+};
+
+export const RoomChatTab: FC = () => {
+  const slug = useRoomStore.getState().roomSlug;
 
   const { isLoading } = useRoomMessagesQuery(
     { slug },
@@ -120,16 +138,7 @@ export const RoomChatTab: FC = () => {
     <>
       <VStack px="1" h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
         <Flex w="full" flexDirection="column" overflowY="scroll" flex={1}>
-          <VStack w="full" spacing={4}>
-            {messages.map((message) => (
-              <MessageBox
-                key={message.id}
-                message={message}
-                isOwn={message.creatorId === user?.id}
-              />
-            ))}
-            <AlwaysScrollToBottom />
-          </VStack>
+          <MessageList />
         </Flex>
         <MessageComposer />
       </VStack>

@@ -24,7 +24,6 @@ const RoomPrimarySection: FC = () => {
       }}
     >
       <Player />
-
       <RoomBelowSection />
       <Footer px="0" />
     </Box>

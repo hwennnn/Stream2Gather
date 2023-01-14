@@ -24,9 +24,7 @@ import { IoMdSend } from 'react-icons/io';
 const AlwaysScrollToBottom: FC = () => {
   const elementRef = useRef<any>();
   useEffect(() => {
-    if (elementRef.current !== undefined) {
-      elementRef.current.scrollIntoView();
-    }
+    elementRef.current?.scrollIntoView();
   });
   return <Box ref={elementRef} />;
 };

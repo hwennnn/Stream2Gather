@@ -7,7 +7,6 @@ interface Props {
 }
 
 export const CircleLoading: FC<ChakraProps & Props> = (props) => {
-  console.log(props.showFullScreen);
   return (
     <Flex
       h={props.showFullScreen === true ? 'full' : 'auto'}

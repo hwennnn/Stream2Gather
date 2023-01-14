@@ -38,15 +38,122 @@ interface PlayerControlProps {
   playerWrapperRef: MutableRefObject<any>;
 }
 
+const ProgressSlider: FC<{ playerRef: MutableRefObject<any> }> = ({
+  playerRef
+}) => {
+  const { socket } = useRoomContext();
+  const { playedSeconds, duration } = useRoomStore(
+    (state) => ({
+      playedSeconds: state.playedSeconds,
+      duration: state.duration
+    }),
+    shallow
+  );
+
+  const seeking = (value: number): void => {
+    const timestamp = (value / 100) * duration;
+    // optimistically update the playedSeconds store
+    setPlayedSeconds(timestamp);
+
+    setPlaying(true);
+    playerRef.current.seekTo(timestamp, 'seconds');
+  };
+
+  const seek = (value: number): void => {
+    const timestamp = (value / 100) * duration;
+
+    const payload: StreamEvent = {
+      isPlaying: true,
+      timestamp
+    };
+    emitStreamEvent(socket, payload);
+  };
+
+  return (
+    <Box flex="1">
+      <Slider
+        focusThumbOnChange={false}
+        mt="2"
+        aria-label="slider-ex-1"
+        value={duration === 0 ? 0 : (playedSeconds / duration) * 100}
+        defaultValue={0}
+        onChangeEnd={(value) => {
+          seek(value);
+        }}
+        onChange={(value) => {
+          seeking(value);
+        }}
+      >
+        <SliderTrack>
+          <SliderFilledTrack />
+        </SliderTrack>
+        <SliderThumb />
+      </Slider>
+    </Box>
+  );
+};
+
+const VolumeSlider: FC = () => {
+  const { volume, isMuted } = useUserSettingsStore(
+    (state) => ({
+      volume: state.volume,
+      isMuted: state.isMuted
+    }),
+    shallow
+  );
+
+  return (
+    <Slider
+      focusThumbOnChange={false}
+      mt="2"
+      width={'50px'}
+      aria-label="slider-ex-2"
+      colorScheme={'brand'}
+      value={isMuted ? 0 : volume}
+      defaultValue={100}
+      onChange={(value) => {
+        if (value > 0 && isMuted) {
+          toggleMutedMode();
+        }
+        setVolume(value);
+      }}
+      cursor="pointer"
+    >
+      <SliderTrack>
+        <SliderFilledTrack />
+      </SliderTrack>
+      <SliderThumb />
+    </Slider>
+  );
+};
+
+const ProgressText: FC = () => {
+  const { playedSeconds, duration } = useRoomStore(
+    (state) => ({
+      playedSeconds: state.playedSeconds,
+      duration: state.duration
+    }),
+    shallow
+  );
+
+  return (
+    <Text
+      userSelect={'none'}
+      fontSize={'sm'}
+      textColor="white"
+    >{`${getFormattedTime(playedSeconds)} / ${getFormattedTime(
+      duration
+    )}`}</Text>
+  );
+};
+
 const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   const { socket } = useRoomContext();
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
-  const { playing, playedSeconds, duration } = useRoomStore(
+  const { playing } = useRoomStore(
     (state) => ({
-      playing: state.playing,
-      playedSeconds: state.playedSeconds,
-      duration: state.duration
+      playing: state.playing
     }),
     shallow
   );
@@ -84,25 +191,6 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     emitStreamEvent(socket, payload);
   };
 
-  const seeking = (value: number): void => {
-    const timestamp = (value / 100) * duration;
-    // optimistically update the playedSeconds store
-    setPlayedSeconds(timestamp);
-
-    setPlaying(true);
-    playerRef.current.seekTo(timestamp, 'seconds');
-  };
-
-  const seek = (value: number): void => {
-    const timestamp = (value / 100) * duration;
-
-    const payload: StreamEvent = {
-      isPlaying: true,
-      timestamp
-    };
-    emitStreamEvent(socket, payload);
-  };
-
   const handleClickFullscreen = async (): Promise<void> => {
     if (screenfull.isEnabled) {
       await screenfull.request(playerRef.current.wrapper);
@@ -111,28 +199,9 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
 
   return (
     <Flex w="full" direction="column" mb="3">
-      <Box flex="1">
-        <Slider
-          focusThumbOnChange={false}
-          mt="2"
-          aria-label="slider-ex-1"
-          value={duration === 0 ? 0 : (playedSeconds / duration) * 100}
-          defaultValue={0}
-          onChangeEnd={(value) => {
-            seek(value);
-          }}
-          onChange={(value) => {
-            seeking(value);
-          }}
-        >
-          <SliderTrack>
-            <SliderFilledTrack />
-          </SliderTrack>
-          <SliderThumb />
-        </Slider>
-      </Box>
-
       <HStack spacing={5} w="full" alignItems="center">
+        <ProgressSlider playerRef={playerRef} />
+
         <Box onClick={() => setPlaying(!playing)} cursor="pointer">
           {playing ? (
             <BsPauseFill onClick={pause} size={32} color={'white'} />
@@ -162,36 +231,10 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
             )}
           </Box>
 
-          <Slider
-            focusThumbOnChange={false}
-            mt="2"
-            width={'50px'}
-            aria-label="slider-ex-2"
-            colorScheme={'brand'}
-            value={isMuted ? 0 : volume}
-            defaultValue={100}
-            onChange={(value) => {
-              if (value > 0 && isMuted) {
-                toggleMutedMode();
-              }
-              setVolume(value);
-            }}
-            cursor="pointer"
-          >
-            <SliderTrack>
-              <SliderFilledTrack />
-            </SliderTrack>
-            <SliderThumb />
-          </Slider>
+          <VolumeSlider />
         </HStack>
 
-        <Text
-          userSelect={'none'}
-          fontSize={'sm'}
-          textColor="white"
-        >{`${getFormattedTime(playedSeconds)} / ${getFormattedTime(
-          duration
-        )}`}</Text>
+        <ProgressText />
 
         <Spacer />
 

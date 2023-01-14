@@ -57,7 +57,7 @@ export const handleJoinRoom = (
       return;
     }
 
-    if (room.activeMembers.length >= ROOM_MAX_LIMIT) {
+    if (activeMembers.length >= ROOM_MAX_LIMIT) {
       socket.emit(RES_ROOM_ALREADY_FULL);
       return;
     }

@@ -25,10 +25,10 @@ const AlwaysScrollToBottom: FC = () => {
   const elementRef = useRef<any>();
   useEffect(() => {
     if (elementRef.current !== undefined) {
-      elementRef.current.scrollIntoView({ behavior: 'smooth' });
+      elementRef.current.scrollIntoView();
     }
   });
-  return <Box h="0" w="0" ref={elementRef} />;
+  return <Box display="none" ref={elementRef} />;
 };
 
 const MessageComposer: FC = () => {
@@ -73,7 +73,6 @@ const MessageBox: FC<{ message: RoomMessage; isOwn: boolean }> = ({
   message,
   isOwn
 }) => {
-  console.log(message);
   return (
     <Flex
       w="full"
@@ -84,14 +83,14 @@ const MessageBox: FC<{ message: RoomMessage; isOwn: boolean }> = ({
         maxW="70%"
         px="4"
         py="2"
-        backgroundColor={isOwn ? 'secondary' : 'gray.200'}
+        backgroundColor={isOwn ? 'secondary' : 'gray.300'}
         rounded={15}
         roundedTopRight={isOwn ? 0 : 'auto'}
         roundedBottomRight={isOwn ? 10 : 'auto'}
-        roundedTopLeft={!isOwn ? 10 : 'auto'}
+        roundedTopLeft={!isOwn ? 0 : 'auto'}
         roundedBottomLeft={!isOwn ? 10 : 'auto'}
       >
-        <Text color="white">{message.content}</Text>
+        <Text color={isOwn ? 'white' : 'black'}>{message.content}</Text>
       </Box>
       <Text mt="0.5" fontSize="xs">
         {formatMsToMinutesSeconds(message.createdAt)}
@@ -118,7 +117,7 @@ export const RoomChatTab: FC = () => {
 
   return (
     <>
-      <VStack pb="1" h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
+      <VStack px="1" h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
         <Flex w="full" flexDirection="column" overflowY="scroll" flex={1}>
           <VStack w="full" spacing={4}>
             {messages.map((message) => (

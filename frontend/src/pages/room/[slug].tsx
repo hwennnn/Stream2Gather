@@ -2,6 +2,7 @@ import { Loading } from '@app/components/common/loading/Loading';
 import RoomAlreadyFull from '@app/components/rooms/errors/RoomAlreadyFull';
 import RoomAlreadyJoined from '@app/components/rooms/errors/RoomAlreadyJoined';
 import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
+import RoomFailed from '@app/components/rooms/errors/RoomFailed';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
 import RoomNoPermission from '@app/components/rooms/errors/RoomNoPermission';
 import RoomLayout from '@app/components/rooms/RoomLayout';
@@ -67,16 +68,11 @@ const RoomPage: NextPage = () => {
       reconnectionAttempts: Infinity
     });
 
-    if (
-      typeof slug === 'string' &&
-      user?.id !== undefined &&
-      user?.username !== undefined
-    ) {
+    if (typeof slug === 'string' && user?.id !== undefined) {
       initSocketForRoom(
         newSocket,
         slug,
         user?.id,
-        user?.username,
         invitationCode as string | undefined
       );
     }
@@ -107,6 +103,10 @@ const RoomPage: NextPage = () => {
 
   if (joiningStatus === RoomJoiningStatus.ALREADY_FULL) {
     return <RoomAlreadyFull />;
+  }
+
+  if (joiningStatus === RoomJoiningStatus.FAILED) {
+    return <RoomFailed />;
   }
 
   if (

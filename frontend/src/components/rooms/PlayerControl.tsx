@@ -70,7 +70,7 @@ const ProgressSlider: FC<{ playerRef: MutableRefObject<any> }> = ({
   };
 
   return (
-    <Box flex="1">
+    <Box flex={1}>
       <Slider
         focusThumbOnChange={false}
         mt="2"
@@ -199,9 +199,9 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
 
   return (
     <Flex w="full" direction="column" mb="3">
-      <HStack spacing={5} w="full" alignItems="center">
-        <ProgressSlider playerRef={playerRef} />
+      <ProgressSlider playerRef={playerRef} />
 
+      <HStack spacing={5} w="full" alignItems="center">
         <Box onClick={() => setPlaying(!playing)} cursor="pointer">
           {playing ? (
             <BsPauseFill onClick={pause} size={32} color={'white'} />

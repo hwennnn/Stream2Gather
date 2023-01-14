@@ -14,6 +14,9 @@ export class RoomMember {
   @Field()
   username: string;
 
+  @Field({ nullable: true })
+  displayPhoto?: string;
+
   @Field()
   socketId: string;
 

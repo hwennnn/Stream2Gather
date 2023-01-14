@@ -7,6 +7,7 @@ import RedisHelper from '../utils/redisHelper';
 import RedisRoomHelper from '../utils/redisRoomHelper';
 import {
   RES_JOINED_ROOM,
+  RES_JOIN_ROOM_FAILED,
   RES_NEW_MEMBER,
   RES_ROOM_ALREADY_FULL,
   RES_ROOM_ALREADY_JOINED,
@@ -17,12 +18,10 @@ import {
 
 type JoinRoomFunction = ({
   uid,
-  username,
   slug,
   invitationCode
 }: {
   uid: string;
-  username: string;
   slug: string;
   invitationCode: string;
 }) => Promise<void>;
@@ -32,7 +31,7 @@ export const handleJoinRoom = (
   redisHelper: RedisHelper,
   redisRoomHelper: RedisRoomHelper
 ): JoinRoomFunction => {
-  return async ({ uid, slug, username, invitationCode }): Promise<void> => {
+  return async ({ uid, slug, invitationCode }): Promise<void> => {
     const room = await Room.findOne({
       where: { slug },
       relations: {
@@ -62,6 +61,12 @@ export const handleJoinRoom = (
       return;
     }
 
+    const user = await User.findOne({ where: { id: uid } });
+    if (user === null) {
+      socket.emit(RES_JOIN_ROOM_FAILED);
+      return;
+    }
+
     if (!room.isPublic && room.members.every((m) => m.id !== uid)) {
       const invitationCodeFromRedis = await redisRoomHelper.getInvitationCode(
         room.id
@@ -70,13 +75,6 @@ export const handleJoinRoom = (
         socket.emit(RES_ROOM_NO_PERMISSION);
         return;
       } else {
-        // handle new member in private room logic
-        const user = await User.findOne({ where: { id: uid } });
-        if (user === null) {
-          socket.emit(RES_ROOM_NO_PERMISSION);
-          return;
-        }
-
         room.members.push(user);
         await room.save();
       }
@@ -88,9 +86,10 @@ export const handleJoinRoom = (
       socketId: socket.id,
       roomId,
       uid,
-      username
+      username: user.username,
+      displayPhoto: user.displayPhoto
     };
-    console.log(`${username} has joined the room with id ${roomId}`);
+    console.log(`${user.username} has joined the room with id ${roomId}`);
 
     await socket.join(roomId);
     socket.roomId = roomId;

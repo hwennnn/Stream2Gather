@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import shortid from 'shortid';
 import { RoomInfo, RoomMember } from '../models/RedisModel';
 import RedisHelper from './redisHelper';
 
@@ -67,7 +67,7 @@ export default class RedisRoomHelper extends RedisHelper {
       currentTime - parseInt(result.createdAt) > 86400000
     ) {
       result = {
-        hash: randomUUID(),
+        hash: shortid.generate(),
         createdAt: currentTime.toString()
       };
       await this.set<InvitationCode>('invitation_code', roomId, result);

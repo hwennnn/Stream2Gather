@@ -15,7 +15,7 @@ interface UserSettingsState {
 
 const initialUserSettingsData = {
   isTheatreMode: false,
-  isMuted: false,
+  isMuted: true,
   volume: 100
 };
 

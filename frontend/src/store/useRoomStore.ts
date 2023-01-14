@@ -14,6 +14,7 @@ export enum RoomJoiningStatus {
   INACTIVE,
   NO_PERMISSION,
   ALREADY_IN_ROOM,
+  ALREADY_FULL,
   FAILED // Error Base Case
 }
 

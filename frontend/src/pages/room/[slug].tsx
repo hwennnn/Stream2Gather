@@ -1,4 +1,5 @@
 import { Loading } from '@app/components/common/loading/Loading';
+import RoomAlreadyFull from '@app/components/rooms/errors/RoomAlreadyFull';
 import RoomAlreadyJoined from '@app/components/rooms/errors/RoomAlreadyJoined';
 import RoomDoesNotExist from '@app/components/rooms/errors/RoomDoesNotExist';
 import RoomInactive from '@app/components/rooms/errors/RoomInactive';
@@ -93,6 +94,10 @@ const RoomPage: NextPage = () => {
 
   if (joiningStatus === RoomJoiningStatus.ALREADY_IN_ROOM) {
     return <RoomAlreadyJoined />;
+  }
+
+  if (joiningStatus === RoomJoiningStatus.ALREADY_FULL) {
+    return <RoomAlreadyFull />;
   }
 
   if (

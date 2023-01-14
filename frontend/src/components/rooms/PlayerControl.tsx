@@ -7,7 +7,8 @@ import useRoomStore, {
 } from '@app/store/useRoomStore';
 import useUserSettingsStore, {
   setVolume,
-  toggleMutedMode
+  toggleMutedMode,
+  toggleTheatreMode
 } from '@app/store/useUserSettingsStore';
 import {
   Box,
@@ -28,6 +29,7 @@ import {
   BsVolumeMuteFill,
   BsVolumeUpFill
 } from 'react-icons/bs';
+import { TbRectangle, TbSquare } from 'react-icons/tb';
 import screenfull from 'screenfull';
 import shallow from 'zustand/shallow';
 
@@ -49,10 +51,11 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
     shallow
   );
 
-  const { volume, isMuted } = useUserSettingsStore(
+  const { volume, isMuted, isTheatreMode } = useUserSettingsStore(
     (state) => ({
       volume: state.volume,
-      isMuted: state.isMuted
+      isMuted: state.isMuted,
+      isTheatreMode: state.isTheatreMode
     }),
     shallow
   );
@@ -107,7 +110,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   };
 
   return (
-    <Flex w="full" direction={'column'} mb="3">
+    <Flex w="full" direction="column" mb="3">
       <Box flex="1">
         <Slider
           focusThumbOnChange={false}
@@ -192,9 +195,15 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
 
         <Spacer />
 
+        <Box onClick={toggleTheatreMode} cursor="pointer">
+          {isTheatreMode ? (
+            <TbSquare color={'white'} size={24} />
+          ) : (
+            <TbRectangle color={'white'} size={24} />
+          )}
+        </Box>
+
         <Box
-          ml="5"
-          mr="2"
           onClick={async () => await handleClickFullscreen()}
           cursor="pointer"
         >

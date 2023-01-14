@@ -1,6 +1,7 @@
 import { RoomChatTab } from '@app/components/rooms/RoomChatTab';
 import { RoomMembersTab } from '@app/components/rooms/RoomMembersTab';
 import { RoomPlaylistsTab } from '@app/components/rooms/RoomPlaylistsTab';
+import useUserSettingsStore from '@app/store/useUserSettingsStore';
 
 import {
   Box,
@@ -12,23 +13,37 @@ import {
   useColorModeValue
 } from '@chakra-ui/react';
 import { FC } from 'react';
+import shallow from 'zustand/shallow';
 
 const RoomSecondarySection: FC = () => {
+  const { isTheatreMode } = useUserSettingsStore(
+    (state) => ({
+      isTheatreMode: state.isTheatreMode
+    }),
+    shallow
+  );
+
   return (
     <Box
-      position={{ base: 'relative', lg: 'fixed' }}
-      top={{ base: 'none', lg: '94px' }}
+      position={{ base: 'relative', lg: isTheatreMode ? 'relative' : 'fixed' }}
+      top={{ base: 'none', lg: isTheatreMode ? 'none' : '94px' }}
       right={{
         base: 'none',
-        lg: 'calc(max(1rem, (100vw - 120em) / 2 + 1rem))'
+        lg: isTheatreMode
+          ? 'none'
+          : 'calc(max(1rem, (100vw - 120em) / 2 + 1rem))'
       }}
-      mt={{ base: '6', lg: '0' }}
+      mt={{ base: '6', lg: isTheatreMode ? '6' : '0' }}
       borderRadius="lg"
-      width={{ base: '100%', lg: 'sm', xl: 'md' }}
+      width={{
+        base: '100%',
+        lg: isTheatreMode ? '100%' : 'sm',
+        xl: isTheatreMode ? '100%' : 'md'
+      }}
       bg="bg-surface"
       boxShadow={useColorModeValue('sm', 'sm-dark')}
       p="2"
-      h={{ base: '700px', lg: 'calc(100vh - 104px)' }}
+      h={{ base: '700px', lg: isTheatreMode ? '700px' : 'calc(100vh - 104px)' }}
     >
       <Tabs variant="enclosed" isFitted>
         <TabList>

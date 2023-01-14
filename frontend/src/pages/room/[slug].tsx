@@ -15,11 +15,13 @@ import useRoomStore, {
   RoomJoiningStatus,
   setRoom
 } from '@app/store/useRoomStore';
+import useUserSettingsStore from '@app/store/useUserSettingsStore';
 import { Flex } from '@chakra-ui/react';
 import { NextPage } from 'next';
 import { useRouter } from 'next/router';
 import React, { useContext, useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import shallow from 'zustand/shallow';
 
 export interface RoomContextInterface {
   socket: Socket;
@@ -31,6 +33,13 @@ const RoomContext = React.createContext<RoomContextInterface | undefined>(
 
 const RoomPage: NextPage = () => {
   const { slug, invitationCode } = useRouter().query;
+
+  const { isTheatreMode } = useUserSettingsStore(
+    (state) => ({
+      isTheatreMode: state.isTheatreMode
+    }),
+    shallow
+  );
 
   const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -112,7 +121,10 @@ const RoomPage: NextPage = () => {
     <RoomLayout>
       <RoomContext.Provider value={{ socket }}>
         <Flex
-          flexDirection={{ base: 'column', lg: 'row' }}
+          flexDirection={{
+            base: 'column',
+            lg: isTheatreMode ? 'column' : 'row'
+          }}
           mx="auto"
           px="4"
           pt="24px"

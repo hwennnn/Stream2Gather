@@ -28,7 +28,7 @@ const AlwaysScrollToBottom: FC = () => {
       elementRef.current.scrollIntoView();
     }
   });
-  return <Box display="none" ref={elementRef} />;
+  return <Box ref={elementRef} />;
 };
 
 const MessageComposer: FC = () => {
@@ -83,12 +83,12 @@ const MessageBox: FC<{ message: RoomMessage; isOwn: boolean }> = ({
         maxW="70%"
         px="4"
         py="2"
-        backgroundColor={isOwn ? 'secondary' : 'gray.300'}
-        rounded={15}
+        backgroundColor={isOwn ? 'secondary' : 'gray.200'}
+        rounded={20}
         roundedTopRight={isOwn ? 0 : 'auto'}
-        roundedBottomRight={isOwn ? 10 : 'auto'}
+        roundedBottomRight={isOwn ? 18 : 'auto'}
         roundedTopLeft={!isOwn ? 0 : 'auto'}
-        roundedBottomLeft={!isOwn ? 10 : 'auto'}
+        roundedBottomLeft={!isOwn ? 18 : 'auto'}
       >
         <Text color={isOwn ? 'white' : 'black'}>{message.content}</Text>
       </Box>

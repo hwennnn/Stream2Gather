@@ -1,3 +1,4 @@
+import BadWords from 'bad-words';
 import { Socket } from 'socket.io';
 import { Message } from '../entities/Message';
 import RedisHelper from '../utils/redisHelper';
@@ -14,6 +15,9 @@ export const handleSendMessage = (
     const uid = socket.uid;
 
     if (roomId === undefined || uid === undefined) return;
+
+    const filter = new BadWords();
+    content = filter.clean(content);
 
     try {
       const message = await Message.create({

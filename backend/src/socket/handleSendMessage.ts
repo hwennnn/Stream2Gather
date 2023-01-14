@@ -22,9 +22,14 @@ export const handleSendMessage = (
         creatorId: uid
       }).save();
 
+      const createdAt = message.createdAt.getTime().toString();
+
       const payload = {
         roomId,
-        message
+        message: {
+          ...message,
+          createdAt
+        }
       };
 
       await redisHelper.publish(RES_NEW_MESSAGE, payload);

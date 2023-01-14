@@ -1,3 +1,4 @@
+import { RoomChatTab } from '@app/components/rooms/RoomChatTab';
 import { RoomMembersTab } from '@app/components/rooms/RoomMembersTab';
 import { RoomPlaylistsTab } from '@app/components/rooms/RoomPlaylistsTab';
 
@@ -41,11 +42,13 @@ const RoomSecondarySection: FC = () => {
             <RoomPlaylistsTab />
           </TabPanel>
 
-          <TabPanel>
+          <TabPanel px="0">
             <RoomMembersTab />
           </TabPanel>
 
-          <TabPanel>Chat</TabPanel>
+          <TabPanel px="0">
+            <RoomChatTab />
+          </TabPanel>
         </TabPanels>
       </Tabs>
     </Box>

@@ -43,14 +43,41 @@ export type LoginInput = {
   token: Scalars['String'];
 };
 
+export type Message = {
+  __typename?: 'Message';
+  content: Scalars['String'];
+  createdAt: Scalars['String'];
+  creatorId: Scalars['String'];
+  id: Scalars['String'];
+  room?: Maybe<Room>;
+  updatedAt: Scalars['String'];
+};
+
+export type MessageInput = {
+  content: Scalars['String'];
+  roomId: Scalars['String'];
+};
+
+export type MessageResponse = {
+  __typename?: 'MessageResponse';
+  errors?: Maybe<Array<FieldError>>;
+  message?: Maybe<Message>;
+};
+
 export type Mutation = {
   __typename?: 'Mutation';
+  createMessage: MessageResponse;
   createRoom: RoomResponse;
   deleteRoom: Scalars['Boolean'];
   login: UserResponse;
   logout: Scalars['Boolean'];
   register: UserResponse;
   socialLogin: UserResponse;
+};
+
+
+export type MutationCreateMessageArgs = {
+  options: MessageInput;
 };
 
 
@@ -78,6 +105,7 @@ export type Query = {
   me?: Maybe<User>;
   ownRooms?: Maybe<User>;
   room?: Maybe<Room>;
+  roomMessages?: Maybe<Array<Message>>;
   rooms: Array<Room>;
   user?: Maybe<User>;
   users: Array<User>;
@@ -89,6 +117,11 @@ export type Query = {
 
 
 export type QueryRoomArgs = {
+  slug: Scalars['String'];
+};
+
+
+export type QueryRoomMessagesArgs = {
   slug: Scalars['String'];
 };
 
@@ -122,6 +155,7 @@ export type RegisterInput = {
 export type Room = {
   __typename?: 'Room';
   activeMembers: Array<RoomMember>;
+  bannedUsers: Array<Scalars['String']>;
   createdAt: Scalars['String'];
   creator?: Maybe<User>;
   creatorId: Scalars['String'];
@@ -131,6 +165,7 @@ export type Room = {
   isPublic: Scalars['Boolean'];
   isTemporary: Scalars['Boolean'];
   members?: Maybe<Array<User>>;
+  messages?: Maybe<Array<Message>>;
   roomInfo: RoomInfo;
   slug: Scalars['String'];
   updatedAt: Scalars['String'];
@@ -198,6 +233,8 @@ export type ActiveMemberFragment = { __typename?: 'RoomMember', uid: string, use
 
 export type FullRoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> };
 
+export type MessageItemFragment = { __typename?: 'Message', id: string, creatorId: string, content: string, createdAt: string, updatedAt: string };
+
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
 export type RoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string };
@@ -253,6 +290,13 @@ export type RoomQueryVariables = Exact<{
 
 
 export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string }> } | null };
+
+export type RoomMessagesQueryVariables = Exact<{
+  slug: Scalars['String'];
+}>;
+
+
+export type RoomMessagesQuery = { __typename?: 'Query', roomMessages?: Array<{ __typename?: 'Message', id: string, creatorId: string, content: string, createdAt: string, updatedAt: string }> | null };
 
 export type RoomsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -336,6 +380,15 @@ export const FullRoomItemFragmentDoc = `
     ${RoomItemFragmentDoc}
 ${VideoItemFragmentDoc}
 ${ActiveMemberFragmentDoc}`;
+export const MessageItemFragmentDoc = `
+    fragment MessageItem on Message {
+  id
+  creatorId
+  content
+  createdAt
+  updatedAt
+}
+    `;
 export const RegularErrorFragmentDoc = `
     fragment RegularError on FieldError {
   field
@@ -540,6 +593,29 @@ export const useRoomQuery = <
     );
 
 useRoomQuery.getKey = (variables: RoomQueryVariables) => ['Room', variables];
+;
+
+export const RoomMessagesDocument = `
+    query RoomMessages($slug: String!) {
+  roomMessages(slug: $slug) {
+    ...MessageItem
+  }
+}
+    ${MessageItemFragmentDoc}`;
+export const useRoomMessagesQuery = <
+      TData = RoomMessagesQuery,
+      TError = unknown
+    >(
+      variables: RoomMessagesQueryVariables,
+      options?: UseQueryOptions<RoomMessagesQuery, TError, TData>
+    ) =>
+    useQuery<RoomMessagesQuery, TError, TData>(
+      ['RoomMessages', variables],
+      fetcher<RoomMessagesQuery, RoomMessagesQueryVariables>(RoomMessagesDocument, variables),
+      options
+    );
+
+useRoomMessagesQuery.getKey = (variables: RoomMessagesQueryVariables) => ['RoomMessages', variables];
 ;
 
 export const RoomsDocument = `

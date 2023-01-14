@@ -1,5 +1,6 @@
 import {
   FullRoomItemFragment,
+  MessageItemFragment,
   RoomInfo,
   RoomMember,
   VideoInfo
@@ -19,6 +20,10 @@ export enum RoomJoiningStatus {
 export enum VideoResultTab {
   TRENDING_VIDEOS = 0,
   SEARCH_RESULTS = 1
+}
+
+export interface RoomMessage extends MessageItemFragment {
+  isSent: boolean;
 }
 
 interface RoomState {
@@ -48,6 +53,8 @@ interface RoomState {
   searchQuery: string;
   currentVideoResultTab: VideoResultTab;
 
+  messages: RoomMessage[];
+
   actions: {
     setRoom: (data: FullRoomItemFragment) => void;
     resetRoom: () => void;
@@ -69,6 +76,9 @@ interface RoomState {
 
     setSearchQuery: (query: string) => void;
     setCurrentVideoResultTab: (tab: VideoResultTab) => void;
+
+    setRoomMessages: (m: RoomMessage[]) => void;
+    pushRoomMessage: (m: RoomMessage) => void;
   };
 }
 
@@ -90,7 +100,8 @@ const initialRoomData = {
   playlist: [],
   currentVideo: undefined,
   searchQuery: '',
-  currentVideoResultTab: VideoResultTab.TRENDING_VIDEOS
+  currentVideoResultTab: VideoResultTab.TRENDING_VIDEOS,
+  messages: []
 };
 
 const useRoomStore = create<RoomState>()((set) => ({
@@ -112,6 +123,17 @@ const useRoomStore = create<RoomState>()((set) => ({
         playingIndex: roomInfo.playingIndex,
         playlist: roomInfo.playlist,
         currentVideo: roomInfo.playlist[roomInfo.playingIndex]
+      });
+    },
+    setRoomMessages: (messages: RoomMessage[]) => {
+      set({
+        messages
+      });
+    },
+    pushRoomMessage: (m: RoomMessage) => {
+      set((state) => {
+        const messages = [...state.messages, m];
+        return { messages };
       });
     },
     resetRoom: () =>
@@ -185,7 +207,9 @@ export const {
   addToPlaylist,
   updateRoomInfo,
   setSearchQuery,
-  setCurrentVideoResultTab
+  setCurrentVideoResultTab,
+  setRoomMessages,
+  pushRoomMessage
 } = useRoomStore.getState().actions;
 
 export default useRoomStore;

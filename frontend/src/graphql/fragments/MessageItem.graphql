@@ -1,0 +1,7 @@
+fragment MessageItem on Message {
+  id
+  creatorId
+  content
+  createdAt
+  updatedAt
+}

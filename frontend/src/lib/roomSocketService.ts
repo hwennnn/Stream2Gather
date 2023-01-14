@@ -8,11 +8,13 @@ import {
   REQ_PLAY_VIDEO,
   REQ_REMOVE_FROM_PLAYLIST,
   REQ_RESET_QUEUE,
+  REQ_SEND_MESSAGE,
   REQ_STREAMING_EVENTS,
   RES_JOINED_ROOM,
   RES_JOIN_ROOM_FAILED,
   RES_MEMBER_LEFT,
   RES_NEW_MEMBER,
+  RES_NEW_MESSAGE,
   RES_ROOM_ALREADY_JOINED,
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
@@ -25,6 +27,7 @@ import { RoomMember, VideoInfo } from '@app/generated/graphql';
 import {
   addActiveMember,
   addToPlaylist,
+  pushRoomMessage,
   removeActiveMember,
   RoomJoiningStatus,
   setPlaying,
@@ -108,6 +111,10 @@ export const playExistingVideo = (
   socket.emit(REQ_PLAY_EXISTING_VIDEO, { playingIndex });
 };
 
+export const sendMessage = (socket: Socket, content: string): void => {
+  socket.emit(REQ_SEND_MESSAGE, { content });
+};
+
 const listenEvent = (socket: Socket): void => {
   if (process.env.NODE_ENV !== 'production') {
     socket.on(CONNECT, () => {
@@ -188,6 +195,13 @@ const handleRoomInfoUpdate = (socket: Socket): void => {
   });
 };
 
+const handleNewMessage = (socket: Socket): void => {
+  socket.on(RES_NEW_MESSAGE, (data) => {
+    const { message } = data;
+    pushRoomMessage(message);
+  });
+};
+
 export const initSocketForRoom = (
   socket: Socket,
   slug: string,
@@ -206,4 +220,5 @@ export const initSocketForRoom = (
   handleNewMember(socket);
   handleMemberLeft(socket);
   handleRoomInfoUpdate(socket);
+  handleNewMessage(socket);
 };

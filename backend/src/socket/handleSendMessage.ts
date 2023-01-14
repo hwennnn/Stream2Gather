@@ -24,7 +24,7 @@ export const handleSendMessage = (
 
       const payload = {
         roomId,
-        ...message
+        message
       };
 
       await redisHelper.publish(RES_NEW_MESSAGE, payload);

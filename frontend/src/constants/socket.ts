@@ -34,8 +34,11 @@ export const REQ_PLAY_EXISTING_VIDEO = 'req_play_existing_video';
 // From frontend: The video has ended. I want to play the next video
 export const REQ_PLAY_NEXT_VIDEO = 'req_play_next_video';
 
+// From frontend: I want to send a message inside the group
+export const REQ_SEND_MESSAGE = 'req_send_message';
+
 // From backend: There is a new message in the group
-export const RES_MESSAGE = 'res_messages';
+export const RES_NEW_MESSAGE = 'res_new_message';
 
 // From backend: There is a new member in the group
 export const RES_NEW_MEMBER = 'res_new_member';

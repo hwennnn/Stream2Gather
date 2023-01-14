@@ -6,14 +6,12 @@ interface Props {
   showFullScreen?: boolean;
 }
 
-export const CircleLoading: FC<ChakraProps> = (
-  props,
-  { showFullScreen = false }: Props
-) => {
+export const CircleLoading: FC<ChakraProps & Props> = (props) => {
+  console.log(props.showFullScreen);
   return (
     <Flex
-      h={showFullScreen ? 'full' : 'auto'}
-      width={showFullScreen ? '100vw' : 'auto'}
+      h={props.showFullScreen === true ? 'full' : 'auto'}
+      width={props.showFullScreen === true ? '100vw' : 'auto'}
       alignItems="center"
       justifyContent="center"
       {...props}

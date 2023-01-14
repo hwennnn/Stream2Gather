@@ -1,0 +1,5 @@
+query RoomMessages($slug: String!) {
+  roomMessages(slug: $slug) {
+    ...MessageItem
+  }
+}

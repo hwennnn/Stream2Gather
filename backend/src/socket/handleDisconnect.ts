@@ -50,7 +50,7 @@ const stopVideoWhenLastMemberLeft = async (
 
   const currentTimestamp =
     playedSeconds +
-    (playedTimestampUpdatedAt === '0'
+    (!roomInfo.isPlaying || playedTimestampUpdatedAt === '0'
       ? 0
       : (Date.now() - Number.parseInt(playedTimestampUpdatedAt)) / 1000);
   console.log(currentTimestamp);

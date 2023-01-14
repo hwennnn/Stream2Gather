@@ -55,11 +55,14 @@ const MessageComposer: FC = () => {
             onChange={(event) => {
               setMessage(event.target.value);
             }}
+            fontSize="lg"
             maxLength={128}
+            size="lg"
             placeholder="Enter a message"
           />
           <InputRightElement
-            children={<IoMdSend type="submit" onClick={submitForm} />}
+            h="full"
+            children={<IoMdSend size={24} type="submit" onClick={submitForm} />}
           />
         </InputGroup>
       </form>

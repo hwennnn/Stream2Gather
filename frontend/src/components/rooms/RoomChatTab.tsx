@@ -1,5 +1,6 @@
 /* eslint-disable react/no-children-prop */
 import { CircleLoading } from '@app/components/common/loading/CircleLoading';
+import { useAuth } from '@app/contexts/AuthContext';
 import { useRoomMessagesQuery } from '@app/generated/graphql';
 import { sendMessage } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
@@ -7,6 +8,7 @@ import useRoomStore, {
   RoomMessage,
   setRoomMessages
 } from '@app/store/useRoomStore';
+import { formatMsToMinutesSeconds } from '@app/utils/formatDatetime';
 import {
   Box,
   Flex,
@@ -16,18 +18,18 @@ import {
   Text,
   VStack
 } from '@chakra-ui/react';
-import { FC, useState } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import { IoMdSend } from 'react-icons/io';
 
-// const AlwaysScrollToBottom: FC = () => {
-//   const elementRef = useRef<any>();
-//   useEffect(() => {
-//     if (elementRef.current !== undefined) {
-//       elementRef.current.scrollIntoView({ behavior: 'smooth' });
-//     }
-//   });
-//   return <Box ref={elementRef} />;
-// };
+const AlwaysScrollToBottom: FC = () => {
+  const elementRef = useRef<any>();
+  useEffect(() => {
+    if (elementRef.current !== undefined) {
+      elementRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
+  return <Box h="0" w="0" ref={elementRef} />;
+};
 
 const MessageComposer: FC = () => {
   const { socket } = useRoomContext();
@@ -67,7 +69,39 @@ const MessageComposer: FC = () => {
   );
 };
 
+const MessageBox: FC<{ message: RoomMessage; isOwn: boolean }> = ({
+  message,
+  isOwn
+}) => {
+  console.log(message);
+  return (
+    <Flex
+      w="full"
+      flexDirection="column"
+      alignItems={isOwn ? 'flex-end' : 'flex-start'}
+    >
+      <Box
+        maxW="70%"
+        px="4"
+        py="2"
+        backgroundColor={isOwn ? 'secondary' : 'gray.200'}
+        rounded={15}
+        roundedTopRight={isOwn ? 0 : 'auto'}
+        roundedBottomRight={isOwn ? 10 : 'auto'}
+        roundedTopLeft={!isOwn ? 10 : 'auto'}
+        roundedBottomLeft={!isOwn ? 10 : 'auto'}
+      >
+        <Text color="white">{message.content}</Text>
+      </Box>
+      <Text mt="0.5" fontSize="xs">
+        {formatMsToMinutesSeconds(message.createdAt)}
+      </Text>
+    </Flex>
+  );
+};
+
 export const RoomChatTab: FC = () => {
+  const { user } = useAuth();
   const slug = useRoomStore.getState().roomSlug;
   const messages = useRoomStore((state) => state.messages);
 
@@ -84,17 +118,20 @@ export const RoomChatTab: FC = () => {
 
   return (
     <>
-      <VStack
-        h={{ base: '614px', lg: 'calc(100vh - 188px)' }}
-        overflowY="scroll"
-      >
-        <Flex flexDirection="column" flex={1}>
-          {messages.map((message) => (
-            <Text key={message.id}>{message.content}</Text>
-          ))}
+      <VStack pb="1" h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
+        <Flex w="full" flexDirection="column" overflowY="scroll" flex={1}>
+          <VStack w="full" spacing={4}>
+            {messages.map((message) => (
+              <MessageBox
+                key={message.id}
+                message={message}
+                isOwn={message.creatorId === user?.id}
+              />
+            ))}
+            <AlwaysScrollToBottom />
+          </VStack>
         </Flex>
         <MessageComposer />
-        {/* <AlwaysScrollToBottom /> */}
       </VStack>
     </>
   );

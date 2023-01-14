@@ -83,7 +83,7 @@ export class RoomResolver {
         },
         order: {
           messages: {
-            createdAt: 'DESC'
+            createdAt: 'ASC'
           }
         }
       });

@@ -11,6 +11,7 @@ import {
   Root,
   UseMiddleware
 } from 'type-graphql';
+import { Message } from '../entities/Message';
 import { Room } from '../entities/Room';
 import { User } from '../entities/User';
 import { MyContext } from '../types';
@@ -68,6 +69,31 @@ export class RoomResolver {
     }
 
     return null;
+  }
+
+  @Query(() => [Message], { nullable: true })
+  async roomMessages(
+    @Arg('slug') slug: string
+  ): Promise<Message[] | undefined> {
+    try {
+      const room = await Room.findOne({
+        where: { slug },
+        relations: {
+          messages: true
+        },
+        order: {
+          messages: {
+            createdAt: 'DESC'
+          }
+        }
+      });
+
+      return room?.messages;
+    } catch (err) {
+      console.log(err);
+    }
+
+    return undefined;
   }
 
   @Query(() => [Room])

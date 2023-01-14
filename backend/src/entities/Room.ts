@@ -7,10 +7,11 @@ import {
   JoinTable,
   ManyToMany,
   ManyToOne,
-  PrimaryColumn,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
+import { Message } from '../entities/Message';
 import { RoomInfo, RoomMember } from '../models/RedisModel';
 import { User } from './User';
 
@@ -22,7 +23,7 @@ export class Room extends BaseEntity {
   id!: string;
 
   @Field()
-  @PrimaryColumn()
+  @Column({ unique: true })
   slug!: string;
 
   @Field()
@@ -80,4 +81,8 @@ export class Room extends BaseEntity {
   // Fetch from redis
   @Field(() => [RoomMember])
   activeMembers: RoomMember[];
+
+  @Field(() => [Message], { nullable: true })
+  @OneToMany(() => Message, (message) => message.room)
+  messages!: Message[];
 }

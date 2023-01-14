@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { Message } from '../entities/Message';
 import { Room } from '../entities/Room';
 import { User } from '../entities/User';
 
@@ -11,7 +12,7 @@ export const AppDataSource = new DataSource({
   database: process.env.PG_DB,
   synchronize: true,
   logging: true,
-  entities: [User, Room],
+  entities: [User, Room, Message],
   migrations: [],
   subscribers: []
 });

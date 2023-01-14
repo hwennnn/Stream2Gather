@@ -12,6 +12,7 @@ import { Server } from 'http';
 import Redis from 'ioredis';
 import { buildSchema } from 'type-graphql';
 import { isProd } from '../constants/config';
+import { MessageResolver } from '../resolvers/messageResolver';
 import { RoomResolver } from '../resolvers/roomResolver';
 import { UserResolver } from '../resolvers/userResolver';
 import { VideoInfoResolver } from '../resolvers/videoInfoResolver';
@@ -25,7 +26,7 @@ const initApolloServer = async (
   redis: Redis
 ): Promise<void> => {
   const schema = await buildSchema({
-    resolvers: [UserResolver, RoomResolver, VideoInfoResolver],
+    resolvers: [UserResolver, RoomResolver, VideoInfoResolver, MessageResolver],
     validate: false
   });
 

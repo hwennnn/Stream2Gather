@@ -3,8 +3,8 @@ import { Server } from 'socket.io';
 import {
   REDIS_PUB_MESSAGE,
   RES_MEMBER_LEFT,
-  RES_MESSAGE,
   RES_NEW_MEMBER,
+  RES_NEW_MESSAGE,
   RES_ROOM_INFO,
   RES_STREAMING_EVENTS
 } from './../constants/socket';
@@ -35,7 +35,7 @@ const initRedisSubscribers = async (
 ): Promise<Map<String, Redis>> => {
   const redisSubscribers = new Map<String, Redis>();
   const channels = [
-    RES_MESSAGE,
+    RES_NEW_MESSAGE,
     RES_NEW_MEMBER,
     RES_MEMBER_LEFT,
     RES_STREAMING_EVENTS,

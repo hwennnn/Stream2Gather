@@ -14,5 +14,6 @@ declare module 'express-session' {
 declare module 'socket.io' {
   interface Socket {
     roomId?: string;
+    uid?: string;
   }
 }

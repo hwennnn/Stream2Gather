@@ -87,6 +87,7 @@ export const handleJoinRoom = (
 
     await socket.join(roomId);
     socket.roomId = roomId;
+    socket.uid = uid;
 
     socket.emit(RES_JOINED_ROOM);
 

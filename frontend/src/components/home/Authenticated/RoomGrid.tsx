@@ -17,7 +17,7 @@ export const RoomGrid: FC = () => {
   );
 
   if (isLoading) {
-    return <CircleLoading showFullScreen={true} />;
+    return <CircleLoading showfullscreen={true} />;
   }
 
   return (

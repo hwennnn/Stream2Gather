@@ -4,6 +4,7 @@ import { MeQueryKey } from '@app/constants/query';
 import { useAuth } from '@app/contexts/AuthContext';
 import { useLogoutMutation } from '@app/generated/graphql';
 import { queryClient } from '@app/pages/_app';
+import { resetUserSettings } from '@app/store/useUserSettingsStore';
 import {
   Avatar,
   Box,
@@ -35,6 +36,7 @@ const UserMenu: FC = () => {
       await firebaseLogout();
       await queryClient.invalidateQueries({ queryKey: MeQueryKey });
       await router.push('/');
+      resetUserSettings();
     }
   };
 

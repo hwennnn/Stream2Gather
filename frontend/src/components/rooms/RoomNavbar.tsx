@@ -10,6 +10,7 @@ import useRoomStore, {
   setSearchQuery,
   VideoResultTab
 } from '@app/store/useRoomStore';
+import { resetUserSettings } from '@app/store/useUserSettingsStore';
 import { SearchIcon } from '@chakra-ui/icons';
 import {
   Avatar,
@@ -47,6 +48,7 @@ const UserMenu: FC = () => {
       await firebaseLogout();
       await queryClient.invalidateQueries({ queryKey: MeQueryKey });
       await router.push('/');
+      resetUserSettings();
     }
   };
 

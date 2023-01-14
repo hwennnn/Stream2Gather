@@ -16,6 +16,9 @@ export const REQ_STREAMING_EVENTS = 'req_streaming_events';
 // From frontend: I starts to play the video
 export const REQ_PLAY_VIDEO = 'req_play_video';
 
+// From frontend: I want to add a playable video id to the playlist
+export const REQ_ADD_VIDEO_ID_TO_PLAYLIST = 'req_add_video_id_to_playlist';
+
 // From frontend: I want to add a video to the playlist
 export const REQ_ADD_TO_PLAYLIST = 'req_add_to_playlist';
 

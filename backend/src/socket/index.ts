@@ -1,5 +1,6 @@
 import { Redis } from 'ioredis';
 import { Server as SocketServer } from 'socket.io';
+import { handleAddVideoIdToPlaylist } from '../socket/handleAddVideoIdToPlaylist';
 import { handleSendMessage } from '../socket/handleSendMessage';
 import RedisHelper from '../utils/redisHelper';
 import RedisRoomHelper from '../utils/redisRoomHelper';
@@ -7,6 +8,7 @@ import {
   CONNECT,
   DISCONNECT,
   REQ_ADD_TO_PLAYLIST,
+  REQ_ADD_VIDEO_ID_TO_PLAYLIST,
   REQ_JOIN_ROOM,
   REQ_PLAY_EXISTING_VIDEO,
   REQ_PLAY_NEW_VIDEO,
@@ -46,6 +48,11 @@ const setUpIo = async (io: SocketServer, redis: Redis): Promise<void> => {
     socket.on(
       REQ_STREAMING_EVENTS,
       handleStreamingEvents(socket, redisHelper, redisRoomHelper)
+    );
+
+    socket.on(
+      REQ_ADD_VIDEO_ID_TO_PLAYLIST,
+      handleAddVideoIdToPlaylist(socket, redisRoomHelper)
     );
 
     socket.on(

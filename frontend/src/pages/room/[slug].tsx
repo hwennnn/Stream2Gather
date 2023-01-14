@@ -118,8 +118,8 @@ const RoomPage: NextPage = () => {
   }
 
   return (
-    <RoomLayout>
-      <RoomContext.Provider value={{ socket }}>
+    <RoomContext.Provider value={{ socket }}>
+      <RoomLayout>
         <Flex
           flexDirection={{
             base: 'column',
@@ -132,8 +132,8 @@ const RoomPage: NextPage = () => {
           <RoomPrimarySection />
           <RoomSecondarySection />
         </Flex>
-      </RoomContext.Provider>
-    </RoomLayout>
+      </RoomLayout>
+    </RoomContext.Provider>
   );
 };
 

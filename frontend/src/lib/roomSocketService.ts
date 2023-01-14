@@ -1,6 +1,7 @@
 import {
   CONNECT,
   REQ_ADD_TO_PLAYLIST,
+  REQ_ADD_VIDEO_ID_TO_PLAYLIST,
   REQ_JOIN_ROOM,
   REQ_PLAY_EXISTING_VIDEO,
   REQ_PLAY_NEW_VIDEO,
@@ -80,6 +81,10 @@ export const subscribeStreamEvent = (
     setPlaying(isPlaying);
     playerRef.current.seekTo(playedSeconds, 'seconds');
   });
+};
+
+export const addVideoIdToPlaylist = (socket: Socket, videoId: string): void => {
+  socket.emit(REQ_ADD_VIDEO_ID_TO_PLAYLIST, { videoId });
 };
 
 export const addToPlayList = (socket: Socket, videoInfo: VideoInfo): void => {

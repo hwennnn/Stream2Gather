@@ -4,6 +4,8 @@ import { Logo } from '@app/components/common/Logo';
 import { MeQueryKey } from '@app/constants/query';
 import { useAuth } from '@app/contexts/AuthContext';
 import { useLogoutMutation } from '@app/generated/graphql';
+import { addVideoIdToPlaylist } from '@app/lib/roomSocketService';
+import { useRoomContext } from '@app/pages/room/[slug]';
 import { queryClient } from '@app/pages/_app';
 import useRoomStore, {
   setCurrentVideoResultTab,
@@ -11,6 +13,7 @@ import useRoomStore, {
   VideoResultTab
 } from '@app/store/useRoomStore';
 import { resetUserSettings } from '@app/store/useUserSettingsStore';
+import { parseYoutubeUrl } from '@app/utils/parseYoutubeUrl';
 import { SearchIcon } from '@chakra-ui/icons';
 import {
   Avatar,
@@ -37,6 +40,7 @@ import router from 'next/router';
 import { FC, useState } from 'react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { RiMoonClearFill, RiSunLine } from 'react-icons/ri';
+import ReactPlayer from 'react-player';
 
 const UserMenu: FC = () => {
   const { user } = useAuth();
@@ -129,12 +133,21 @@ const InvitationButton: FC = () => {
 };
 
 const SearchBox: FC = () => {
+  const { socket } = useRoomContext();
   const [searchValue, setSearchValue] = useState('');
 
   const submitForm = (): void => {
     if (searchValue.length > 0) {
-      setSearchQuery(searchValue);
-      setCurrentVideoResultTab(VideoResultTab.SEARCH_RESULTS);
+      if (ReactPlayer.canPlay(searchValue)) {
+        const videoId = parseYoutubeUrl(searchValue);
+        if (videoId !== null) {
+          addVideoIdToPlaylist(socket, videoId);
+        }
+        setSearchValue('');
+      } else {
+        setSearchQuery(searchValue);
+        setCurrentVideoResultTab(VideoResultTab.SEARCH_RESULTS);
+      }
     }
   };
 

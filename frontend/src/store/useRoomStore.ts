@@ -38,8 +38,6 @@ interface RoomState {
   activeMembers: RoomMember[];
   invitationCode?: string | null;
 
-  isMuted: boolean;
-  volume: number;
   duration: number;
 
   // Room Info
@@ -61,8 +59,6 @@ interface RoomState {
     resetRoom: () => void;
     setRoomJoiningStatus: (status: RoomJoiningStatus) => void;
     setPlaying: (playing: boolean) => void;
-    setIsMuted: (isMuted: boolean) => void;
-    setVolume: (volume: number) => void;
 
     setPlayedSeconds: (playedSeconds: number) => void;
     setDuration: (duration: number) => void;
@@ -91,8 +87,6 @@ const initialRoomData = {
   isTemporary: true,
   isPublic: false,
   activeMembers: [],
-  isMuted: true,
-  volume: 100,
   duration: 0,
   playing: false,
   playedSeconds: 0,
@@ -143,8 +137,6 @@ const useRoomStore = create<RoomState>()((set) => ({
       }),
     setRoomJoiningStatus: (status) => set({ status }),
     setPlaying: (playing) => set({ playing }),
-    setIsMuted: (isMuted) => set({ isMuted }),
-    setVolume: (volume) => set({ volume }),
     setPlayedSeconds: (playedSeconds) => set({ playedSeconds }),
     setDuration: (duration) => set({ duration }),
     setPlayingIndex: (playingIndex) => set({ playingIndex }),
@@ -196,8 +188,6 @@ export const {
   resetRoom,
   setRoomJoiningStatus,
   setPlaying,
-  setIsMuted,
-  setVolume,
   setPlayedSeconds,
   setDuration,
   setPlayingIndex,

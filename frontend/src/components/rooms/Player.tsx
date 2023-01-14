@@ -10,6 +10,7 @@ import useRoomStore, {
   setPlayedSeconds,
   setPlaying
 } from '@app/store/useRoomStore';
+import useUserSettingsStore from '@app/store/useUserSettingsStore';
 import { Box, SlideFade } from '@chakra-ui/react';
 import dynamic from 'next/dynamic';
 import { FC, useRef, useState } from 'react';
@@ -24,14 +25,20 @@ const ReactPlayer = dynamic(
 
 export const Player: FC = () => {
   const { socket } = useRoomContext();
-  const { playing, isMuted, volume } = useRoomStore(
+  const { playing } = useRoomStore(
     (state) => ({
-      playing: state.playing,
-      isMuted: state.isMuted,
-      volume: state.volume
+      playing: state.playing
     }),
     shallow
   );
+  const { volume, isMuted } = useUserSettingsStore(
+    (state) => ({
+      volume: state.volume,
+      isMuted: state.isMuted
+    }),
+    shallow
+  );
+
   const [hasPlayed, setHasPlayed] = useState(false);
 
   const { currentVideo } = useRoomStore(

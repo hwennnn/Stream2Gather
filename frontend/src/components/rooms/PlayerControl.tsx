@@ -2,11 +2,13 @@ import { getFormattedTime } from '@app/helpers/time-helper';
 import { emitStreamEvent, StreamEvent } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore, {
-  setIsMuted,
   setPlayedSeconds,
-  setPlaying,
-  setVolume
+  setPlaying
 } from '@app/store/useRoomStore';
+import useUserSettingsStore, {
+  setVolume,
+  toggleMutedMode
+} from '@app/store/useUserSettingsStore';
 import {
   Box,
   Flex,
@@ -38,13 +40,19 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
   const { socket } = useRoomContext();
   const [isVolumeHovered, setIsVolumeHovered] = useState(false);
 
-  const { playing, isMuted, volume, playedSeconds, duration } = useRoomStore(
+  const { playing, playedSeconds, duration } = useRoomStore(
     (state) => ({
       playing: state.playing,
-      isMuted: state.isMuted,
-      volume: state.volume,
       playedSeconds: state.playedSeconds,
       duration: state.duration
+    }),
+    shallow
+  );
+
+  const { volume, isMuted } = useUserSettingsStore(
+    (state) => ({
+      volume: state.volume,
+      isMuted: state.isMuted
     }),
     shallow
   );
@@ -143,7 +151,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
             }, 200);
           }}
         >
-          <Box onClick={() => setIsMuted(!isMuted)} cursor="pointer">
+          <Box onClick={() => toggleMutedMode()} cursor="pointer">
             {!isMuted && volume > 0 ? (
               <BsVolumeUpFill color={'white'} size={32} />
             ) : (
@@ -161,7 +169,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
             defaultValue={100}
             onChange={(value) => {
               if (value > 0 && isMuted) {
-                setIsMuted(false);
+                toggleMutedMode();
               }
               setVolume(value);
             }}

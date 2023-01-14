@@ -232,13 +232,15 @@ export type VideoInfo = {
 
 export type ActiveMemberFragment = { __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null };
 
-export type FullRoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null }> };
+export type FullRoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, members?: Array<{ __typename?: 'User', id: string, username: string, displayPhoto?: string | null }> | null, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null }> };
 
 export type MessageItemFragment = { __typename?: 'Message', id: string, creatorId: string, content: string, createdAt: string, updatedAt: string };
 
 export type RegularErrorFragment = { __typename?: 'FieldError', field: string, message: string };
 
 export type RoomItemFragment = { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string };
+
+export type RoomMemberFragment = { __typename?: 'User', id: string, username: string, displayPhoto?: string | null };
 
 export type UserItemFragment = { __typename?: 'User', id: string, username: string, email?: string | null, displayPhoto?: string | null, createdAt: string, updatedAt: string };
 
@@ -290,7 +292,7 @@ export type RoomQueryVariables = Exact<{
 }>;
 
 
-export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null }> } | null };
+export type RoomQuery = { __typename?: 'Query', room?: { __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, members?: Array<{ __typename?: 'User', id: string, username: string, displayPhoto?: string | null }> | null, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null }> } | null };
 
 export type RoomMessagesQueryVariables = Exact<{
   slug: Scalars['String'];
@@ -302,7 +304,7 @@ export type RoomMessagesQuery = { __typename?: 'Query', roomMessages?: Array<{ _
 export type RoomsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type RoomsQuery = { __typename?: 'Query', rooms: Array<{ __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null }> }> };
+export type RoomsQuery = { __typename?: 'Query', rooms: Array<{ __typename?: 'Room', id: string, slug: string, isActive: boolean, isTemporary: boolean, isPublic: boolean, invitationCode?: string | null, creatorId: string, roomInfo: { __typename?: 'RoomInfo', playingIndex: number, isPlaying: boolean, playedSeconds: number, playedTimestampUpdatedAt: string, playlist: Array<{ __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string }>, currentVideo: { __typename?: 'VideoInfo', id: string, platform: string, title: string, author: string, url: string, thumbnailUrl: string } }, members?: Array<{ __typename?: 'User', id: string, username: string, displayPhoto?: string | null }> | null, activeMembers: Array<{ __typename?: 'RoomMember', uid: string, username: string, socketId: string, roomId: string, displayPhoto?: string | null }> }> };
 
 export type SearchYoutubeVideosQueryVariables = Exact<{
   keyword: Scalars['String'];
@@ -351,6 +353,13 @@ export const VideoItemFragmentDoc = `
   thumbnailUrl
 }
     `;
+export const RoomMemberFragmentDoc = `
+    fragment RoomMember on User {
+  id
+  username
+  displayPhoto
+}
+    `;
 export const ActiveMemberFragmentDoc = `
     fragment ActiveMember on RoomMember {
   uid
@@ -375,12 +384,16 @@ export const FullRoomItemFragmentDoc = `
     playedSeconds
     playedTimestampUpdatedAt
   }
+  members {
+    ...RoomMember
+  }
   activeMembers {
     ...ActiveMember
   }
 }
     ${RoomItemFragmentDoc}
 ${VideoItemFragmentDoc}
+${RoomMemberFragmentDoc}
 ${ActiveMemberFragmentDoc}`;
 export const MessageItemFragmentDoc = `
     fragment MessageItem on Message {

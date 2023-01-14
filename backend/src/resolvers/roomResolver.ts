@@ -62,7 +62,10 @@ export class RoomResolver {
   async room(@Arg('slug') slug: string): Promise<Room | null> {
     try {
       return await Room.findOne({
-        where: { slug }
+        where: { slug },
+        relations: {
+          members: true
+        }
       });
     } catch (err) {
       console.log(err);

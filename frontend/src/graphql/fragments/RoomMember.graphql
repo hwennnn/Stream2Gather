@@ -1,0 +1,5 @@
+fragment RoomMember on User {
+  id
+  username
+  displayPhoto
+}

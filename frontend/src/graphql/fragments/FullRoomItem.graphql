@@ -12,6 +12,9 @@ fragment FullRoomItem on Room {
     playedSeconds
     playedTimestampUpdatedAt
   }
+  members {
+    ...RoomMember
+  }
   activeMembers {
     ...ActiveMember
   }

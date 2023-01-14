@@ -3,6 +3,7 @@ import {
   MessageItemFragment,
   RoomInfo,
   RoomMember,
+  RoomMemberFragment,
   VideoInfo
 } from '@app/generated/graphql';
 import create from 'zustand';
@@ -32,10 +33,12 @@ interface RoomState {
   roomSlug: string;
   status: RoomJoiningStatus;
 
+  membersMap: Map<string, RoomMemberFragment>;
+  activeMembers: RoomMember[];
+
   isActive: boolean;
   isPublic: boolean;
   isTemporary: boolean;
-  activeMembers: RoomMember[];
   invitationCode?: string | null;
 
   duration: number;
@@ -86,6 +89,7 @@ const initialRoomData = {
   isActive: true,
   isTemporary: true,
   isPublic: false,
+  membersMap: new Map<string, RoomMemberFragment>(),
   activeMembers: [],
   duration: 0,
   playing: false,
@@ -103,8 +107,18 @@ const useRoomStore = create<RoomState>()((set) => ({
   ...initialRoomData,
   actions: {
     setRoom: (data: FullRoomItemFragment) => {
+      const members = data.members;
+      const membersMap = new Map<string, RoomMemberFragment>();
+
+      if (members !== null && members !== undefined) {
+        for (const member of members) {
+          membersMap.set(member.id, member);
+        }
+      }
+
       const roomInfo = data.roomInfo;
       set({
+        membersMap,
         roomId: data.id,
         roomSlug: data.slug,
         isActive: data.isActive,
@@ -144,8 +158,18 @@ const useRoomStore = create<RoomState>()((set) => ({
     setCurrentVideo: (currentVideo) => set({ currentVideo }),
     addActiveMember: (member) =>
       set((state) => {
+        const roomMember: RoomMemberFragment = {
+          id: member.uid,
+          username: member.username,
+          displayPhoto: member.displayPhoto
+        };
+        const membersMap = new Map(state.membersMap).set(
+          member.uid,
+          roomMember
+        );
+
         const activeMembers = [...state.activeMembers, member];
-        return { activeMembers };
+        return { activeMembers, membersMap };
       }),
     removeActiveMember: (socketId) =>
       set((state) => {

@@ -195,7 +195,7 @@ const PlayerControl: FC<PlayerControlProps> = ({ playerRef }) => {
 
         <Spacer />
 
-        <Box onClick={toggleTheatreMode} cursor="pointer">
+        <Box onClick={() => toggleTheatreMode()} cursor="pointer">
           {isTheatreMode ? (
             <TbSquare color={'white'} size={24} />
           ) : (

@@ -1,4 +1,5 @@
 import create from 'zustand';
+import { devtools, persist } from 'zustand/middleware';
 
 interface UserSettingsState {
   isTheatreMode: boolean;
@@ -15,69 +16,44 @@ interface UserSettingsState {
 
 const initialUserSettingsData = {
   isTheatreMode: false,
-  isMuted: true,
+  isMuted: false,
   volume: 100
 };
 
-const useUserSettingsStore = create<UserSettingsState>()((set) => ({
-  ...initialUserSettingsData,
-  actions: {
-    toggleTheatreMode: () => {
-      set((state) => {
-        return {
-          isTheatreMode: !state.isTheatreMode
-        };
-      });
-    },
-    toggleMutedMode: () => {
-      set((state) => {
-        return {
-          isMuted: !state.isMuted
-        };
-      });
-    },
-    setVolume: (volume: number) => {
-      set({
-        volume
-      });
-    },
-    resetUserSettings: () => {
-      set(initialUserSettingsData);
-    }
-  }
-}));
-
-// const useUserSettingsStore = create<UserSettingsState>()(
-//   devtools(
-//     persist((set) => ({
-//       ...initialUserSettingsData,
-//       actions: {
-//         toggleTheatreMode: () => {
-//           set((state) => {
-//             return {
-//               isTheatreMode: !state.isTheatreMode
-//             };
-//           });
-//         },
-//         toggleMutedMode: () => {
-//           set((state) => {
-//             return {
-//               isMuted: !state.isMuted
-//             };
-//           });
-//         },
-//         setVolume: (volume: number) => {
-//           set({
-//             volume
-//           });
-//         },
-//         resetUserSettings: () => {
-//           set(initialUserSettingsData);
-//         }
-//       }
-//     }))
-//   )
-// );
+const useUserSettingsStore = create<UserSettingsState>()(
+  devtools(
+    persist(
+      (set) => ({
+        ...initialUserSettingsData,
+        actions: {
+          toggleTheatreMode: () => {
+            set((state) => {
+              return {
+                isTheatreMode: !state.isTheatreMode
+              };
+            });
+          },
+          toggleMutedMode: () => {
+            set((state) => {
+              return {
+                isMuted: !state.isMuted
+              };
+            });
+          },
+          setVolume: (volume: number) => {
+            set({
+              volume
+            });
+          },
+          resetUserSettings: () => {
+            set(initialUserSettingsData);
+          }
+        }
+      }),
+      { name: 'user-settings' }
+    )
+  )
+);
 
 export const {
   toggleTheatreMode,

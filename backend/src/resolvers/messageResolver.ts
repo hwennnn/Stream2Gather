@@ -1,3 +1,7 @@
+import { Message } from '@src/entities/Message';
+import { isAuth } from '@src/middleware/isAuth';
+import { FieldError } from '@src/resolvers/types';
+import { MyContext } from '@src/types';
 import {
   Arg,
   Ctx,
@@ -8,10 +12,6 @@ import {
   Resolver,
   UseMiddleware
 } from 'type-graphql';
-import { Message } from '../entities/Message';
-import { isAuth } from '../middleware/isAuth';
-import { FieldError } from '../resolvers/types';
-import { MyContext } from '../types';
 
 @ObjectType()
 class MessageResponse {

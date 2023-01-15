@@ -1,7 +1,7 @@
+import { RES_MEMBER_LEFT } from '@src/constants/socket';
+import RedisHelper from '@src/utils/redisHelper';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
 import { Socket } from 'socket.io';
-import { RES_MEMBER_LEFT } from '../constants/socket';
-import RedisHelper from '../utils/redisHelper';
-import RedisRoomHelper from '../utils/redisRoomHelper';
 
 type DisconnectFunction = () => Promise<void>;
 

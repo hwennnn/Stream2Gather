@@ -1,7 +1,7 @@
 import 'dotenv-safe/config';
 import 'reflect-metadata';
 
-import { ApiServer } from './server';
+import { ApiServer } from '@src/server';
 
 const apiServer = new ApiServer();
 apiServer.initialize().catch((err) => {

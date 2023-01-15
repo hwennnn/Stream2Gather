@@ -1,3 +1,12 @@
+import initApolloServer from '@src/apollo';
+import { isProd } from '@src/constants/config';
+import initializeDB from '@src/db/initializeDb';
+import errorRouter from '@src/routes/404';
+import authRouter from '@src/routes/authRouter';
+import router from '@src/routes/routes';
+import sessionOptions from '@src/session/session';
+import setUpIo from '@src/socket';
+import { initializeFirebase } from '@src/utils/initializeFirebase';
 import cors, { CorsOptions } from 'cors';
 import express from 'express';
 import session from 'express-session';
@@ -5,15 +14,6 @@ import helmet from 'helmet';
 import { createServer, Server } from 'http';
 import Redis from 'ioredis';
 import { Server as SocketServer } from 'socket.io';
-import initApolloServer from './apollo';
-import { isProd } from './constants/config';
-import initializeDB from './db/initializeDb';
-import errorRouter from './routes/404';
-import authRouter from './routes/authRouter';
-import router from './routes/routes';
-import sessionOptions from './session/session';
-import setUpIo from './socket';
-import { initializeFirebase } from './utils/initializeFirebase';
 
 export const corsOptions: CorsOptions = {
   origin: process.env.CORS_ORIGIN,

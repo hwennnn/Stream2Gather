@@ -1,8 +1,8 @@
+import { RES_NEW_MESSAGE } from '@src/constants/socket';
+import { Message } from '@src/entities/Message';
+import RedisHelper from '@src/utils/redisHelper';
 import BadWords from 'bad-words';
 import { Socket } from 'socket.io';
-import { Message } from '../entities/Message';
-import RedisHelper from '../utils/redisHelper';
-import { RES_NEW_MESSAGE } from './../constants/socket';
 
 type SendMessageFunction = ({ content }: { content: string }) => Promise<void>;
 

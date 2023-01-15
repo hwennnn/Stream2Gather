@@ -1,11 +1,11 @@
-import { decode } from 'html-entities';
-import BaseApi from '../lib/baseApi';
-import { VideoInfo, VideoPlatform } from '../models/RedisModel';
 import {
   queryYoutubeTrendingVideosURL,
   queryYoutubeVideoInfoURL,
   queryYoutubeVideoSearchURL
-} from './../constants/videos';
+} from '@src/constants/videos';
+import BaseApi from '@src/lib/baseApi';
+import { VideoInfo, VideoPlatform } from '@src/models/RedisModel';
+import { decode } from 'html-entities';
 
 class VideoInfoApi extends BaseApi {
   async getYoutubeVideoInfo(videoId: string): Promise<VideoInfo | null> {

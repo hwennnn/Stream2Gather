@@ -1,9 +1,8 @@
+import { RoomInfoType } from '@src/constants/rooms';
+import { RES_ROOM_INFO } from '@src/constants/socket';
+import { VideoInfo } from '@src/models/RedisModel';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
 import { Socket } from 'socket.io';
-import { RoomInfoType } from '../constants/rooms';
-import { RES_ROOM_INFO } from '../constants/socket';
-import { VideoInfo } from '../models/RedisModel';
-
-import RedisRoomHelper from '../utils/redisRoomHelper';
 
 type PlayNewVideoFunction = ({
   videoInfo

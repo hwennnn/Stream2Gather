@@ -1,6 +1,6 @@
+import videoInfoApi from '@src/lib/videoInfoApi';
+import { VideoInfo } from '@src/models/RedisModel';
 import { Arg, Query, Resolver } from 'type-graphql';
-import videoInfoApi from '../lib/videoInfoApi';
-import { VideoInfo } from './../models/RedisModel';
 
 @Resolver(VideoInfo)
 export class VideoInfoResolver {

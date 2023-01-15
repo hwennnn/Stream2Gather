@@ -1,6 +1,6 @@
+import { RoomInfo, RoomMember } from '@src/models/RedisModel';
+import RedisHelper from '@src/utils/redisHelper';
 import shortid from 'shortid';
-import { RoomInfo, RoomMember } from '../models/RedisModel';
-import RedisHelper from './redisHelper';
 
 enum RoomTable {
   ROOM_INFO = 'room_info'

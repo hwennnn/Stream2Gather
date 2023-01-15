@@ -1,10 +1,4 @@
-import { Socket } from 'socket.io';
-import { ROOM_MAX_LIMIT } from '../constants/config';
-import { Room } from '../entities/Room';
-import { User } from '../entities/User';
-import { RoomMember } from '../models/RedisModel';
-import RedisHelper from '../utils/redisHelper';
-import RedisRoomHelper from '../utils/redisRoomHelper';
+import { ROOM_MAX_LIMIT } from '@src/constants/config';
 import {
   RES_JOINED_ROOM,
   RES_JOIN_ROOM_FAILED,
@@ -14,7 +8,13 @@ import {
   RES_ROOM_DOES_NOT_EXIST,
   RES_ROOM_INACTIVE,
   RES_ROOM_NO_PERMISSION
-} from './../constants/socket';
+} from '@src/constants/socket';
+import { Room } from '@src/entities/Room';
+import { User } from '@src/entities/User';
+import { RoomMember } from '@src/models/RedisModel';
+import RedisHelper from '@src/utils/redisHelper';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
+import { Socket } from 'socket.io';
 
 type JoinRoomFunction = ({
   uid,

@@ -1,3 +1,9 @@
+import { COOKIE_NAME } from '@src/constants/config';
+import { User } from '@src/entities/User';
+import { isAuth } from '@src/middleware/isAuth';
+import { FieldError } from '@src/resolvers/types';
+import { MyContext } from '@src/types';
+import { verifyFirebaseToken } from '@src/utils/verifyFirebaseToken';
 import {
   Arg,
   Ctx,
@@ -11,12 +17,7 @@ import {
   Root,
   UseMiddleware
 } from 'type-graphql';
-import { COOKIE_NAME } from '../constants/config';
-import { User } from '../entities/User';
-import { isAuth } from '../middleware/isAuth';
-import { MyContext } from '../types';
-import { verifyFirebaseToken } from '../utils/verifyFirebaseToken';
-import { FieldError } from './types';
+
 @InputType()
 class RegisterInput {
   @Field()

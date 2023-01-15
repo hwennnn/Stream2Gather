@@ -1,9 +1,8 @@
+import { RoomInfoType } from '@src/constants/rooms';
+import { RES_ROOM_INFO } from '@src/constants/socket';
+import videoInfoApi from '@src/lib/videoInfoApi';
+import RedisRoomHelper from '@src/utils/redisRoomHelper';
 import { Socket } from 'socket.io';
-import { RoomInfoType } from '../constants/rooms';
-import { RES_ROOM_INFO } from '../constants/socket';
-
-import videoInfoApi from '../lib/videoInfoApi';
-import RedisRoomHelper from '../utils/redisRoomHelper';
 
 type AddVideoIdToPlaylistFunction = ({
   videoId

@@ -1,3 +1,4 @@
+import { Room } from '@src/entities/Room';
 import { Field, ObjectType } from 'type-graphql';
 import {
   BaseEntity,
@@ -8,7 +9,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
-import { Room } from './Room';
 
 @ObjectType()
 @Entity()

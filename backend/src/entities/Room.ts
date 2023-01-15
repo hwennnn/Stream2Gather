@@ -1,3 +1,6 @@
+import { Message } from '@src/entities/Message';
+import { User } from '@src/entities/User';
+import { RoomInfo, RoomMember } from '@src/models/RedisModel';
 import { Field, ObjectType } from 'type-graphql';
 import {
   BaseEntity,
@@ -11,9 +14,6 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn
 } from 'typeorm';
-import { Message } from '../entities/Message';
-import { RoomInfo, RoomMember } from '../models/RedisModel';
-import { User } from './User';
 
 @ObjectType()
 @Entity()

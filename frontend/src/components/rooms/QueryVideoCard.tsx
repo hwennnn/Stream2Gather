@@ -1,3 +1,4 @@
+import VideoPlatformLogo from '@app/components/rooms/VideoPlatformLogo';
 import { VideoInfo } from '@app/generated/graphql';
 import {
   Box,
@@ -72,33 +73,23 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({
           <Text
             color={useColorModeValue('gray.700', 'gray.50')}
             lineHeight={'shorter'}
-            fontSize={{ base: 'sm', lg: 'sm' }}
+            fontSize={{ base: 'sm' }}
             noOfLines={3}
           >
+            <VideoPlatformLogo platform={video.platform} />
             {video.title}
           </Text>
 
           <Text
             mt="2"
             color={useColorModeValue('gray.600', 'gray.200')}
-            fontSize={{ base: 'xs', lg: '11px' }}
+            fontSize={{ base: 'xs' }}
             noOfLines={1}
           >
             {video.author}
           </Text>
         </Box>
       </CardBody>
-
-      {/* <CardFooter px="0" pb="0" pt="2">
-          <Flex w="full" justify="space-between" flexWrap="wrap">
-            <Button onClick={onClickPlay} borderRadius="md" flex="1" mr="1">
-              <Icon w={6} h={6} as={BsFillPlayFill} />
-            </Button>
-            <Button onClick={onClickAdd} borderRadius="md" flex="1">
-              <Icon w={6} h={6} as={MdPlaylistAdd} />
-            </Button>
-          </Flex>
-        </CardFooter> */}
     </Card>
   );
 };

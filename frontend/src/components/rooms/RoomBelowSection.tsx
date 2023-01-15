@@ -30,11 +30,11 @@ export const RoomBelowSection: FC = () => {
           <Tab>Trending Videos</Tab>
           <Tab>Search Results</Tab>
         </TabList>
-        <TabPanels overflowY="scroll">
-          <TabPanel>
+        <TabPanels>
+          <TabPanel p={0}>
             <TrendingVideosSection />
           </TabPanel>
-          <TabPanel>
+          <TabPanel p={0}>
             <SearchResultSection />
           </TabPanel>
         </TabPanels>

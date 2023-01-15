@@ -6,7 +6,7 @@ import {
 } from '@app/generated/graphql';
 import { addToPlayList, playNewVideo } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
-import { Box, Button, Grid } from '@chakra-ui/react';
+import { Button, SimpleGrid, VStack } from '@chakra-ui/react';
 import { FC, useEffect, useState } from 'react';
 
 const showLimit = 9;
@@ -50,13 +50,13 @@ export const TrendingVideosSection: FC = () => {
   }
 
   return (
-    <Box>
-      <Grid
+    <VStack alignItems="start" p={0} spacing={10}>
+      <SimpleGrid
         pt={2}
-        templateColumns={{
-          base: 'repeat(2, 1fr)',
-          md: 'repeat(3, 1fr)',
-          xl: 'repeat(4, 1fr)'
+        columns={{
+          base: 2,
+          md: 3,
+          xl: 4
         }}
         gap={6}
       >
@@ -68,11 +68,11 @@ export const TrendingVideosSection: FC = () => {
             onClickPlay={() => onClickPlayVideo(video)}
           />
         ))}
-      </Grid>
+      </SimpleGrid>
 
-      <Button mt="10" onClick={() => setShowMore(!showMore)}>
+      <Button onClick={() => setShowMore(!showMore)}>
         {showMore ? 'Show Less' : 'Show More'}
       </Button>
-    </Box>
+    </VStack>
   );
 };

@@ -1,3 +1,4 @@
+import VideoPlatformLogo from '@app/components/rooms/VideoPlatformLogo';
 import { VideoInfo } from '@app/generated/graphql';
 import {
   playExistingVideo,
@@ -80,6 +81,7 @@ export const PlaylistCard: FC<VideoCardProps> = ({
             noOfLines={2}
             mr="1"
           >
+            <VideoPlatformLogo platform={video.platform} />
             {video.title}
           </Text>
           <Text

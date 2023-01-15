@@ -6,12 +6,10 @@ interface UserSettingsState {
   isMuted: boolean;
   volume: number;
 
-  actions: {
-    toggleTheatreMode: () => void;
-    toggleMutedMode: () => void;
-    setVolume: (volume: number) => void;
-    resetUserSettings: () => void;
-  };
+  toggleTheatreMode: () => void;
+  toggleMutedMode: () => void;
+  setVolume: (volume: number) => void;
+  resetUserSettings: () => void;
 }
 
 const initialUserSettingsData = {
@@ -25,29 +23,27 @@ const useUserSettingsStore = create<UserSettingsState>()(
     persist(
       (set) => ({
         ...initialUserSettingsData,
-        actions: {
-          toggleTheatreMode: () => {
-            set((state) => {
-              return {
-                isTheatreMode: !state.isTheatreMode
-              };
-            });
-          },
-          toggleMutedMode: () => {
-            set((state) => {
-              return {
-                isMuted: !state.isMuted
-              };
-            });
-          },
-          setVolume: (volume: number) => {
-            set({
-              volume
-            });
-          },
-          resetUserSettings: () => {
-            set(initialUserSettingsData);
-          }
+        toggleTheatreMode: () => {
+          set((state) => {
+            return {
+              isTheatreMode: !state.isTheatreMode
+            };
+          });
+        },
+        toggleMutedMode: () => {
+          set((state) => {
+            return {
+              isMuted: !state.isMuted
+            };
+          });
+        },
+        setVolume: (volume: number) => {
+          set({
+            volume
+          });
+        },
+        resetUserSettings: () => {
+          set(initialUserSettingsData);
         }
       }),
       { name: 'user-settings' }
@@ -60,6 +56,6 @@ export const {
   toggleMutedMode,
   setVolume,
   resetUserSettings
-} = useUserSettingsStore.getState().actions;
+} = useUserSettingsStore.getState();
 
 export default useUserSettingsStore;

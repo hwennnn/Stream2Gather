@@ -1,4 +1,5 @@
 import PlayerControl from '@app/components/rooms/PlayerControl';
+import { videoOverlayImageUrl } from '@app/constants/config';
 import {
   playNextVideo,
   startPlayingVideo,
@@ -105,7 +106,7 @@ export const Player: FC = () => {
     <Box
       ref={playerWrapperRef}
       position="relative"
-      pt={'56.25%'}
+      pt="56.25%"
       onMouseOver={() => {
         if (isHovered) return;
         setIsHovered(true);
@@ -164,13 +165,19 @@ export const Player: FC = () => {
 
       <SlideFade in={isHovered || !playing} offsetY="20px">
         <Box
+          position="absolute"
+          w="full"
+          bottom={0}
+          height="90px"
+          backgroundImage={videoOverlayImageUrl}
+        ></Box>
+        <Box
           px="4"
           w="full"
           position={'absolute'}
           left={0}
           bottom={0}
           right={0}
-          style={{ backgroundColor: 'rgba(1,1,1,0.005)' }}
         >
           <PlayerControl
             playerRef={playerRef}

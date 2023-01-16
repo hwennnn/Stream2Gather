@@ -4,7 +4,7 @@ import { useSearchYoutubeVideosQuery, VideoInfo } from '@app/generated/graphql';
 import { addToPlayList, playNewVideo } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
-import { Box, Button, SimpleGrid, Text, VStack } from '@chakra-ui/react';
+import { Box, Button, Flex, SimpleGrid, Text, VStack } from '@chakra-ui/react';
 import { FC, useEffect, useState } from 'react';
 import shallow from 'zustand/shallow';
 
@@ -60,17 +60,21 @@ export const SearchResultSection: FC = () => {
   }
 
   return (
-    <VStack alignItems="start" p={0} spacing={10}>
+    <VStack alignItems="start" p={0} spacing={5}>
       {searchQuery.length > 0 && (
-        <Text fontSize="lg">Search Result for {searchQuery}</Text>
+        <Flex>
+          <Text fontSize="md">Search Result for</Text>
+          <Text ml="1" as="b">
+            {searchQuery}
+          </Text>
+        </Flex>
       )}
 
       {isLoading ? (
-        <CircleLoading marginTop="10" />
+        <CircleLoading mt="10" alignSelf="center" />
       ) : (
         <>
           <SimpleGrid
-            pt={4}
             columns={{
               base: 2,
               md: 3,
@@ -88,7 +92,7 @@ export const SearchResultSection: FC = () => {
             ))}
           </SimpleGrid>
 
-          <Button mt="10" onClick={() => setShowMore(!showMore)}>
+          <Button onClick={() => setShowMore(!showMore)}>
             {showMore ? 'Show Less' : 'Show More'}
           </Button>
         </>

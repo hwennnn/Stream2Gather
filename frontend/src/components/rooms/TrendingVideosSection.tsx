@@ -46,13 +46,12 @@ export const TrendingVideosSection: FC = () => {
   };
 
   if (isLoading) {
-    return <CircleLoading />;
+    return <CircleLoading mt={10} />;
   }
 
   return (
-    <VStack alignItems="start" p={0} spacing={10}>
+    <VStack alignItems="start" p={0} spacing={5}>
       <SimpleGrid
-        pt={2}
         columns={{
           base: 2,
           md: 3,

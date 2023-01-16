@@ -74,7 +74,7 @@ export const QueryVideoCard: FC<QueryVideoCardProps> = ({
             color={useColorModeValue('gray.700', 'gray.50')}
             lineHeight={'shorter'}
             fontSize={{ base: 'sm' }}
-            noOfLines={3}
+            noOfLines={2}
           >
             <VideoPlatformLogo platform={video.platform} />
             {video.title}

@@ -17,7 +17,13 @@ const RoomLayout: FC<PropsWithChildren> = ({ children }) => {
 
       <RoomNavbar />
 
-      <Box mx="auto" width="100vw" maxWidth="120em" flex="1" mt="72px">
+      <Box
+        mx="auto"
+        width="calc(100vw - 32px)"
+        maxWidth="120em"
+        flex="1"
+        mt="72px"
+      >
         {children}
       </Box>
     </Flex>

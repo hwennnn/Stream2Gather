@@ -15,6 +15,9 @@ import { formatMsToMinutesSeconds } from '@app/utils/formatDatetime';
 import {
   Avatar,
   Box,
+  BoxProps,
+  Flex,
+  forwardRef,
   HStack,
   Input,
   InputGroup,
@@ -23,11 +26,13 @@ import {
   Tooltip,
   VStack
 } from '@chakra-ui/react';
-import { FC, useState } from 'react';
+import { FC, useRef, useState } from 'react';
 import { IoMdSend } from 'react-icons/io';
 import InfiniteScroll from 'react-infinite-scroll-component';
 
-const MessageComposer: FC = () => {
+const MessageComposer: FC<{
+  scrollToBottom: () => void;
+}> = ({ scrollToBottom }) => {
   const { socket } = useRoomContext();
   const [message, setMessage] = useState('');
 
@@ -35,6 +40,7 @@ const MessageComposer: FC = () => {
     if (message.length > 0) {
       sendMessage(socket, message);
       setMessage('');
+      scrollToBottom();
     }
   };
 
@@ -122,47 +128,53 @@ const MessageBox: FC<{
   );
 };
 
-const MessageList: FC<{
+interface MessageListProps {
   fetchMore: () => void;
-}> = ({ fetchMore }) => {
-  const { user } = useAuth();
-  const messages = useRoomStore((state) => state.messages);
-  const membersMap = useRoomStore((state) => state.membersMap);
-  const hasMoreMessages = useRoomStore((state) => state.hasMoreMessages);
+}
 
-  return (
-    <Box
-      id="scrollableDiv"
-      w="full"
-      overflow="auto"
-      display="flex"
-      flexDir="column-reverse"
-    >
-      <InfiniteScroll
-        dataLength={messages.length}
-        next={fetchMore}
-        style={{ display: 'flex', flexDirection: 'column-reverse' }} // To put endMessage and loader to the top.
-        inverse={true}
-        hasMore={hasMoreMessages}
-        loader={<Text alignSelf="center">Loading...</Text>}
-        scrollableTarget="scrollableDiv"
+const MessageList = forwardRef<BoxProps & MessageListProps, 'div'>(
+  (props, ref) => {
+    const { user } = useAuth();
+    const messages = useRoomStore((state) => state.messages);
+    const membersMap = useRoomStore((state) => state.membersMap);
+    const hasMoreMessages = useRoomStore((state) => state.hasMoreMessages);
+
+    return (
+      <Box
+        id="scrollableDiv"
+        w="full"
+        overflow="auto"
+        display="flex"
+        flexDir="column-reverse"
       >
-        {messages.map((message, index) => (
-          <MessageBox
-            key={index}
-            message={message}
-            isOwn={message.creatorId === user?.id}
-            member={membersMap.get(message.creatorId)}
-          />
-        ))}
-      </InfiniteScroll>
-    </Box>
-  );
-};
+        <InfiniteScroll
+          dataLength={messages.length}
+          next={props.fetchMore}
+          style={{ display: 'flex', flexDirection: 'column-reverse' }} // To put endMessage and loader to the top.
+          inverse={true}
+          hasMore={hasMoreMessages}
+          loader={<Text alignSelf="center">Loading...</Text>}
+          scrollableTarget="scrollableDiv"
+        >
+          <Box ref={ref}></Box>
+          {messages.map((message, index) => (
+            <MessageBox
+              key={index}
+              message={message}
+              isOwn={message.creatorId === user?.id}
+              member={membersMap.get(message.creatorId)}
+            />
+          ))}
+        </InfiniteScroll>
+      </Box>
+    );
+  }
+);
 
 export const RoomChatTab: FC = () => {
   const roomId = useRoomStore.getState().roomId;
 
+  const bottomRef = useRef<any>(null);
   const { isLoading, fetchNextPage } = useInfiniteRoomMessagesQuery(
     'skip',
     {
@@ -191,15 +203,24 @@ export const RoomChatTab: FC = () => {
     }
   };
 
+  const scrollToBottomSection = (): void => {
+    bottomRef.current.scrollIntoView({
+      block: 'nearest',
+      inline: 'start'
+    });
+  };
+
   return (
     <VStack h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
       {isLoading ? (
         <CircleLoading h="full" justifySelf="center" alignSelf="center" />
       ) : (
         <>
-          <MessageList fetchMore={fetchMoreMessages} />
+          <Flex flex={1} flexDir="column" w="full" overflowY="hidden">
+            <MessageList ref={bottomRef} fetchMore={fetchMoreMessages} />
+          </Flex>
 
-          <MessageComposer />
+          <MessageComposer scrollToBottom={scrollToBottomSection} />
         </>
       )}
     </VStack>

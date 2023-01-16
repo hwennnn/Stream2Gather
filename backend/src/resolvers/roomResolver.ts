@@ -1,4 +1,3 @@
-import { Message } from '@src/entities/Message';
 import { Room } from '@src/entities/Room';
 import { User } from '@src/entities/User';
 import { isAuth } from '@src/middleware/isAuth';
@@ -72,31 +71,6 @@ export class RoomResolver {
     }
 
     return null;
-  }
-
-  @Query(() => [Message], { nullable: true })
-  async roomMessages(
-    @Arg('slug') slug: string
-  ): Promise<Message[] | undefined> {
-    try {
-      const room = await Room.findOne({
-        where: { slug },
-        relations: {
-          messages: true
-        },
-        order: {
-          messages: {
-            createdAt: 'ASC'
-          }
-        }
-      });
-
-      return room?.messages;
-    } catch (err) {
-      console.log(err);
-    }
-
-    return undefined;
   }
 
   @Query(() => [Room])

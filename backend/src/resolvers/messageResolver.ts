@@ -7,8 +7,10 @@ import {
   Ctx,
   Field,
   InputType,
+  Int,
   Mutation,
   ObjectType,
+  Query,
   Resolver,
   UseMiddleware
 } from 'type-graphql';
@@ -65,5 +67,28 @@ export class MessageResolver {
         }
       ]
     };
+  }
+
+  @Query(() => [Message], { nullable: true })
+  async roomMessages(
+    @Arg('roomId') roomId: string,
+    @Arg('skip', () => Int) skip: number
+  ): Promise<Message[] | undefined> {
+    try {
+      const messages = await Message.find({
+        where: { room: { id: roomId } },
+        order: {
+          createdAt: 'DESC'
+        },
+        take: 25,
+        skip
+      });
+
+      return messages;
+    } catch (err) {
+      console.log(err);
+    }
+
+    return undefined;
   }
 }

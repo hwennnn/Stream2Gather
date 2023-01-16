@@ -8,8 +8,8 @@ export const RoomMembersTab: FC = () => {
   return (
     <>
       <VStack mx={1} alignItems="flex-start" spacing={4}>
-        {activeMembers.map((member) => (
-          <HStack key={member.uid}>
+        {activeMembers.map((member, index) => (
+          <HStack key={`${index}${member.uid}`}>
             <Avatar
               name={member?.username}
               size={'sm'}

@@ -3,7 +3,7 @@ import { CircleLoading } from '@app/components/common/loading/CircleLoading';
 import { useAuth } from '@app/contexts/AuthContext';
 import {
   RoomMemberFragment,
-  useRoomMessagesQuery
+  useInfiniteRoomMessagesQuery
 } from '@app/generated/graphql';
 import { sendMessage } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
@@ -15,7 +15,6 @@ import { formatMsToMinutesSeconds } from '@app/utils/formatDatetime';
 import {
   Avatar,
   Box,
-  Flex,
   HStack,
   Input,
   InputGroup,
@@ -24,8 +23,9 @@ import {
   Tooltip,
   VStack
 } from '@chakra-ui/react';
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useState } from 'react';
 import { IoMdSend } from 'react-icons/io';
+import InfiniteScroll from 'react-infinite-scroll-component';
 
 const MessageComposer: FC = () => {
   const { socket } = useRoomContext();
@@ -53,7 +53,7 @@ const MessageComposer: FC = () => {
             onChange={(event) => {
               setMessage(event.target.value);
             }}
-            fontSize="lg"
+            fontSize={{ base: 'sm', md: 'md' }}
             maxLength={128}
             size="lg"
             placeholder="Enter a message"
@@ -74,7 +74,7 @@ const MessageBox: FC<{
   member: RoomMemberFragment | undefined;
 }> = ({ message, isOwn, member }) => {
   return (
-    <HStack w="full">
+    <HStack px="1" mt="3" w="full">
       {!isOwn && (
         <Tooltip
           hasArrow
@@ -109,67 +109,99 @@ const MessageBox: FC<{
             roundedTopLeft={!isOwn ? 0 : 'auto'}
             roundedBottomLeft={!isOwn ? 18 : 'auto'}
           >
-            <Text color={isOwn ? 'white' : 'black'}>{message.content}</Text>
+            <Text
+              fontSize={{ base: 'sm', md: 'md' }}
+              color={isOwn ? 'white' : 'black'}
+            >
+              {message.content}
+            </Text>
           </Box>
         </Tooltip>
-        {/* <Text mt="0.5" fontSize="xx-small">
-          {formatMsToMinutesSeconds(message.createdAt)}
-        </Text> */}
       </VStack>
     </HStack>
   );
 };
 
-const MessageList: FC = () => {
+const MessageList: FC<{
+  fetchMore: () => void;
+}> = ({ fetchMore }) => {
   const { user } = useAuth();
   const messages = useRoomStore((state) => state.messages);
   const membersMap = useRoomStore((state) => state.membersMap);
-
-  const bottomRef = useRef<any>(null);
-
-  useEffect(() => {
-    const { scrollX, scrollY } = window;
-
-    bottomRef.current?.scrollIntoView();
-
-    window.scrollTo(scrollX, scrollY);
-  }, [messages]);
+  const hasMoreMessages = useRoomStore((state) => state.hasMoreMessages);
 
   return (
-    <VStack w="full" px={1} spacing={4}>
-      {messages.map((message) => (
-        <MessageBox
-          key={message.id}
-          message={message}
-          isOwn={message.creatorId === user?.id}
-          member={membersMap.get(message.creatorId)}
-        />
-      ))}
-      <Box ref={bottomRef} />
-    </VStack>
+    <Box
+      id="scrollableDiv"
+      w="full"
+      overflow="auto"
+      display="flex"
+      flexDir="column-reverse"
+    >
+      <InfiniteScroll
+        dataLength={messages.length}
+        next={fetchMore}
+        style={{ display: 'flex', flexDirection: 'column-reverse' }} // To put endMessage and loader to the top.
+        inverse={true}
+        hasMore={hasMoreMessages}
+        loader={<Text alignSelf="center">Loading...</Text>}
+        scrollableTarget="scrollableDiv"
+      >
+        {messages.map((message, index) => (
+          <MessageBox
+            key={index}
+            message={message}
+            isOwn={message.creatorId === user?.id}
+            member={membersMap.get(message.creatorId)}
+          />
+        ))}
+      </InfiniteScroll>
+    </Box>
   );
 };
 
 export const RoomChatTab: FC = () => {
-  const slug = useRoomStore.getState().roomSlug;
+  const roomId = useRoomStore.getState().roomId;
 
-  const { isLoading } = useRoomMessagesQuery(
-    { slug },
+  const { isLoading, fetchNextPage } = useInfiniteRoomMessagesQuery(
+    'skip',
+    {
+      skip: 0,
+      roomId
+    },
     {
       onSuccess(data) {
-        setRoomMessages(data.roomMessages as RoomMessage[]);
+        const { pages: allMessages } = data;
+        const latestIndex = allMessages.length - 1;
+        const latestMessages = allMessages[latestIndex].roomMessages;
+
+        setRoomMessages(latestMessages as RoomMessage[]);
       }
     }
   );
 
-  if (isLoading) return <CircleLoading />;
+  const fetchMoreMessages = async (): Promise<void> => {
+    const hasMoreMessages = useRoomStore.getState().hasMoreMessages;
+    const totalMessages = useRoomStore.getState().messages.length;
+
+    if (hasMoreMessages) {
+      await fetchNextPage({
+        pageParam: totalMessages
+      });
+    }
+  };
 
   return (
     <VStack h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
-      <Flex w="full" flexDirection="column" overflowY="scroll" flex={1}>
-        <MessageList />
-      </Flex>
-      <MessageComposer />
+      {isLoading ? (
+        <CircleLoading h="full" justifySelf="center" alignSelf="center" />
+      ) : (
+        <>
+          <MessageList fetchMore={fetchMoreMessages} />
+
+          <MessageComposer />
+        </>
+      )}
     </VStack>
   );
 };

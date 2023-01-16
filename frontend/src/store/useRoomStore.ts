@@ -56,6 +56,7 @@ interface RoomState {
   currentVideoResultTab: VideoResultTab;
 
   messages: RoomMessage[];
+  hasMoreMessages: boolean;
 
   actions: {
     setRoom: (data: FullRoomItemFragment) => void;
@@ -100,7 +101,8 @@ const initialRoomData = {
   currentVideo: undefined,
   searchQuery: '',
   currentVideoResultTab: VideoResultTab.TRENDING_VIDEOS,
-  messages: []
+  messages: [],
+  hasMoreMessages: true
 };
 
 const useRoomStore = create<RoomState>()((set) => ({
@@ -135,13 +137,18 @@ const useRoomStore = create<RoomState>()((set) => ({
       });
     },
     setRoomMessages: (messages: RoomMessage[]) => {
-      set({
-        messages
+      set((state) => {
+        const hasMoreMessages = messages.length === 25;
+        const newMessages = state.messages.concat(messages);
+        return {
+          messages: newMessages,
+          hasMoreMessages
+        };
       });
     },
     pushRoomMessage: (m: RoomMessage) => {
       set((state) => {
-        const messages = [...state.messages, m];
+        const messages = [m, ...state.messages];
         return { messages };
       });
     },

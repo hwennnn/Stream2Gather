@@ -1,5 +1,5 @@
-query RoomMessages($slug: String!) {
-  roomMessages(slug: $slug) {
+query RoomMessages($roomId: String!, $skip: Int!) {
+  roomMessages(roomId: $roomId, skip: $skip) {
     ...MessageItem
   }
 }

@@ -21,6 +21,7 @@ import {
   InputGroup,
   InputRightElement,
   Text,
+  Tooltip,
   VStack
 } from '@chakra-ui/react';
 import { FC, useEffect, useRef, useState } from 'react';
@@ -74,38 +75,46 @@ const MessageBox: FC<{
 }> = ({ message, isOwn, member }) => {
   return (
     <HStack w="full">
-      {
-        !isOwn && (
+      {!isOwn && (
+        <Tooltip
+          hasArrow
+          label={member?.username}
+          aria-label="Tooltip for message"
+        >
           <Avatar
             alignSelf="start"
             name={member?.username ?? 'Deleted User'}
             size={'sm'}
             src={member?.displayPhoto ?? undefined}
           />
-        )
-        // <Text>{member.username}</Text>
-      }
+        </Tooltip>
+      )}
       <VStack
         w="full"
         flexDirection="column"
         alignItems={isOwn ? 'flex-end' : 'flex-start'}
       >
-        <Box
-          maxW="70%"
-          px="4"
-          py="2"
-          backgroundColor={isOwn ? 'secondary' : 'gray.200'}
-          rounded={20}
-          roundedTopRight={isOwn ? 0 : 'auto'}
-          roundedBottomRight={isOwn ? 18 : 'auto'}
-          roundedTopLeft={!isOwn ? 0 : 'auto'}
-          roundedBottomLeft={!isOwn ? 18 : 'auto'}
+        <Tooltip
+          label={formatMsToMinutesSeconds(message.createdAt)}
+          aria-label="Tooltip for message"
         >
-          <Text color={isOwn ? 'white' : 'black'}>{message.content}</Text>
-        </Box>
-        <Text mt="0.5" fontSize="xs">
+          <Box
+            maxW="70%"
+            px="3"
+            py="2"
+            backgroundColor={isOwn ? 'secondary' : 'gray.200'}
+            rounded={20}
+            roundedTopRight={isOwn ? 0 : 'auto'}
+            roundedBottomRight={isOwn ? 18 : 'auto'}
+            roundedTopLeft={!isOwn ? 0 : 'auto'}
+            roundedBottomLeft={!isOwn ? 18 : 'auto'}
+          >
+            <Text color={isOwn ? 'white' : 'black'}>{message.content}</Text>
+          </Box>
+        </Tooltip>
+        {/* <Text mt="0.5" fontSize="xx-small">
           {formatMsToMinutesSeconds(message.createdAt)}
-        </Text>
+        </Text> */}
       </VStack>
     </HStack>
   );
@@ -127,7 +136,7 @@ const MessageList: FC = () => {
   }, [messages]);
 
   return (
-    <VStack w="full" spacing={4}>
+    <VStack w="full" px={1} spacing={4}>
       {messages.map((message) => (
         <MessageBox
           key={message.id}
@@ -153,16 +162,14 @@ export const RoomChatTab: FC = () => {
     }
   );
 
-  if (isLoading === true) return <CircleLoading />;
+  if (isLoading) return <CircleLoading />;
 
   return (
-    <>
-      <VStack px="1" h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
-        <Flex w="full" flexDirection="column" overflowY="scroll" flex={1}>
-          <MessageList />
-        </Flex>
-        <MessageComposer />
-      </VStack>
-    </>
+    <VStack h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
+      <Flex w="full" flexDirection="column" overflowY="scroll" flex={1}>
+        <MessageList />
+      </Flex>
+      <MessageComposer />
+    </VStack>
   );
 };

@@ -153,11 +153,11 @@ const MessageList = forwardRef<BoxProps & MessageListProps, 'div'>(
           style={{ display: 'flex', flexDirection: 'column-reverse' }} // To put endMessage and loader to the top.
           inverse={true}
           hasMore={hasMoreMessages}
-          loader={<Text alignSelf="center">Loading...</Text>}
+          loader={<CircleLoading size="lg" alignSelf="center" />}
           scrollableTarget="scrollableDiv"
         >
           <Box ref={ref}></Box>
-          {messages.map((message, index) => (
+          {messages.map((message: RoomMessage, index: number) => (
             <MessageBox
               key={index}
               message={message}

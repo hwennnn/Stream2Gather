@@ -2,12 +2,15 @@ import { PlaylistCard } from '@app/components/rooms/PlaylistCard';
 import { resetQueue } from '@app/lib/roomSocketService';
 import { useRoomContext } from '@app/pages/room/[slug]';
 import useRoomStore from '@app/store/useRoomStore';
+import useUserSettingsStore from '@app/store/useUserSettingsStore';
 import { Box, Button, VStack } from '@chakra-ui/react';
 import { FC } from 'react';
 import { VscClearAll } from 'react-icons/vsc';
 import shallow from 'zustand/shallow';
 
 export const RoomPlaylistsTab: FC = () => {
+  const isTheatreMode = useUserSettingsStore((state) => state.isTheatreMode);
+
   const { socket } = useRoomContext();
   const { playingIndex, playlist } = useRoomStore(
     (state) => ({
@@ -23,7 +26,7 @@ export const RoomPlaylistsTab: FC = () => {
 
   return (
     <VStack
-      h={{ base: '614px', lg: 'calc(100vh - 188px)' }}
+      h={{ base: '614px', lg: isTheatreMode ? '614px' : 'calc(100vh - 188px)' }}
       overflowY="scroll"
       spacing={0}
     >

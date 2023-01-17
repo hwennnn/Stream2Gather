@@ -11,6 +11,7 @@ import useRoomStore, {
   RoomMessage,
   setRoomMessages
 } from '@app/store/useRoomStore';
+import useUserSettingsStore from '@app/store/useUserSettingsStore';
 import { formatMsToMinutesSeconds } from '@app/utils/formatDatetime';
 import {
   Avatar,
@@ -173,6 +174,7 @@ const MessageList = forwardRef<BoxProps & MessageListProps, 'div'>(
 
 export const RoomChatTab: FC = () => {
   const roomId = useRoomStore.getState().roomId;
+  const isTheatreMode = useUserSettingsStore((state) => state.isTheatreMode);
 
   const bottomRef = useRef<any>(null);
   const { isLoading, fetchNextPage } = useInfiniteRoomMessagesQuery(
@@ -211,7 +213,9 @@ export const RoomChatTab: FC = () => {
   };
 
   return (
-    <VStack h={{ base: '614px', lg: 'calc(100vh - 188px)' }}>
+    <VStack
+      h={{ base: '614px', lg: isTheatreMode ? '614px' : 'calc(100vh - 188px)' }}
+    >
       {isLoading ? (
         <CircleLoading h="full" justifySelf="center" alignSelf="center" />
       ) : (

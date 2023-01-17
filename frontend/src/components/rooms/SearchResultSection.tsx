@@ -78,7 +78,8 @@ export const SearchResultSection: FC = () => {
             columns={{
               base: 2,
               md: 3,
-              xl: 4
+              xl: 4,
+              '2xl': 5
             }}
             gap={6}
           >

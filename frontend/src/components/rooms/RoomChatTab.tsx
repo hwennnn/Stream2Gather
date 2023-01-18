@@ -162,7 +162,9 @@ const MessageList = forwardRef<BoxProps & MessageListProps, 'div'>(
             <MessageBox
               key={index}
               message={message}
-              isOwn={message.creatorId === user?.id}
+              isOwn={
+                message.creatorId === user?.id || message.creatorId === 'self'
+              }
               member={membersMap.get(message.creatorId)}
             />
           ))}

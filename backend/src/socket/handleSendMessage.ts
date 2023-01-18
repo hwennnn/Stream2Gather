@@ -4,13 +4,19 @@ import RedisHelper from '@src/utils/redisHelper';
 import BadWords from 'bad-words';
 import { Socket } from 'socket.io';
 
-type SendMessageFunction = ({ content }: { content: string }) => Promise<void>;
+type SendMessageFunction = ({
+  content,
+  frontendId
+}: {
+  content: string;
+  frontendId: string;
+}) => Promise<void>;
 
 export const handleSendMessage = (
   socket: Socket,
   redisHelper: RedisHelper
 ): SendMessageFunction => {
-  return async ({ content }): Promise<void> => {
+  return async ({ content, frontendId }): Promise<void> => {
     const roomId = socket.roomId;
     const uid = socket.uid;
 
@@ -32,7 +38,8 @@ export const handleSendMessage = (
         roomId,
         message: {
           ...message,
-          createdAt
+          createdAt,
+          frontendId
         }
       };
 

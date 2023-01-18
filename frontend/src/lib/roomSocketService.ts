@@ -32,12 +32,14 @@ import {
   pushRoomMessage,
   removeActiveMember,
   RoomJoiningStatus,
+  RoomMessage,
   setPlaying,
   setRoomJoiningStatus,
   updateRoomInfo
 } from '@app/store/useRoomStore';
 import { MutableRefObject } from 'react';
 import { Socket } from 'socket.io-client';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface StreamEvent {
   isPlaying: boolean;
@@ -116,7 +118,19 @@ export const playExistingVideo = (
 };
 
 export const sendMessage = (socket: Socket, content: string): void => {
-  socket.emit(REQ_SEND_MESSAGE, { content });
+  const id = uuidv4();
+  const timestamp = new Date().getTime().toString();
+  // for frontend purpose only, the real message will be created at backend instead
+  const message: RoomMessage = {
+    id,
+    content,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    creatorId: 'self',
+    frontendId: id
+  };
+  pushRoomMessage(message);
+  socket.emit(REQ_SEND_MESSAGE, message);
 };
 
 const listenEvent = (socket: Socket): void => {

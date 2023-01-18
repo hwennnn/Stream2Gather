@@ -25,7 +25,7 @@ export enum VideoResultTab {
 }
 
 export interface RoomMessage extends MessageItemFragment {
-  isSent: boolean;
+  frontendId?: string;
 }
 
 interface RoomState {
@@ -148,7 +148,19 @@ const useRoomStore = create<RoomState>()((set) => ({
     },
     pushRoomMessage: (m: RoomMessage) => {
       set((state) => {
-        const messages = [m, ...state.messages];
+        const currentMessages = state.messages;
+        if (m.frontendId !== undefined) {
+          const index = currentMessages.findIndex(
+            (message) => message.frontendId === m.frontendId
+          );
+
+          if (index !== -1) {
+            currentMessages[index] = m;
+            return { messages: [...currentMessages] };
+          }
+        }
+
+        const messages = [m, ...currentMessages];
         return { messages };
       });
     },

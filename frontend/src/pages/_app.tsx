@@ -4,7 +4,6 @@ import { isProd } from '@app/constants/config';
 import AppProviders from '@app/contexts/AppProvider';
 import theme from '@app/lib/theme';
 import { ChakraProvider } from '@chakra-ui/react';
-import '@fontsource/inter/variable.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import type { AppProps } from 'next/app';

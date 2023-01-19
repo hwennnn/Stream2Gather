@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useInfiniteQuery, UseMutationOptions, UseQueryOptions, UseInfiniteQueryOptions } from '@tanstack/react-query';
+import { useInfiniteQuery, UseInfiniteQueryOptions, useMutation, UseMutationOptions, useQuery, UseQueryOptions } from '@tanstack/react-query';
 export type Maybe<T> = T | null;
 export type InputMaybe<T> = Maybe<T>;
 export type Exact<T extends { [key: string]: unknown }> = { [K in keyof T]: T[K] };
@@ -551,13 +551,13 @@ export const useInfiniteMeQuery = <
       TData = MeQuery,
       TError = unknown
     >(
-      pageParamKey: keyof MeQueryVariables,
+      _pageParamKey: keyof MeQueryVariables,
       variables?: MeQueryVariables,
       options?: UseInfiniteQueryOptions<MeQuery, TError, TData>
     ) =>
     useInfiniteQuery<MeQuery, TError, TData>(
       variables === undefined ? ['Me.infinite'] : ['Me.infinite', variables],
-      (metaData) => fetcher<MeQuery, MeQueryVariables>(MeDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<MeQuery, MeQueryVariables>(MeDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -611,13 +611,13 @@ export const useInfiniteOwnRoomsQuery = <
       TData = OwnRoomsQuery,
       TError = unknown
     >(
-      pageParamKey: keyof OwnRoomsQueryVariables,
+      _pageParamKey: keyof OwnRoomsQueryVariables,
       variables?: OwnRoomsQueryVariables,
       options?: UseInfiniteQueryOptions<OwnRoomsQuery, TError, TData>
     ) =>
     useInfiniteQuery<OwnRoomsQuery, TError, TData>(
       variables === undefined ? ['OwnRooms.infinite'] : ['OwnRooms.infinite', variables],
-      (metaData) => fetcher<OwnRoomsQuery, OwnRoomsQueryVariables>(OwnRoomsDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<OwnRoomsQuery, OwnRoomsQueryVariables>(OwnRoomsDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -652,13 +652,13 @@ export const useInfiniteRoomQuery = <
       TData = RoomQuery,
       TError = unknown
     >(
-      pageParamKey: keyof RoomQueryVariables,
+      _pageParamKey: keyof RoomQueryVariables,
       variables: RoomQueryVariables,
       options?: UseInfiniteQueryOptions<RoomQuery, TError, TData>
     ) =>
     useInfiniteQuery<RoomQuery, TError, TData>(
       ['Room.infinite', variables],
-      (metaData) => fetcher<RoomQuery, RoomQueryVariables>(RoomDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<RoomQuery, RoomQueryVariables>(RoomDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -693,13 +693,13 @@ export const useInfiniteRoomMessagesQuery = <
       TData = RoomMessagesQuery,
       TError = unknown
     >(
-      pageParamKey: keyof RoomMessagesQueryVariables,
+      _pageParamKey: keyof RoomMessagesQueryVariables,
       variables: RoomMessagesQueryVariables,
       options?: UseInfiniteQueryOptions<RoomMessagesQuery, TError, TData>
     ) =>
     useInfiniteQuery<RoomMessagesQuery, TError, TData>(
       ['RoomMessages.infinite', variables],
-      (metaData) => fetcher<RoomMessagesQuery, RoomMessagesQueryVariables>(RoomMessagesDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<RoomMessagesQuery, RoomMessagesQueryVariables>(RoomMessagesDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -734,13 +734,13 @@ export const useInfiniteRoomsQuery = <
       TData = RoomsQuery,
       TError = unknown
     >(
-      pageParamKey: keyof RoomsQueryVariables,
+      _pageParamKey: keyof RoomsQueryVariables,
       variables?: RoomsQueryVariables,
       options?: UseInfiniteQueryOptions<RoomsQuery, TError, TData>
     ) =>
     useInfiniteQuery<RoomsQuery, TError, TData>(
       variables === undefined ? ['Rooms.infinite'] : ['Rooms.infinite', variables],
-      (metaData) => fetcher<RoomsQuery, RoomsQueryVariables>(RoomsDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<RoomsQuery, RoomsQueryVariables>(RoomsDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -775,13 +775,13 @@ export const useInfiniteSearchYoutubeVideosQuery = <
       TData = SearchYoutubeVideosQuery,
       TError = unknown
     >(
-      pageParamKey: keyof SearchYoutubeVideosQueryVariables,
+      _pageParamKey: keyof SearchYoutubeVideosQueryVariables,
       variables: SearchYoutubeVideosQueryVariables,
       options?: UseInfiniteQueryOptions<SearchYoutubeVideosQuery, TError, TData>
     ) =>
     useInfiniteQuery<SearchYoutubeVideosQuery, TError, TData>(
       ['SearchYoutubeVideos.infinite', variables],
-      (metaData) => fetcher<SearchYoutubeVideosQuery, SearchYoutubeVideosQueryVariables>(SearchYoutubeVideosDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<SearchYoutubeVideosQuery, SearchYoutubeVideosQueryVariables>(SearchYoutubeVideosDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -822,13 +822,13 @@ export const useInfiniteUsersWithRelationsQuery = <
       TData = UsersWithRelationsQuery,
       TError = unknown
     >(
-      pageParamKey: keyof UsersWithRelationsQueryVariables,
+      _pageParamKey: keyof UsersWithRelationsQueryVariables,
       variables: UsersWithRelationsQueryVariables,
       options?: UseInfiniteQueryOptions<UsersWithRelationsQuery, TError, TData>
     ) =>
     useInfiniteQuery<UsersWithRelationsQuery, TError, TData>(
       ['UsersWithRelations.infinite', variables],
-      (metaData) => fetcher<UsersWithRelationsQuery, UsersWithRelationsQueryVariables>(UsersWithRelationsDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<UsersWithRelationsQuery, UsersWithRelationsQueryVariables>(UsersWithRelationsDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -863,13 +863,13 @@ export const useInfiniteYoutubeTrendingVideosQuery = <
       TData = YoutubeTrendingVideosQuery,
       TError = unknown
     >(
-      pageParamKey: keyof YoutubeTrendingVideosQueryVariables,
+      _pageParamKey: keyof YoutubeTrendingVideosQueryVariables,
       variables?: YoutubeTrendingVideosQueryVariables,
       options?: UseInfiniteQueryOptions<YoutubeTrendingVideosQuery, TError, TData>
     ) =>
     useInfiniteQuery<YoutubeTrendingVideosQuery, TError, TData>(
       variables === undefined ? ['YoutubeTrendingVideos.infinite'] : ['YoutubeTrendingVideos.infinite', variables],
-      (metaData) => fetcher<YoutubeTrendingVideosQuery, YoutubeTrendingVideosQueryVariables>(YoutubeTrendingVideosDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<YoutubeTrendingVideosQuery, YoutubeTrendingVideosQueryVariables>(YoutubeTrendingVideosDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 
@@ -904,13 +904,13 @@ export const useInfiniteYoutubeVideoInfoQuery = <
       TData = YoutubeVideoInfoQuery,
       TError = unknown
     >(
-      pageParamKey: keyof YoutubeVideoInfoQueryVariables,
+      _pageParamKey: keyof YoutubeVideoInfoQueryVariables,
       variables: YoutubeVideoInfoQueryVariables,
       options?: UseInfiniteQueryOptions<YoutubeVideoInfoQuery, TError, TData>
     ) =>
     useInfiniteQuery<YoutubeVideoInfoQuery, TError, TData>(
       ['YoutubeVideoInfo.infinite', variables],
-      (metaData) => fetcher<YoutubeVideoInfoQuery, YoutubeVideoInfoQueryVariables>(YoutubeVideoInfoDocument, {...variables, ...(metaData.pageParam ? {[pageParamKey]: metaData.pageParam} : {})})(),
+      (metaData) => fetcher<YoutubeVideoInfoQuery, YoutubeVideoInfoQueryVariables>(YoutubeVideoInfoDocument, {...variables, ...(metaData.pageParam ?? {})})(),
       options
     );
 

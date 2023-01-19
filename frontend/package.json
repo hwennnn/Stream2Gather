@@ -45,7 +45,7 @@
     "devDependencies": {
         "@graphql-codegen/cli": "2.16.1",
         "@graphql-codegen/client-preset": "1.2.3",
-        "@graphql-codegen/typescript-react-query": "^4.0.6",
+        "@graphql-codegen/typescript-react-query": "4.1.0",
         "@types/dateformat": "^5.0.0",
         "@types/node": "18.11.12",
         "@types/react": "18.0.26",

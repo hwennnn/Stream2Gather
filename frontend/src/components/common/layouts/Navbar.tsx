@@ -72,7 +72,9 @@ const UserMenu: FC = () => {
           </Text>
         </Center>
         <br />
+
         <MenuDivider />
+        <MenuItem>My Rooms</MenuItem>
         <MenuItem>Edit Profile</MenuItem>
         <MenuItem>Account Settings</MenuItem>
         <MenuItem onClick={async () => await logout()}>Logout</MenuItem>

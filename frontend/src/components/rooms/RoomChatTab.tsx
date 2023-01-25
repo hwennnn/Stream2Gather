@@ -102,6 +102,7 @@ const MessageBox: FC<{
         alignItems={isOwn ? 'flex-end' : 'flex-start'}
       >
         <Tooltip
+          hasArrow
           label={formatMsToMinutesSeconds(message.createdAt)}
           aria-label="Tooltip for message"
         >

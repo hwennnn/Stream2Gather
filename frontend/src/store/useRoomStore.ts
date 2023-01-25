@@ -31,6 +31,7 @@ export interface RoomMessage extends MessageItemFragment {
 interface RoomState {
   roomId: string;
   roomSlug: string;
+  creatorId: string;
   status: RoomJoiningStatus;
 
   membersMap: Map<string, RoomMemberFragment>;
@@ -86,6 +87,7 @@ interface RoomState {
 const initialRoomData = {
   roomId: '',
   roomSlug: '',
+  creatorId: '',
   status: RoomJoiningStatus.LOADING,
   isActive: true,
   isTemporary: true,
@@ -123,6 +125,7 @@ const useRoomStore = create<RoomState>()((set) => ({
         membersMap,
         roomId: data.id,
         roomSlug: data.slug,
+        creatorId: data.creatorId,
         isActive: data.isActive,
         isTemporary: data.isTemporary,
         isPublic: data.isPublic,

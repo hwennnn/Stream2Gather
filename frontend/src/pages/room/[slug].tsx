@@ -126,7 +126,6 @@ const RoomPage: NextPage = () => {
             lg: isTheatreMode ? 'column' : 'row'
           }}
           mx="auto"
-          px="4"
           pt="24px"
         >
           <RoomPrimarySection />

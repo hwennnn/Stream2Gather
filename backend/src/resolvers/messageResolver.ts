@@ -50,8 +50,6 @@ export class MessageResolver {
         creatorId: uid
       }).save();
 
-      console.log(message);
-
       return {
         message
       };

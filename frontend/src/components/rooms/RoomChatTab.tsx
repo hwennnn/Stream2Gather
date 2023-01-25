@@ -202,7 +202,9 @@ export const RoomChatTab: FC = () => {
 
     if (hasMoreMessages) {
       await fetchNextPage({
-        pageParam: totalMessages
+        pageParam: {
+          skip: totalMessages
+        }
       });
     }
   };

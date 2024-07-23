@@ -6,7 +6,7 @@ import {
   RoomMemberFragment,
   VideoInfo
 } from '@app/generated/graphql';
-import create from 'zustand';
+import { create } from 'zustand';
 
 export enum RoomJoiningStatus {
   LOADING,

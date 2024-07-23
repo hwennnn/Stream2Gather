@@ -15,9 +15,6 @@
     "prod": "node dist/index.js",
     "typeorm": "typeorm-ts-node-commonjs"
   },
-  "engines": {
-    "node": "18"
-  },
   "dependencies": {
     "@apollo/server": "^4.3.0",
     "axios": "^1.2.2",

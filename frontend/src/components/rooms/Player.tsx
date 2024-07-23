@@ -1,3 +1,5 @@
+'use client';
+
 import PlayerControl from '@app/components/rooms/PlayerControl';
 import { videoOverlayImageUrl } from '@app/constants/config';
 import {

@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img src="docs/cover.jpg" width="80%"/></p>
+<p align="center"><img src="docs/cover.jpeg" width="80%"/></p>
 
 <h1 align="center">Stream2Gather</h1>
 
@@ -8,6 +8,10 @@
 **Stream2Gather** is an online video streaming site designed to provide a seamless media playback experience. It mimics watching YouTube videos with friends in real life by synchronizing play, pause, and seek events within a virtual room using Socket.io. Users can search for videos by keyword and add them to a playlist queue.
 
 Powered by web sockets, **Stream2Gather** allows real-time communication within rooms through live chats. Currently, the platform fully supports YouTube, and the next update will introduce support for Dailymotion and Twitch.
+
+## Quick Demo
+
+<p align="center"><img src="docs/demo.gif" width="80%"/></p>
 
 ## Built With
 

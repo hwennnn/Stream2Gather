@@ -1,7 +1,11 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img alt="cover" src="docs/cover.jpeg" width="80%"/></p>
+<p align="center"><img alt="cover" src="docs/logo.png" width="80px"/></p>
 
 <h1 align="center">Stream2Gather</h1>
+
+<p align="center"><b>Stay connected made easier</b></p>
+
+<p align="center"><img alt="cover" src="docs/cover.jpeg" width="80%"/></p>
 
 ## Overview
 
@@ -11,7 +15,7 @@ Powered by web sockets, **Stream2Gather** allows real-time communication within 
 
 ## Quick Demo
 
-<p align="center"><img alt="demo" src="docs/demo.gif" width="80%"/></p>
+<p align="center"><img alt="demo" src="docs/demo.gif" width="100%"/></p>
 
 ## Built With
 

@@ -1,5 +1,5 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img src="docs/cover.jpeg" width="80%"/></p>
+<p align="center"><img alt="cover" src="docs/cover.jpeg" width="80%"/></p>
 
 <h1 align="center">Stream2Gather</h1>
 
@@ -11,7 +11,7 @@ Powered by web sockets, **Stream2Gather** allows real-time communication within 
 
 ## Quick Demo
 
-<p align="center"><img src="docs/demo.gif" width="80%"/></p>
+<p align="center"><img alt="demo" src="docs/demo.gif" width="80%"/></p>
 
 ## Built With
 
@@ -21,9 +21,10 @@ Powered by web sockets, **Stream2Gather** allows real-time communication within 
 - Express.js
 - GraphQL with Apollo Server
 - PostgreSQL
+- Redis
 - Socket.io
 - TypeORM
-- Firebase
+- Firebase Authentication
 
 ## Installation
 

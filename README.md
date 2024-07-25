@@ -15,11 +15,11 @@ Powered by web sockets, **Stream2Gather** allows real-time communication within 
 
 ## Quick Demo
 
-<p align="center"><img alt="demo" src="docs/demo.gif" width="100%"/></p>
+<p align="center"><img alt="demo" src="https://res.cloudinary.com/dt9ce3w58/image/upload/v1721916362/demo_w2iqgv.gif" width="100%"/></p>
 
 ## Built With
 
-- [React.js](https://reactjs.org/) - JavaScript library for building user interfaces
+- [React](https://reactjs.org/) - JavaScript library for building user interfaces
 - [Next.js](https://nextjs.org/) - React framework for server-side rendering and static site generation
 - [Chakra UI](https://chakra-ui.com/) - Modular and accessible component library for React
 - [Express.js](https://expressjs.com/) - Web application framework for Node.js

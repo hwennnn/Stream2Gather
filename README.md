@@ -15,7 +15,13 @@ Powered by web sockets, **Stream2Gather** allows real-time communication within 
 
 ## Quick Demo
 
-<p align="center"><img alt="demo" src="https://res.cloudinary.com/dt9ce3w58/image/upload/v1721916362/demo_w2iqgv.gif" width="100%"/></p>
+### Video Controls and Playback
+
+<p align="center"><img alt="play-pause-seek" src="docs/play-pause-seek.gif" width="100%"/></p>
+
+### Live Chat
+
+<p align="center"><img alt="live-chat" src="docs/live-chat.gif" width="100%"/></p>
 
 ## Built With
 

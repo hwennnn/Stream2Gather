@@ -112,4 +112,6 @@ export const api = {
   clerkSession: (token: string) =>
     request<Session>('/v1/session/clerk', { method: 'POST', headers: { authorization: `Bearer ${token}` } }),
   signOut: () => request<Session>('/v1/session', { method: 'DELETE' }),
+  /** Ends this browser's session and nobody else's. */
+  signOutHere: () => request<Session>('/v1/session?scope=browser', { method: 'DELETE' }),
 };

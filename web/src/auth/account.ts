@@ -105,7 +105,8 @@ export const account = {
 
   async signOut(): Promise<void> {
     stopPings();
-    await clerk?.signOut();
+    // The server goes first. Clerk signing out makes the bridge clear this browser's
+    // cookie, and the server needs that cookie to know whose other devices to end.
     try {
       setUser((await api.signOut()).user);
     } catch {
@@ -113,6 +114,8 @@ export const account = {
       await account.refresh();
       update({ othersMayRemain: true });
     }
+    // The server has usually ended this session already, so Clerk may object.
+    await clerk?.signOut().catch(() => {});
   },
 
   /** Called by the Clerk bridge once Clerk's script has loaded. */
@@ -140,12 +143,15 @@ export const account = {
    * settles nothing. Only a page that opened nothing itself knows the attempt
    * that set the flag is over: back from a redirect signed out, or reloaded after
    * closing the sign-in. A return that did sign in reports that instead.
+   *
+   * It ends this browser only. A Clerk session lapses long before our cookie does,
+   * so a device left idle says this on its next load, and that mustn't end the others.
    */
   async clerkSignedOut(): Promise<void> {
     if (!openWhenReady && !openedHere) sessionStorage.removeItem(SIGNING_IN);
     if (view.user?.signedIn) {
       stopPings();
-      setUser((await api.signOut()).user);
+      setUser((await api.signOutHere()).user);
     }
   },
 

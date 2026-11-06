@@ -484,12 +484,17 @@ func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
 }
 
 // endSession signs the browser out, and every other copy of an account's cookie
-// with it. The next action starts a new guest.
+// with it. The next action starts a new guest. scope=browser ends this browser
+// alone, for when it learns from Clerk that its own session lapsed.
 func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
 	claims, ok, err := s.session(r)
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Secure, SameSite: http.SameSiteLaxMode,
 	})
+	if r.URL.Query().Get("scope") == "browser" {
+		writeJSON(w, http.StatusOK, map[string]any{"user": nil})
+		return
+	}
 	// This browser is out either way. Its other copies are not, and it should know.
 	if err != nil {
 		s.internal(w, err)

@@ -303,6 +303,8 @@ type conn struct {
 	// reactions has its own limit, so a burst of them can't cost a chat message.
 	reactions *rate.Limiter
 	reports   *rate.Limiter
+	// voiceRate has its own limit, so push-to-talk can't cost a pause.
+	voiceRate *rate.Limiter
 
 	mu     sync.RWMutex
 	person store.Person

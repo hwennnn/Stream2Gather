@@ -2,7 +2,6 @@ package hub
 
 import (
 	"context"
-	"encoding/json"
 	"sync"
 	"testing"
 	"time"
@@ -82,17 +81,4 @@ func TestRecorderHearsTheRoom(t *testing.T) {
 	recorder.waitFor(t, "left:u", 0)
 	_ = second.ws.CloseNow()
 	recorder.waitFor(t, "left:u", 1)
-}
-
-func TestVoiceMessageIsRoutedButNotYetBuilt(t *testing.T) {
-	r := newRig(t, testRedis)
-	c := r.joined(t, r.newRoom(t, directVideo(t)), "u", room.RoleMember)
-	c.sendWithID(t, "3", "voice", map[string]any{"state": "listening"})
-	failure := c.expect(t, "error")
-	var problem struct {
-		Code string `json:"code"`
-	}
-	if err := json.Unmarshal(failure.D, &problem); err != nil || problem.Code != "unknown" {
-		t.Fatalf("got %s", failure.D)
-	}
 }

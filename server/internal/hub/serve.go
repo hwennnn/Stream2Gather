@@ -43,6 +43,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 		chat:      rate.NewLimiter(2, 5),
 		reactions: rate.NewLimiter(2, 5),
 		reports:   rate.NewLimiter(rate.Every(5*time.Second), 3),
+		voiceRate: rate.NewLimiter(5, 10),
 	}
 	defer c.close()
 

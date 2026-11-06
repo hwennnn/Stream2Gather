@@ -1,0 +1,92 @@
+package store
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+
+	"stream2gather/internal/room"
+)
+
+// MaxWatchlist is how many videos a crew can have lined up.
+const MaxWatchlist = 200
+
+// ErrWatchlistFull means the crew has nowhere to put another video.
+var ErrWatchlistFull = errors.New("watchlist is full")
+
+// WatchItem is one video a crew means to watch. Only its ids are stored; Media is
+// joined on every read, and is nil once the source's data has gone or aged out.
+type WatchItem struct {
+	ID       int64       `json:"id"`
+	Source   string      `json:"source"`
+	SourceID string      `json:"sourceId"`
+	AddedAt  time.Time   `json:"addedAt"`
+	Media    *room.Media `json:"media"`
+}
+
+// AddWatch lines a video up. Adding one that's there already changes nothing.
+func (p *Postgres) AddWatch(ctx context.Context, crewID, source, sourceID, addedBy string) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	// The lock makes two adds take turns, so neither finds the last place empty.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM crews WHERE id = $1 FOR UPDATE`, crewID); err != nil {
+		return err
+	}
+	var count int
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND removed_at IS NULL`, crewID).Scan(&count)
+	if err != nil {
+		return err
+	}
+	if count >= MaxWatchlist {
+		return ErrWatchlistFull
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO watchlist_items (crew_id, source, source_id, added_by) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (crew_id, source, source_id) WHERE removed_at IS NULL DO NOTHING`,
+		crewID, source, sourceID, addedBy)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// Watchlist returns what the crew hasn't watched yet, oldest idea first.
+func (p *Postgres) Watchlist(ctx context.Context, crewID string) ([]WatchItem, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT w.id, w.source, w.source_id, w.added_at,
+		       m.url, m.title, m.author, m.thumbnail_url, m.duration_ms, m.is_live
+		FROM watchlist_items w
+		LEFT JOIN media m ON m.source = w.source AND m.source_id = w.source_id
+		                 AND m.fetched_at > now() - interval '30 days'
+		WHERE w.crew_id = $1 AND w.removed_at IS NULL AND w.watched_session_id IS NULL
+		ORDER BY w.id`, crewID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (WatchItem, error) {
+		var item WatchItem
+		var url, title, author, thumbnail *string
+		var duration *int64
+		var live *bool
+		err := row.Scan(&item.ID, &item.Source, &item.SourceID, &item.AddedAt, &url, &title, &author, &thumbnail, &duration, &live)
+		if err == nil && url != nil {
+			item.Media = &room.Media{
+				Source: item.Source, SourceID: item.SourceID, URL: *url, Title: *title,
+				Author: *author, ThumbnailURL: *thumbnail, DurationMS: *duration, IsLive: *live,
+			}
+		}
+		return item, err
+	})
+}
+
+// RemoveWatch takes a video off the list, and reports whether it was on it.
+func (p *Postgres) RemoveWatch(ctx context.Context, crewID string, id int64) (bool, error) {
+	tag, err := p.pool.Exec(ctx, `
+		UPDATE watchlist_items SET removed_at = now() WHERE id = $1 AND crew_id = $2 AND removed_at IS NULL`, id, crewID)
+	return tag.RowsAffected() > 0, err
+}

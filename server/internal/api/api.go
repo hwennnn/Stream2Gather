@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html"
 	"io"
 	"log/slog"
@@ -267,18 +268,27 @@ func (s *Server) config(w http.ResponseWriter, _ *http.Request) {
 	})
 }
 
-// session returns the caller's identity, if any.
-func (s *Server) session(r *http.Request) (auth.Claims, bool) {
+// session returns the caller's identity, if any. An error means a signed-in
+// cookie could not be checked against sign-out. Nobody is trusted on it, and the
+// caller must not treat it as no session either: starting a guest would replace
+// the cookie of someone who is still signed in.
+func (s *Server) session(r *http.Request) (auth.Claims, bool, error) {
 	cookie, err := r.Cookie(sessionCookie)
 	if err != nil {
-		return auth.Claims{}, false
+		return auth.Claims{}, false, nil
 	}
 	claims, err := s.Issuer.Verify(cookie.Value)
 	if err != nil {
-		return auth.Claims{}, false
+		return auth.Claims{}, false, nil
 	}
-	if claims.Account && !s.sessionLive(r.Context(), claims) {
-		return auth.Claims{}, false
+	if claims.Account {
+		live, err := s.sessionLive(r.Context(), claims)
+		if err != nil {
+			return auth.Claims{}, false, err
+		}
+		if !live {
+			return auth.Claims{}, false, nil
+		}
 	}
 	// Cookies from before names were checked can hold what Postgres refuses.
 	if name, ok := room.CleanName(claims.Name); ok {
@@ -286,22 +296,19 @@ func (s *Server) session(r *http.Request) (auth.Claims, bool) {
 	} else {
 		claims.Name = ids.GuestName()
 	}
-	return claims, true
+	return claims, true, nil
 }
 
-// sessionLive reports whether sign-out has left this signed-in cookie valid. A
-// lookup that fails leaves it valid: the route behind it needs the same database,
-// and dropping the session here would replace the cookie with a new guest's.
-func (s *Server) sessionLive(ctx context.Context, claims auth.Claims) bool {
+// sessionLive reports whether sign-out has left this signed-in cookie valid.
+func (s *Server) sessionLive(ctx context.Context, claims auth.Claims) (bool, error) {
 	version, err := s.versions.current(ctx, claims.Subject, s.DB.SessionVersion)
 	if errors.Is(err, store.ErrNotFound) {
-		return false
+		return false, nil
 	}
 	if err != nil {
-		s.Log.Warn("session check failed", "error", err)
-		return true
+		return false, fmt.Errorf("session check: %w", err)
 	}
-	return version == claims.Version
+	return version == claims.Version, nil
 }
 
 func (s *Server) setSession(w http.ResponseWriter, claims auth.Claims) (auth.Claims, error) {
@@ -324,7 +331,11 @@ func (s *Server) setSession(w http.ResponseWriter, claims auth.Claims) (auth.Cla
 // ensureSession signs a visitor in as a guest the first time they act, so no
 // one has to create an account to watch.
 func (s *Server) ensureSession(w http.ResponseWriter, r *http.Request) (auth.Claims, error) {
-	if claims, ok := s.session(r); ok {
+	claims, ok, err := s.session(r)
+	if err != nil {
+		return auth.Claims{}, err
+	}
+	if ok {
 		return claims, s.DB.EnsureUser(r.Context(), claims.Subject, claims.Name)
 	}
 	allowed, err := s.Live.Limit(r.Context(), "guest:"+s.clientIP(r), guestsPerHour, time.Hour)
@@ -334,7 +345,7 @@ func (s *Server) ensureSession(w http.ResponseWriter, r *http.Request) (auth.Cla
 	if !allowed {
 		return auth.Claims{}, errRateLimited
 	}
-	claims, err := s.setSession(w, auth.Claims{Subject: "g_" + ids.New(), Name: ids.GuestName()})
+	claims, err = s.setSession(w, auth.Claims{Subject: "g_" + ids.New(), Name: ids.GuestName()})
 	if err != nil {
 		return auth.Claims{}, err
 	}
@@ -352,7 +363,11 @@ func (s *Server) sessionFailed(w http.ResponseWriter, err error) {
 }
 
 func (s *Server) me(w http.ResponseWriter, r *http.Request) {
-	claims, ok := s.session(r)
+	claims, ok, err := s.session(r)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
 	if !ok {
 		writeJSON(w, http.StatusOK, map[string]any{"user": nil})
 		return
@@ -395,7 +410,8 @@ func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	current, _ := s.session(r)
+	// A guest is never in doubt, and an account hands over nothing.
+	current, _, _ := s.session(r)
 	if current.Account {
 		current = auth.Claims{} // Only a guest hands anything over to an account.
 	}
@@ -424,10 +440,15 @@ func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
 // endSession signs the browser out, and every other copy of an account's cookie
 // with it. The next action starts a new guest.
 func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
-	claims, ok := s.session(r)
+	claims, ok, err := s.session(r)
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Secure, SameSite: http.SameSiteLaxMode,
 	})
+	// This browser is out either way. Its other copies are not, and it should know.
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
 	if ok && claims.Account {
 		if err := s.DB.BumpSessionVersion(r.Context(), claims.Subject); err != nil {
 			s.internal(w, err)
@@ -731,7 +752,12 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.session(r); !ok {
+	_, ok, err := s.session(r)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !ok {
 		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Join the room to read its chat.")
 		return
 	}
@@ -798,7 +824,7 @@ func (s *Server) telemetry(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &request) {
 		return
 	}
-	claims, _ := s.session(r)
+	claims, _, _ := s.session(r) // Anonymous samples are still samples.
 	at := time.Now().UTC().Format("2006-01-02 15:04:05.000")
 	for i, event := range request.Events {
 		if i >= 100 {

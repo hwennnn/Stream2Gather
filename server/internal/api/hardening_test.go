@@ -367,3 +367,23 @@ func TestRenameStoresAndReissues(t *testing.T) {
 		t.Fatalf("%s %v", response.Body, response.Header())
 	}
 }
+
+func TestANewRoomsVideoSurvivesLosingRedis(t *testing.T) {
+	s, _ := stackServer(t)
+	s.Catalog = source.NewCatalog(s.DB, 0, s.Log, source.Direct{})
+	recorder, body := serve(s, http.MethodPost, "/v1/rooms", `{"url":"https://a.test/a.mp4"}`, from("203.0.113."+ids.New()))
+	if recorder.Code != http.StatusCreated {
+		t.Fatalf("status %d: %v", recorder.Code, body)
+	}
+	record, err := s.DB.RoomBySlug(context.Background(), body["slug"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, _, err := s.DB.LoadSnapshot(context.Background(), record.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Queue) != 1 {
+		t.Fatalf("saved queue = %+v: Redis held the only copy of the video", state.Queue)
+	}
+}

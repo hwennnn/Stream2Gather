@@ -642,6 +642,19 @@ body {
   border-radius: 999px;
 }
 
+/* On a phone the track comes up to the top bar with the seats, in a row kept whether or not a video is on. */
+.seat-track-slot {
+  display: none;
+  height: 0.75rem;
+}
+
+/* A short phone has no height to spare from chat, and a sideways one has no row under its seats. */
+@media (max-width: 639px) and (min-height: 600px) {
+  .seat-track-slot {
+    display: block;
+  }
+}
+
 /* On a phone, and sideways, the seats sit in the top bar, which leaves the height for chat. */
 @media (max-width: 639px), (orientation: landscape) and (max-height: 500px) {
   .front-row {

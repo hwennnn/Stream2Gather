@@ -93,9 +93,14 @@ type Hub struct {
 	mu     sync.Mutex
 	rooms  map[string]*liveRoom
 	active sync.Map // room id to *liveRoom
-	// accounts holds every signed-in *conn. It sits apart from the rooms so that
-	// checking them needs nothing from a room's goroutine.
+	// accounts holds every signed-in *conn and its room's id. It sits apart from
+	// the rooms so that checking them needs nothing from a room's goroutine.
 	accounts sync.Map
+	// LeaveCall takes someone out of a room's voice call, which outlives their
+	// socket because tokens can't be revoked. Nil means no voice. Set it before Run.
+	LeaveCall func(ctx context.Context, roomID, userID string) error
+	// leavers is who still has to leave a call. Only the session check touches it.
+	leavers map[seat]struct{}
 	// addresses counts open sockets per address, on this server.
 	addressMu     sync.Mutex
 	addresses     map[string]int
@@ -121,6 +126,7 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 		snapshots:       snapshotEvery,
 		keepAlive:       keepAliveEvery,
 		sessionCheck:    sessionCheckEvery,
+		leavers:         map[seat]struct{}{},
 		pingEvery:       pingEvery,
 		commandPatience: opTimeout,
 
@@ -180,29 +186,61 @@ func (h *Hub) watchSessions(ctx context.Context) {
 }
 
 func (h *Hub) endSignedOut(ctx context.Context) {
-	var conns []*conn
+	ctx, cancel := context.WithTimeout(ctx, opTimeout)
+	defer cancel()
+	h.closeSignedOut(ctx)
+	h.clearCalls(ctx)
+}
+
+// seat is one person in one room.
+type seat struct{ room, user string }
+
+func (h *Hub) closeSignedOut(ctx context.Context) {
+	conns := map[*conn]string{}
 	var ids []string
-	h.accounts.Range(func(key, _ any) bool {
+	h.accounts.Range(func(key, roomID any) bool {
 		c := key.(*conn)
-		conns = append(conns, c)
+		conns[c] = roomID.(string)
 		ids = append(ids, c.who().UserID)
 		return true
 	})
 	if len(ids) == 0 {
 		return
 	}
-	ctx, cancel := context.WithTimeout(ctx, opTimeout)
-	defer cancel()
 	versions, err := h.db.SessionVersions(ctx, ids)
 	if err != nil {
 		// Not knowing is no reason to drop a party. The next check will tell.
 		h.log.Warn("session check failed", "error", err)
 		return
 	}
-	for _, c := range conns {
-		if version, found := versions[c.who().UserID]; !found || version != c.version {
+	staying := map[seat]bool{}
+	for c, roomID := range conns {
+		here := seat{roomID, c.who().UserID}
+		if version, found := versions[here.user]; !found || version != c.version {
 			c.shut(statusSignedOut, "signed out")
+			h.leavers[here] = struct{}{}
+		} else {
+			staying[here] = true
 		}
+	}
+	// A call belongs to the person, so one who signed back in keeps it.
+	for here := range staying {
+		delete(h.leavers, here)
+	}
+}
+
+// clearCalls runs after the sockets close, so a slow voice server delays nobody's
+// disconnect. A removal that fails waits for the next check: nothing else would
+// try again once the socket has gone.
+func (h *Hub) clearCalls(ctx context.Context) {
+	for here := range h.leavers {
+		if h.LeaveCall != nil {
+			if err := h.LeaveCall(ctx, here.room, here.user); err != nil {
+				h.log.Warn("removing a signed-out person from a call failed", "room", here.room, "error", err)
+				continue
+			}
+		}
+		delete(h.leavers, here)
 	}
 }
 

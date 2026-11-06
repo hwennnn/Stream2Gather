@@ -25,6 +25,7 @@ import (
 	"stream2gather/internal/source"
 	"stream2gather/internal/store"
 	"stream2gather/internal/telemetry"
+	"stream2gather/internal/voice"
 	"stream2gather/internal/workflows"
 	"stream2gather/migrations"
 )
@@ -78,6 +79,15 @@ func migrate(cfg config.Config) error {
 		return err
 	}
 	return goose.Up(db, ".")
+}
+
+// newHub connects the rooms to the voice server, when there is one.
+func newHub(cfg config.Config, db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *source.Catalog, log *slog.Logger) *hub.Hub {
+	rooms := hub.New(db, live, rdb, catalog, log)
+	if cfg.LiveKit.Enabled() {
+		rooms.LeaveCall = voice.New(cfg.LiveKit).Remove
+	}
+	return rooms
 }
 
 func catalogFor(cfg config.Config, db *store.Postgres, log *slog.Logger) *source.Catalog {
@@ -153,7 +163,7 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 
 	catalog := catalogFor(cfg, db, log)
 
-	rooms := hub.New(db, live, rdb, catalog, log)
+	rooms := newHub(cfg, db, live, rdb, catalog, log)
 	go rooms.Run(ctx)
 
 	server := newHTTPServer(cfg.HTTPAddr, (&api.Server{

@@ -46,7 +46,10 @@ export const createHtml5Player = async (
 
   video.addEventListener('canplay', () => state === 'loading' && set('ready'));
   video.addEventListener('playing', () => set('playing'));
-  video.addEventListener('pause', () => set('paused'));
+  // A video pauses itself on reaching its end, just before 'ended'. Nobody pressed anything.
+  video.addEventListener('pause', () => {
+    if (!video.ended) set('paused');
+  });
   video.addEventListener('waiting', () => set('buffering'));
   video.addEventListener('ended', () => set('ended'));
   video.addEventListener('error', () =>

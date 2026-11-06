@@ -46,6 +46,18 @@ describe('watchAutoplay', () => {
     expect(fake.setMuted).not.toHaveBeenCalled();
   });
 
+  it('takes a pause after the video has played for the viewer pausing', () => {
+    const fake = fakePlayer('loading');
+    watchAutoplay(() => true, fake.player, vi.fn());
+    fake.setState('playing');
+    vi.advanceTimersByTime(CHECK_MS - 300);
+    // The room still says playing, because a viewer's pause is held before it is sent.
+    fake.setState('paused');
+    vi.advanceTimersByTime(CHECK_MS * 3);
+    expect(fake.setMuted).not.toHaveBeenCalled();
+    expect(fake.play).not.toHaveBeenCalled();
+  });
+
   it('still catches a slow load that was then refused', () => {
     const fake = fakePlayer('loading');
     watchAutoplay(() => true, fake.player, vi.fn());

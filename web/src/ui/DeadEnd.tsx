@@ -18,7 +18,8 @@ export type Ending = {
 
 type Seated = Pick<Person, 'userId' | 'name' | 'avatarUrl'>;
 
-const SEATS = 6;
+/** What fits a 320px phone, the same as the gate. */
+const SEATS = 4;
 const EMPTY = [0, 1, 2, 3];
 
 export const ENDINGS = {

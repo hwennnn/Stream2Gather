@@ -13,7 +13,7 @@ describe('DeadEnd', () => {
   it('shows a full room its seats, names the host, and offers no new room', () => {
     const people = [{ userId: 'h', name: 'Maya Lin', role: 'host' as const }, ...Array.from({ length: 49 }, (_, index) => member(index))];
     render(<DeadEnd {...fullRoom(people)} />);
-    expect(screen.getByRole('list', { name: 'Seats' }).textContent).toContain('+44');
+    expect(screen.getByRole('list', { name: 'Seats' }).textContent).toContain('+46');
     expect(screen.getByText('Every seat is taken. Ask Maya to open another room.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Check for a seat' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start a new room' })).toBeNull();

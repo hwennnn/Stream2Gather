@@ -11,6 +11,34 @@ import (
 	"stream2gather/internal/store"
 )
 
+// watchParty runs one session in a crew and ends it, and returns its id.
+func watchParty(t *testing.T, s *Server, crewID, sourceID string, people ...store.Person) string {
+	t.Helper()
+	ctx := context.Background()
+	err := s.DB.RecordCapture(ctx, store.Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "test", SourceID: sourceID, Present: people})
+	if err != nil {
+		t.Fatal(err)
+	}
+	open, err := s.DB.OpenSessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, session := range open {
+		crew, err := s.DB.CrewIDOfRoom(ctx, session.RoomID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if crew == crewID {
+			if _, err := s.DB.EndSession(ctx, session.ID, time.Now()); err != nil {
+				t.Fatal(err)
+			}
+			return session.ID
+		}
+	}
+	t.Fatal("no session opened")
+	return ""
+}
+
 func crewIDOf(t *testing.T, s *Server, slug string) (store.Room, string) {
 	t.Helper()
 	ctx := context.Background()
@@ -23,6 +51,37 @@ func crewIDOf(t *testing.T, s *Server, slug string) (store.Room, string) {
 		t.Fatal(err)
 	}
 	return record, crewID
+}
+
+func TestSessionHistoryIsForMembersAndJoinsTitlesFresh(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	owner, as := signUp(t, s, "Hana")
+	_, stranger := signUp(t, s, "Stranger")
+	slug, _ := newCrew(t, s, as)
+	_, crewID := crewIDOf(t, s, slug)
+	kept, stale := seedMedia(t, s, "test", "Marker title"), seedMedia(t, s, "test", "Old title")
+	hana := store.Person{UserID: owner.Subject, Name: "Hana", Member: true}
+	watchParty(t, s, crewID, kept.SourceID, hana)
+	watchParty(t, s, crewID, stale.SourceID, hana)
+	if _, err := pool.Exec(ctx, `UPDATE media SET fetched_at = now() - interval '31 days' WHERE source_id = $1`, stale.SourceID); err != nil {
+		t.Fatal(err)
+	}
+
+	path := "/v1/crews/" + slug + "/sessions"
+	if response, _ := serve(s, http.MethodGet, path, "", stranger); response.Code != http.StatusForbidden {
+		t.Fatalf("stranger: %d", response.Code)
+	}
+	response, body := serve(s, http.MethodGet, path, "", as)
+	items, _ := body["items"].([]any)
+	if response.Code != http.StatusOK || len(items) != 2 {
+		t.Fatalf("history: %d %s", response.Code, response.Body)
+	}
+	newest := items[0].(map[string]any)["videos"].([]any)[0].(map[string]any)
+	oldest := items[1].(map[string]any)["videos"].([]any)[0].(map[string]any)
+	if newest["media"] != nil || oldest["media"].(map[string]any)["title"] != "Marker title" {
+		t.Fatalf("a video past 30 days must lose its title: %s", response.Body)
+	}
 }
 
 func TestNonMembersOnlyReadChatFromTheOpenSession(t *testing.T) {

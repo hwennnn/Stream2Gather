@@ -26,6 +26,24 @@ type WatchItem struct {
 	Media    *room.Media `json:"media"`
 }
 
+// freshMedia scans a LEFT JOIN on media, which finds nothing once the data has
+// gone or aged out.
+type freshMedia struct {
+	url, title, author, thumbnail *string
+	duration                      *int64
+	live                          *bool
+}
+
+func (f freshMedia) media(source, sourceID string) *room.Media {
+	if f.url == nil {
+		return nil
+	}
+	return &room.Media{
+		Source: source, SourceID: sourceID, URL: *f.url, Title: *f.title,
+		Author: *f.author, ThumbnailURL: *f.thumbnail, DurationMS: *f.duration, IsLive: *f.live,
+	}
+}
+
 // AddWatch lines a video up. Adding one that's there already changes nothing.
 func (p *Postgres) AddWatch(ctx context.Context, crewID, source, sourceID, addedBy string) error {
 	tx, err := p.pool.Begin(ctx)
@@ -70,16 +88,9 @@ func (p *Postgres) Watchlist(ctx context.Context, crewID string) ([]WatchItem, e
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (WatchItem, error) {
 		var item WatchItem
-		var url, title, author, thumbnail *string
-		var duration *int64
-		var live *bool
-		err := row.Scan(&item.ID, &item.Source, &item.SourceID, &item.AddedAt, &url, &title, &author, &thumbnail, &duration, &live)
-		if err == nil && url != nil {
-			item.Media = &room.Media{
-				Source: item.Source, SourceID: item.SourceID, URL: *url, Title: *title,
-				Author: *author, ThumbnailURL: *thumbnail, DurationMS: *duration, IsLive: *live,
-			}
-		}
+		var fresh freshMedia
+		err := row.Scan(&item.ID, &item.Source, &item.SourceID, &item.AddedAt, &fresh.url, &fresh.title, &fresh.author, &fresh.thumbnail, &fresh.duration, &fresh.live)
+		item.Media = fresh.media(item.Source, item.SourceID)
 		return item, err
 	})
 }

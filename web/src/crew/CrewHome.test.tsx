@@ -39,10 +39,11 @@ const signIntoAccount = () => {
 };
 
 beforeEach(() => {
+  vi.restoreAllMocks();
+  vi.spyOn(crewApi, 'sessions').mockResolvedValue({ items: [] });
   accountState.view = { user: null, publishableKey: 'pk', clerkWanted: false, problem: null };
   sessionStorage.clear();
   window.history.replaceState(null, '', '/r/movie-night');
-  vi.restoreAllMocks();
   onJoin.mockClear();
   signIn.mockClear();
   window.matchMedia = vi.fn(() => ({ matches: false })) as never;
@@ -142,5 +143,30 @@ describe('CrewHome', () => {
     expect(await screen.findByRole('button', { name: 'Leave' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Settings' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+  });
+
+  it('lists past sessions with fresh titles, and says when there are none', async () => {
+    signIntoAccount();
+    vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana]));
+    const empty = render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    expect(await screen.findByText('Your first watch party will show up here.')).toBeTruthy();
+    expect(screen.queryByText(/come from Stream2Gather/)).toBeNull();
+    empty.unmount();
+
+    vi.spyOn(crewApi, 'sessions').mockResolvedValue({
+      items: [
+        {
+          id: 's',
+          startedAt: '2026-11-01T20:00:00Z',
+          endedAt: '2026-11-01T21:30:00Z',
+          people: [{ name: 'Hana', isGuest: false }],
+          videos: [{ source: 'youtube', media: null }],
+        },
+      ],
+    });
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    expect(await screen.findByText('Video unavailable')).toBeTruthy();
+    expect(screen.getByText('1 h 30 min')).toBeTruthy();
+    expect(screen.getByText('Reactions and watch stats come from Stream2Gather, not YouTube.')).toBeTruthy();
   });
 });

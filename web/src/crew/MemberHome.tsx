@@ -8,6 +8,7 @@ import { Thumb } from '../ui/Thumb';
 import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
 import { CrewSettings, MemberRow } from './CrewSettings';
+import { Sessions } from './Sessions';
 import { Watchlist } from './Watchlist';
 
 const PushCard = lazy(() => import('../push/Card'));
@@ -124,6 +125,8 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
       <Invite slug={slug} home={home} />
 
       <Watchlist slug={slug} items={home.watchlist} onChange={refresh} />
+
+      <Sessions slug={slug} />
 
       <section aria-label="Members" className="mt-8">
         <h2 className="text-sm font-semibold">Members</h2>

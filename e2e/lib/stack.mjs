@@ -60,7 +60,8 @@ const build = async (tree, work, cache) => {
 export const startStack = async ({ tree, port, cache, youtubeUrl, youtubeKey }) => {
   const id = `${process.pid}-${port}`;
   const work = await mkdtemp(path.join(tmpdir(), 's2g-flows-'));
-  const base = `http://127.0.0.1:${port}`;
+  // Named, as people's are: the server sends a page opened at an IP on to its name.
+  const base = `http://localhost:${port}`;
   const [{ webDir, binary }, containers] = await Promise.all([build(tree, work, cache), startContainers(id)]);
   const { redis, postgres, redisPort, postgresPort } = containers;
 

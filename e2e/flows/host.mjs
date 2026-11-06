@@ -109,15 +109,15 @@ flow('host lock: a late joiner arrives locked out', async (t) => {
   t.eq('no Skip', await ui.bar(late.page).getByRole('button', { name: 'Skip' }).count(), 0);
 });
 
-flow('handover: a locked room opens up when the host goes, and locks when they return', { timeout: 120_000 }, async (t) => {
+flow('handover: a locked room passes to the next person when the host goes, and back when they return', { timeout: 120_000 }, async (t) => {
   const { host, guest, room } = await locked(t);
   await host.page.goto('about:blank');
-  await t.see('the room opens up', guest.page.getByText(/Hana left, so anyone can control playback/), 55_000);
+  await t.see('the room passes on', guest.page.getByText(/Hana left, so Gus is the host now/), 55_000);
   await t.see('Skip for the guest', ui.bar(guest.page).getByRole('button', { name: 'Skip' }));
-  await t.gone('the chip', guest.page.getByText('Host controls', { exact: true }));
+  await t.see('still locked, now in his hands', guest.page.getByText('Host controls', { exact: true }));
   await host.page.goto(room.url);
   await reenter(host.page);
-  await t.see('the lock returns', guest.page.getByText(/Hana is back, so they control playback again/), 15_000);
+  await t.see('it comes back', guest.page.getByText(/Hana is back, so they.re the host again/), 15_000);
   await t.gone('Skip for the guest', ui.bar(guest.page).getByRole('button', { name: 'Skip' }));
 });
 
@@ -127,7 +127,7 @@ flow('handover: an open room carries on untouched without its host', async (t) =
   const room = await startRoom(t, host, { url: golden.url });
   await joinRoom(guest, room.url);
   await host.page.goto('about:blank');
-  await t.see('the host goes', ui.chatLog(guest.page).getByText('Hana left'));
+  await t.see('the host goes', ui.chatLog(guest.page).getByText('Hana left, so Gus is the host now.'), 55_000);
   await t.until('the guest keeps watching', async () => (await guest.sample())?.state === 'playing');
   await t.see('and keeps the controls', ui.bar(guest.page).getByRole('button', { name: /finish|skip/i }));
 });

@@ -1,8 +1,10 @@
-import { joinRoom, openTab, player, react, search, seedRoom, startRoom, ui } from '../lib/app.mjs';
+import { joinRoom, openTab, player, react, search, seedRoom, sendChat, startRoom, ui } from '../lib/app.mjs';
 import { crowd } from '../lib/bots.mjs';
 import { byId, video, youtube } from '../lib/fixtures.mjs';
 import { blockedControls, gutters, insets, playerCover, sideScroll, spills } from '../lib/layout.mjs';
 import { flow } from '../lib/runner.mjs';
+
+const train = video('Night Train');
 
 const WIDTHS = [
   { width: 390, height: 844, phone: true },
@@ -174,10 +176,16 @@ for (const size of WIDTHS) {
 
     await ui.invite(host.page).click();
     if (!phone) { // A phone gets the share sheet, which is the browser's own.
-      await t.see('a toast', host.page.getByText(/link copied/i));
+      await t.see('the invite card', host.page.getByRole('region', { name: 'Invite' }));
+      await checkPlayer(t, `${width} with the invite card`, host.page);
+      await checkPage(t, `${width} with the invite card`, host.page);
+      await host.page.getByRole('button', { name: 'Close' }).click();
+      await sendChat(guest.page, train.url);
+      await ui.chatLog(host.page).getByRole('button', { name: 'Add to queue' }).click();
+      await t.see('a toast', host.page.getByText('Added to the queue'));
       await checkPlayer(t, `${width} with a toast`, host.page);
       await checkPage(t, `${width} with a toast`, host.page);
-      await t.gone('the toast', host.page.getByText(/link copied/i), 8000);
+      await t.gone('the toast', host.page.getByText('Added to the queue'), 8000);
     }
 
     await react(guest.page, '🔥');

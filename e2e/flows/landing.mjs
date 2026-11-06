@@ -14,12 +14,11 @@ flow('landing: a first visit shows the pitch, the box and what is trending', asy
   t.check('the box has focus on a desktop', await ui.linkBox(a.page).evaluate((el) => el === document.activeElement));
 });
 
-flow('landing: pasting a link opens a room playing it, with the link copied', async (t) => {
+flow('landing: pasting a link opens a room playing it, and leaves the clipboard alone', async (t) => {
   const a = await t.person('a');
   const room = await startRoom(t, a, { url: golden.url });
   await t.see('the video title', ui.bar(a.page).getByRole('heading', { name: golden.title }));
-  await t.see('the copied toast', a.page.getByText(/link copied/i));
-  t.eq('clipboard', await a.page.evaluate(() => navigator.clipboard.readText()), room.url);
+  t.check('the clipboard is left alone', (await a.page.evaluate(() => navigator.clipboard.readText())) !== room.url);
   await t.until('it plays', async () => (await a.sample())?.state === 'playing');
 });
 
@@ -123,7 +122,9 @@ flow('landing: too many new rooms says so, and offers nothing that would fail', 
 });
 
 flow('landing: a server that is down gets a calm note, and the page recovers', { serial: true }, async (t) => {
-  const { page } = await t.person('a');
+  const a = await t.person('a');
+  const { page } = a;
+  a.expectedErrors = /dynamically imported module/; // The room page warms up in the background, and can meet the outage.
   await page.goto(t.base);
   await ui.linkBox(page).fill(golden.url);
   await t.stack.stop();

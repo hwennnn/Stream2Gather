@@ -39,13 +39,13 @@ for (const [label, source] of [['a file', (t) => sample(t.base)], ['YouTube', ()
     const { a, b } = await watching(t, source(t));
     await player(b.page).seek(120);
     await t.until('Ana lands there', async () => (await a.sample())?.time > 118, 8000);
-    await t.see('the chat says it', ui.chatLog(a.page).getByText(/Ben jumped to 2:0\d/));
+    await t.see('the status says it', ui.bar(a.page).filter({ hasText: /Ben moved to 2:0\d/ }));
     await player(a.page).seek(30);
     await t.until('Ben comes back', async () => {
       const now = await b.sample();
       return now.time > 28 && now.time < 45;
     }, 8000);
-    await t.see('and that too', ui.chatLog(b.page).getByText(/Ana went back to 0:3\d/));
+    await t.see('and that too', ui.bar(b.page).filter({ hasText: /Ana moved to 0:3\d/ }));
   });
 }
 
@@ -103,7 +103,7 @@ flow('skip: moves everyone to the next video and says what it is', async (t) => 
   await ui.skip(b.page).click();
   await t.see('Ana moved on', ui.bar(a.page).getByRole('heading', { name: train.title }));
   await t.see('Ben moved on', ui.bar(b.page).getByRole('heading', { name: train.title }));
-  await t.see('the chat says it', ui.chatLog(a.page).getByText(`Ben jumped to ${train.title}`));
+  await t.see('the chat says it', ui.chatLog(a.page).getByText(`Ben skipped to ${train.title}`));
   await openTab(a.page, 'Queue');
   await t.gone('it left the queue', ui.upNext(a.page).getByText(train.title));
   await t.see('one left in the queue', ui.tab(a.page, 'Queue').getByText('1'));
@@ -127,7 +127,7 @@ flow('end of video: a real file finishes and the next starts for everyone', { ti
   await addByMessage(t, a.page, [sample(t.base, 'sample.mp4', 'next')]);
   await t.see('Ana moves on', ui.bar(a.page).getByRole('heading', { name: 'sample.mp4' }), 14_000);
   await t.see('Ben moves on', ui.bar(b.page).getByRole('heading', { name: 'sample.mp4' }));
-  await t.see('the chat says it', ui.chatLog(b.page).getByText('Up next: sample.mp4'));
+  t.eq('the heading says it, so the chat needn\'t', await ui.chatLog(b.page).getByText('Up next: sample.mp4').count(), 0);
   t.check('nobody is blamed for the pause at the end', !(await ui.chatLog(a.page).getByText(/paused at/).isVisible()));
   await t.until('the next one plays', async () => (await b.sample())?.state === 'playing' && (await b.sample()).time < 10, 8000);
 });

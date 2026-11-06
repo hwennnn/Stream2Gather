@@ -84,7 +84,7 @@ export const runAll = async ({ grep, concurrency, out, makeContext, label }) => 
   const summary = { label, flows: results.length, flowsFailed: failed.length, checks, checksFailed: failedChecks, seconds };
   await writeFile(path.join(out, 'report.json'), JSON.stringify({ summary, results }, null, 1));
   console.log(`\n${label}: ${results.length - failed.length} of ${results.length} flows passed, ` +
-    `${checks - failedChecks} of ${checks} checks passed, ${seconds}s`);
+    `${checks} checks, ${failedChecks} failures, ${seconds}s`);
   const known = await readKnown();
   let fresh = 0;
   for (const result of failed) {

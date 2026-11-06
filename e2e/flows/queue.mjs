@@ -52,7 +52,6 @@ flow('search: from the empty stage, a result starts the room', async (t) => {
   await pressRow(a.page, rain.title, 'Queue');
   await t.see('Ana watches it', ui.bar(a.page).getByRole('heading', { name: rain.title }));
   await t.see('Ben watches it', ui.bar(b.page).getByRole('heading', { name: rain.title }));
-  await t.see('Ben is told', ui.chatLog(b.page).getByText(`Ana added ${rain.title}`));
 });
 
 flow('search row: Play now replaces the video for everyone and offers Undo', async (t) => {
@@ -147,8 +146,6 @@ flow('add by link: a pasted link joins the queue for everyone', async (t) => {
   await t.until('the box clears', async () => (await ui.addBox(a.page).inputValue()) === '');
   await t.see('Ben sees it', ui.upNext(b.page).getByText(train.title));
   await t.see('with who added it', ui.upNext(b.page).getByText('Ana', { exact: true }));
-  await openTab(b.page, 'Chat');
-  await t.see('and is told', ui.chatLog(b.page).getByText(`Ana added ${train.title}`));
 });
 
 flow('add by link: bad links stay in the box with a reason', async (t) => {

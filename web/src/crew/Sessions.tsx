@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { initials } from '../ui/format';
 import { crewApi, type PastSession, type SessionPage } from './api';
 
 const DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -10,15 +11,34 @@ const lasted = (session: PastSession): string => {
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 };
 
-const titles = (session: PastSession): string =>
-  session.videos.map((video) => video.media?.title ?? 'Video unavailable').join(', ') || 'Nothing played';
+const FACES = 3;
 
+/** The first thing they watched, and how much came after it. */
+const watched = ({ videos }: PastSession): string => {
+  const [first] = videos;
+  if (!first) return 'Nothing played';
+  const title = first.media?.title ?? 'Video unavailable';
+  return videos.length > 1 ? `${title} + ${videos.length - 1} more` : title;
+};
+
+/** Discs stay neutral: a session carries names, not ids, and a person's hue comes from their id. */
 const SessionRow = ({ session }: { session: PastSession }) => (
-  <li className="py-2 text-sm">
-    <p className="line-clamp-2">{titles(session)}</p>
-    <p className="mt-0.5 text-[13px] text-muted">
-      {DAY.format(Date.parse(session.startedAt))}, <span className="fig text-[13px]">{lasted(session)}</span>, {session.people.map((person) => person.name).join(', ')}
-    </p>
+  <li className="flex min-h-11 items-center gap-3 py-1 text-sm">
+    <span aria-hidden="true" className="flex w-[60px] shrink-0 -space-x-1.5">
+      {session.people.slice(0, FACES).map((person, index) => (
+        <span key={index} title={person.name} className="inline-flex size-7 items-center justify-center rounded-full bg-raised text-[11px] font-semibold text-muted ring-2 ring-ink">
+          {initials(person.name)}
+        </span>
+      ))}
+    </span>
+    <span className="min-w-0 flex-1 truncate">
+      {watched(session)}
+      <span className="sr-only">, with {session.people.map((person) => person.name).join(', ')}</span>
+    </span>
+    <span className="shrink-0 text-[13px] text-dim tabular-nums">
+      {DAY.format(Date.parse(session.startedAt))}
+      <span className="phone:hidden">, {lasted(session)}</span>
+    </span>
   </li>
 );
 
@@ -54,7 +74,7 @@ export const Sessions = ({ slug }: { slug: string }) => {
         <p className="mt-2 text-sm text-muted">Your first watch party will show up here.</p>
       ) : (
         <>
-          <ul className="mt-2 divide-y divide-line border-y border-line">
+          <ul aria-label="Past sessions" className="mt-2 divide-y divide-line border-y border-line">
             {page.items.map((session) => (
               <SessionRow key={session.id} session={session} />
             ))}
@@ -64,7 +84,6 @@ export const Sessions = ({ slug }: { slug: string }) => {
               Older
             </button>
           )}
-          <p className="mt-2 text-xs text-dim">Reactions and watch stats come from Stream2Gather, not YouTube.</p>
         </>
       )}
     </section>

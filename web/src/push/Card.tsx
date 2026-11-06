@@ -7,10 +7,12 @@ import {
 
 const FAILED = 'That didn’t work. Try again.';
 
-const Settings = ({ slug, onChanged }: { slug: string; onChanged: () => void }) => {
+/** What pings do for this crew and which devices get them. Lives with the crew's settings. */
+export const PushSettings = ({ slug }: { slug: string }) => {
   const [devices, setDevices] = useState<PushDevice[] | null>(null);
   const [crew, setCrew] = useState<PushCrew | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [offered, setOffered] = useState(false);
 
   const load = () =>
     readSettings().then(
@@ -23,6 +25,11 @@ const Settings = ({ slug, onChanged }: { slug: string; onChanged: () => void }) 
 
   useEffect(() => {
     void load();
+    // A browser that can't get pings has nothing to set here.
+    void Promise.all([readPushState(), api.config()]).then(
+      ([state, config]) => setOffered(state !== 'unsupported' && state !== 'install' && Boolean(config.vapidPublicKey)),
+      () => setOffered(false),
+    );
   }, [slug]);
 
   const toggle = async (on: boolean) => {
@@ -33,53 +40,49 @@ const Settings = ({ slug, onChanged }: { slug: string; onChanged: () => void }) 
 
   const remove = async (id: string) => {
     setProblem(null);
-    await removeDevice(id).then(() => {
-      onChanged();
-      return load();
-    }, () => setProblem(FAILED));
+    await removeDevice(id).then(load, () => setProblem(FAILED));
   };
 
+  if (!offered || (!devices && !problem)) return null;
+
   return (
-    <div className="mt-3">
-      {crew && (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={crew.notify === 'all'} onChange={(event) => void toggle(event.target.checked)} />
-          Ping me about this crew
-        </label>
-      )}
-      {devices?.length === 0 && <p className="mt-3 text-sm text-muted">No devices yet.</p>}
-      {devices && devices.length > 0 && (
-        <ul aria-label="Devices" className="mt-3 divide-y divide-line border-y border-line">
-          {devices.map((device) => (
-            <li key={device.id} className="flex h-11 items-center gap-3 text-sm">
-              <span className="min-w-0 truncate">
-                {deviceName(device.userAgent)}
-                {isThisDevice(device.id) && <span className="text-muted"> (this one)</span>}
-              </span>
-              <button type="button" onClick={() => void remove(device.id)} className="btn btn-ghost ml-auto">
-                Remove
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+    <section aria-label="Pings" className="mt-8">
+      <h2 className="text-sm font-semibold">Pings</h2>
+      <div className="mt-2 divide-y divide-line border-y border-line text-sm">
+        {crew && (
+          <label className="flex min-h-11 cursor-pointer items-center justify-between gap-4 py-1">
+            Ping me about this crew
+            <input type="checkbox" checked={crew.notify === 'all'} onChange={(event) => void toggle(event.target.checked)} className="size-4 accent-primary" />
+          </label>
+        )}
+        {devices?.length === 0 && <p className="flex min-h-11 items-center py-1 text-dim">No devices yet.</p>}
+        {devices?.map((device) => (
+          <div key={device.id} className="flex min-h-11 items-center gap-3 py-1">
+            <span className="min-w-0 truncate">
+              {deviceName(device.userAgent)}
+              {isThisDevice(device.id) && <span className="text-dim"> (this one)</span>}
+            </span>
+            <button type="button" onClick={() => void remove(device.id)} className="btn btn-ghost btn-sm -mr-2.5 ml-auto text-text">
+              Stop pings
+            </button>
+          </div>
+        ))}
+      </div>
       {problem && (
         <p role="status" className="mt-2 text-sm text-warn">
           {problem}
         </p>
       )}
-    </div>
+    </section>
   );
 };
 
 /** Offers pings on a crew home. It asks the browser only when someone presses Allow. */
-export default function Card({ slug }: { slug: string }) {
+export default function Card() {
   const [state, setState] = useState<PushState | null>(null);
   const [publicKey, setPublicKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
-
-  const refresh = () => void readPushState().then(setState, () => setState('unsupported'));
 
   useEffect(() => {
     // Failing costs nothing: the card says what the browser says, as it always has.
@@ -97,7 +100,7 @@ export default function Card({ slug }: { slug: string }) {
   if (!state || state === 'unsupported' || !publicKey) return null;
 
   return (
-    <section aria-label="Pings" className="mt-6">
+    <section aria-label="Pings" className="mt-3 border-t border-line pt-3">
       {state === 'off' && (
         <div className="flex items-center gap-3">
           <p className="min-w-0 flex-1 text-sm text-muted">Get a ping when your crew starts watching.</p>
@@ -121,12 +124,6 @@ export default function Card({ slug }: { slug: string }) {
         <p role="status" className="mt-2 text-sm text-warn">
           {problem}
         </p>
-      )}
-      {state !== 'install' && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-sm text-muted">Devices and settings</summary>
-          <Settings slug={slug} onChanged={refresh} />
-        </details>
       )}
     </section>
   );

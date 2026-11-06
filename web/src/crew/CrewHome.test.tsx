@@ -132,6 +132,7 @@ describe('CrewHome', () => {
     vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana, mika]));
     const close = vi.spyOn(crewApi, 'close').mockResolvedValue({});
     const owner = render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Members and settings' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
     expect(close).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Close it for everyone?' }));
@@ -140,9 +141,39 @@ describe('CrewHome', () => {
 
     accountState.view = { ...accountState.view, user: { id: 'u2', name: 'Mika', avatarUrl: '', signedIn: true } };
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Members and settings' }));
     expect(await screen.findByRole('button', { name: 'Leave' })).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Settings' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Actions for Hana' })).toBeNull();
+  });
+
+  it('keeps Remove and Make owner behind a row menu, and asks first', async () => {
+    signIntoAccount();
+    vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana, mika]));
+    const removeMember = vi.spyOn(crewApi, 'removeMember').mockResolvedValue({});
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Members and settings' }));
     expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Make owner' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actions for Mika' }));
+    expect(screen.getByRole('button', { name: 'Make owner' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    expect(removeMember).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Mika?' }));
+    await waitFor(() => expect(removeMember).toHaveBeenCalledWith('movie-night', 'u2'));
+  });
+
+  it('shows the link only when the clipboard refuses it', async () => {
+    signIntoAccount();
+    vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana, mika]));
+    Object.assign(navigator, { clipboard: { writeText: vi.fn().mockRejectedValue(new Error('denied')) } });
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    const field = await screen.findByLabelText('Invite link');
+    expect(field.className).toBe('sr-only');
+    fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    await waitFor(() => expect(field.className).toContain('field'));
+    expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
   });
 
   it('lists past sessions with fresh titles, and says when there are none', async () => {
@@ -150,7 +181,6 @@ describe('CrewHome', () => {
     vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana]));
     const empty = render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
     expect(await screen.findByText('Your first watch party will show up here.')).toBeTruthy();
-    expect(screen.queryByText(/come from Stream2Gather/)).toBeNull();
     empty.unmount();
 
     vi.spyOn(crewApi, 'sessions').mockResolvedValue({
@@ -160,13 +190,13 @@ describe('CrewHome', () => {
           startedAt: '2026-11-01T20:00:00Z',
           endedAt: '2026-11-01T21:30:00Z',
           people: [{ name: 'Hana', isGuest: false }],
-          videos: [{ source: 'youtube', media: null }],
+          videos: [{ source: 'youtube', media: null }, { source: 'youtube', media: null }],
         },
       ],
     });
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
-    expect(await screen.findByText('Video unavailable')).toBeTruthy();
-    expect(screen.getByText('1 h 30 min')).toBeTruthy();
-    expect(screen.getByText('Reactions and watch stats come from Stream2Gather, not YouTube.')).toBeTruthy();
+    expect((await screen.findByRole('list', { name: 'Past sessions' })).textContent).toContain('Video unavailable + 1 more');
+    expect(screen.getByRole('list', { name: 'Past sessions' }).textContent).toContain('1 h 30 min');
+    expect(screen.queryByText(/come from Stream2Gather/)).toBeNull();
   });
 });

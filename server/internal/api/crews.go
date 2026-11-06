@@ -38,6 +38,10 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews/{slug}/sessions/{id}/recap/share", s.shareRecap)
 	mux.HandleFunc("GET /v1/recaps/{token}", s.sharedRecap)
 	mux.HandleFunc("GET /s/{token}", s.recapPage)
+	mux.HandleFunc("GET /v1/crews/{slug}/items/{id}", s.crewItem)
+	mux.HandleFunc("GET /v1/crews/{slug}/missed", s.missed)
+	mux.HandleFunc("GET /v1/crews/{slug}/moments", s.moments)
+	mux.HandleFunc("POST /v1/crews/{slug}/moments", s.addMoment)
 	mux.HandleFunc("GET /v1/crews/{slug}/watchlist", s.watchlist)
 	mux.HandleFunc("POST /v1/crews/{slug}/watchlist", s.addWatch)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/watchlist/{id}", s.removeWatch)
@@ -91,8 +95,11 @@ func (s *Server) roomMessages(r *http.Request, record store.Room, before int64, 
 	if err != nil {
 		return nil, err
 	}
-	if !access.Exists || access.Member {
+	if !access.Exists {
 		return s.DB.Messages(r.Context(), record.ID, before, limit)
+	}
+	if access.Member {
+		return s.DB.MemberMessages(r.Context(), record.ID, claims.Subject, before, limit)
 	}
 	// A crew's history is the crew's. A guest sees the party they came to.
 	since, open, err := s.DB.OpenSessionStart(r.Context(), record.ID)

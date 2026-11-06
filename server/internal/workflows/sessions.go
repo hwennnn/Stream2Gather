@@ -38,6 +38,7 @@ type SessionStore interface {
 	OpenSessions(ctx context.Context) ([]store.OpenSession, error)
 	TouchSession(ctx context.Context, sessionID string, at time.Time) error
 	EndSession(ctx context.Context, sessionID string, at time.Time) (bool, error)
+	CatchupPerSession(ctx context.Context) (float64, error)
 	UnbuiltSessions(ctx context.Context, limit int) ([]string, error)
 	BuildRecap(ctx context.Context, sessionID string) error
 }
@@ -152,6 +153,11 @@ func (a *Activities) sweep(ctx context.Context, session store.OpenSession, now t
 // MeasureCrews reports crew_second_session_14d, the phase's headline number: of
 // the crews whose first fortnight is over, the share that came back within it.
 func (a *Activities) MeasureCrews(ctx context.Context) error {
+	perSession, err := a.Sessions.CatchupPerSession(ctx)
+	if err != nil {
+		return err
+	}
+	a.metric("moments_catchup_per_session", perSession)
 	cohort, returned, err := a.Sessions.SecondSessions(ctx)
 	if err != nil || cohort == 0 {
 		return err

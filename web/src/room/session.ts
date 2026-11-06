@@ -8,7 +8,8 @@ export type QueueItem = Media & { id: string; addedBy: string; addedByName: stri
 export type Settings = { controlMode: 'everyone' | 'hosts'; queueMode: 'everyone' | 'hosts' };
 
 export type ChatEntry =
-  | (ChatMessage & { kind: 'chat' })
+  /** History is what was said before this viewer joined, so none of it is news. */
+  | (ChatMessage & { kind: 'chat'; history?: true })
   | { kind: 'system'; id: string; text: string; createdAt: string };
 
 export type QueueMode = 'now' | 'next' | 'end';
@@ -104,6 +105,7 @@ export class RoomSession {
   private lastStatus = '';
   private behindAt: number | null = null;
   private resyncAt: number | null = null;
+  private historyLoaded = false;
   private narrator = new Narrator({
     say: (text) => this.say(text),
     rewrite: (lineId, text) => this.rewrite(lineId, text),
@@ -367,10 +369,13 @@ export class RoomSession {
   }
 
   private mergeHistory(items: ChatMessage[]): void {
+    // What comes in on a reconnect was said while this viewer was in the room.
+    const history = this.historyLoaded ? {} : { history: true as const };
+    this.historyLoaded = true;
     const known = new Set(this.view.messages.map((entry) => entry.id));
     const missing = items
       .filter((message) => !known.has(message.id))
-      .map((message): ChatEntry => ({ ...message, kind: 'chat' }));
+      .map((message): ChatEntry => ({ ...message, kind: 'chat', ...history }));
     if (missing.length === 0) return;
     const merged = [...missing, ...this.view.messages].sort(
       (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),

@@ -6,6 +6,11 @@ const MAX_SHOWN = 3;
 
 type Local = { text: string; count: number };
 
+/** Shows a failed action's own words, for use as a catch handler. */
+export const toastError = (onToast: (text: string) => void) => (error: unknown) => {
+  if (error instanceof Error) onToast(error.message);
+};
+
 /** Short-lived messages from this page. Saying the same thing again only extends it. */
 export const useToasts = () => {
   const [toasts, setToasts] = useState<Local[]>([]);

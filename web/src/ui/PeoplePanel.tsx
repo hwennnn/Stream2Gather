@@ -4,6 +4,7 @@ import type { RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import { isHost, isLocked, isOffline } from './rules';
+import { toastError } from './Toasts';
 
 type Props = { session: RoomSession; view: RoomView; onToast: (text: string) => void };
 
@@ -140,7 +141,7 @@ const HostSwitch = ({ session, view, onToast }: Props) => {
     try {
       await session.request('settings', { settings: { controlMode: mode, queueMode: mode } });
     } catch (error) {
-      if (error instanceof Error) onToast(error.message);
+      toastError(onToast)(error);
     } finally {
       setBusy(false);
     }

@@ -117,6 +117,8 @@ func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 		r.react(c, message)
 	case "status":
 		r.status(c, message)
+	case "voice":
+		r.voice(c, message)
 	case "media_error":
 		r.mediaError(c, message)
 	case room.CmdPlay, room.CmdPause, room.CmdSeek, room.CmdEnded, room.CmdSkip,
@@ -308,6 +310,9 @@ func (r *liveRoom) chat(c *conn, message Message) {
 		c.fail(message.ID, "unavailable", "Your message did not send.")
 		return
 	}
+	r.hub.recorder.Moment(r.id, Moment{
+		Kind: MomentChat, UserID: person.UserID, Author: person.Name, MessageID: stored.ID, At: stored.CreatedAt,
+	})
 	c.ack(message.ID)
 }
 
@@ -322,9 +327,15 @@ func (r *liveRoom) react(c *conn, message Message) {
 	}
 	ctx, cancel := opContext()
 	defer cancel()
-	_ = r.hub.live.Publish(ctx, r.id, encode("react", map[string]string{
-		"emoji": request.Emoji, "name": c.who().Name,
+	person := c.who()
+	err := r.hub.live.Publish(ctx, r.id, encode("react", map[string]string{
+		"emoji": request.Emoji, "name": person.Name,
 	}))
+	if err == nil {
+		r.hub.recorder.Moment(r.id, Moment{
+			Kind: MomentReaction, UserID: person.UserID, Author: person.Name, Emoji: request.Emoji, At: time.Now(),
+		})
+	}
 }
 
 // viewerStates are the only states relayed. Other clients use them as keys.

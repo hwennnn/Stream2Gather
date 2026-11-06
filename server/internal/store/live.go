@@ -177,6 +177,10 @@ type Person struct {
 	Name      string `json:"name"`
 	Role      string `json:"role"`
 	AvatarURL string `json:"avatarUrl,omitempty"`
+	// Member is true for someone on the room's crew roster.
+	Member bool `json:"member,omitempty"`
+	// Voice is empty, or listening, muted or live.
+	Voice string `json:"voice,omitempty"`
 }
 
 // Touch records that a connection is alive.
@@ -261,15 +265,27 @@ func (l *Live) People(ctx context.Context, roomID string) ([]Person, error) {
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool, len(connected))
+	return mergeTabs(connected), nil
+}
+
+// mergeTabs folds one person's tabs together. Only one of them is in voice, and
+// a tab opened before they joined the crew must not hide that they did.
+func mergeTabs(connected []Person) []Person {
+	seen := make(map[string]int, len(connected))
 	people := make([]Person, 0, len(connected))
 	for _, person := range connected {
-		if !seen[person.UserID] {
-			seen[person.UserID] = true
+		at, found := seen[person.UserID]
+		if !found {
+			seen[person.UserID] = len(people)
 			people = append(people, person)
+			continue
 		}
+		if people[at].Voice == "" {
+			people[at].Voice = person.Voice
+		}
+		people[at].Member = people[at].Member || person.Member
 	}
-	return people, nil
+	return people
 }
 
 // Ticket is what a WebSocket upgrade exchanges for an identity.

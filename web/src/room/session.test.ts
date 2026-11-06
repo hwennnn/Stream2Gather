@@ -1017,4 +1017,46 @@ describe('RoomSession', () => {
       expect(socket.ofType('status')).toHaveLength(1);
     });
   });
+
+  describe('voice', () => {
+    it('reports only where a fast run of changes ended up', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      session.setVoice('live');
+      session.setVoice('muted');
+      session.setVoice('live');
+      session.setVoice('muted');
+      vi.advanceTimersByTime(200);
+      expect(socket.ofType('voice').map((message) => message.d)).toEqual([{ state: 'muted' }]);
+    });
+
+    it('says it again on a new socket, which starts out knowing nothing', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      session.setVoice('live');
+      vi.advanceTimersByTime(200);
+
+      session.retry();
+      await vi.advanceTimersByTimeAsync(0);
+      const next = FakeSocket.last;
+      expect(next).not.toBe(socket);
+      next.deliver('welcome', welcome(2));
+      expect(next.ofType('voice').map((message) => message.d)).toEqual([{ state: 'live' }]);
+    });
+
+    it('has nothing to repeat after leaving the call', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      session.setVoice('live');
+      vi.advanceTimersByTime(200);
+      session.setVoice('off');
+      vi.advanceTimersByTime(200);
+      expect(socket.ofType('voice').at(-1)?.d).toEqual({ state: 'off' });
+
+      session.retry();
+      await vi.advanceTimersByTimeAsync(0);
+      FakeSocket.last.deliver('welcome', welcome(2));
+      expect(FakeSocket.last.ofType('voice')).toEqual([]);
+    });
+  });
 });

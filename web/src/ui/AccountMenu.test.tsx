@@ -29,6 +29,13 @@ describe('AccountMenu', () => {
     expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
   });
 
+  it('says when it could not confirm the other devices are out', () => {
+    shows({ publishableKey: 'pk_test_x', othersMayRemain: true });
+    render(<AccountMenu />);
+    expect(screen.getByRole('status').textContent).toMatch(/other devices/);
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeTruthy();
+  });
+
   it('stays out of the way on a server with no sign-in', () => {
     shows({});
     render(<AccountMenu />);

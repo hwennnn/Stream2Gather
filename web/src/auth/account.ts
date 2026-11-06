@@ -16,6 +16,8 @@ type AccountView = {
   /** Clerk's script only loads for people who are signing in or signed in. */
   clerkWanted: boolean;
   problem: string | null;
+  /** This browser is out, but the server couldn't confirm the others are. */
+  othersMayRemain: boolean;
   /** The server couldn't say how to sign in. A failed `/v1/me` isn't this: sign-in still works. */
   startFailed: boolean;
 };
@@ -23,7 +25,7 @@ type AccountView = {
 // Survives the redirect back from Google, which reloads the page.
 const SIGNING_IN = 's2g:signing-in';
 
-let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null, startFailed: false };
+let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null, othersMayRemain: false, startFailed: false };
 let clerk: ClerkControls | null = null;
 let openWhenReady = false;
 /** The sign-in was opened by this page, so it may still be showing. */
@@ -98,7 +100,13 @@ export const account = {
 
   async signOut(): Promise<void> {
     await clerk?.signOut();
-    setUser((await api.signOut()).user);
+    try {
+      setUser((await api.signOut()).user);
+    } catch {
+      // The server drops this browser's cookie even when it fails, so ask who's left.
+      await account.refresh();
+      update({ othersMayRemain: true });
+    }
   },
 
   /** Called by the Clerk bridge once Clerk's script has loaded. */

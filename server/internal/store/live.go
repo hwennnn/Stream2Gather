@@ -236,6 +236,60 @@ func (l *Live) Lines(ctx context.Context, roomID string) ([]Line, error) {
 	return lines, nil
 }
 
+// Departure is someone whose last socket closed without them saying goodbye.
+type Departure struct {
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	At     int64  `json:"at"`
+}
+
+func goneKey(roomID string) string { return "room:" + roomID + ":gone" }
+
+// MarkGone notes a departure that might only be a reload.
+func (l *Live) MarkGone(ctx context.Context, roomID string, gone Departure) error {
+	doc, err := json.Marshal(gone)
+	if err != nil {
+		return err
+	}
+	key := goneKey(roomID)
+	pipe := l.rdb.TxPipeline()
+	pipe.HSet(ctx, key, gone.UserID, doc)
+	pipe.Expire(ctx, key, liveTTL)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// TakeGone claims a departure. Only one caller gets it, on any server.
+func (l *Live) TakeGone(ctx context.Context, roomID, userID string) (Departure, bool, error) {
+	key := goneKey(roomID)
+	pipe := l.rdb.TxPipeline()
+	doc := pipe.HGet(ctx, key, userID)
+	deleted := pipe.HDel(ctx, key, userID)
+	if _, err := pipe.Exec(ctx); err != nil && !errors.Is(err, redis.Nil) {
+		return Departure{}, false, err
+	}
+	if deleted.Val() == 0 {
+		return Departure{}, false, nil
+	}
+	var gone Departure
+	return gone, true, json.Unmarshal([]byte(doc.Val()), &gone)
+}
+
+// Departures lists who is marked gone.
+func (l *Live) Departures(ctx context.Context, roomID string) ([]Departure, error) {
+	docs, err := l.rdb.HVals(ctx, goneKey(roomID)).Result()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Departure, len(docs))
+	for i, doc := range docs {
+		if err := json.Unmarshal([]byte(doc), &out[i]); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
+}
+
 // Touch records that a connection is alive.
 func (l *Live) Touch(ctx context.Context, roomID, connID string, person Person) error {
 	doc, err := json.Marshal(person)

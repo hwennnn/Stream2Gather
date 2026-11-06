@@ -85,12 +85,12 @@ flow('popular: the strip under the player adds what is tapped, and it leaves the
   await t.see('it is queued', ui.upNext(a.page).getByRole('listitem').filter({ hasText: train.title }));
 });
 
-flow('links: catch-up and recap links land somewhere until those pages exist', async (t) => {
+flow('links: a catch-up link lands somewhere until that page exists, and a dead recap link says so', async (t) => {
   const a = await t.person('Ana');
   const room = await startRoom(t, a, { url: golden.url });
   const b = await t.person('Ben');
   await b.page.goto(`${t.base}/r/${room.slug}/catchup/nothing`);
   await t.see('the gate', ui.join(b.page));
   await b.page.goto(`${t.base}/s/no-such-token`);
-  await t.see('home', ui.linkBox(b.page));
+  await t.see('a recap that is not shared', b.page.getByRole('heading', { name: /recap isn.t shared/ }));
 });

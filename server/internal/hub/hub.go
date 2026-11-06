@@ -1010,6 +1010,10 @@ func (r *liveRoom) arrived(ctx context.Context, person store.Person, tabs, other
 // settleDepartures says who left, once they have been gone too long for a reload.
 func (r *liveRoom) settleDepartures(ctx context.Context) {
 	departures, err := r.hub.live.Departures(ctx, r.id)
+	if err != nil || len(departures) == 0 {
+		return
+	}
+	people, err := r.hub.live.People(ctx, r.id)
 	if err != nil {
 		return
 	}
@@ -1018,12 +1022,17 @@ func (r *liveRoom) settleDepartures(ctx context.Context) {
 		if departure.At > cutoff {
 			continue
 		}
-		if _, claimed, err := r.hub.live.TakeGone(ctx, r.id, departure.UserID); err == nil && claimed {
-			if !departure.Quiet {
-				r.say(ctx, departure.Name+" left", "")
-			}
-			r.vacate(ctx, departure.UserID)
+		if _, claimed, err := r.hub.live.TakeGone(ctx, r.id, departure.UserID); err != nil || !claimed {
+			continue
 		}
+		// They came back before this was written, so their join couldn't clear it.
+		if slices.ContainsFunc(people, func(p store.Person) bool { return p.UserID == departure.UserID }) {
+			continue
+		}
+		if !departure.Quiet {
+			r.say(ctx, departure.Name+" left", "")
+		}
+		r.vacate(ctx, departure.UserID)
 	}
 }
 

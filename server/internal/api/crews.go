@@ -6,12 +6,21 @@ import (
 	"errors"
 	"net/http"
 	"slices"
+	"strconv"
 	"time"
 
 	"stream2gather/internal/auth"
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
+	"stream2gather/internal/source"
 	"stream2gather/internal/store"
+)
+
+const (
+	// A person lining up a whole evening is well inside this.
+	watchlistAddsPerHour = 120
+	// mediaFreshFor is the 30-day limit on keeping a source's data.
+	mediaFreshFor = 30 * 24 * time.Hour
 )
 
 // crewRoutes adds the crew routes. Track A owns this file.
@@ -23,6 +32,9 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews/{slug}/join", s.joinCrew)
 	mux.HandleFunc("POST /v1/crews/{slug}/invite", s.rotateInvite)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/members/{userId}", s.removeMember)
+	mux.HandleFunc("GET /v1/crews/{slug}/watchlist", s.watchlist)
+	mux.HandleFunc("POST /v1/crews/{slug}/watchlist", s.addWatch)
+	mux.HandleFunc("DELETE /v1/crews/{slug}/watchlist/{id}", s.removeWatch)
 	mux.HandleFunc("GET /v1/me/crews", s.myCrews)
 	mux.HandleFunc("DELETE /v1/me", s.deleteMe)
 	mux.HandleFunc("PATCH /v1/crews/{slug}/me", s.setCrewNotify)
@@ -136,6 +148,8 @@ func (s *Server) crewFailed(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusGone, "room_closed", "This room has closed.")
 	case errors.Is(err, store.ErrNotMember):
 		writeProblem(w, http.StatusConflict, "not_member", "That person isn't on this crew.")
+	case errors.Is(err, store.ErrWatchlistFull):
+		writeProblem(w, http.StatusConflict, "watchlist_full", "The watchlist is full.")
 	case errors.Is(err, errOwnerStays):
 		writeProblem(w, http.StatusConflict, "owner_stays", "Hand the crew to someone else first.")
 	default:
@@ -329,6 +343,108 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// memberCrew is findCrew for routes only people on the roster may use. Guests in
+// the room are not: they can watch, but the crew's list is the crew's.
+func (s *Server) memberCrew(w http.ResponseWriter, r *http.Request) (auth.Claims, store.Crew, bool) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return auth.Claims{}, store.Crew{}, false
+	}
+	record, crew, ok := s.findCrew(w, r)
+	if !ok {
+		return auth.Claims{}, store.Crew{}, false
+	}
+	access, err := s.DB.CrewAccessOf(r.Context(), record.ID, claims.Subject)
+	if err != nil {
+		s.internal(w, err)
+		return auth.Claims{}, store.Crew{}, false
+	}
+	if !access.Member {
+		writeProblem(w, http.StatusForbidden, "not_member", "Join the crew to see this.")
+		return auth.Claims{}, store.Crew{}, false
+	}
+	return claims, crew, true
+}
+
+func (s *Server) watchlist(w http.ResponseWriter, r *http.Request) {
+	_, crew, ok := s.memberCrew(w, r)
+	if !ok {
+		return
+	}
+	items, err := s.DB.Watchlist(r.Context(), crew.ID)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// addWatch goes through the catalog like queue.add, so clients only ever name a
+// video. A link can cost a source lookup, and that is what the limit is for.
+func (s *Server) addWatch(w http.ResponseWriter, r *http.Request) {
+	claims, crew, ok := s.memberCrew(w, r)
+	if !ok {
+		return
+	}
+	var request struct {
+		URL      string `json:"url"`
+		Source   string `json:"source"`
+		SourceID string `json:"sourceId"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	allowed, err := s.Live.Limit(r.Context(), "watchlist:"+claims.Subject, watchlistAddsPerHour, time.Hour)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !allowed {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many videos at once. Try again later.")
+		return
+	}
+	videoSource, sourceID := request.Source, request.SourceID
+	if request.URL != "" {
+		media, err := s.Catalog.Resolve(r.Context(), request.URL, source.LookupCharge(s.Live.Limit, s.clientIP(r)))
+		if err != nil {
+			s.mediaFailed(w, err)
+			return
+		}
+		videoSource, sourceID = media.Source, media.SourceID
+	} else if _, found, err := s.DB.GetMedia(r.Context(), videoSource, sourceID, mediaFreshFor); err != nil {
+		s.internal(w, err)
+		return
+	} else if !found {
+		writeProblem(w, http.StatusUnprocessableEntity, "media", "That video could not be loaded.")
+		return
+	}
+	if err := s.DB.AddWatch(r.Context(), crew.ID, videoSource, sourceID, claims.Subject); err != nil {
+		s.crewFailed(w, err)
+		return
+	}
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "watchlist"})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) removeWatch(w http.ResponseWriter, r *http.Request) {
+	_, crew, ok := s.memberCrew(w, r)
+	if !ok {
+		return
+	}
+	id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	removed, err := s.DB.RemoveWatch(r.Context(), crew.ID, id)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !removed {
+		writeProblem(w, http.StatusNotFound, "not_found", "That video isn't on the list.")
+		return
+	}
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "watchlist"})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // myCrews feeds the rail. Who is here comes live from each room, so one room's
 // Redis read failing costs its count and nothing else.
 func (s *Server) myCrews(w http.ResponseWriter, r *http.Request) {
@@ -437,6 +553,7 @@ type crewDocument struct {
 	InviteToken string             `json:"inviteToken"`
 	GuestAccess bool               `json:"guestAccess"`
 	Roster      []store.CrewMember `json:"roster"`
+	Watchlist   []store.WatchItem  `json:"watchlist"`
 }
 
 func (s *Server) crewHome(w http.ResponseWriter, r *http.Request) {
@@ -462,7 +579,13 @@ func (s *Server) crewHome(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
+	watchlist, err := s.DB.Watchlist(r.Context(), crew.ID)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, crewDocument{
-		preview: live, OwnerID: record.OwnerID, InviteToken: crew.InviteToken, GuestAccess: crew.GuestAccess, Roster: roster,
+		preview: live, OwnerID: record.OwnerID, InviteToken: crew.InviteToken, GuestAccess: crew.GuestAccess,
+		Roster: roster, Watchlist: watchlist,
 	})
 }

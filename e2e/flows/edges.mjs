@@ -101,8 +101,10 @@ flow('error pages: odd addresses still land somewhere sensible', async (t) => {
 flow('error pages: a page that does not exist is not a blank screen', async (t) => {
   const { page } = await t.person('a');
   const response = await page.goto(`${t.base}/no/such/page`);
-  t.check('it renders something', (await page.locator('#root').innerText()).length > 0);
-  t.eq('the address is honest about being missing', response.status() === 404 || (await page.getByText(/not found|can.t find/i).count()) > 0, true);
+  t.eq('the address is honest about being missing', response.status(), 404);
+  await t.see('it says so', page.getByRole('heading', { name: /page doesn.t exist/i }));
+  await page.getByRole('link', { name: 'Go home' }).click();
+  await t.see('and the way home works', ui.linkBox(page));
 });
 
 flow('error pages: a broken answer from the server hits the safety net, not a white page', async (t) => {

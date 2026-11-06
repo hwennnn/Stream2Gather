@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { RoomPreview } from '../api/http';
 import { useAccount } from '../auth/account';
 import { Avatar } from './Avatar';
@@ -10,6 +10,15 @@ import { Thumb } from './Thumb';
 type JoinGateProps = {
   preview: RoomPreview | null;
   onJoin: (name: string, changed: boolean) => Promise<void>;
+  /** A crew's gate says whose room this is, not who's inviting. */
+  heading?: string;
+  /** Join stands aside for a better way in, shown above it. */
+  aside?: ReactNode;
+  joinLabel?: string;
+  /** Join is the lesser way in here. */
+  quiet?: boolean;
+  /** False when the room has no way in from here. */
+  canJoin?: boolean;
 };
 
 const MAX_NAME = 32;
@@ -25,7 +34,7 @@ export const WhereItIs = ({ preview }: { preview: RoomPreview }) => {
 };
 
 /** The Join click is also the gesture that lets the video start with sound. */
-export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
+export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', quiet = false, canJoin = true }: JoinGateProps) => {
   const { user } = useAccount();
   const [suggested] = useState(suggestName);
   const [edited, setEdited] = useState<string | null>(null);
@@ -51,7 +60,8 @@ export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
   seatHues(others.map((person) => person.userId));
   const extra = others.length - SHOWN;
   const inviter = others.find((person) => person.role === 'host') ?? others[0];
-  const empties = Math.max(0, MIN_EMPTY - others.length);
+  // A crew's gate counts its members, so seats nobody took would say something else.
+  const empties = heading ? 0 : Math.max(0, MIN_EMPTY - others.length);
 
   return (
     <Page>
@@ -65,8 +75,10 @@ export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
         <div>
           {preview ? (
             <>
-              <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-balance">{inviter ? `${firstName(inviter.name)} saved you a seat` : preview.name}</h1>
-              {inviter ? (
+              <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-balance">{heading ?? (inviter ? `${firstName(inviter.name)} saved you a seat` : preview.name)}</h1>
+              {heading ? (
+                preview.nowPlaying && <p className="mt-1 line-clamp-2 text-muted">Watching {preview.nowPlaying.title}</p>
+              ) : inviter ? (
                 <p className="mt-1 line-clamp-2 text-muted">{preview.nowPlaying ? `${preview.name}, watching ${preview.nowPlaying.title}` : preview.name}</p>
               ) : (
                 <p className="mt-1 text-muted">You’re first in. Friends with the link will sit down next to you.</p>
@@ -80,48 +92,58 @@ export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
             </div>
           )}
 
-          <ul aria-label="In the room" data-gate="true" className="seats mt-6">
-            {others.slice(0, SHOWN).map((person) => (
-              <li key={person.userId} className="seat">
-                <span className="seat-disc">
-                  <Avatar person={person} labelled={false} className="size-full text-[13px]" />
-                </span>
-                <span className="seat-name">{firstName(person.name)}</span>
-              </li>
-            ))}
-            {extra > 0 && (
-              <li className="seat">
-                <span className="seat-more">+{extra}</span>
-              </li>
-            )}
-            <li className="seat seat-you">
-              <span className="seat-empty" />
-              <span className="seat-name">{name.trim() || suggested}</span>
-            </li>
-            {Array.from({ length: empties }, (_, index) => (
-              <li key={index} aria-hidden="true" className="seat">
-                <span className="seat-empty" />
-              </li>
-            ))}
-          </ul>
+          {(!heading || others.length > 0) && (
+            <ul aria-label="In the room" data-gate="true" className="seats mt-6">
+              {others.slice(0, SHOWN).map((person) => (
+                <li key={person.userId} className="seat">
+                  <span className="seat-disc">
+                    <Avatar person={person} labelled={false} className="size-full text-[13px]" />
+                  </span>
+                  <span className="seat-name">{firstName(person.name)}</span>
+                </li>
+              ))}
+              {extra > 0 && (
+                <li className="seat">
+                  <span className="seat-more">+{extra}</span>
+                </li>
+              )}
+              {!heading && (
+                <li className="seat seat-you">
+                  <span className="seat-empty" />
+                  <span className="seat-name">{name.trim() || suggested}</span>
+                </li>
+              )}
+              {Array.from({ length: empties }, (_, index) => (
+                <li key={index} aria-hidden="true" className="seat">
+                  <span className="seat-empty" />
+                </li>
+              ))}
+            </ul>
+          )}
 
-          <label htmlFor="join-name" className="mt-6 block text-[13px] text-muted">
-            Your name
-          </label>
-          <div className="mt-1.5 flex gap-2">
-            <input
-              id="join-name"
-              value={name}
-              maxLength={MAX_NAME}
-              onChange={(event) => setEdited(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-              className="field min-w-0 flex-1"
-            />
-            <button ref={button} type="submit" disabled={!preview || busy} className="btn btn-primary">
-              Join
-            </button>
-          </div>
+          {aside}
+
+          {canJoin && (
+            <>
+              <label htmlFor="join-name" className="mt-6 block text-[13px] text-muted">
+                Your name
+              </label>
+              <div className="mt-1.5 flex gap-2">
+                <input
+                  id="join-name"
+                  value={name}
+                  maxLength={MAX_NAME}
+                  onChange={(event) => setEdited(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="field min-w-0 flex-1"
+                />
+                <button ref={button} type="submit" disabled={!preview || busy} className={`btn ${quiet ? 'btn-quiet' : 'btn-primary'}`}>
+                  {joinLabel}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </form>
     </Page>

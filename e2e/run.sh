@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Runs sync.mjs against a private server, so it never touches one in use, and
-# builds whatever is missing first. Needs `make up` and Google Chrome.
-#   E2E_PORT  port for the private server (18082)
-#   E2E_WEB   a web build to serve, built here if empty (web/dist)
-#   E2E_OUT   where sync.mjs leaves its screenshots (a temporary folder)
+# Runs sync.mjs against a private server and a fresh web build, so it never
+# touches a server in use or tests stale code. Needs `make up` and Google Chrome.
+#   E2E_PORT    port for the private server (18082)
+#   E2E_SAMPLE  the test video, made here if missing (.data/sample.mp4)
+#   E2E_OUT     where sync.mjs leaves its screenshots (a temporary folder)
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 port=${E2E_PORT:-18082}
-web=${E2E_WEB:-$root/web/dist}
+sample=${E2E_SAMPLE:-$root/.data/sample.mp4}
 work=$(mktemp -d)
+web=$work/web
 out=${E2E_OUT:-$work}
 base=http://127.0.0.1:$port
 
@@ -20,12 +21,13 @@ stop() {
 }
 trap stop EXIT
 
-if [ ! -f "$web/index.html" ]; then
-  (cd "$root/web" && npm ci && npx vite build --outDir "$web")
+[ -d "$root/web/node_modules" ] || (cd "$root/web" && npm ci)
+(cd "$root/web" && npx vite build --outDir "$web" --emptyOutDir)
+if [ ! -f "$sample" ]; then
+  mkdir -p "$(dirname "$sample")"
+  make -C "$root" sample SAMPLE="$sample"
 fi
-if [ ! -f "$web/sample.mp4" ]; then
-  make -C "$root" sample SAMPLE="$web/sample.mp4"
-fi
+cp "$sample" "$web/sample.mp4"
 [ -d "$root/e2e/node_modules" ] || (cd "$root/e2e" && npm ci)
 (cd "$root/server" && go build -o "$work/s2g" ./cmd/s2g)
 

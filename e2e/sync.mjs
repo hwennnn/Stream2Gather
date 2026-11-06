@@ -38,12 +38,14 @@ const viewer = async (name, { latencyMs = 0 } = {}) => {
   await page.addInitScript((delay) => {
     const Native = window.WebSocket;
     window.__sockets = [];
+    window.__roomEvents = 0;
     window.WebSocket = class extends Native {
       #onmessage = null;
       constructor(...args) {
         super(...args);
         window.__sockets.push(this);
         super.addEventListener('message', (event) => {
+          if (/^\{"t":"(state|playback)"/.test(event.data)) window.__roomEvents += 1;
           if (delay === 0) this.#onmessage?.(event);
           else setTimeout(() => this.#onmessage?.(event), delay);
         });
@@ -109,6 +111,13 @@ const measure = async (viewers, seconds) => {
 /** Sends a message on the viewer's own socket, the way the app would. */
 const sendOnSocket = (v, t, d) =>
   v.page.evaluate(([type, data]) => window.__sockets.at(-1).send(JSON.stringify({ t: type, d: data })), [t, d]);
+
+/** Does something that reaches the viewer as a room event, and returns as it lands. */
+const roomEventFrom = async (v, action) => {
+  const seen = await v.page.evaluate(() => window.__roomEvents);
+  await action();
+  await v.page.waitForFunction((count) => window.__roomEvents > count, seen, { timeout: 5000 });
+};
 
 const videoSources = (viewers) =>
   Promise.all(viewers.map((v) => v.page.evaluate(() => document.querySelector('video')?.currentSrc ?? '')));
@@ -225,6 +234,37 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   await Promise.all([a, b, c].map((v) => v.context.close()));
 }
 
+// An event that leaves playback alone must not swallow a real pause. Each of these
+// pauses the moment the event lands, inside what used to be an ignored window.
+{
+  const [host, guest] = await Promise.all(['host', 'guest'].map(viewer));
+  const room = await createRoom(host, `${BASE}/sample.mp4`);
+  await join(guest, room.url);
+  check('pause after an event: both play', await waitPlaying([host, guest]), '');
+  await sleep(3000);
+
+  const pausesAndStays = async (label, pauser, event) => {
+    await roomEventFrom(pauser, event);
+    await pauser.page.evaluate(() => document.querySelector('video').pause());
+    const landed = await waitFor(() => allInState([host, guest], 'paused'), 3000);
+    await sleep(3000); // Long enough for a dropped pause to resume by itself.
+    const states = (await sampleAll([host, guest])).map((s) => s?.state);
+    check(`pause after ${label}: everyone stays paused`, landed && states.every((s) => s === 'paused'), states.join());
+    await host.page.evaluate(() => document.querySelector('video').play());
+    await waitFor(() => allInState([host, guest], 'playing'), 3000);
+    await sleep(2000);
+  };
+
+  await host.page.getByRole('tab', { name: /People/ }).click();
+  await pausesAndStays('a lock toggle', host, () => host.page.getByRole('switch').click());
+  await pausesAndStays('an unlock', host, () => host.page.getByRole('switch').click());
+  await pausesAndStays('a queue add', guest, () =>
+    sendOnSocket(host, 'queue.add', { url: `${BASE}/sample.mp4?video=next`, mode: 'end' }));
+
+  report.pauseAfterEventErrors = [...new Set([...host.errors, ...guest.errors])].slice(0, 5);
+  await Promise.all([host, guest].map((v) => v.context.close()));
+}
+
 // Someone arriving after the queue moved on must get the room as it is now, not
 // as it was. The queue change reaches viewers as one event; a late joiner only
 // ever sees the snapshot in its welcome.
@@ -289,13 +329,14 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   for (let i = 0; i < 6; i += 1) {
     await far.page.evaluate(() => document.querySelector('video').pause());
     if (await waitFor(() => allInState([a, far], 'paused'), 3000)) landed += 1;
-    await sleep(1700); // Past the echo window, so the next one reads as a viewer's.
     await far.page.evaluate(() => document.querySelector('video').play());
     if (await waitFor(() => allInState([a, far], 'playing'), 3000)) landed += 1;
-    await sleep(1700);
   }
   check('latency: every pause and play lands', landed === 12, `${landed} of 12`);
 
+  // A seek shows as a jump between two ticks of a running player, so one made in
+  // the tick after resuming isn't seen. That is a known limit, not what this tests.
+  await sleep(2500);
   const before = (await sampleAll([a]))[0].time;
   await far.page.evaluate((to) => { document.querySelector('video').currentTime = to; }, before + 30);
   const moved = await waitFor(async () => {

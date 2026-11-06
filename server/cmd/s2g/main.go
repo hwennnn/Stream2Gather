@@ -40,7 +40,7 @@ const (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: s2g serve | worker | notifier | migrate")
+		fmt.Fprintln(os.Stderr, "usage: s2g serve | worker | notifier | migrate | vapid-keys")
 		os.Exit(2)
 	}
 
@@ -58,6 +58,8 @@ func main() {
 			err = worker(ctx, cfg, log)
 		case "notifier":
 			err = notifier(ctx, cfg, log)
+		case "vapid-keys":
+			err = vapidKeys()
 		default:
 			err = fmt.Errorf("unknown command %q", os.Args[1])
 		}

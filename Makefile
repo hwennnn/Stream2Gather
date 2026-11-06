@@ -1,4 +1,4 @@
-.PHONY: up down voice voice-keys web serve worker notifier temporal test sample e2e e2e-voice flows
+.PHONY: up down voice voice-keys push-keys web serve worker notifier temporal test sample e2e e2e-voice flows
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
@@ -11,6 +11,10 @@ voice-keys:
 	@umask 077; grep -q '^LIVEKIT_API_SECRET=' server/.env.local 2>/dev/null || \
 		printf 'LIVEKIT_URL=ws://127.0.0.1:17880\nLIVEKIT_API_KEY=dev%s\nLIVEKIT_API_SECRET=%s\n' \
 		"$$(openssl rand -hex 6)" "$$(openssl rand -hex 24)" >> server/.env.local
+
+# Writes local VAPID keys into server/.env.local once. Only `make notifier` needs the private one.
+push-keys:
+	@cd server && umask 077; grep -q '^VAPID_PRIVATE_KEY=' .env.local 2>/dev/null || go run ./cmd/s2g vapid-keys >> .env.local
 
 voice: voice-keys
 	. server/.env.local && LIVEKIT_KEYS="$$LIVEKIT_API_KEY: $$LIVEKIT_API_SECRET" \

@@ -32,9 +32,11 @@ type Config struct {
 	LookupDailyBudget int
 	LiveKit           LiveKit
 	VAPID             VAPID
-	EnableVimeo       bool
-	EnableTwitch      bool
-	TwitchParent      string
+	// NotifierHealthAddr is where s2g notifier answers health checks.
+	NotifierHealthAddr string
+	EnableVimeo        bool
+	EnableTwitch       bool
+	TwitchParent       string
 }
 
 // LiveKit is the voice server. The zero value means voice is off.
@@ -106,6 +108,7 @@ func Load() (Config, error) {
 			APIKey:    os.Getenv("LIVEKIT_API_KEY"),
 			APISecret: os.Getenv("LIVEKIT_API_SECRET"),
 		},
+		NotifierHealthAddr: env("NOTIFIER_HEALTH_ADDR", "127.0.0.1:18090"),
 		VAPID: VAPID{
 			PublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
 			PrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),

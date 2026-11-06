@@ -59,7 +59,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	}
 	defer c.close()
 	if ticket.Account {
-		h.accounts.Store(c, struct{}{})
+		h.accounts.Store(c, r.id)
 		defer h.accounts.Delete(c)
 	}
 

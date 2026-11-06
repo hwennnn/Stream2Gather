@@ -18,7 +18,7 @@ import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerSta
 import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
-import { canControl, chatOffersInvite, noticesToShow, toastLift } from '../ui/rules';
+import { canControl, chatOffersInvite, noticesToShow, onCrew, toastLift } from '../ui/rules';
 import { Slot } from '../ui/Slot';
 import { JumpToast, ToastStack, useToasts } from '../ui/Toasts';
 import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
@@ -29,6 +29,7 @@ import { useRoomPlayer } from '../ui/useRoomPlayer';
 
 const CrewHome = lazy(() => import('./CrewHome'));
 const VoiceButton = lazy(() => import('../voice/VoiceButton'));
+const RoomWatchlist = lazy(() => import('../crew/RoomWatchlist'));
 
 type Tab = 'chat' | 'queue' | 'people';
 
@@ -197,6 +198,11 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const current = view.queue[0];
   const railHidden = theatre && wide && !fullscreen.on && current !== undefined;
   const inviteUrl = useInviteUrl(session, view);
+  const watchlist = onCrew(view) ? (
+    <Slot>
+      <RoomWatchlist session={session} view={view} />
+    </Slot>
+  ) : undefined;
 
   const unread = useUnread(view.messages, view.self?.userId, tab === 'chat' && !railHidden && visible);
 
@@ -329,6 +335,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
 
       <div className="room-body">
         <PlayerStage
+          extra={watchlist}
           session={session}
           view={view}
           player={player}
@@ -402,7 +409,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
             />
           </div>
           <div id="panel-queue" role="tabpanel" aria-labelledby="tab-queue" hidden={tab !== 'queue'} className="min-h-0 flex-1">
-            <QueuePanel session={session} view={view} onToast={toast} />
+            <QueuePanel session={session} view={view} onToast={toast} extra={watchlist} />
           </div>
           <div id="panel-people" role="tabpanel" aria-labelledby="tab-people" hidden={tab !== 'people'} className="min-h-0 flex-1">
             <PeoplePanel session={session} view={view} onToast={toast} />

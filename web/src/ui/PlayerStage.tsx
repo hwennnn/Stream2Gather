@@ -42,6 +42,8 @@ type StageProps = {
   queueOpen: boolean;
   offlineNote: ReactNode;
   onToast: (text: string) => void;
+  /** A labelled group of videos beside search and suggestions. */
+  extra?: ReactNode;
   /** Theatre mode has hidden the rail, so what lives there has to show here. */
   railHidden: boolean;
   /** Toasts in theatre mode, when there's no rail to hold them. */
@@ -56,7 +58,7 @@ export const PlayerStage = (props: StageProps) => {
     <main className="room-main">
       <div className={current ? 'stage aspect-video' : 'stage stage-idle'}>
         <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
-        {!current && <IdleStage session={session} view={view} />}
+        {!current && <IdleStage session={session} view={view} extra={props.extra} />}
         {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} onRetry={player.retry} />}
         {current && !player.failure && !player.ready && <Poster item={current} changing={changing} />}
       </div>
@@ -131,7 +133,7 @@ export const FailurePanel = ({ item, error, view, onPickAnother, onRetry }: Fail
 
 const PICKS = 4;
 
-const IdleStage = ({ session, view }: { session: RoomSession; view: RoomView }) => {
+const IdleStage = ({ session, view, extra }: { session: RoomSession; view: RoomView; extra?: ReactNode }) => {
   const finished = view.ranOut;
   const adder = useAdder(session, view);
   const search = useSearch(adder);
@@ -151,10 +153,13 @@ const IdleStage = ({ session, view }: { session: RoomSession; view: RoomView }) 
           </div>
           {searching ? (
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto">
-              <SearchResults search={search} adder={adder} />
+              <SearchResults search={search} adder={adder} extra={extra} />
             </div>
           ) : (
-            <Picks items={trending} adder={adder} />
+            <>
+              <Picks items={trending} adder={adder} />
+              {extra && <div className="min-h-0 overflow-y-auto">{extra}</div>}
+            </>
           )}
         </div>
       )}

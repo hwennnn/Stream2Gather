@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { formatTime, plural } from './format';
 import { Icon, type IconName } from './Icon';
@@ -12,7 +12,13 @@ import { toastError } from './Toasts';
 import { useAdder } from './useAdder';
 import { notInRoom, useTrending } from './useTrending';
 
-type Props = { session: RoomSession; view: RoomView; onToast: (text: string) => void };
+type Props = {
+  session: RoomSession;
+  view: RoomView;
+  onToast: (text: string) => void;
+  /** A labelled group of videos beside search and suggestions. */
+  extra?: ReactNode;
+};
 
 const summary = (items: QueueItem[]): string => {
   const parts = [plural(items.length, 'video')];
@@ -21,7 +27,7 @@ const summary = (items: QueueItem[]): string => {
   return parts.join(', ');
 };
 
-export const QueuePanel = ({ session, view, onToast }: Props) => {
+export const QueuePanel = ({ session, view, onToast, extra }: Props) => {
   const adder = useAdder(session, view);
   const search = useSearch(adder);
   const suggestions = notInRoom(useTrending(), view.queue);
@@ -52,7 +58,7 @@ export const QueuePanel = ({ session, view, onToast }: Props) => {
 
       <div className="rail-scroll min-h-0 flex-1 pb-3">
         {search.query !== null ? (
-          <SearchResults search={search} adder={adder} />
+          <SearchResults search={search} adder={adder} extra={extra} />
         ) : (
           <>
             <section aria-label="Up next">
@@ -68,6 +74,8 @@ export const QueuePanel = ({ session, view, onToast }: Props) => {
                 <UpNextList session={session} view={view} items={upcoming} onToast={onToast} />
               )}
             </section>
+
+            {extra}
 
             {editable && current && suggestions?.length !== 0 && (
               <section aria-label="Popular on YouTube" className="mt-3 lg:hidden">

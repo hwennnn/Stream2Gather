@@ -508,13 +508,20 @@ func (l *Live) HostLastSeen(ctx context.Context, roomID string, now int64) (stri
 
 // Limit reports whether a fixed-window limit still has room.
 func (l *Live) Limit(ctx context.Context, key string, limit int64, window time.Duration) (bool, error) {
+	allowed, _, err := l.LimitFor(ctx, key, limit, window)
+	return allowed, err
+}
+
+// LimitFor is Limit, also saying how long until the window opens again.
+func (l *Live) LimitFor(ctx context.Context, key string, limit int64, window time.Duration) (bool, time.Duration, error) {
 	pipe := l.rdb.TxPipeline()
 	count := pipe.Incr(ctx, "limit:"+key)
 	pipe.ExpireNX(ctx, "limit:"+key, window)
+	left := pipe.PTTL(ctx, "limit:"+key)
 	if _, err := pipe.Exec(ctx); err != nil {
-		return false, err
+		return false, 0, err
 	}
-	return count.Val() <= limit, nil
+	return count.Val() <= limit, left.Val(), nil
 }
 
 // refundScript leaves an expired window alone: a count with no key behind it

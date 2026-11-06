@@ -42,7 +42,10 @@ const (
 	guestsPerHour = 600
 	// Each search can spend YouTube quota the whole site shares.
 	searchesPerHour = 20
-	searchMaxQuery  = 200
+	// ticketsPerMinute leaves a full room behind one address room to reconnect
+	// at once after a restart, with a second room's worth to spare.
+	ticketsPerMinute = 120
+	searchMaxQuery   = 200
 	// Tabs flush every ten seconds. This leaves room for a shared address.
 	telemetryPerMinute = 240
 	// Counts rooms that exist, so a mistyped link costs nothing here. What a link
@@ -706,6 +709,18 @@ func (s *Server) roomPreview(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
+	allowed, wait, err := s.Live.LimitFor(r.Context(), "ticket:"+s.clientIP(r), ticketsPerMinute, time.Minute)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !allowed {
+		// The client waits this out and tries again, so a party on one address
+		// that hits the limit is delayed rather than turned away.
+		w.Header().Set("Retry-After", strconv.Itoa(int(wait.Seconds())+1))
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many people are joining from here. Trying again.")
+		return
+	}
 	record, ok := s.findRoom(w, r)
 	if !ok {
 		return

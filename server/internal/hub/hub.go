@@ -57,6 +57,10 @@ const (
 	statusSignedOut = websocket.StatusCode(4401)
 	// MaxSocketsPerUser is per person, per room, across every server.
 	MaxSocketsPerUser = 10
+	// maxSocketsPerAddress is per server. It is four full rooms behind one
+	// address, because guests are free and the per-person limit stops nobody
+	// who makes more of them.
+	maxSocketsPerAddress = 200
 	// How many distinct people must report an embed block before it is believed.
 	embedBlockReports = 2
 )
@@ -90,8 +94,13 @@ type Hub struct {
 	// accounts holds every signed-in *conn. It sits apart from the rooms so that
 	// checking them needs nothing from a room's goroutine.
 	accounts sync.Map
-	closing  bool
-	serving  sync.WaitGroup
+	// addresses counts open sockets per address, on this server.
+	addressMu     sync.Mutex
+	addresses     map[string]int
+	maxPerAddress int
+
+	closing bool
+	serving sync.WaitGroup
 }
 
 // New returns a hub. Call Run to start delivering events.
@@ -113,7 +122,9 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 		pingEvery:       pingEvery,
 		commandPatience: opTimeout,
 
-		rooms: make(map[string]*liveRoom),
+		rooms:         make(map[string]*liveRoom),
+		addresses:     make(map[string]int),
+		maxPerAddress: maxSocketsPerAddress,
 	}
 	h.recorder = newRecorder(h)
 	return h

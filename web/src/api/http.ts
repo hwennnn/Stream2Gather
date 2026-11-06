@@ -58,6 +58,8 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    /** How long the server asked us to wait before trying again. */
+    readonly retryAfterMs = 0,
   ) {
     super(message);
   }
@@ -78,7 +80,8 @@ export const request = async <T>(path: string, init?: RequestInit): Promise<T> =
   const response = await reach(path, init);
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { code?: string; message?: string } | null;
-    throw new ApiError(response.status, problem?.code ?? 'unknown', problem?.message ?? 'Something went wrong. Try again.');
+    const retryAfter = (Number(response.headers.get('retry-after')) || 0) * 1000;
+    throw new ApiError(response.status, problem?.code ?? 'unknown', problem?.message ?? 'Something went wrong. Try again.', retryAfter);
   }
   return (await response.json()) as T;
 };

@@ -363,6 +363,46 @@ describe('RoomSession', () => {
   });
 
   describe('connection state', () => {
+    const refusing = (status: number, headers: Record<string, string> = {}) => {
+      const replies = [
+        new Response(JSON.stringify({ code: 'rate_limited', message: 'Wait.' }), { status, headers }),
+      ];
+      vi.stubGlobal('fetch', async () => replies.shift() ?? new Response(JSON.stringify({ ticket: 't', items: [] })));
+    };
+
+    it('waits out a 429 on its ticket and tries again', async () => {
+      refusing(429, { 'retry-after': '5' });
+      const session = new RoomSession('slug');
+      await session.connect();
+      expect(session.getView().connection).toBe('reconnecting');
+
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(FakeSocket.opened).toBe(0);
+      await vi.advanceTimersByTimeAsync(2700);
+      expect(FakeSocket.opened).toBe(1);
+      session.close();
+    });
+
+    it('still retries a 429 that gives no wait', async () => {
+      refusing(429);
+      const session = new RoomSession('slug');
+      await session.connect();
+      expect(session.getView().connection).toBe('reconnecting');
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(FakeSocket.opened).toBe(1);
+      session.close();
+    });
+
+    it('treats any other refusal as final', async () => {
+      refusing(409);
+      const session = new RoomSession('slug');
+      await session.connect();
+      expect(session.getView().connection).toBe('failed');
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(FakeSocket.opened).toBe(0);
+      session.close();
+    });
+
     it('records when it went offline and clears it on return', async () => {
       const { session, socket } = await connected();
       socket.deliver('welcome', welcome(1));

@@ -240,6 +240,11 @@ export class RoomSession {
       socket.onclose = () => this.handleClose();
     } catch (error) {
       if (generation !== this.generation) return;
+      // Too many at once is a wait, not a refusal: a whole party can hit it together.
+      if (error instanceof ApiError && error.status === 429) {
+        this.handleClose(error.retryAfterMs);
+        return;
+      }
       if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
         this.update({ connection: 'failed', failure: error.message });
         return;
@@ -248,12 +253,14 @@ export class RoomSession {
     }
   }
 
-  private handleClose(): void {
+  private handleClose(notBeforeMs = 0): void {
     this.detachSocket();
     this.update({ connection: 'reconnecting', offlineSince: this.view.offlineSince ?? Date.now() });
     this.attempts += 1;
     const backoff = Math.min(250 * 2 ** this.attempts, MAX_BACKOFF_MS);
-    this.reconnectTimer = window.setTimeout(() => void this.connect(), backoff * (0.5 + Math.random() / 2));
+    // Spread past the server's wait, so a party doesn't all come back in the same moment.
+    const delay = Math.max(backoff * (0.5 + Math.random() / 2), notBeforeMs * (1 + Math.random() / 2));
+    this.reconnectTimer = window.setTimeout(() => void this.connect(), delay);
   }
 
   private clearReconnect(): void {

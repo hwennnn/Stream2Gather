@@ -9,6 +9,7 @@ import { HostChip } from './RoomHeader';
 import { canControl, canQueue, failureNote, isLocked, isOffline, pillFor } from './rules';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
+import { UpNext } from './UpNext';
 import { useAdder, type Adder } from './useAdder';
 import { PHONE_LANDSCAPE, useMediaQuery } from './useMediaQuery';
 import type { RoomPlayer } from './useRoomPlayer';
@@ -28,13 +29,14 @@ type StageProps = {
   onTheatre: () => void;
   onFullscreen: () => void;
   onPickAnother: () => void;
+  onShowQueue: () => void;
   onToast: (text: string) => void;
   /** Toasts in theatre mode, when there's no rail to hold them. */
   toastSlot: ReactNode;
 };
 
 export const PlayerStage = (props: StageProps) => {
-  const { session, view, player, finished, changing, onPickAnother, onToast } = props;
+  const { session, view, player, finished, changing, onPickAnother, onShowQueue, onToast } = props;
   const current = view.queue[0];
 
   return (
@@ -47,7 +49,7 @@ export const PlayerStage = (props: StageProps) => {
       </div>
 
       {current && <PlayerBar {...props} item={current} />}
-      {current && <UpNext session={session} view={view} onPickAnother={onPickAnother} onToast={onToast} />}
+      {current && <UpNext session={session} view={view} onPickAnother={onPickAnother} onShowQueue={onShowQueue} onToast={onToast} />}
     </main>
   );
 };
@@ -259,52 +261,5 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
     {!sideways && <ReactionLane reactions={view.reactions} />}
     {toastSlot}
   </section>
-  );
-};
-
-const STRIP_ITEMS = 6;
-
-type UpNextProps = { session: RoomSession; view: RoomView; onPickAnother: () => void; onToast: (text: string) => void };
-
-/** Fills the height the player doesn't need. Hides itself when there's too little. */
-const UpNext = ({ session, view, onPickAnother, onToast }: UpNextProps) => {
-  const upcoming = view.queue.slice(1, 1 + STRIP_ITEMS);
-  const playable = canControl(view) && !isOffline(view);
-  return (
-    <section aria-label="Up next in the queue" className="up-next">
-      <div className="up-next-inner items-start gap-3 border-t border-line px-4 py-3">
-        <h3 className="w-16 shrink-0 pt-1 text-[13px] leading-snug font-semibold">Up next</h3>
-        {upcoming.length === 0 ? (
-          <p className="flex min-w-0 flex-1 items-center gap-3 pt-0.5 text-[13px] text-muted">
-            Nothing queued.
-            {canQueue(view) && (
-              <button type="button" onClick={onPickAnother} className="btn btn-quiet btn-sm">
-                Add a video
-              </button>
-            )}
-          </p>
-        ) : (
-          <ol className="up-next-cards">
-            {upcoming.map((item) => (
-              <li key={item.id} className="min-w-0">
-                <button
-                  type="button"
-                  disabled={!playable}
-                  title={playable ? `Play ${item.title} now` : item.title}
-                  onClick={() => void session.request('queue.play', { target: item.id }).catch(toastError(onToast))}
-                  className="flex w-full items-center gap-2.5 rounded-lg p-1 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-white/[0.05]"
-                >
-                  <Thumb src={item.thumbnailUrl} className="up-next-thumb w-24 rounded-md" />
-                  <span className="min-w-0 flex-1">
-                    <span className="line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</span>
-                    <span className="mt-0.5 block truncate text-xs text-muted">{item.addedByName}</span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-    </section>
   );
 };

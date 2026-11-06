@@ -3,6 +3,9 @@ import type { Account } from '../api/http';
 
 const FLAG = 's2g:signing-in';
 
+const stopPings = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock('../push/push', () => ({ stopPings }));
+
 const guest: Account = { id: 'g_1', name: 'Amber panda', avatarUrl: '', signedIn: false };
 const ada: Account = { id: 'u_1', name: 'Ada', avatarUrl: 'https://img.clerk.com/a', signedIn: true };
 
@@ -33,6 +36,7 @@ describe('account sign-in', () => {
   beforeEach(() => {
     storage = new Map();
     signedOutCalls.mockReset();
+    stopPings.mockClear();
     exchanges.mockReset();
     responses.session = ada;
     responses.meDown = false;
@@ -225,6 +229,32 @@ describe('account sign-in', () => {
 
     expect(account.current().user).toBeNull();
     expect(account.current().othersMayRemain).toBe(true);
+  });
+
+  it('stops this browser’s pings when the viewer signs out', async () => {
+    const { account, clerkReports } = await load(ada);
+    await clerkReports(true);
+
+    await account.signOut();
+
+    await vi.waitFor(() => expect(stopPings).toHaveBeenCalledOnce());
+  });
+
+  it('stops them too when Clerk is what ended the session', async () => {
+    const { clerkReports } = await load(ada);
+    await clerkReports(false);
+
+    await vi.waitFor(() => expect(stopPings).toHaveBeenCalledOnce());
+  });
+
+  it('signs out even if the browser won’t let go of its pings', async () => {
+    const { account, clerkReports } = await load(ada);
+    await clerkReports(true);
+    stopPings.mockRejectedValueOnce(new Error('no worker'));
+
+    await account.signOut();
+
+    expect(signedOutCalls).toHaveBeenCalledOnce();
   });
 
   it('signs out of this app when Clerk no longer knows the viewer', async () => {

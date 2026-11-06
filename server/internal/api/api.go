@@ -501,7 +501,8 @@ func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.versions.forget(claims.Subject)
-		if err := s.endClerkSessions(r.Context(), claims.Subject); err != nil {
+		// Both, whichever fails: a signed-out device shouldn't show who's watching.
+		if err := errors.Join(s.DB.ForgetPushDevices(r.Context(), claims.Subject), s.endClerkSessions(r.Context(), claims.Subject)); err != nil {
 			s.internal(w, err)
 			return
 		}

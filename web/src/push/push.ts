@@ -27,6 +27,12 @@ export const readPushState = async (): Promise<PushState> => {
   return Notification.permission === 'granted' && (await subscription()) ? 'on' : 'off';
 };
 
+const save = async (current: PushSubscription) => {
+  const { endpoint, keys } = current.toJSON();
+  const { id } = await post<{ id: string }>('/v1/push/subscriptions', { endpoint, keys });
+  localStorage.setItem(THIS_DEVICE, id);
+};
+
 const keyBytes = (key: string) =>
   Uint8Array.from(atob(key.replace(/-/g, '+').replace(/_/g, '/')), (char) => char.charCodeAt(0));
 
@@ -40,10 +46,23 @@ export const turnOn = async (publicKey: string): Promise<PushState> => {
   const registration = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
   const created = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
-  const { endpoint, keys } = created.toJSON();
-  const { id } = await post<{ id: string }>('/v1/push/subscriptions', { endpoint, keys });
-  localStorage.setItem(THIS_DEVICE, id);
+  await save(created);
   return 'on';
+};
+
+/**
+ * Signing out takes this browser off the server, but elsewhere it can't take it
+ * off the browser. Without this the card would say on for a device nothing pings.
+ */
+export const saveThisDevice = async () => {
+  const current = await subscription();
+  if (current) await save(current);
+};
+
+/** A browser that signed out holds no subscription. Others are ended by the server. */
+export const stopPings = async () => {
+  localStorage.removeItem(THIS_DEVICE);
+  await (await subscription())?.unsubscribe();
 };
 
 export const isThisDevice = (id: string) => localStorage.getItem(THIS_DEVICE) === id;

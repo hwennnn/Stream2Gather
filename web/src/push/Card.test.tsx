@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Card from './Card';
-import { deviceName, readPushState, turnOn } from './push';
+import { deviceName, readPushState, stopPings, turnOn } from './push';
 
 const post = vi.hoisted(() => vi.fn());
 const request = vi.hoisted(() => vi.fn());
@@ -15,7 +15,7 @@ const worker = (subscribed: boolean) => {
   const registration = { pushManager };
   const serviceWorker = { getRegistration: vi.fn(async () => registration), register: vi.fn(async () => registration), ready: Promise.resolve(registration) };
   Object.defineProperty(navigator, 'serviceWorker', { value: serviceWorker, configurable: true });
-  return { serviceWorker, pushManager };
+  return { serviceWorker, pushManager, subscription };
 };
 
 const permission = (value: NotificationPermission, answer: NotificationPermission = value) => {
@@ -60,6 +60,34 @@ describe('the ping card', () => {
     expect(serviceWorker.register).toHaveBeenCalledWith('/sw.js');
     expect(pushManager.subscribe).toHaveBeenCalledWith(expect.objectContaining({ userVisibleOnly: true }));
     expect(post).toHaveBeenCalledWith('/v1/push/subscriptions', { endpoint: 'https://push.test/1', keys: { p256dh: 'k', auth: 'a' } });
+  });
+
+  it('puts a subscribed browser back under whoever is here, without asking', async () => {
+    worker(true);
+    const ask = permission('granted');
+    render(<Card slug="movie" />);
+    await screen.findByText('You’re on. We’ll ping this device.');
+    expect(post).toHaveBeenCalledWith('/v1/push/subscriptions', { endpoint: 'https://push.test/1', keys: { p256dh: 'k', auth: 'a' } });
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it('does not save anything for a browser that never said yes', async () => {
+    worker(false);
+    permission('default');
+    render(<Card slug="movie" />);
+    await screen.findByRole('button', { name: 'Allow' });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('lets go of the browser at sign-out, so it stops looking turned on', async () => {
+    const { subscription } = worker(true);
+    permission('granted');
+    localStorage.setItem('s2g:push-device', 'd1');
+
+    await stopPings();
+
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(localStorage.getItem('s2g:push-device')).toBeNull();
   });
 
   it('says what blocked it, and never asks again', async () => {

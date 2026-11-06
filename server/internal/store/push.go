@@ -69,6 +69,12 @@ func (p *Postgres) DeletePushSubscription(ctx context.Context, userID, id string
 	return nil
 }
 
+// ForgetPushDevices removes every browser a person has, at sign-out.
+func (p *Postgres) ForgetPushDevices(ctx context.Context, userID string) error {
+	_, err := p.pool.Exec(ctx, `DELETE FROM push_subscriptions WHERE user_id = $1`, userID)
+	return err
+}
+
 // PushDevices lists this person's browsers, newest first.
 func (p *Postgres) PushDevices(ctx context.Context, userID string) ([]PushDevice, error) {
 	rows, err := p.pool.Query(ctx, `

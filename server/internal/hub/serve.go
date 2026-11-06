@@ -279,20 +279,26 @@ func (r *liveRoom) queueAdd(ctx context.Context, c *conn, message Message) {
 		return
 	}
 
+	// A lookup can take seconds, and this goroutine is the one reading the socket.
+	// Pings left unanswered that long look like a dead connection to the client.
+	go r.addResolved(ctx, c, message.ID, request.URL, request.Mode)
+}
+
+func (r *liveRoom) addResolved(ctx context.Context, c *conn, id, link, mode string) {
 	// Metadata always comes from the source, never from the client.
-	media, err := r.hub.catalog.Resolve(ctx, request.URL, source.LookupCharge(r.hub.live.Limit, c.address))
+	media, err := r.hub.catalog.Resolve(ctx, link, source.LookupCharge(r.hub.live.Limit, c.address))
 	if err != nil {
 		if source.IsUserError(err) {
-			c.fail(message.ID, "media", err.Error())
+			c.fail(id, "media", err.Error())
 			return
 		}
 		r.hub.log.Error("resolve failed", "room", r.id, "error", err)
-		c.fail(message.ID, "media", "That video could not be loaded. Try again.")
+		c.fail(id, "media", "That video could not be loaded. Try again.")
 		return
 	}
 
-	cmd := room.Command{Type: room.CmdQueueAdd, Mode: request.Mode, Media: &media, NewItemID: ids.New()}
-	r.queueFor(c, message.ID, cmd)
+	cmd := room.Command{Type: room.CmdQueueAdd, Mode: mode, Media: &media, NewItemID: ids.New()}
+	r.queueFor(c, id, cmd)
 }
 
 func (r *liveRoom) chat(c *conn, message Message) {

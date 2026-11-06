@@ -2,7 +2,6 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { account } from '../auth/account';
 import type { RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
-import { Icon } from './Icon';
 import { isHost, isLocked, isOffline } from './rules';
 import { toastError } from './Toasts';
 
@@ -28,7 +27,7 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
 
   return (
     <div className="flex h-full flex-col">
-      <ul className="min-h-0 flex-1 overflow-y-auto p-2">
+      <ul className="rail-scroll min-h-0 flex-1 py-1">
         {view.members.map((person) => {
           const own = person.userId === view.self?.userId;
           const status = view.viewerStates[person.userId];
@@ -37,28 +36,27 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
 
           if (own && editing) {
             return (
-              <li key={person.userId} className="px-2 py-1.5">
+              <li key={person.userId} className="row py-2.5">
                 <NameEditor session={session} name={view.self?.name ?? person.name} onDone={() => setEditing(false)} />
               </li>
             );
           }
           return (
-            <li key={person.userId} className="flex min-h-12 items-center gap-3 rounded-lg px-2 py-1.5">
-              <Avatar person={person} status={status} className={`size-8 text-xs ${status ? '' : 'ring-panel!'}`} />
-              <span className="flex min-w-0 flex-1 items-baseline gap-1 text-sm font-medium">
+            <li key={person.userId} className="flex min-h-11 items-center gap-2.5">
+              <Avatar person={person} className="size-7 text-xs" />
+              <span className="flex min-w-0 flex-1 items-baseline gap-1 font-medium">
                 <span className="min-w-0 truncate">{person.name}</span>
-                {own && <span className="shrink-0 font-normal text-muted">(you)</span>}
+                {own && <span className="shrink-0 font-normal text-dim">(you)</span>}
               </span>
               {badges.map((badge) => (
                 <span key={badge} className="chip shrink-0">
                   {badge}
                 </span>
               ))}
-              {detail && <span className="shrink-0 text-xs text-muted">{detail}</span>}
+              {detail && <span className="shrink-0 text-[13px] text-dim">{detail}</span>}
               {own && (
-                <button type="button" onClick={() => setEditing(true)} className="btn btn-ghost btn-sm">
-                  <Icon name="pencil" className="size-3.5" />
-                  Edit
+                <button type="button" onClick={() => setEditing(true)} className="btn btn-quiet btn-sm">
+                  Rename
                 </button>
               )}
             </li>
@@ -70,8 +68,7 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
         <HostSwitch session={session} view={view} onToast={onToast} />
       ) : (
         isLocked(view) && (
-          <p className="flex items-center gap-2 border-t border-line p-4 text-[13px] text-muted">
-            <Icon name="lock" className="size-3.5 shrink-0" />
+          <p className="rail-edge border-t border-line py-3 text-[13px] text-muted">
             The host controls playback and the queue.
           </p>
         )
@@ -115,7 +112,7 @@ const NameEditor = ({ session, name, onDone }: { session: RoomSession; name: str
 
   return (
     <form onSubmit={(event) => void submit(event)}>
-      <label htmlFor="rename" className="mb-1.5 block text-xs text-muted">
+      <label htmlFor="rename" className="mb-1.5 block text-[13px] text-muted">
         Your name
       </label>
       <div className="flex gap-2">
@@ -128,14 +125,14 @@ const NameEditor = ({ session, name, onDone }: { session: RoomSession; name: str
           onKeyDown={(event) => event.key === 'Escape' && onDone()}
           autoComplete="off"
           aria-invalid={problem !== null}
-          className="field h-9 min-w-0 flex-1"
+          className="field h-9 min-w-0 flex-1 phone:text-base"
         />
         <button type="submit" disabled={busy} className="btn btn-primary">
           Save
         </button>
       </div>
       {problem && (
-        <p role="alert" className="mt-1.5 text-[13px] text-warn">
+        <p role="alert" className="mt-1.5 text-[13px] text-bad">
           {problem}
         </p>
       )}
@@ -160,9 +157,9 @@ const HostSwitch = ({ session, view, onToast }: Props) => {
   };
 
   return (
-    <div className="flex items-center justify-between gap-4 border-t border-line p-4">
-      <span id="host-switch" className="text-sm leading-snug">
-        Only I can control playback and the queue
+    <div className="rail-edge flex items-center justify-between gap-4 border-t border-line py-3">
+      <span id="host-switch" className="leading-5">
+        Only I control playback and the queue
       </span>
       <button
         type="button"
@@ -171,9 +168,9 @@ const HostSwitch = ({ session, view, onToast }: Props) => {
         aria-labelledby="host-switch"
         disabled={busy || isOffline(view)}
         onClick={() => void toggle()}
-        className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? 'bg-accent' : 'bg-white/15'}`}
+        className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? 'bg-primary' : 'bg-line'}`}
       >
-        <span className={`absolute top-1 left-1 size-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+        <span className={`absolute top-0.5 left-0.5 size-4 rounded bg-text transition-transform ${on ? 'translate-x-4' : ''}`} />
       </button>
     </div>
   );

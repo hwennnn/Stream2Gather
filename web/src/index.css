@@ -343,6 +343,38 @@ body {
   display: none;
 }
 
+/* The rail's one margin, left and right, for every tab. Nothing here sets its own:
+ * a fixed block sits on .rail-edge, a scrolling list on .rail-scroll, and rows, rules
+ * and headings inside inherit it. Rules stop at it too, so no line touches the panel. */
+.rail-edge {
+  margin-inline: var(--gutter);
+}
+
+.rail-scroll {
+  padding-inline: var(--gutter);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+
+/* A mouse gets a real scrollbar on some systems. Taking it out of the gutter keeps the right edge put. */
+@media (hover: hover) and (pointer: fine) {
+  @supports selector(::-webkit-scrollbar) {
+    .rail-scroll {
+      padding-right: calc(var(--gutter) - 6px);
+      scrollbar-gutter: stable;
+    }
+
+    .rail-scroll::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .rail-scroll::-webkit-scrollbar-thumb {
+      border-radius: 3px;
+      background: var(--color-line);
+    }
+  }
+}
+
 .stage {
   position: relative;
   flex: none;
@@ -381,10 +413,11 @@ body {
     width: min(100cqw, calc((100cqh - var(--bar)) * 16 / 9));
   }
 
+  /* The same screen as a playing room, so the seats don't move when a video starts. */
   .stage-idle {
-    flex: 1;
-    width: 100%;
-    aspect-ratio: auto;
+    width: min(100cqw, calc((100cqh - var(--bar)) * 16 / 9));
+    aspect-ratio: 16 / 9;
+    background: var(--color-stage);
   }
 
   .room-rail {
@@ -457,6 +490,13 @@ body {
   display: none;
 }
 
+/* With a free strip under the seats, suggestions sit there rather than on the screen. */
+@media (min-width: 1024px) and (min-height: 501px) {
+  .stage-picks {
+    display: none;
+  }
+}
+
 @container up-next (min-height: 88px) {
   .up-next-inner {
     display: flex;
@@ -504,6 +544,19 @@ body {
   border-top: 1px solid var(--color-line);
 }
 
+/* The same in every list: under the row, from its left edge to its right. */
+.row-tray {
+  display: flex;
+  position: relative;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.row-tray > * {
+  flex: 1 1 5.5rem;
+}
+
 /* Grey until someone means it. Colour in this room belongs to what people did. */
 .react {
   filter: grayscale(1);
@@ -530,6 +583,18 @@ body {
   transform: scale(0.97);
 }
 
+/* At the end of the line, so the channel and the time are still there to decide with. */
+.row-actions {
+  display: flex;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  align-items: center;
+  gap: 0.25rem;
+  transition: opacity 140ms var(--ease-room);
+}
+
 .row-tap,
 .row-more {
   display: none;
@@ -540,14 +605,19 @@ body {
     opacity: 0;
   }
 
+  .row-grip {
+    opacity: 0;
+  }
+
   .row:hover .row-actions,
-  .row:focus-within .row-actions {
+  .row:focus-within .row-actions,
+  .row:hover .row-grip {
     opacity: 1;
   }
 
   .row:hover .row-meta,
   .row:focus-within .row-meta {
-    opacity: 0;
+    padding-right: var(--acts);
   }
 }
 

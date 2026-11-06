@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { api, ApiError, type Media } from '../api/http';
 import { useAccount } from '../auth/account';
 import type { QueueMode } from '../room/session';
 import { formatTime, looksLikeUrl, normalizeUrl } from './format';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { addPrompt } from './sources';
 import { Thumb } from './Thumb';
 import type { Adder, AddStatus } from './useAdder';
 
-const isMac = () => /mac|iphone|ipad/i.test(navigator.platform);
 
 export type Search = {
   value: string;
@@ -105,7 +104,7 @@ export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
         <label className="sr-only" htmlFor={id}>
           Add a video
         </label>
-        <span className="pointer-events-none absolute inset-y-0 left-3.5 flex items-center text-muted">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-dim">
           {search.busy || search.searching ? <span className="spinner" /> : <Icon name="search" />}
         </span>
         <input
@@ -121,7 +120,7 @@ export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
           enterKeyHint="search"
           aria-invalid={adder.problem !== null}
           aria-describedby={adder.problem ? errorId : undefined}
-          className={`field pr-11 pl-10 ${large ? 'h-12' : ''}`}
+          className="field pr-11 pl-9"
         />
         {showClear ? (
           <button
@@ -135,14 +134,10 @@ export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
           >
             <Icon name="close" className="size-3.5" />
           </button>
-        ) : (
-          <kbd className="pointer-events-none absolute inset-y-0 right-3 my-auto hidden h-fit rounded-md bg-white/[0.06] px-1.5 py-0.5 font-sans text-[11px] text-muted [@media(hover:hover)]:block">
-            {isMac() ? '⌘K' : 'Ctrl K'}
-          </kbd>
-        )}
+        ) : null}
       </form>
       {adder.problem && (
-        <p id={errorId} role="alert" className="mt-2 text-[13px] text-warn">
+        <p id={errorId} role="alert" className="mt-2 text-[13px] text-bad">
           {adder.problem}
         </p>
       )}
@@ -164,16 +159,14 @@ const Results = ({ search, adder }: ResultsProps) => {
   if (search.query === null) return null;
   return (
     <section aria-label="Search results" className="enter">
-      <div className="flex items-center justify-between gap-2 px-3 pt-1 pb-1.5">
-        <h3 className="min-w-0 truncate text-[13px] font-semibold">Results for “{search.query}”</h3>
-      </div>
+      <h3 className="truncate pb-1.5 text-[13px] font-semibold">Results for “{search.query}”</h3>
       {search.searching && <MediaSkeleton count={5} />}
-      {search.problem && <p className="px-3 py-3 text-sm text-warn">{search.problem}</p>}
+      {search.problem && <p className="py-3 text-bad">{search.problem}</p>}
       {!search.searching && !search.problem && search.results?.length === 0 && (
-        <p className="px-3 py-3 text-sm text-muted">Nothing found for “{search.query}”. Try other words, or paste a link.</p>
+        <p className="py-3 text-muted">Nothing found for “{search.query}”. Try other words, or paste a link.</p>
       )}
       {search.results && search.results.length > 0 && (
-        <ul className="px-1">
+        <ul>
           {search.results.map((media) => (
             <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={(mode) => void adder.addMedia(media, mode)} />
           ))}
@@ -184,10 +177,10 @@ const Results = ({ search, adder }: ResultsProps) => {
 };
 
 export const MediaSkeleton = ({ count }: { count: number }) => (
-  <ul aria-hidden="true" className="px-1">
+  <ul aria-hidden="true">
     {Array.from({ length: count }, (_, index) => (
-      <li key={index} className="flex gap-3 p-2">
-        <span className="skeleton aspect-video w-28 shrink-0 rounded-lg" />
+      <li key={index} className="flex gap-3 py-2">
+        <span className="skeleton aspect-video w-20 shrink-0 rounded-md" />
         <span className="min-w-0 flex-1 space-y-2 pt-1">
           <span className="skeleton block h-3 w-full rounded" />
           <span className="skeleton block h-3 w-2/3 rounded" />
@@ -197,17 +190,20 @@ export const MediaSkeleton = ({ count }: { count: number }) => (
   </ul>
 );
 
+/** Keeps the channel and the time in view beside a row's buttons. */
+export const actionRoom = (count: number) => ({ '--acts': `${count * 32 + 4}px` }) as CSSProperties;
+
 const STATUS_TEXT: ReadonlyMap<AddStatus, string> = new Map([
   ['adding', 'Adding…'],
   ['added', 'Added ✓'],
-  ['queued', 'Already queued'],
+  ['queued', 'Queued'],
   ['playing', 'Playing now'],
 ]);
 
-const ACTIONS: { mode: QueueMode; label: string }[] = [
-  { mode: 'now', label: 'Play now' },
-  { mode: 'next', label: 'Play next' },
-  { mode: 'end', label: 'Queue' },
+const ACTIONS: { mode: QueueMode; label: string; icon: IconName }[] = [
+  { mode: 'now', label: 'Play now', icon: 'play' },
+  { mode: 'next', label: 'Play next', icon: 'next' },
+  { mode: 'end', label: 'Queue', icon: 'plus' },
 ];
 
 type RowProps = { media: Media; status: AddStatus; onAdd: (mode: QueueMode) => void };
@@ -216,37 +212,44 @@ type RowProps = { media: Media; status: AddStatus; onAdd: (mode: QueueMode) => v
 export const MediaRow = ({ media, status, onAdd }: RowProps) => {
   const [tray, setTray] = useState(false);
   const label = STATUS_TEXT.get(status);
-  const meta = [media.author, media.durationMs > 0 ? formatTime(media.durationMs / 1000) : ''].filter(Boolean).join(' · ');
+  const duration = media.durationMs > 0 && <span className="fig shrink-0 text-dim">{formatTime(media.durationMs / 1000)}</span>;
 
   return (
-    <li className="row relative rounded-xl p-2 transition-colors hover:bg-white/[0.04]">
+    <li className="row relative py-2">
       {!label && (
-        <button type="button" aria-label={`Queue ${media.title}`} onClick={() => onAdd('end')} className="row-tap absolute inset-0 rounded-xl" />
+        <button type="button" aria-label={`Queue ${media.title}`} onClick={() => onAdd('end')} className="row-tap absolute inset-0" />
       )}
       <div className="flex items-center gap-3">
-        <Thumb src={media.thumbnailUrl} className="w-28 rounded-lg land:w-20" />
+        <Thumb src={media.thumbnailUrl} className="w-20 rounded-md" />
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-[13px] leading-snug font-medium">{media.title}</p>
-          <div className="relative mt-1 min-h-[26px]">
+          <p className="line-clamp-2 text-[13px] leading-[18px] font-medium">{media.title}</p>
+          <div style={actionRoom(ACTIONS.length)} className="relative min-h-[26px]">
             {label ? (
               <p className="flex justify-between gap-2 text-xs leading-[26px] text-muted">
-                <span className="min-w-0 truncate">{meta}</span>
+                <span className="flex min-w-0 gap-2">
+                  <span className="min-w-0 truncate">{media.author}</span>
+                  {duration}
+                </span>
                 <span className={`shrink-0 font-medium ${status === 'added' ? 'text-good' : ''}`}>{label}</span>
               </p>
             ) : (
-              <p className="row-meta truncate text-xs leading-[26px] text-muted transition-opacity">{meta}</p>
+              <p className="row-meta flex gap-2 text-xs leading-[26px] text-muted transition-opacity">
+                <span className="min-w-0 truncate">{media.author}</span>
+                {duration}
+              </p>
             )}
             {!label && (
-              <div className="row-actions absolute inset-0 flex items-center gap-1 transition-opacity">
-                {ACTIONS.map(({ mode, label: text }) => (
+              <div className="row-actions">
+                {ACTIONS.map(({ mode, label: text, icon }) => (
                   <button
                     key={mode}
                     type="button"
                     aria-label={`${text}: ${media.title}`}
+                    title={text}
                     onClick={() => onAdd(mode)}
-                    className={`btn btn-sm ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}
+                    className={`btn btn-sm btn-icon ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}
                   >
-                    {text}
+                    <Icon name={icon} className="size-3.5" />
                   </button>
                 ))}
               </div>
@@ -266,9 +269,9 @@ export const MediaRow = ({ media, status, onAdd }: RowProps) => {
         )}
       </div>
       {tray && !label && (
-        <div className="relative mt-2 flex gap-2">
+        <div className="row-tray">
           {ACTIONS.map(({ mode, label: text }) => (
-            <button key={mode} type="button" onClick={() => onAdd(mode)} className={`btn flex-1 ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}>
+            <button key={mode} type="button" onClick={() => onAdd(mode)} className={`btn ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}>
               {text}
             </button>
           ))}

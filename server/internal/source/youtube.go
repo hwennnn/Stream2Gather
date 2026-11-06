@@ -43,6 +43,9 @@ func NewYouTube(key, baseURL string) *YouTube {
 // Name returns the source identifier.
 func (y *YouTube) Name() string { return youtubeName }
 
+// Metered says every call here spends the key's daily quota.
+func (y *YouTube) Metered() {}
+
 // Match recognises every common YouTube link form.
 func (y *YouTube) Match(link *url.URL) (Ref, bool) {
 	host := strings.TrimPrefix(strings.ToLower(link.Hostname()), "www.")

@@ -19,7 +19,27 @@ const (
 	searchMaxAge   = 7 * 24 * time.Hour
 	trendingMaxAge = time.Hour
 	searchBucket   = "youtube:search"
+	// LookupsPerHour is what one address can spend on links nobody has seen. It
+	// has to outlast a party behind one address, and leave most of a day's budget.
+	LookupsPerHour = 120
 )
+
+// Charge asks whoever wants a lookup to pay for it. Lookups the cache answers are free.
+type Charge func(context.Context) error
+
+// LookupCharge charges an address, through a fixed-window limiter.
+func LookupCharge(limit func(context.Context, string, int64, time.Duration) (bool, error), address string) Charge {
+	return func(ctx context.Context) error {
+		allowed, err := limit(ctx, "lookups:"+address, LookupsPerHour, time.Hour)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			return ErrTooManyLinks
+		}
+		return nil
+	}
+}
 
 // Catalog resolves links and searches through caches and the quota budget.
 type Catalog struct {
@@ -27,6 +47,9 @@ type Catalog struct {
 	db      *store.Postgres
 	budget  int
 	log     *slog.Logger
+	// LookupBudget caps lookups a day, so nothing can spend the quota that search
+	// and metadata renewal also need. Zero means no cap.
+	LookupBudget int
 }
 
 // NewCatalog returns a catalog over sources, tried in order.
@@ -43,8 +66,32 @@ func (c *Catalog) Names() []string {
 	return names
 }
 
-// Resolve turns a pasted link into media.
-func (c *Catalog) Resolve(ctx context.Context, raw string) (room.Media, error) {
+// spend pays for one call to a metered source. charge may be nil.
+func (c *Catalog) spend(ctx context.Context, s Source, charge Charge) error {
+	if _, metered := s.(Metered); !metered {
+		return nil
+	}
+	if charge != nil {
+		if err := charge(ctx); err != nil {
+			return err
+		}
+	}
+	if c.LookupBudget == 0 {
+		return nil
+	}
+	reserved, err := c.db.ReserveQuota(ctx, s.Name()+":lookup", c.LookupBudget)
+	if err != nil {
+		return err
+	}
+	if !reserved {
+		return ErrLinksResting
+	}
+	return nil
+}
+
+// Resolve turns a pasted link into media. charge pays if the source has to be
+// asked, and a dead link is never cached, so it pays every time.
+func (c *Catalog) Resolve(ctx context.Context, raw string, charge Charge) (room.Media, error) {
 	link, err := url.Parse(strings.TrimSpace(raw))
 	if err != nil || link.Host == "" {
 		return room.Media{}, ErrUnsupportedURL
@@ -64,6 +111,9 @@ func (c *Catalog) Resolve(ctx context.Context, raw string) (room.Media, error) {
 			return cached, nil
 		}
 
+		if err := c.spend(ctx, s, charge); err != nil {
+			return room.Media{}, err
+		}
 		media, err := s.Resolve(ctx, ref)
 		if err != nil {
 			return room.Media{}, err
@@ -135,6 +185,9 @@ func (c *Catalog) Trending(ctx context.Context, sourceName string) ([]room.Media
 		return cached, nil
 	}
 
+	if err := c.spend(ctx, s, nil); err != nil {
+		return nil, err
+	}
 	items, err := s.Trending(ctx)
 	if err != nil {
 		return nil, err
@@ -242,5 +295,6 @@ func (c *Catalog) PurgeSearches(ctx context.Context) (int64, error) {
 // IsUserError reports whether an error's text is safe and useful to show.
 func IsUserError(err error) bool {
 	return errors.Is(err, ErrUnsupportedURL) || errors.Is(err, ErrUnavailable) ||
-		errors.Is(err, ErrOverBudget) || errors.Is(err, ErrNoSearch) || errors.Is(err, ErrLive)
+		errors.Is(err, ErrOverBudget) || errors.Is(err, ErrNoSearch) || errors.Is(err, ErrLive) ||
+		errors.Is(err, ErrTooManyLinks) || errors.Is(err, ErrLinksResting)
 }

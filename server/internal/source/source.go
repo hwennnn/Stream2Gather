@@ -16,6 +16,8 @@ var (
 	ErrNoSearch       = errors.New("this source has no search")
 	ErrOverBudget     = errors.New("search is resting until tomorrow")
 	ErrLive           = errors.New("Live streams aren’t supported yet.")
+	ErrTooManyLinks   = errors.New("Too many new links. Try again later.")
+	ErrLinksResting   = errors.New("New links are resting until tomorrow.")
 )
 
 // Ref points at one video on a source.
@@ -34,6 +36,11 @@ type Source interface {
 	Resolve(ctx context.Context, ref Ref) (room.Media, error)
 	Search(ctx context.Context, query, region string) ([]room.Media, error)
 	Trending(ctx context.Context) ([]room.Media, error)
+}
+
+// Metered is a source whose lookups spend the API quota the whole site shares.
+type Metered interface {
+	Metered()
 }
 
 // Batcher is a source that can renew many videos at once.

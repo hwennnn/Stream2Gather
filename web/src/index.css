@@ -967,6 +967,39 @@ body {
   .row:focus-within .row-meta {
     padding-right: var(--acts);
   }
+
+  /* Only here: a positioned line would sit above the tap target that touch rows have. */
+  .row-line {
+    position: relative;
+  }
+
+  /* The tray's way in for a mouse. It holds its place, so the row's words don't move on hover. */
+  .row-more {
+    display: inline-flex;
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 1.75rem;
+    min-width: 0;
+    height: 1.75rem;
+    min-height: 0;
+    opacity: 0;
+  }
+
+  .row:hover .row-more,
+  .row:focus-within .row-more,
+  .row-more[aria-expanded='true'] {
+    opacity: 1;
+  }
+
+  .row:has(.row-more) .row-actions {
+    right: 2rem;
+  }
+
+  .row:has(.row-more):hover .row-meta,
+  .row:has(.row-more):focus-within .row-meta {
+    padding-right: calc(var(--acts) + 2rem);
+  }
 }
 
 /* Touch has no hover, so rows are tappable and keep their actions behind a ⋯. */

@@ -240,7 +240,7 @@ const QueueRow = memo((props: RowProps) => {
   const { onDragStart, onMove, onPlay, onRemove } = props;
   const [tray, setTray] = useState(false);
   const actions: RowAction[] = [
-    ...(canPlay ? [{ label: 'Play now', icon: 'play' as const, primary: true, disabled: offline, run: () => onPlay(item) }] : []),
+    ...(canPlay ? [{ label: 'Play now', trayOnly: true, disabled: offline, run: () => onPlay(item) }] : []),
     ...(editable
       ? [
           { label: 'Play next', trayOnly: true, disabled: index === 0 || offline, run: () => onMove(item, 0) },
@@ -260,7 +260,7 @@ const QueueRow = memo((props: RowProps) => {
       {(canPlay || editable) && (
         <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => setTray(!tray)} className="row-tap absolute inset-0" />
       )}
-      <div className="flex items-center gap-3">
+      <div className="row-line flex items-center gap-3">
         {editable ? (
           <button
             type="button"

@@ -74,7 +74,7 @@ flow('races: a double click on Queue in a search row queues once', async (t) => 
   await search(a.page, 'mix');
   const row = ui.results(a.page).getByRole('listitem').filter({ hasText: train.title });
   await row.hover();
-  await row.getByRole('button', { name: /^Queue:/ }).dblclick();
+  await row.getByRole('button', { name: /^Add:/ }).dblclick();
   await t.see('it is added', row.getByText(/added|queued/i));
   await a.page.keyboard.press('Escape');
   await t.sleep(500);

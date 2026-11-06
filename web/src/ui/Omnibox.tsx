@@ -206,17 +206,18 @@ const STATUS_TEXT: ReadonlyMap<AddStatus, string> = new Map([
   ['playing', 'Playing now'],
 ]);
 
-const ACTIONS: { mode: QueueMode; label: string; icon: IconName }[] = [
-  { mode: 'now', label: 'Play now', icon: 'play' },
+/** Adding is the suggestion. Interrupting everyone is a choice, so it waits in the tray. */
+const ACTIONS: { mode: QueueMode; label: string; icon: IconName; trayOnly?: boolean }[] = [
+  { mode: 'end', label: 'Add', icon: 'plus' },
   { mode: 'next', label: 'Play next', icon: 'next' },
-  { mode: 'end', label: 'Queue', icon: 'plus' },
+  { mode: 'now', label: 'Play now', icon: 'play', trayOnly: true },
 ];
 
 type RowProps = { media: Media; status: AddStatus; action?: string; onAdd: (media: Media, mode: QueueMode) => unknown };
 
-/** One video you could add. Hover shows the actions; touch taps to queue, ⋯ for the rest. */
+/** One video you could add. Hover shows Add; touch taps to add. ⋯ has the rest either way. */
 export const MediaRow = memo(({ media, status, action, onAdd }: RowProps) => {
-  const actions = action ? ACTIONS.filter(({ mode }) => mode === 'end').map((one) => ({ ...one, label: action })) : ACTIONS;
+  const actions = action ? ACTIONS.filter(({ mode }) => mode === 'end').map((one) => ({ ...one, label: action })) : ACTIONS.filter(({ trayOnly }) => !trayOnly);
   const [tray, setTray] = useState(false);
   const label = STATUS_TEXT.get(status);
   const duration = media.durationMs > 0 && <span className="fig shrink-0 text-dim">{formatTime(media.durationMs / 1000)}</span>;
@@ -224,9 +225,9 @@ export const MediaRow = memo(({ media, status, action, onAdd }: RowProps) => {
   return (
     <li className="row relative py-2">
       {!label && (
-        <button type="button" aria-label={`${action ?? 'Queue'} ${media.title}`} onClick={() => void onAdd(media, 'end')} className="row-tap absolute inset-0" />
+        <button type="button" aria-label={`${action ?? 'Add'} ${media.title}`} onClick={() => void onAdd(media, 'end')} className="row-tap absolute inset-0" />
       )}
-      <div className="flex items-center gap-3">
+      <div className="row-line flex items-center gap-3">
         <Thumb src={media.thumbnailUrl} className="w-20 rounded-md" />
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-[13px] leading-[18px] font-medium">{media.title}</p>
@@ -254,7 +255,7 @@ export const MediaRow = memo(({ media, status, action, onAdd }: RowProps) => {
                     aria-label={`${text}: ${media.title}`}
                     title={text}
                     onClick={() => void onAdd(media, mode)}
-                    className={`btn btn-sm btn-icon ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}
+                    className={`btn btn-sm btn-icon ${mode === 'end' ? 'btn-primary' : 'btn-quiet'}`}
                   >
                     <Icon name={icon} className="size-3.5" />
                   </button>
@@ -280,7 +281,7 @@ export const MediaRow = memo(({ media, status, action, onAdd }: RowProps) => {
       {tray && !label && (
         <div className="row-tray">
           {ACTIONS.map(({ mode, label: text }) => (
-            <button key={mode} type="button" onClick={() => void onAdd(media, mode)} className={`btn ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}>
+            <button key={mode} type="button" onClick={() => void onAdd(media, mode)} className={`btn ${mode === 'end' ? 'btn-primary' : 'btn-quiet'}`}>
               {text}
             </button>
           ))}

@@ -705,6 +705,10 @@ func (s *Server) roomPreview(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
+	// The door says whose room it is. What's inside is for the crew.
+	if crew := out.Crew; crew != nil && !crew.IsMember && !crew.GuestAccess {
+		out.NowPlaying, out.Playback, out.Members = nil, nil, []store.Person{}
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 
@@ -811,7 +815,7 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
-	_, ok, err := s.session(r)
+	claims, ok, err := s.session(r)
 	if err != nil {
 		s.internal(w, err)
 		return
@@ -822,6 +826,9 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 	}
 	record, ok := s.findRoom(w, r)
 	if !ok {
+		return
+	}
+	if _, ok := s.crewEntry(w, r, record, claims); !ok {
 		return
 	}
 	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
@@ -908,8 +915,12 @@ func (s *Server) roomPage(w http.ResponseWriter, r *http.Request) {
 	card := siteCard
 	if record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug")); err == nil {
 		var playing *room.Media
-		if out, err := s.buildPreview(r.Context(), record); err == nil {
-			playing = out.NowPlaying
+		// Cards go to whoever a link is pasted in front of, so they show what a stranger may see.
+		access, err := s.DB.CrewAccessOf(r.Context(), record.ID, "")
+		if err == nil && !crewPrivate(access) {
+			if out, err := s.buildPreview(r.Context(), record); err == nil {
+				playing = out.NowPlaying
+			}
 		}
 		card = roomCard(record.Name, playing)
 	}

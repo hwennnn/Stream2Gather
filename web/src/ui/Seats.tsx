@@ -4,6 +4,7 @@ import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import { firstName, hueOf } from './people';
 import { MAX_SEATS, placeSeats, rowLength, standing, type Row } from './seatRow';
+import { viewerState } from './status';
 
 const STATES = new Map([
   ['buffering', 'catching up'],
@@ -63,7 +64,7 @@ export const Seats = ({ view, row, actor, onInvite, onPeople, compact = false }:
         }
         const { person, here } = seat;
         const own = person.userId === view.self?.userId;
-        const status = view.viewerStates[person.userId];
+        const status = viewerState(view, person.userId);
         const state = status && STATES.get(status);
         const reaction = view.reactions.findLast((entry) => entry.name === person.name);
         return (

@@ -10,7 +10,7 @@ describe('PeoplePanel', () => {
   afterEach(cleanup);
 
   it('truncates the name and never "(you)"', () => {
-    const view = { self, members: [self], speaking: [], viewerStates: {}, settings: { controlMode: 'everyone', queueMode: 'everyone' }, offlineSince: null } as unknown as RoomView;
+    const view = { self, members: [self], speaking: [], viewerStates: {}, playback: { status: 'playing' }, settings: { controlMode: 'everyone', queueMode: 'everyone' }, offlineSince: null } as unknown as RoomView;
     render(<PeoplePanel session={{} as RoomSession} view={view} onToast={() => {}} />);
     const you = screen.getByText('(you)');
     expect(you.className).toMatch(/shrink-0/);
@@ -20,7 +20,7 @@ describe('PeoplePanel', () => {
 
   it('says who is talking, over how they joined', () => {
     const listener = { ...self, voice: 'listening' };
-    const view = { self: listener, members: [listener], speaking: ['me'], viewerStates: {}, settings: { controlMode: 'everyone', queueMode: 'everyone' } } as unknown as RoomView;
+    const view = { self: listener, members: [listener], speaking: ['me'], viewerStates: {}, playback: { status: 'playing' }, settings: { controlMode: 'everyone', queueMode: 'everyone' } } as unknown as RoomView;
     render(<PeoplePanel session={{} as RoomSession} view={view} onToast={() => {}} />);
     expect(screen.getByText('Speaking')).toBeDefined();
     expect(screen.queryByText('Listening')).toBeNull();
@@ -36,7 +36,7 @@ describe('PeoplePanel', () => {
       render(
         <PeoplePanel
           session={{} as RoomSession}
-          view={{ self, members: people, viewerStates, speaking: [], settings: { controlMode: 'everyone', queueMode: 'everyone' } } as unknown as RoomView}
+          view={{ self, members: people, viewerStates, playback: { status: 'playing' }, speaking: [], settings: { controlMode: 'everyone', queueMode: 'everyone' } } as unknown as RoomView}
           onToast={() => {}}
         />,
       );
@@ -52,6 +52,17 @@ describe('PeoplePanel', () => {
       const host = rows().find((row) => row.includes('Neon')) ?? '';
       expect(host).toContain('Host');
       expect(host).toContain('Can’t play this video');
+    });
+
+    it('says nobody is catching up in a paused room', () => {
+      render(
+        <PeoplePanel
+          session={{} as RoomSession}
+          view={{ self: people[2], members: people, viewerStates: { a: 'correcting' }, playback: { status: 'paused' }, speaking: [], settings: { controlMode: 'everyone', queueMode: 'everyone' } } as unknown as RoomView}
+          onToast={() => {}}
+        />,
+      );
+      expect(screen.queryByText('Catching up')).toBeNull();
     });
 
     it('marks you, even when you are the host', () => {

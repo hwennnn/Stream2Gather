@@ -534,6 +534,17 @@ describe('SyncController', () => {
       expect(lastHealth()).toBe('correcting');
     });
 
+    it('takes back what a viewer\'s own pause said once the room has paused', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.fire('paused');
+      expect(lastHealth()).toBe('correcting');
+      sync.apply({ item: 'a', status: 'paused', pos: player.current, at: timers.now, rate: 1 });
+      expect(reports.at(-1)).toEqual({ health: 'waiting', drift: 0 });
+      run(3);
+      expect(lastHealth()).toBe('waiting');
+    });
+
     it('stops saying in sync the moment the room moves it', () => {
       sync.apply(playing(0, timers.now));
       run(3);

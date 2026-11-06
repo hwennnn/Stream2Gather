@@ -412,6 +412,11 @@ body {
   background: transparent;
 }
 
+/* Only theatre mode draws this. It stays in the page either way, as moving a player reloads it. */
+.stage-well {
+  display: contents;
+}
+
 @media (min-width: 1024px), (orientation: landscape) and (max-height: 500px) {
   .room-body {
     flex-direction: row;
@@ -439,6 +444,12 @@ body {
     width: min(100cqw, calc((100cqh - var(--bar)) * 16 / 9));
     aspect-ratio: 16 / 9;
     background: var(--color-stage);
+  }
+
+  /* As wide as that screen, so the first seat lines up with the search box above it. */
+  .front-row[data-idle='true'] {
+    width: min(100cqw, calc((100cqh - var(--bar)) * 16 / 9));
+    margin-inline: auto;
   }
 
   .room-rail {
@@ -514,6 +525,52 @@ body {
   .stage-idle {
     display: flex;
     max-height: 66dvh;
+  }
+}
+
+/*
+ * Theatre mode: the video gets every pixel of height that isn't the bar. The seats go up to the top
+ * bar as they do on a phone, the reactions to the player bar, and only the track stays under the
+ * video. The screen runs edge to edge, and a lane each side keeps reactions off the video.
+ */
+.room-shell[data-theatre='true'] .stage-well {
+  position: relative;
+  display: flex;
+  flex: none;
+  justify-content: center;
+  background: var(--color-stage);
+}
+
+.room-shell[data-theatre='true'] .stage {
+  width: min(calc(100cqw - 2 * var(--lane)), calc((100cqh - var(--bar)) * 16 / 9));
+}
+
+.room-shell[data-theatre='true'] .reaction-lane {
+  top: 0;
+  bottom: 0;
+}
+
+.room-shell[data-theatre='true'] .room-header-seats {
+  display: block;
+}
+
+.room-shell[data-theatre='true'] .front-row {
+  grid-template-rows: 0.75rem;
+}
+
+.room-shell[data-theatre='true'] .front-row .seats {
+  display: none;
+}
+
+.room-shell[data-theatre='true'] .front-row .seat-track {
+  grid-row: 1;
+}
+
+/* Sideways on a short window there's no bar or row to give up, so the height is already the video's. */
+@media (min-height: 501px) {
+  .room-shell[data-theatre='true'] {
+    --seats: 1rem;
+    --bar: calc(var(--seats) + var(--info));
   }
 }
 
@@ -610,12 +667,11 @@ body {
 
 /*
  * Before anything plays, the screen is off and the people are the room: their seats are big, and
- * search docks to the screen's bottom edge, above them. The row grows upward, so its bottom edge and
- * everything under it stay where a playing room has them. Nothing plays here to be drawn over.
+ * search docks to the screen's bottom edge, above them. The row starts where a playing room's does,
+ * and takes its extra height from the strip below, so it sits under the screen and not on it.
  */
 .stage-dock {
   justify-content: flex-end;
-  padding-bottom: 3.5rem;
 }
 
 .stage-dock[data-searching='true'] {
@@ -625,7 +681,6 @@ body {
 .front-row[data-idle='true'] {
   position: relative;
   align-items: flex-end;
-  margin-top: -2.5rem;
   height: calc(var(--seats) + 2.5rem);
 }
 
@@ -634,11 +689,14 @@ body {
   font-size: 0.8125rem;
 }
 
+/* The row is only as wide as the screen, so a full one shrinks its discs rather than stacking them. */
 .front-row[data-idle='true'] .seat-disc,
 .front-row[data-idle='true'] .seat-empty,
 .front-row[data-idle='true'] .seat-more {
-  width: 4.5rem;
-  height: 4.5rem;
+  width: 100%;
+  max-width: 4.5rem;
+  height: auto;
+  aspect-ratio: 1;
 }
 
 .front-row[data-idle='true'] .seat-disc > span {
@@ -836,6 +894,11 @@ body {
 
 .seats[data-gate='true'] .seat {
   width: 3.5rem;
+}
+
+/* A picture of a room, where each seat reads on its own. */
+.seats[data-picture='true'] .seat {
+  align-items: center;
 }
 
 .seat-you {
@@ -1092,8 +1155,9 @@ body {
 }
 
 /* ---- Reactions ------------------------------------------------------------
- * The lane sits in the rail and clips what it holds, so a reaction can't reach
- * the player, and in the room .chat-line leaves, so it crosses no words.
+ * The lane sits in the rail, or in theatre mode beside the video, and clips what it
+ * holds, so a reaction can't reach the player. In the rail it has the room .chat-line
+ * leaves, so it crosses no words.
  */
 
 .reaction-lane {

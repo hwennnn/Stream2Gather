@@ -4,6 +4,7 @@ import type { RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
 import { drivingLine, isHost, isLocked, isOffline, rosterFor } from './rules';
 import { Slot } from './Slot';
+import { viewerState } from './status';
 import { toastError } from './Toasts';
 
 const VoiceSettings = lazy(() => import('../voice/VoiceButton').then(({ VoiceSettingsSlot }) => ({ default: VoiceSettingsSlot })));
@@ -35,7 +36,7 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
       <ul className="rail-scroll min-h-0 flex-1 py-1">
         {rosterFor(view).map((person) => {
           const own = person.userId === view.self?.userId;
-          const status = STATUS_TEXT.get(view.viewerStates[person.userId] ?? '');
+          const status = STATUS_TEXT.get(viewerState(view, person.userId) ?? '');
           const speaking = view.speaking.includes(person.userId);
           const voice = speaking ? 'Speaking' : VOICE_TEXT.get(person.voice ?? '');
           const badges = [person.role === 'host' ? 'Host' : undefined, person.member ? 'Crew' : undefined, voice].filter(Boolean);

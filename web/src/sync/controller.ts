@@ -189,6 +189,8 @@ export class SyncController {
         if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.seekPlayer(playback.pos);
       });
       this.noteSettled(playback);
+      // Ticks report nothing here, so without this a viewer's last word stands for the whole pause.
+      this.report({ health: 'waiting', drift: 0 });
       return;
     }
     if (playback.status !== 'playing') return;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RoomView } from '../room/session';
-import { actFor, statusFor, type Part } from './status';
+import { actFor, laggingFriend, statusFor, viewerState, type Part } from './status';
 
 const me = { userId: 'me', name: 'Ada', role: 'member' as const };
 const maya = { userId: 'm', name: 'Maya', role: 'host' as const };
@@ -20,6 +20,22 @@ const line = (patch: Partial<Parameters<typeof statusFor>[0]>) => {
 };
 
 const paused = (pausedBy?: string, pausedById?: string) => ({ status: 'paused', pausedBy, pausedById }) as RoomView['playback'];
+
+describe('viewerState', () => {
+  it('passes on what someone reports while the room plays', () => {
+    expect(viewerState(view({ viewerStates: { m: 'correcting' } }), 'm')).toBe('correcting');
+  });
+
+  it.each(['buffering', 'correcting', 'stalled'])('leaves nobody %s in a paused room', (state) => {
+    const room = view({ viewerStates: { m: state }, playback: paused('Maya', 'm') });
+    expect(viewerState(room, 'm')).toBeUndefined();
+    expect(laggingFriend(room)).toBeUndefined();
+  });
+
+  it('keeps a video someone can’t play, which a pause doesn’t change', () => {
+    expect(viewerState(view({ viewerStates: { m: 'unavailable' }, playback: paused('Maya', 'm') }), 'm')).toBe('unavailable');
+  });
+});
 
 describe('statusFor', () => {
   it('never leaves a pause anonymous when it knows who did it', () => {

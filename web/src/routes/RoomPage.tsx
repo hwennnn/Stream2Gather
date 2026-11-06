@@ -315,7 +315,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const railToasts = !railHidden && toastStack('rail-edge shrink-0 pb-2 empty:hidden');
 
   return (
-    <div data-fullscreen={fullscreen.on} className="room-shell flex h-dvh flex-col bg-ink">
+    <div data-fullscreen={fullscreen.on} data-theatre={railHidden} className="room-shell flex h-dvh flex-col bg-ink">
       {!fullscreen.on && (
         <RoomHeader
           session={session}
@@ -362,6 +362,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           onToast={toast}
           railHidden={railHidden}
           toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink px-4 empty:hidden', 1)}
+          laneSlot={railHidden && <ReactionLane reactions={view.reactions} />}
         />
 
         <div className="flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5 empty:hidden">

@@ -208,7 +208,8 @@ for (const [layout, options] of LAYOUTS) {
     await page.goto(`${BASE}/r/${SLUG}`);
     await page.getByRole('button', { name: 'Join' }).click();
     await page.waitForSelector('[data-player] iframe, [data-player] video', { timeout: 20_000 });
-    await page.waitForFunction(() => !document.querySelector('.stage [role=status]'), null, { timeout: 25_000 });
+    // The poster stands in until the player has a picture, so nothing can be judged before it goes.
+    await page.waitForFunction(() => !document.querySelector('.stage > [aria-hidden="true"]'), null, { timeout: 25_000 });
 
     const controls = await page.evaluate(() => {
       const surface = document.querySelector('[data-player] iframe, [data-player] video');

@@ -193,6 +193,49 @@ func WithActingHost(people []Person, state room.State) []Person {
 	return people
 }
 
+// Line is something the room itself said. The server writes these, so everyone
+// reads the same history, whenever they arrive.
+type Line struct {
+	ID        string    `json:"id"`
+	Text      string    `json:"text"`
+	URL       string    `json:"url,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+const maxLines = 200
+
+func linesKey(roomID string) string { return "room:" + roomID + ":lines" }
+
+// AddLine appends to the room's history and keeps the newest.
+func (l *Live) AddLine(ctx context.Context, roomID string, line Line) error {
+	doc, err := json.Marshal(line)
+	if err != nil {
+		return err
+	}
+	key := linesKey(roomID)
+	pipe := l.rdb.TxPipeline()
+	pipe.RPush(ctx, key, doc)
+	pipe.LTrim(ctx, key, -maxLines, -1)
+	pipe.Expire(ctx, key, liveTTL)
+	_, err = pipe.Exec(ctx)
+	return err
+}
+
+// Lines returns the room's history, oldest first.
+func (l *Live) Lines(ctx context.Context, roomID string) ([]Line, error) {
+	docs, err := l.rdb.LRange(ctx, linesKey(roomID), 0, -1).Result()
+	if err != nil {
+		return nil, err
+	}
+	lines := make([]Line, len(docs))
+	for i, doc := range docs {
+		if err := json.Unmarshal([]byte(doc), &lines[i]); err != nil {
+			return nil, err
+		}
+	}
+	return lines, nil
+}
+
 // Touch records that a connection is alive.
 func (l *Live) Touch(ctx context.Context, roomID, connID string, person Person) error {
 	doc, err := json.Marshal(person)

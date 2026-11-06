@@ -968,3 +968,36 @@ func TestAWatchedRoomDoesNotExpireUnderItsViewers(t *testing.T) {
 	}
 	eventually(t, "a room in use was left to expire", func() bool { return !expired() })
 }
+
+func lineText(t *testing.T, message frame) string {
+	t.Helper()
+	var line store.Line
+	if err := json.Unmarshal(message.D, &line); err != nil {
+		t.Fatal(err)
+	}
+	return line.Text
+}
+
+func TestAJumpIsInTheHistory(t *testing.T) {
+	r := newRig(t, testRedis)
+	state := directVideo(t)
+	state.Queue = append(state.Queue, room.Item{ID: "next", Media: room.Media{Title: "Next one"}})
+	id := r.newRoom(t, state)
+	watching := r.joined(t, id, "a", room.RoleMember)
+
+	watching.send(t, room.CmdQueuePlay, map[string]any{"target": "next"})
+	if got := lineText(t, watching.expect(t, "line")); got != "a jumped to Next one" {
+		t.Fatalf("line = %q", got)
+	}
+
+	late := r.dial(t, id, "b", room.RoleMember)
+	var welcome struct {
+		Lines []store.Line `json:"lines"`
+	}
+	if err := json.Unmarshal(late.expect(t, "welcome").D, &welcome); err != nil {
+		t.Fatal(err)
+	}
+	if len(welcome.Lines) == 0 || welcome.Lines[0].Text != "a jumped to Next one" {
+		t.Fatalf("lines = %+v", welcome.Lines)
+	}
+}

@@ -18,6 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/time/rate"
 
+	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
 	"stream2gather/internal/source"
 	"stream2gather/internal/store"
@@ -721,6 +722,7 @@ func mostAreFailing(people []store.Person, failing []string) bool {
 }
 
 func (r *liveRoom) publishNotice(ctx context.Context, notice map[string]string) {
+	r.say(ctx, notice["text"], notice["url"])
 	if err := r.hub.live.Publish(ctx, r.id, encode("notice", notice)); err != nil {
 		r.hub.log.Warn("notice publish failed", "room", r.id, "error", err)
 	}
@@ -876,11 +878,12 @@ func (r *liveRoom) applySystem(ctx context.Context, cmd room.Command) bool {
 // who are still connected never find out.
 func (r *liveRoom) mutate(ctx context.Context, actor room.Actor, cmd room.Command) (room.State, error) {
 	var change room.Change
+	var before room.State
 	attempt := func() (room.State, error) {
 		return r.hub.live.Mutate(ctx, r.id,
 			func(state room.State) (room.State, error) {
 				next, applied, err := room.Apply(state, actor, cmd, time.Now().UnixMilli())
-				change = applied
+				change, before = applied, state
 				return next, err
 			},
 			func(state room.State) ([]byte, error) { return encodeChange(state, change), nil },
@@ -895,8 +898,23 @@ func (r *liveRoom) mutate(ctx context.Context, actor room.Actor, cmd room.Comman
 	}
 	if err == nil {
 		r.hub.recorder.Applied(r.id, state)
+		if text := room.Narrate(before, state, change); text != "" {
+			r.say(ctx, text, "")
+		}
 	}
 	return state, err
+}
+
+// say adds to what the room has said, for those here and those yet to arrive.
+func (r *liveRoom) say(ctx context.Context, text, url string) {
+	line := store.Line{ID: ids.New(), Text: text, URL: url, CreatedAt: time.Now().UTC()}
+	err := r.hub.live.AddLine(ctx, r.id, line)
+	if err == nil {
+		err = r.hub.live.Publish(ctx, r.id, encode("line", line))
+	}
+	if err != nil {
+		r.hub.log.Warn("line failed", "room", r.id, "error", err)
+	}
 }
 
 func (r *liveRoom) join(c *conn, ticket store.Ticket) {
@@ -952,8 +970,13 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 	}
 	self := person
 	self.Role = state.RoleOf(person.UserID, person.Role)
+	lines, err := r.hub.live.Lines(ctx, r.id)
+	if err != nil {
+		r.hub.log.Warn("lines read failed", "room", r.id, "error", err)
+	}
 	c.send(encode("welcome", map[string]any{
 		"self":    self,
+		"lines":   lines,
 		"room":    map[string]string{"id": r.id, "slug": ticket.RoomSlug, "name": ticket.RoomName},
 		"state":   state,
 		"members": people,

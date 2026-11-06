@@ -190,3 +190,33 @@ func TestOnlyPressingPlayNamesSomeone(t *testing.T) {
 		})
 	}
 }
+
+func TestOnlyUnbrokenPlayLongEnoughCounts(t *testing.T) {
+	now := time.Now()
+	running := playingAt(0, now.Add(-store.WatchedAfter-time.Second))
+	fresh := playingAt(0, now.Add(-time.Second))
+	paused := running
+	paused.Playback.Status = room.StatusPaused
+	stopped := fresh
+	stopped.Playback.Status = room.StatusPaused
+	for name, tc := range map[string]struct {
+		live   room.State
+		events []recorded
+		want   int
+	}{
+		"still playing at the flush":   {running, []recorded{{left: "bo"}}, 1},
+		"paused long enough after it":  {paused, []recorded{{state: &paused, before: &running, at: now}}, 1},
+		"just started":                 {fresh, []recorded{{left: "bo"}}, 0},
+		"paused the moment it started": {stopped, []recorded{{state: &stopped, before: &fresh, at: now}}, 0},
+		"sitting paused all along":     {paused, []recorded{{left: "bo"}}, 0},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := &fakeCaptureStore{crew: "c"}
+			c := newCapture(db, fakeRoomReader{state: tc.live}, quiet())
+			c.flush(context.Background(), "r", tc.events)
+			if got := len(db.batches[0].Played); got != tc.want {
+				t.Fatalf("%d runs, want %d", got, tc.want)
+			}
+		})
+	}
+}

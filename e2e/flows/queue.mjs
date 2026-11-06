@@ -96,8 +96,10 @@ flow('search: nothing found, a broken API and a spent quota all say something us
   await openTab(a.page, 'Queue');
   await search(a.page, 'nothing matches this');
   await t.see('no results', ui.results(a.page).getByText(/nothing found/i));
+  const answer = a.page.waitForResponse(/media\/search\?q=please/);
   await search(a.page, 'please break the api');
-  await t.see('search failed', ui.results(a.page).getByText(/isn.t available|went wrong|try again|paste a link/i));
+  t.eq('it is not called a server error', (await answer).status(), 503);
+  await t.see('search failed', ui.results(a.page).getByText('Search isn’t working right now. Paste a link instead.'));
   await search(a.page, 'out of quota today');
   await t.see('quota', ui.results(a.page).getByText(/resting|tomorrow/i));
 });

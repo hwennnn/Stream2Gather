@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,6 +17,7 @@ import (
 type countedSearch struct {
 	calls   atomic.Int32
 	regions atomic.Int32
+	broken  error
 }
 
 func (*countedSearch) Name() string { return "youtube" }
@@ -30,7 +32,7 @@ func (c *countedSearch) Search(_ context.Context, _, region string) ([]room.Medi
 	if region != "" {
 		c.regions.Add(1)
 	}
-	return nil, nil
+	return nil, c.broken
 }
 func (*countedSearch) Trending(context.Context) ([]room.Media, error) {
 	return nil, source.ErrNoSearch
@@ -42,6 +44,18 @@ func searchServer(t *testing.T) (*Server, *countedSearch) {
 	counted := &countedSearch{}
 	s.Catalog = source.NewCatalog(s.DB, 1_000_000, s.Log, counted)
 	return s, counted
+}
+
+func TestABrokenSourceIsAFriendlyFailure(t *testing.T) {
+	s, counted := searchServer(t)
+	counted.broken = errors.New("youtube said 500, with a key in the url")
+	response, body := serve(s, http.MethodGet, "/v1/media/search?q=broken-"+ids.New(), "", from("broken-"+ids.New()))
+	if response.Code != http.StatusServiceUnavailable || body["code"] != "search_unavailable" {
+		t.Fatalf("code = %d, body = %v", response.Code, body)
+	}
+	if message, _ := body["message"].(string); !strings.Contains(message, "Paste a link") || strings.Contains(message, "youtube said") {
+		t.Fatalf("message = %q", message)
+	}
 }
 
 func TestALongSearchIsRefusedBeforeItSpendsQuota(t *testing.T) {

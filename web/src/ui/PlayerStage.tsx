@@ -215,7 +215,7 @@ export const SkipButton = ({ session, view, onToast, className = '' }: { session
 };
 
 export const UnmuteButton = ({ player, className = '' }: { player: RoomPlayer; className?: string }) => {
-  if (!player.muted || player.failure) return null;
+  if (!player.muted || player.failure || player.refused) return null;
   return (
     <button type="button" onClick={player.unmute} className={`btn btn-primary ${className}`}>
       <Icon name="muted" />

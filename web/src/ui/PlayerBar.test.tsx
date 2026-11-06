@@ -3,7 +3,8 @@ import { cleanup, render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
-import { PlayerBar } from './PlayerStage';
+import { PlayerBar, UnmuteButton } from './PlayerStage';
+import type { RoomPlayer } from './useRoomPlayer';
 
 afterEach(cleanup);
 
@@ -51,5 +52,20 @@ describe('PlayerBar when this viewer cannot play and someone else can', () => {
   it('gives no Skip to a guest the host has locked out', () => {
     bar(viewFor('member', 'hosts'));
     expect(screen.queryByRole('button', { name: 'Finish' })).toBeNull();
+  });
+});
+
+describe('UnmuteButton', () => {
+  const shown = (refused: boolean) => {
+    render(<UnmuteButton player={{ muted: true, failure: null, refused } as unknown as RoomPlayer} />);
+    return screen.queryByRole('button', { name: 'Tap to unmute' }) !== null;
+  };
+
+  it('offers sound for a video that is playing silently', () => {
+    expect(shown(false)).toBe(true);
+  });
+
+  it('stays out of the way while the viewer still has to press play', () => {
+    expect(shown(true)).toBe(false);
   });
 });

@@ -453,7 +453,7 @@ func TestQueueAddModes(t *testing.T) {
 		{AddEnd, "a b n", "a"},
 		{"", "a b n", "a"},
 		{AddNext, "a n b", "a"},
-		{AddNow, "n a b", "n"},
+		{AddNow, "n b", "n"},
 	}
 	for _, test := range cases {
 		next, _, err := Apply(s, member, Command{Type: CmdQueueAdd, Mode: test.mode, Media: media, NewItemID: "n"}, now)
@@ -466,6 +466,45 @@ func TestQueueAddModes(t *testing.T) {
 	}
 	if _, _, err := Apply(s, member, Command{Type: CmdQueueAdd, Mode: "sideways", Media: media, NewItemID: "n"}, now); !errors.Is(err, ErrInvalid) {
 		t.Fatalf("unknown mode: %v", err)
+	}
+}
+
+func TestPlayNowReplacesWhatWasPlayingAndCanBeUndone(t *testing.T) {
+	s := add(t, add(t, New(), "a", 0), "b", 0)
+	media := &Media{Source: "youtube", SourceID: "n"}
+	next, change, err := Apply(s, member, Command{Type: CmdQueueAdd, Mode: AddNow, Media: media, NewItemID: "n"}, now+5000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(next); got != "n b" {
+		t.Fatalf("the interrupted video came back: %s", got)
+	}
+	if change.Cause != CmdQueuePlay {
+		t.Fatalf("cause = %q, want the same news as a jump", change.Cause)
+	}
+
+	undone, _, err := Apply(next, member, Command{Type: CmdQueueUndo, Target: "n"}, now+6000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(undone); got != "a n b" {
+		t.Fatalf("after undo: %s", got)
+	}
+}
+
+func TestAddingAfterAJumpIsNotAnotherJump(t *testing.T) {
+	s := add(t, add(t, New(), "a", 0), "b", 0)
+	jumped, _, err := Apply(s, member, Command{Type: CmdQueuePlay, Target: "b"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	media := &Media{Source: "youtube", SourceID: "n"}
+	_, change, err := Apply(jumped, member, Command{Type: CmdQueueAdd, Mode: AddEnd, Media: media, NewItemID: "n"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if change.Cause != CmdQueueAdd {
+		t.Fatalf("cause = %q", change.Cause)
 	}
 }
 

@@ -95,6 +95,9 @@ func Apply(s State, actor Actor, cmd Command, now int64) (State, Change, error) 
 	case CmdQueueAdd:
 		change.Queue = true
 		err = applyAdd(&s, actor, cmd, now)
+		if cmd.Mode == AddNow && s.Jump != nil {
+			change.Cause = CmdQueuePlay // To everyone watching, this is a jump.
+		}
 	case CmdQueueRemove:
 		change.Queue = true
 		err = applyRemove(&s, actor, cmd, now)
@@ -203,8 +206,13 @@ func applyAdd(s *State, actor Actor, cmd Command, now int64) error {
 		if !allowed(s.Settings.ControlMode, actor) {
 			return ErrForbidden
 		}
-		s.Queue = slices.Insert(s.Queue, 0, item)
+		// It replaces what was playing, as queue.play does, and Undo brings that back.
+		back := s.Playback
+		back.Pos = s.PositionAt(now)
+		jump := &Jump{To: item.ID, Index: 1, Replaced: s.Queue[0], Playback: back, At: now}
+		s.Queue[0] = item
 		start(s, now)
+		s.Jump = jump
 	case cmd.Mode == AddNext:
 		s.Queue = slices.Insert(s.Queue, 1, item)
 	case cmd.Mode == AddEnd || cmd.Mode == "":

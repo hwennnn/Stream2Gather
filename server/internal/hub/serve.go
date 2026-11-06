@@ -33,17 +33,14 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	defer h.release(r)
 
 	c := &conn{
-		id:        ids.New(),
-		address:   ticket.Address,
-		version:   ticket.SessionVersion,
-		person:    ticket.Person,
-		out:       make(chan []byte, sendBuffer),
-		closed:    make(chan struct{}),
-		control:   rate.NewLimiter(5, 10),
-		chat:      rate.NewLimiter(2, 5),
-		reactions: rate.NewLimiter(2, 5),
-		reports:   rate.NewLimiter(rate.Every(5*time.Second), 3),
-		voiceRate: rate.NewLimiter(5, 10),
+		id:      ids.New(),
+		address: ticket.Address,
+		version: ticket.SessionVersion,
+		person:  ticket.Person,
+		out:     make(chan []byte, sendBuffer),
+		closed:  make(chan struct{}),
+		limits:  r.limitsFor(ticket.Person.UserID),
+		pings:   rate.NewLimiter(2, 10),
 	}
 	defer c.close()
 	if ticket.Account {
@@ -138,6 +135,9 @@ func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 // pong reports the version in Redis, not the last one seen here. Comparing the
 // room with itself could never reveal that this server missed an event.
 func (r *liveRoom) pong(ctx context.Context, c *conn, message Message) {
+	if !c.pings.Allow() {
+		return
+	}
 	var ping struct {
 		T0 float64 `json:"t0"`
 	}
@@ -359,7 +359,7 @@ func (r *liveRoom) status(c *conn, message Message) {
 		State string  `json:"state"`
 		Drift float64 `json:"drift"`
 	}
-	if err := json.Unmarshal(message.Data, &request); err != nil || !viewerStates[request.State] || !c.control.Allow() {
+	if err := json.Unmarshal(message.Data, &request); err != nil || !viewerStates[request.State] || !c.status.Allow() {
 		return
 	}
 	ctx, cancel := opContext()

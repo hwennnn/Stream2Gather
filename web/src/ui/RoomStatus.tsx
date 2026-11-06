@@ -52,7 +52,7 @@ const Piece = ({ part }: { part: Part }) => {
   if (typeof part === 'string') return part;
   if ('fig' in part) return <span className="fig text-[13px]">{part.fig}</span>;
   return (
-    <span style={part.userId ? { color: hueOf(part.userId) } : undefined} className="font-semibold">
+    <span style={part.userId ? { color: hueOf(part.userId) } : undefined} className="font-semibold whitespace-nowrap">
       {part.who}
     </span>
   );

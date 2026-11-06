@@ -24,6 +24,42 @@ flow('chat: a message reaches everyone, with its author', async (t) => {
     ui.chatLog(a.page).locator('[data-delivery]').filter({ hasText: 'hello from Ana' }).evaluateAll((lines) => lines.length === 0 || lines.every((line) => !line.dataset.delivery)));
 });
 
+flow('chat: a Korean word and a name stay whole, on the narrowest phone', async (t) => {
+  const a = await t.person('Ana', { viewport: { width: 320, height: 640 }, phone: true });
+  const b = await t.person('Ben');
+  const room = await startRoom(t, a, { url: golden.url });
+  await joinRoom(b, room.url, { name: 'WWWWWWWWWW-WWWWWWWWWW-WWWWWWWWWW' });
+  await sendChat(b.page, '잠깐만 간식 좀 챙겨올게요 ㅋㅋㅋㅋ 5분만 기다려줘 '.repeat(4).trim());
+  await sendChat(b.page, 'ㅋ'.repeat(120));
+  await openTab(a.page, 'Chat');
+  const lines = ui.chatLog(a.page).locator('p');
+  await t.see('the long laugh', lines.filter({ hasText: 'ㅋㅋㅋㅋㅋㅋㅋㅋ' }));
+  const measured = await lines.filter({ hasText: '기다려줘' }).evaluate((line) => {
+    const countRows = (rects) => new Set([...rects].map((rect) => Math.round(rect.top))).size;
+    const text = [...line.childNodes].find((node) => node.nodeType === Node.TEXT_NODE);
+    const words = [...text.textContent.matchAll(/\S+/g)];
+    const cut = (word) => {
+      const range = document.createRange();
+      range.setStart(text, word.index);
+      range.setEnd(text, word.index + word[0].length);
+      return countRows(range.getClientRects()) > 1;
+    };
+    const name = countRows(line.querySelector('span').getClientRects());
+    // Where a word lands depends on the width, so one width could miss it by luck.
+    const split = new Set();
+    for (let width = 160; width <= 288; width += 8) {
+      line.style.width = `${width}px`;
+      for (const word of words) if (cut(word)) split.add(`${word[0]} at ${width}`);
+    }
+    line.style.width = '';
+    return { name, split: [...split] };
+  });
+  t.eq('the name stays on one line', measured.name, 1);
+  t.eq('no Korean word is cut in half', measured.split.slice(0, 3).join(', '), '');
+  const laugh = lines.filter({ hasText: 'ㅋㅋㅋㅋㅋㅋㅋㅋ' });
+  t.check('a word with no spaces still wraps', await laugh.evaluate((line) => line.scrollWidth <= line.clientWidth && line.getBoundingClientRect().height > 40));
+});
+
 flow('chat: Send only works with something to send', async (t) => {
   const { a } = await pair(t);
   const send = a.page.getByRole('button', { name: 'Send' });

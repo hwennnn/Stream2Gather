@@ -5,6 +5,7 @@ import { Icon, type IconName } from './Icon';
 import { AddBox, MediaRow, MediaSkeleton, SearchResults, useSearch } from './Omnibox';
 import { followPointer } from './pointerDrag';
 import { canControl, canQueue, isOffline } from './rules';
+import { sourceName } from './sources';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { useAdder } from './useAdder';
@@ -99,7 +100,8 @@ const NowPlaying = ({ item, paused }: { item: QueueItem; paused: boolean }) => (
       <div className="min-w-0 flex-1">
         <p className="line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</p>
         <p className="mt-0.5 truncate text-xs text-muted">
-          {paused ? 'Paused · ' : ''}Added by {item.addedByName}
+          {paused ? 'Paused · ' : ''}
+          {sourceName(item.source)} · Added by {item.addedByName}
         </p>
       </div>
     </div>
@@ -242,7 +244,7 @@ const QueueRow = (props: RowProps) => {
   const { item, index, last, offset, dragging, settling, canPlay, editable, offline } = props;
   const { onDragStart, onMove, onPlay, onRemove } = props;
   const [tray, setTray] = useState(false);
-  const meta = [`Added by ${item.addedByName}`, item.durationMs > 0 ? formatTime(item.durationMs / 1000) : ''].filter(Boolean).join(' · ');
+  const meta = [sourceName(item.source), `Added by ${item.addedByName}`, item.durationMs > 0 ? formatTime(item.durationMs / 1000) : ''].filter(Boolean).join(' · ');
   const actions: RowAction[] = [
     ...(canPlay ? [{ label: 'Play now', primary: true, disabled: offline, run: onPlay }] : []),
     ...(editable

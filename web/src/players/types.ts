@@ -4,8 +4,8 @@ export type PlayerErrorKind = 'unavailable' | 'embed_blocked' | 'network' | 'unk
 
 export type PlayerError = { kind: PlayerErrorKind; code: number };
 
-/** 'fine' takes any playback rate; 'discrete' only the steps YouTube offers. */
-export type PlayerRates = 'fine' | 'discrete';
+/** 'fine' takes any playback rate; 'discrete' only the steps YouTube offers; 'none' can't change rate. */
+export type PlayerRates = 'fine' | 'discrete' | 'none';
 
 /** The only surface sync logic sees, so every source behaves the same to it. */
 export interface PlayerAdapter {
@@ -18,6 +18,10 @@ export interface PlayerAdapter {
   state(): PlayerState;
   setMuted(muted: boolean): void;
   muted(): boolean;
+  /** Takes 0 to 1. Does nothing where the browser keeps volume to itself, as on iPhone. */
+  setVolume(volume: number): void;
+  /** From 0 to 1, or null if the player can't say. */
+  volume(): number | null;
   onState(listener: (state: PlayerState) => void): void;
   onError(listener: (error: PlayerError) => void): void;
   destroy(): void;

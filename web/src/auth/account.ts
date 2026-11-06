@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { api, type Account } from '../api/http';
+import { api, type Account, type SiteConfig } from '../api/http';
 
 /** The parts of Clerk's browser object this app calls. */
 export type ClerkControls = {
@@ -11,6 +11,8 @@ export type ClerkControls = {
 type AccountView = {
   user: Account | null;
   publishableKey: string;
+  /** Null until the server has answered. */
+  config: SiteConfig | null;
   /** Clerk's script only loads for people who are signing in or signed in. */
   clerkWanted: boolean;
   problem: string | null;
@@ -19,7 +21,7 @@ type AccountView = {
 // Survives the redirect back from Google, which reloads the page.
 const SIGNING_IN = 's2g:signing-in';
 
-let view: AccountView = { user: null, publishableKey: '', clerkWanted: false, problem: null };
+let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null };
 let clerk: ClerkControls | null = null;
 let openWhenReady = false;
 /** The sign-in was opened by this page, so it may still be showing. */
@@ -53,6 +55,7 @@ export const account = {
       update({
         user: me.user,
         publishableKey: config.clerkPublishableKey,
+        config,
         clerkWanted: Boolean(me.user?.signedIn) || sessionStorage.getItem(SIGNING_IN) !== null,
       });
     } catch {

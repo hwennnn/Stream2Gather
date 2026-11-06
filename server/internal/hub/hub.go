@@ -52,6 +52,8 @@ type Hub struct {
 	catalog *source.Catalog
 	log     *slog.Logger
 	pubsub  *redis.PubSub
+	// recorder hears about activity. It never blocks and may lose events.
+	recorder Recorder
 
 	// Timings are fields so tests need not wait them out.
 	idleTimeout time.Duration
@@ -69,7 +71,7 @@ type Hub struct {
 
 // New returns a hub. Call Run to start delivering events.
 func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *source.Catalog, log *slog.Logger) *Hub {
-	return &Hub{
+	h := &Hub{
 		db:      db,
 		live:    live,
 		catalog: catalog,
@@ -82,11 +84,14 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 
 		rooms: make(map[string]*liveRoom),
 	}
+	h.recorder = newRecorder(h)
+	return h
 }
 
 // Run delivers Redis events to local rooms until ctx ends. One connection
 // carries every room on this server, so nothing here may ever wait for a room.
 func (h *Hub) Run(ctx context.Context) {
+	go h.recorder.Run(ctx)
 	messages := h.pubsub.ChannelWithSubscriptions(redis.WithChannelSize(eventBuffer))
 	for {
 		select {
@@ -662,13 +667,16 @@ func (r *liveRoom) mutate(ctx context.Context, actor room.Actor, cmd room.Comman
 		)
 	}
 	state, err := attempt()
-	if !errors.Is(err, store.ErrNoState) {
-		return state, err
+	if errors.Is(err, store.ErrNoState) {
+		if _, err := r.ensureState(ctx); err != nil {
+			return room.State{}, err
+		}
+		state, err = attempt()
 	}
-	if _, err := r.ensureState(ctx); err != nil {
-		return room.State{}, err
+	if err == nil {
+		r.hub.recorder.Applied(r.id, state)
 	}
-	return attempt()
+	return state, err
 }
 
 func (r *liveRoom) join(c *conn, ticket store.Ticket) {
@@ -703,6 +711,7 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 		r.hub.log.Warn("presence write failed", "room", r.id, "error", err)
 	}
 	r.conns[c] = struct{}{}
+	r.hub.recorder.Joined(r.id, person)
 
 	people, err := r.hub.live.People(ctx, r.id)
 	if err != nil {
@@ -740,6 +749,9 @@ func (r *liveRoom) leave(c *conn) {
 	}
 
 	people, err := r.hub.live.People(ctx, r.id)
+	if err == nil && !slices.ContainsFunc(people, func(p store.Person) bool { return p.UserID == person.UserID }) {
+		r.hub.recorder.Left(r.id, person.UserID)
+	}
 	if err == nil && len(people) == 0 {
 		if err := r.hub.live.MarkEmpty(ctx, r.id, time.Now().UnixMilli()); err != nil {
 			r.hub.log.Warn("empty mark failed", "room", r.id, "error", err)

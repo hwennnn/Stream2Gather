@@ -29,13 +29,20 @@ const percentile = (values, p) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? null;
 };
 
-/** latencyMs delays each direction of the viewer's socket by that much. */
-const viewer = async (name, { latencyMs = 0 } = {}) => {
+/**
+ * latencyMs delays each direction of the viewer's socket by that much.
+ * timerScale stretches setInterval, the way a background tab's timers run late.
+ */
+const viewer = async (name, { latencyMs = 0, timerScale = 1 } = {}) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
   const page = await context.newPage();
   // Offline mode leaves open WebSockets alone, so tests need a way to cut one.
   // Browser network throttling doesn't reach them either, so latency goes here.
+  await page.addInitScript((scale) => {
+    const native = window.setInterval.bind(window);
+    window.setInterval = (work, ms, ...rest) => native(work, ms * scale, ...rest);
+  }, timerScale);
   await page.addInitScript((delay) => {
     const Native = window.WebSocket;
     window.__sockets = [];
@@ -92,6 +99,8 @@ const join = async (guest, url) => {
   await guest.page.goto(url);
   await guest.page.getByRole('button', { name: 'Join' }).click();
 };
+
+const seats = (v) => v.page.evaluate(() => Number(/People\s+(\d+)/.exec(document.body.innerText)?.[1] ?? 0));
 
 const sampleAll = (viewers) =>
   Promise.all(viewers.map((v) => v.page.evaluate(() => window.__s2g?.sample() ?? null)));
@@ -218,7 +227,7 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   // Nobody can feel 0.6s being corrected, but the pill may not call it in sync.
   const bar = b.page.locator('section[aria-label="Player controls"]');
   const honest = await bar.getByText('Catching up').waitFor({ timeout: 2500 }).then(() => true, () => false);
-  check('the pill does not say in sync while off the room', honest, '');
+  check('the pill does not say in sync while off the room', honest, honest ? '' : await bar.innerText());
 
   const injectedAt = Date.now();
   let healed = null;
@@ -515,6 +524,29 @@ const waitPlaying = async (viewers, timeout = 15000) => {
     check('end: the room moves on once a report gets through', moved, JSON.stringify(await sampleAll([a, b])));
   }
   await Promise.all([a, b].map((v) => v.context.close()));
+}
+
+// A tab left in the background keeps its seat, however late its timers run.
+{
+  const host = await viewer('host', { timerScale: 7 / 3 }); // The 7s steps seen in real Chrome.
+  const idle = await viewer('idle', { timerScale: 20 }); // Chrome's once a minute for a hidden tab.
+  const frozen = await viewer('frozen');
+  const watcher = await viewer('watcher');
+  const room = await createRoom(host, `${BASE}/sample.mp4?video=hidden`);
+  await Promise.all([idle, frozen, watcher].map((v) => join(v, room.url)));
+  await waitFor(async () => await seats(watcher) === 4, 15000);
+  const cdp = await frozen.context.newCDPSession(frozen.page);
+  await cdp.send('Page.setWebLifecycleState', { state: 'frozen' });
+  const counts = [];
+  for (let i = 0; i < 20; i += 1) {
+    await sleep(5000);
+    if (i === 4) await cdp.send('Page.setWebLifecycleState', { state: 'active' });
+    counts.push(await seats(watcher));
+  }
+  const sockets = await Promise.all([host, idle, frozen].map((v) => v.page.evaluate(() => window.__sockets.length)));
+  check('background: nobody loses a seat', counts.every((n) => n === 4), JSON.stringify(counts));
+  check('background: nobody reconnects', sockets.every((n) => n === 1), JSON.stringify(sockets));
+  await Promise.all([host, idle, frozen, watcher].map((v) => v.context.close()));
 }
 
 // A video whose owner blocks embedding must not break the room.

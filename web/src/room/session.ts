@@ -39,7 +39,8 @@ type Reaction = { id: number; emoji: string; name: string };
 type Notice = { id: number; kind?: string; text: string; url?: string };
 
 /** Someone replaced the current video, and the room can still go back. */
-type Jump = { id: string; by: string; title: string };
+/** Moving to the video that was next is a skip, and can be undone just the same. */
+type Jump = { id: string; by: string; title: string; skip?: boolean };
 
 export type RoomView = {
   connection: 'connecting' | 'live' | 'reconnecting' | 'failed';
@@ -553,15 +554,16 @@ export class RoomSession {
       ranOut: ranOut(message, previous.ranOut),
       lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
     });
-    if (itemChanged) this.noteJump(message);
+    if (itemChanged) this.noteJump(message, previous.queue);
     this.playbackListener(message.playback, snapshot);
   }
 
   /** Any video change ends the offer, and only a jump starts a new one. */
-  private noteJump({ by, cause, queue }: StateMessage): void {
+  private noteJump({ by, cause, queue }: StateMessage, before: QueueItem[]): void {
     if (this.jumpTimer !== null) clearTimeout(this.jumpTimer);
     const item = queue?.[0];
-    const jump = cause === 'queue.play' && by && item ? { id: item.id, by, title: item.title } : null;
+    const skip = item && before[1]?.id === item.id ? { skip: true } : {};
+    const jump = cause === 'queue.play' && by && item ? { id: item.id, by, title: item.title, ...skip } : null;
     this.update({ jump });
     if (jump) this.jumpTimer = window.setTimeout(() => this.update({ jump: null }), UNDO_LIFE_MS);
   }

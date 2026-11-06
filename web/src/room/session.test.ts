@@ -982,6 +982,12 @@ describe('RoomSession', () => {
       return { session, socket, moved };
     };
 
+    it('calls moving to the next video a skip, and keeps its undo', async () => {
+      const { session, socket } = await queued();
+      socket.deliver('state', { version: 2, playback: { ...idle, item: 'b' }, queue: [item('b'), item('c')], cause: 'queue.play', by: 'Asha' });
+      expect(session.getView().jump).toEqual({ id: 'b', by: 'Asha', title: 'Video b', skip: true });
+    });
+
     it('offers an undo for five seconds', async () => {
       const { session, socket, moved } = await queued();
       socket.deliver('state', moved);

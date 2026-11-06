@@ -361,7 +361,11 @@ func Narrate(before, after State, change Change) string {
 	moved := before.Playback.ItemID != after.Playback.ItemID && len(after.Queue) > 0
 	switch {
 	case change.Cause == CmdQueuePlay && moved:
-		return change.By + " jumped to " + after.Queue[0].Title
+		verb := " jumped to "
+		if len(before.Queue) > 1 && before.Queue[1].ID == after.Queue[0].ID {
+			verb = " skipped to " // Skip moves to the next video this way, so that it can be undone.
+		}
+		return change.By + verb + after.Queue[0].Title
 	case change.Cause == CmdQueueUndo && moved:
 		return change.By + " went back to " + after.Queue[0].Title
 	case change.Cause == CmdSettings && before.Settings.ControlMode != after.Settings.ControlMode:

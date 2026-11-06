@@ -27,6 +27,11 @@ describe('JumpToast', () => {
     expect(screen.getByText(/jumped to/).textContent).toBe('Asha jumped to Video c');
   });
 
+  it('calls a skip a skip', () => {
+    setup({ jump: { id: 'c', by: 'Ada', title: 'Video c', skip: true } });
+    expect(screen.getByText(/skipped to/).textContent).toBe('You skipped to Video c');
+  });
+
   it('says you when it was you', () => {
     setup({ jump: { id: 'c', by: 'Ada', title: 'Video c' } });
     expect(screen.getByText(/jumped to/).textContent).toBe('You jumped to Video c');

@@ -5,6 +5,8 @@ import type { PlayerAdapter, PlayerError, PlayerState } from '../players/types';
 import { catchupApi, type CrewVideo, type Moment } from './api';
 import CatchupPage from './CatchupPage';
 
+vi.mock('../auth/account', () => ({ useAccount: () => ({ user: { name: 'Mika' } }) }));
+
 const player = vi.hoisted(() => ({ time: 0, state: 'ready' as PlayerState, fail: null as null | ((error: PlayerError) => void), startAt: -1, autoplay: true }));
 vi.mock('../players/registry', () => ({
   createPlayer: async (_: HTMLElement, __: unknown, startAt: number, autoplay: boolean) => {
@@ -74,6 +76,12 @@ describe('CatchupPage', () => {
     expect(line).toContain('Hana, 12:04, 🔥');
   });
 
+  it('says what the empty rail is waiting for', async () => {
+    await open([moment(1, 724_000)]);
+
+    expect(screen.getByText('Reactions show up here as the video reaches them.')).toBeTruthy();
+  });
+
   it('never starts the video itself, and starts where the link says', async () => {
     window.history.replaceState(null, '', '/r/sundays/catchup/9?at=714000');
     await open([]);
@@ -90,6 +98,12 @@ describe('CatchupPage', () => {
 
     expect(screen.getByRole('list', { name: 'Reactions' }).children).toHaveLength(2);
     expect(document.querySelector('[data-fired]')).toBeNull();
+  });
+
+  it('says so when nobody has reacted', async () => {
+    await open([]);
+
+    expect(screen.getByText('Nobody reacted to this one yet. Your reactions will be here for the next person.')).toBeTruthy();
   });
 
   it('keeps playing when reactions fail to load, and can try again', async () => {
@@ -117,6 +131,36 @@ describe('CatchupPage', () => {
 
     expect(screen.getByRole('link', { name: 'Open on YouTube' }).getAttribute('href')).toBe('https://youtu.be/a');
     expect(screen.getByRole('list', { name: 'Reactions' }).textContent).toContain('12:04');
+    expect(screen.queryByRole('button', { name: 'React 🔥' })).toBeNull();
+  });
+
+  it('keeps a reaction at the video’s position, retrying once', async () => {
+    await open([]);
+    await advance(0);
+    await advance(0.25);
+    player.time = 12.5;
+    const add = vi.spyOn(catchupApi, 'add').mockRejectedValueOnce(new Error('blip')).mockResolvedValueOnce({ id: 7 });
+
+    fireEvent.click(screen.getByRole('button', { name: 'React 🔥' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(add).toHaveBeenCalledTimes(2);
+    expect(add).toHaveBeenLastCalledWith('sundays', { source: 'youtube', id: 'a', posMs: 12_500, emoji: '🔥' });
+    expect(screen.getByRole('list', { name: 'Reactions' }).textContent).toContain('Mika');
+  });
+
+  it('says so when a reaction can’t be saved, and playback carries on', async () => {
+    await open([]);
+    vi.spyOn(catchupApi, 'add').mockRejectedValue(new Error('down'));
+
+    fireEvent.click(screen.getByRole('button', { name: 'React 🔥' }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.getByRole('status').textContent).toContain('didn’t save');
   });
 
   it('says a video is unavailable, with the way back', async () => {
@@ -129,6 +173,33 @@ describe('CatchupPage', () => {
 
     expect(screen.getByText('Video unavailable')).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Sundays' }).getAttribute('href')).toBe('/r/sundays');
+  });
+
+  it('seeks from the strip under the player, and fires nothing doing it', async () => {
+    await open([moment(1, 30_000)]);
+    await advance(0);
+    const strip = screen.getByRole('img', { name: 'Where the reactions are' });
+    strip.getBoundingClientRect = () => ({ left: 0, width: 100 }) as DOMRect;
+
+    fireEvent.click(strip, { clientX: 75 });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+
+    expect(player.time).toBe(45);
+    expect(document.querySelector('[data-fired]')).toBeNull();
+  });
+
+  it('draws no strip for a video of unknown length', async () => {
+    vi.spyOn(catchupApi, 'item').mockResolvedValue({ ...video, media: { ...video.media, durationMs: 0 } as never });
+    vi.spyOn(catchupApi, 'moments').mockResolvedValue([moment(1, 1000)]);
+
+    render(<CatchupPage slug="sundays" itemId="9" />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(screen.queryByRole('img', { name: 'Where the reactions are' })).toBeNull();
   });
 
   it('never opens a socket', async () => {

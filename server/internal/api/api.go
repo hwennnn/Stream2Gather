@@ -54,9 +54,11 @@ const (
 	slugAttempts = 5
 )
 
-// ClerkVerifier turns a Clerk session token into the person it belongs to.
+// ClerkVerifier turns a Clerk session token into the person it belongs to, and
+// ends that person's Clerk sessions when they sign out.
 type ClerkVerifier interface {
 	Verify(ctx context.Context, token string) (auth.Identity, error)
+	EndSessions(ctx context.Context, clerkID string) error
 }
 
 // Server holds what the routes need.
@@ -499,8 +501,25 @@ func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.versions.forget(claims.Subject)
+		if err := s.endClerkSessions(r.Context(), claims.Subject); err != nil {
+			s.internal(w, err)
+			return
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": nil})
+}
+
+// endClerkSessions goes after the version bump: if Clerk can't be reached, the
+// cookies are still dead and the caller hears that the devices aren't all out.
+func (s *Server) endClerkSessions(ctx context.Context, userID string) error {
+	if s.Clerk == nil {
+		return nil
+	}
+	clerkID, err := s.DB.ClerkID(ctx, userID)
+	if err != nil || clerkID == "" {
+		return err
+	}
+	return s.Clerk.EndSessions(ctx, clerkID)
 }
 
 func (s *Server) rename(w http.ResponseWriter, r *http.Request) {

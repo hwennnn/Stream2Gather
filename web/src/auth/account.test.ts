@@ -27,11 +27,13 @@ const load = async (me: Account | null = guest) => {
 let storage: Map<string, string>;
 const responses: { me: Account | null; session: Account | null; meDown?: boolean; configDown?: boolean } = { me: null, session: null };
 const signedOutCalls = vi.fn();
+const exchanges = vi.fn();
 
 describe('account sign-in', () => {
   beforeEach(() => {
     storage = new Map();
     signedOutCalls.mockReset();
+    exchanges.mockReset();
     responses.session = ada;
     responses.meDown = false;
     responses.configDown = false;
@@ -47,7 +49,10 @@ describe('account sign-in', () => {
         return responses.configDown ? new Response('{}', { status: 500 }) : body({ clerkPublishableKey: 'pk_test_x' });
       }
       if (path === '/v1/me') return responses.meDown ? new Response('{}', { status: 500 }) : body({ user: responses.me });
-      if (path === '/v1/session/clerk') return body({ user: responses.session });
+      if (path === '/v1/session/clerk') {
+        exchanges();
+        return body({ user: responses.session });
+      }
       if (path === '/v1/session' && init?.method === 'DELETE') {
         signedOutCalls();
         return body({ user: null });
@@ -187,6 +192,26 @@ describe('account sign-in', () => {
     const { identityChanges, clerkReports } = await load(ada);
     await clerkReports(true);
     expect(identityChanges).not.toHaveBeenCalled();
+  });
+
+  // Another device signed out, so this cookie is dead while Clerk here may not be.
+  describe('with a cookie killed by a sign-out elsewhere', () => {
+    it('never loads Clerk on a reload, so a reload alone can not mint a cookie', async () => {
+      const { account } = await load(null);
+
+      expect(account.current().clerkWanted).toBe(false);
+      expect(exchanges).toHaveBeenCalledTimes(0);
+    });
+
+    it('asks the server only once the viewer clicks sign in, and the server decides', async () => {
+      const { account, clerkReports } = await load(null);
+
+      account.signIn();
+      expect(account.current().clerkWanted).toBe(true);
+      await clerkReports(true);
+
+      expect(exchanges).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('signs out of this app when Clerk no longer knows the viewer', async () => {

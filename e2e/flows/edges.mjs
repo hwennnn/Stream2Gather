@@ -16,9 +16,10 @@ flow('room full: the 51st person gets a straight answer and a way forward', { ti
   const late = await t.person('Late');
   await late.page.goto(room.url);
   await t.see('the answer', late.page.getByRole('heading', { name: /this room is full/i }));
-  await t.see('how full', late.page.getByText(/50 of 50 people/));
-  await t.see('the way forward', newRoomButton(late.page));
+  await t.see('who has the seats', late.page.getByRole('list', { name: 'Seats' }).getByText('+'));
+  await t.see('the way forward', late.page.getByRole('button', { name: 'Check for a seat' }));
   t.eq('no Join on offer', await ui.join(late.page).count(), 0);
+  t.eq('no new room to split the group', await newRoomButton(late.page).count(), 0);
 
   await host.page.reload();
   await reenter(host.page);
@@ -39,7 +40,7 @@ flow('room full: filling up between the gate and Join is explained', async (t) =
   await t.stack.sql(`UPDATE rooms SET max_members = 1 WHERE slug = '${room.slug}'`);
   await ui.join(late.page).click();
   await t.see('the answer', late.page.getByRole('heading', { name: /this room is full/i }));
-  await t.see('the way forward', newRoomButton(late.page));
+  await t.see('the way forward', late.page.getByRole('button', { name: 'Check for a seat' }));
 });
 
 flow('dead room: a closed room says so and starts another', async (t) => {
@@ -60,6 +61,20 @@ flow('dead room: closing under people ends it cleanly on their next connect', as
   await t.stack.sql(`UPDATE rooms SET closed_at = now() WHERE slug = '${room.slug}'`);
   await host.page.evaluate(() => window.__net.cut());
   await t.see('the answer', host.page.getByRole('heading', { name: /room.s night is over/i }), 10_000);
+});
+
+flow('dead room: a closed room says who was there', async (t) => {
+  const host = await t.person('Hana');
+  const room = await startRoom(t, host);
+  const friend = await t.person('Mika');
+  await friend.page.goto(room.url);
+  await ui.join(friend.page).click();
+  await t.see('the room', ui.rail(friend.page));
+  await t.see('Hana in it', ui.tab(friend.page, 'People'));
+  await t.stack.sql(`UPDATE rooms SET closed_at = now() WHERE slug = '${room.slug}'`);
+  await friend.page.reload();
+  await t.see('the answer', friend.page.getByRole('heading', { name: /room.s night is over/i }));
+  await t.see('who was there', friend.page.getByText(/Hana was here/));
 });
 
 flow('dead room: an unknown link says so', async (t) => {

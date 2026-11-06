@@ -3,12 +3,15 @@ import { api, type Person } from '../../api/http';
 
 const KEY = 's2g:recent-room';
 
-type Saved = { slug: string; name: string };
+type Seated = Pick<Person, 'userId' | 'name' | 'avatarUrl'>;
+type Saved = { slug: string; name: string; people?: Seated[] };
 export type RecentRoom = Saved & { members: Person[] };
 
-export const rememberRoom = (slug: string, name: string): void => {
+/** `people` is who else was there, for the page that says so once the room has closed. */
+export const rememberRoom = (slug: string, name: string, people: Seated[]): void => {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ slug, name }));
+    const seated = people.map(({ userId, name: who, avatarUrl }) => ({ userId, name: who, avatarUrl }));
+    localStorage.setItem(KEY, JSON.stringify({ slug, name, people: seated }));
   } catch {
     // A private window can refuse storage. The way back is a nicety.
   }
@@ -20,6 +23,11 @@ const saved = (): Saved | null => {
   } catch {
     return null;
   }
+};
+
+export const peopleLastIn = (slug: string): Seated[] => {
+  const last = saved();
+  return last?.slug === slug ? (last.people ?? []) : [];
 };
 
 /** The room this browser was last in, if it's still there, and who's in it now. */

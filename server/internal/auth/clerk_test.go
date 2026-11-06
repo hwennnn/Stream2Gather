@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/clerk/clerk-sdk-go/v2"
+
+	"stream2gather/internal/room"
 )
 
 func TestClerkHost(t *testing.T) {
@@ -47,7 +49,7 @@ func TestLongNamesAreCutOnRunes(t *testing.T) {
 	for range 40 {
 		long += "界"
 	}
-	if got := []rune(displayName(&clerk.User{FirstName: &long})); len(got) != maxNameRunes {
+	if got := []rune(displayName(&clerk.User{FirstName: &long})); len(got) != room.MaxNameRunes {
 		t.Fatalf("got %d runes", len(got))
 	}
 }

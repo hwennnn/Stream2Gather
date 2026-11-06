@@ -8,15 +8,19 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/jwks"
 	"github.com/clerk/clerk-sdk-go/v2/jwt"
 	"github.com/clerk/clerk-sdk-go/v2/user"
+
+	"stream2gather/internal/room"
 )
 
-const maxNameRunes = 32
+// keyTTL bounds how long a signing key Clerk has retired stays trusted.
+const keyTTL = time.Hour
 
 // Identity is the person behind a verified Clerk session.
 type Identity struct {
@@ -31,18 +35,29 @@ type Clerk struct {
 	users  *user.Client
 	origin string
 
+	now func() time.Time
+
 	mu    sync.Mutex
-	cache map[string]*clerk.JSONWebKey
+	cache map[string]cachedKey
+}
+
+type cachedKey struct {
+	key     *clerk.JSONWebKey
+	fetched time.Time
 }
 
 // NewClerk builds a verifier that accepts tokens issued to origin.
 func NewClerk(secretKey, origin string) *Clerk {
-	config := &clerk.ClientConfig{BackendConfig: clerk.BackendConfig{Key: clerk.String(secretKey)}}
+	return newClerk(&clerk.ClientConfig{BackendConfig: clerk.BackendConfig{Key: clerk.String(secretKey)}}, origin)
+}
+
+func newClerk(config *clerk.ClientConfig, origin string) *Clerk {
 	return &Clerk{
 		keys:   jwks.NewClient(config),
 		users:  user.NewClient(config),
 		origin: origin,
-		cache:  map[string]*clerk.JSONWebKey{},
+		now:    time.Now,
+		cache:  map[string]cachedKey{},
 	}
 }
 
@@ -78,10 +93,10 @@ func (c *Clerk) Verify(ctx context.Context, token string) (Identity, error) {
 
 func (c *Clerk) key(ctx context.Context, id string) (*clerk.JSONWebKey, error) {
 	c.mu.Lock()
-	key, found := c.cache[id]
+	cached, found := c.cache[id]
 	c.mu.Unlock()
-	if found {
-		return key, nil
+	if found && c.now().Sub(cached.fetched) < keyTTL {
+		return cached.key, nil
 	}
 
 	key, err := jwt.GetJSONWebKey(ctx, &jwt.GetJSONWebKeyParams{KeyID: id, JWKSClient: c.keys})
@@ -92,7 +107,7 @@ func (c *Clerk) key(ctx context.Context, id string) (*clerk.JSONWebKey, error) {
 		return nil, errors.New("unknown signing key")
 	}
 	c.mu.Lock()
-	c.cache[id] = key
+	c.cache[id] = cachedKey{key: key, fetched: c.now()}
 	c.mu.Unlock()
 	return key, nil
 }
@@ -110,7 +125,7 @@ func displayName(profile *clerk.User) string {
 	if name == "" && profile.Username != nil {
 		name = strings.TrimSpace(*profile.Username)
 	}
-	return truncate(name, maxNameRunes)
+	return truncate(name, room.MaxNameRunes)
 }
 
 func truncate(value string, limit int) string {

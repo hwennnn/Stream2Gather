@@ -373,7 +373,7 @@ CREATE INDEX ON notification_log (user_id, crew_id, sent_at DESC);
 ### API and WebSocket
 
 - `GET /v1/config` gains `vapidPublicKey`.
-- `POST /v1/push/subscriptions {endpoint, keys}` upserts by endpoint and requires an account.
+- `POST /v1/push/subscriptions {endpoint, keys, claim}` requires an account. Without `claim` it only refreshes a browser this person holds and otherwise answers `409 not_yours`. With `claim`, sent only by pressing Allow, it upserts by endpoint and can take the browser from its holder.
 - `DELETE /v1/push/subscriptions/{id}`.
 - `GET /v1/me/notifications` returns devices and per-crew settings.
 - No WebSocket changes.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
-import { ApiError, post, request } from '../api/http';
+import { api, ApiError, post, request, type Person } from '../api/http';
 import { account, useAccount } from '../auth/account';
+import { inThere, ReturnRow } from '../routes/landing/Sections';
 import { navigate } from '../routes/router';
 import type { CrewLine } from './api';
 
@@ -9,10 +10,25 @@ const myCrews = () => request<{ items: CrewLine[] }>('/v1/me/crews');
 const startCrew = (name: string) => post<{ slug: string }>('/v1/crews', { name });
 
 const POLL_MS = 30_000;
+/** Faces cost a read each, so only the first few live crews get them. */
+const WITH_FACES = 5;
 /** Survives the redirect back from sign-in, which reloads the page. */
 const WANTS_CREW = 's2g:start-crew';
 
 const hereLine = (here: number) => (here === 0 ? 'Nobody’s here' : `${here} here`);
+
+const facesOf = async (crews: CrewLine[]): Promise<Map<string, Person[]>> => {
+  const live = crews.filter(({ here }) => here > 0).slice(0, WITH_FACES);
+  const found = await Promise.all(
+    live.map(({ slug }) =>
+      api.preview(slug).then(
+        ({ members }): [string, Person[]] => [slug, members ?? []],
+        (): [string, Person[]] => [slug, []], // A count still says someone's there.
+      ),
+    ),
+  );
+  return new Map(found);
+};
 
 const StartCrew = ({ onCancel }: { onCancel: () => void }) => {
   const [name, setName] = useState('');
@@ -66,16 +82,20 @@ const StartCrew = ({ onCancel }: { onCancel: () => void }) => {
   );
 };
 
-/** The landing page's way back into a crew, and into starting one. */
-export default function CrewRail() {
+/** The landing page's way back into a crew, and into starting one. `except` is already on the page. */
+export default function CrewRail({ except }: { except?: string }) {
   const { user, publishableKey } = useAccount();
   const signedIn = Boolean(user?.signedIn);
   const [crews, setCrews] = useState<CrewLine[]>([]);
+  const [faces, setFaces] = useState(new Map<string, Person[]>());
   const [starting, setStarting] = useState(false);
 
   const refresh = useCallback(() => {
     myCrews().then(
-      ({ items }) => setCrews(items),
+      ({ items }) => {
+        setCrews(items);
+        void facesOf(items).then(setFaces);
+      },
       () => {}, // The rail is a shortcut. The page works without it.
     );
   }, []);
@@ -107,18 +127,20 @@ export default function CrewRail() {
 
   if (!signedIn && !publishableKey) return null;
 
+  const shown = crews.filter(({ slug }) => slug !== except);
+
   return (
-    <section aria-label="Your crews" className="mt-12 phone:mt-8">
-      {crews.length > 0 && (
+    <section aria-label="Your crews" className={shown.length > 0 ? `mb-10 phone:mb-8 ${except ? '-mt-[41px] phone:-mt-[33px]' : ''}` : 'order-1 mt-12 phone:mt-8'}>
+      {shown.length > 0 && (
         <ul className="mb-3 divide-y divide-line border-y border-line">
-          {crews.map((crew) => (
-            <li key={crew.slug}>
-              <a href={`/r/${crew.slug}`} className="flex h-11 items-center justify-between gap-4 text-sm">
-                <span className="min-w-0 truncate font-medium">{crew.name}</span>
-                <span className={crew.here > 0 ? 'shrink-0 text-text' : 'shrink-0 text-muted'}>{hereLine(crew.here)}</span>
-              </a>
-            </li>
-          ))}
+          {shown.map((crew) => {
+            const people = faces.get(crew.slug) ?? [];
+            return (
+              <li key={crew.slug}>
+                <ReturnRow href={`/r/${crew.slug}`} title={crew.name} note={people.length > 0 ? inThere(people) : hereLine(crew.here)} people={people} />
+              </li>
+            );
+          })}
         </ul>
       )}
       {starting ? (

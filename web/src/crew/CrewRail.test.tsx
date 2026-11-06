@@ -38,6 +38,21 @@ describe('CrewRail', () => {
     expect(screen.getByText('Nobody’s here')).toBeTruthy();
   });
 
+  it('puts faces and names on a live crew, and leaves out the room already shown', async () => {
+    vi.spyOn(http, 'request').mockResolvedValue({
+      items: [
+        { slug: 'a', name: 'Movie night', here: 2 },
+        { slug: 'b', name: 'Sundays', here: 1 },
+      ],
+    });
+    const members = [{ userId: 'u2', name: 'Maya Lin', role: 'host' }, { userId: 'u3', name: '김민지', role: 'member' }];
+    vi.spyOn(http.api, 'preview').mockResolvedValue({ members } as never);
+    render(<CrewRail except="b" />);
+    expect(await screen.findByText('Maya and 김민지 are in there now.')).toBeTruthy();
+    expect(screen.getByRole('link', { name: /Movie night/ }).textContent).toContain('Join');
+    expect(screen.queryByRole('link', { name: /Sundays/ })).toBeNull();
+  });
+
   it('shows no list without crews, and starts one in the page', async () => {
     vi.spyOn(http, 'request').mockResolvedValue({ items: [] });
     const create = vi.spyOn(http, 'post').mockResolvedValue({ slug: 'new-crew', name: 'Sundays', inviteToken: 't' });

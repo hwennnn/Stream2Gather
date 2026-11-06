@@ -1,9 +1,8 @@
-import type { Media } from '../../api/http';
+import type { Media, Person } from '../../api/http';
 import { Avatar } from '../../ui/Avatar';
 import { formatTime } from '../../ui/format';
 import { firstName, hueOf, listNames } from '../../ui/people';
 import { Thumb } from '../../ui/Thumb';
-import type { RecentRoom } from './recent';
 
 const LISTED = 4;
 const REPO = 'https://github.com/hwennnn/Stream2Gather';
@@ -14,7 +13,7 @@ type PopularProps = { items: Media[] | null; busy: string | null; disabled: bool
 export const Popular = ({ items, busy, disabled, onPick }: PopularProps) => {
   if (items?.length === 0) return null;
   return (
-    <section aria-labelledby="popular-title" className="mt-12 phone:mt-8">
+    <section aria-labelledby="popular-title" className="order-2 mt-12 phone:mt-8">
       <h2 id="popular-title" className="text-[15px] font-semibold">
         Popular on YouTube today
       </h2>
@@ -38,24 +37,30 @@ export const Popular = ({ items, busy, disabled, onPick }: PopularProps) => {
   );
 };
 
-export const RecentRoomRow = ({ room }: { room: RecentRoom }) => {
-  const names = room.members.map(({ name }) => firstName(name));
-  return (
-    <a href={`/r/${room.slug}`} className="mt-6 flex lg:max-w-md items-center gap-3 border-t border-line pt-4">
-      {room.members.length > 0 && (
-        <span className="flex shrink-0 -space-x-1.5">
-          {room.members.slice(0, 3).map((person) => (
-            <Avatar key={person.userId} person={person} labelled={false} className="size-7 text-[11px] ring-2 ring-ink" />
-          ))}
-        </span>
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold">Back to {room.name}</span>
-        <span className="block truncate text-[13px] text-muted">{names.length > 0 ? `${listNames(names)} ${names.length > 1 ? 'are' : 'is'} in there now.` : 'Nobody’s in there right now.'}</span>
-      </span>
-    </a>
-  );
+type Face = Pick<Person, 'userId' | 'name' | 'avatarUrl'>;
+
+export const inThere = (people: Face[]): string => {
+  const names = people.map(({ name }) => firstName(name));
+  return names.length > 0 ? `${listNames(names)} ${names.length > 1 ? 'are' : 'is'} in there now.` : 'Nobody’s in there right now.';
 };
+
+/** A way back to people: who they are, where, and Join. */
+export const ReturnRow = ({ href, title, note, people }: { href: string; title: string; note: string; people: Face[] }) => (
+  <a href={href} className="flex min-h-14 items-center gap-3 py-2">
+    {people.length > 0 && (
+      <span className="flex shrink-0 -space-x-1.5">
+        {people.slice(0, 3).map((person) => (
+          <Avatar key={person.userId} person={person} labelled={false} className="size-8 text-xs ring-2 ring-ink" />
+        ))}
+      </span>
+    )}
+    <span className="min-w-0 flex-1">
+      <span className="block truncate font-semibold">{title}</span>
+      <span className="block text-[13px] text-muted">{note}</span>
+    </span>
+    <span className="btn btn-quiet btn-sm shrink-0">Join</span>
+  </a>
+);
 
 const CAST = [
   { userId: 'picture-maya', name: 'Maya', role: 'host' as const },
@@ -65,17 +70,26 @@ const CAST = [
 ];
 
 const LINES: [number, string][] = [
+  [1, 'is this the one with the dog'],
+  [2, 'yes. shh'],
+  [0, 'door, one sec'],
+  [3, 'what did i miss'],
+  [1, 'nothing, she paused it'],
   [2, 'wait for this part'],
   [1, 'no spoilers'],
   [3, 'ok back, go'],
 ];
+/** A phone has room for the end of the conversation. */
+const PHONE_LINES = 3;
 
 /** A picture of a room, not a live one: only the video in it is real. */
 export const RoomPicture = ({ media }: { media: Media | null }) => (
   <figure className="min-w-0">
-    <div aria-hidden="true" className="flex overflow-hidden rounded-lg border border-line bg-ink">
+    <div aria-hidden="true" className="flex overflow-hidden rounded-lg border border-line bg-ink phone:flex-col">
       <div className="min-w-0 flex-1">
-        <div className="aspect-video bg-stage">{media && <img src={media.thumbnailUrl} alt="" className="size-full object-cover" />}</div>
+        <div className="aspect-video bg-stage">
+          <img src={media?.thumbnailUrl ?? '/room-still.svg'} alt="" className="size-full object-cover" />
+        </div>
         <ul className="seats px-3 pt-3">
           {CAST.map((person, index) => (
             <li key={person.userId} data-acting={index === 0} style={{ '--hue': hueOf(person.userId) } as React.CSSProperties} className="seat">
@@ -98,12 +112,12 @@ export const RoomPicture = ({ media }: { media: Media | null }) => (
           at <span className="fig text-[13px]">3:20</span>
         </p>
       </div>
-      <div className="flex w-44 shrink-0 flex-col justify-end gap-2.5 border-l border-line bg-panel p-3 text-[13px] leading-[18px] phone:hidden">
-        {LINES.map(([who, text]) => {
+      <div className="flex w-44 shrink-0 flex-col justify-end gap-2.5 overflow-hidden border-l border-line bg-panel p-3 text-[13px] leading-[18px] phone:w-full phone:border-t phone:border-l-0">
+        {LINES.map(([who, text], index) => {
           const person = CAST[who];
           return (
             person && (
-              <p key={text}>
+              <p key={text} className={index < LINES.length - PHONE_LINES ? 'phone:hidden' : undefined}>
                 <span style={{ color: hueOf(person.userId) }} className="mr-1.5 font-semibold">
                   {person.name}
                 </span>
@@ -120,7 +134,7 @@ export const RoomPicture = ({ media }: { media: Media | null }) => (
 export const Footer = () => (
   <footer className="border-t border-line">
     <div className="mx-auto flex max-w-[1160px] flex-wrap justify-between gap-x-6 gap-y-1 px-6 py-4 text-[13px] text-dim phone:px-4">
-      <span>No account, nothing to install. Videos play in YouTube’s own player.</span>
+      <span>Videos play in each site’s own player.</span>
       <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-text">
         GitHub
       </a>

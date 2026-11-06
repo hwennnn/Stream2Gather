@@ -169,3 +169,38 @@ func TestMomentsKeepTheirPlaceAndEndingClosesWhatACrashLeftOpen(t *testing.T) {
 		t.Fatalf("%d items still open", got)
 	}
 }
+
+func TestOnlyCrewsPastTheirFortnightCountTowardsComingBack(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	cohortBefore, returnedBefore, err := db.SecondSessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	session := func(crewID string, daysAgo int) {
+		t.Helper()
+		_, err := db.pool.Exec(ctx, `
+			INSERT INTO crew_sessions (id, crew_id, started_at, ended_at)
+			VALUES ($1, $2, now() - make_interval(days => $3), now() - make_interval(days => $3))`, ids.New(), crewID, daysAgo)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	back, gone, late, young := "", "", "", ""
+	for _, id := range []*string{&back, &gone, &late, &young} {
+		*id, _ = testCrew(t, db)
+	}
+	session(back, 20)
+	session(back, 10)
+	session(gone, 20)
+	session(late, 40)
+	session(late, 1)
+	session(young, 3)
+
+	cohort, returned, err := db.SecondSessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cohort-cohortBefore != 3 || returned-returnedBefore != 1 {
+		t.Fatalf("cohort up %d, returned up %d", cohort-cohortBefore, returned-returnedBefore)
+	}
+}

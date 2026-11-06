@@ -139,7 +139,7 @@ flow('phone: the host switch and rename work by touch', async (t) => {
   await joinRoom(b, room.url);
   await openTab(a.page, 'People');
   await ui.hostSwitch(a.page).tap();
-  await t.see('the guest is locked', b.page.getByText('Host controls', { exact: true }));
+  await t.see('the guest is locked', b.page.getByText('Ana’s driving', { exact: true }));
   await ui.rail(a.page).getByRole('button', { name: 'Rename' }).tap();
   await a.page.getByRole('textbox', { name: 'Your name' }).fill('Thumbs');
   await a.page.getByRole('button', { name: 'Save' }).tap();

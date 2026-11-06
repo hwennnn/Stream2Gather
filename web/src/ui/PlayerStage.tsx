@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import { AddBox, SearchResults, useSearch } from './Omnibox';
 import { listNames, firstName } from './people';
 import { ReactionBar, ReactionTicker } from './Reactions';
-import { HostChip } from './RoomHeader';
+import { DrivingChip } from './RoomHeader';
 import { RoomStatus } from './RoomStatus';
 import { canControl, canQueue, failureNote, isLocked, isOffline } from './rules';
 import { Seats } from './Seats';
@@ -24,8 +24,6 @@ type StageProps = {
   session: RoomSession;
   view: RoomView;
   player: RoomPlayer;
-  /** Set while the video after this one is loading. */
-  changing: boolean;
   theatre: boolean;
   fullscreen: boolean;
   canFullscreen: boolean;
@@ -53,7 +51,7 @@ type StageProps = {
 };
 
 export const PlayerStage = (props: StageProps) => {
-  const { session, view, player, changing, row, actor, queueOpen, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
+  const { session, view, player, row, actor, queueOpen, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
   const current = view.queue[0];
 
   return (
@@ -62,7 +60,7 @@ export const PlayerStage = (props: StageProps) => {
         <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
         {!current && <IdleStage session={session} view={view} extra={props.extra} />}
         {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} onRetry={player.retry} />}
-        {current && !player.failure && !player.ready && <Poster item={current} changing={changing} />}
+        {current && !player.failure && !player.ready && <Poster item={current} />}
       </div>
 
       <div className="front-row" data-idle={!current || undefined}>
@@ -77,21 +75,10 @@ export const PlayerStage = (props: StageProps) => {
   );
 };
 
-/** Stands in until the player has a picture, and is gone as soon as a video plays. */
-const Poster = ({ item, changing }: { item: QueueItem; changing: boolean }) => (
-  <div className="absolute inset-0 overflow-hidden bg-stage">
-    {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover opacity-70" />}
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center" role="status">
-      {changing && (
-        <p className="enter mb-2 max-w-xl text-[15px] leading-snug font-semibold text-balance">
-          Up next: {item.title}, added by {item.addedByName}.
-        </p>
-      )}
-      <p className="flex items-center gap-2 text-[13px] text-muted">
-        <span className="spinner" />
-        Loading…
-      </p>
-    </div>
+/** Stands in until the player has a picture, and is gone as soon as a video plays. Never words: the status line has those. */
+const Poster = ({ item }: { item: QueueItem }) => (
+  <div aria-hidden="true" className="absolute inset-0 overflow-hidden bg-stage">
+    {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover" />}
   </div>
 );
 
@@ -214,7 +201,7 @@ export const SkipButton = ({ session, view, onToast, className = '' }: { session
   };
   return (
     <button type="button" disabled={busy || isOffline(view)} onClick={() => void skip()} className={`btn btn-quiet ${className}`}>
-      {next ? 'Skip' : 'Finish'}
+      {next ? 'Skip' : 'Finish video'}
     </button>
   );
 };
@@ -229,25 +216,32 @@ export const UnmuteButton = ({ player, className = '' }: { player: RoomPlayer; c
   );
 };
 
-/** The room stopped before this player started, so it's waiting on someone to carry on. */
 const ResumeButton = ({ session, view, onToast }: { session: RoomSession; view: RoomView; onToast: (text: string) => void }) => {
   const { item, pos } = view.playback;
   const resume = () => void session.request('play', { item, pos, ct: session.clock.now() }).catch(toastError(onToast));
   return (
-    <button type="button" aria-label="Resume for everyone" disabled={isOffline(view)} onClick={resume} className="btn btn-primary">
-      Resume<span className="phone:hidden"> for everyone</span>
+    <button type="button" disabled={isOffline(view)} onClick={resume} className="btn btn-primary phone:flex-1">
+      Resume for everyone
     </button>
   );
+};
+
+/** The one primary in the bar. A paused room needs starting; sound can wait until it has. */
+export const MainAction = ({ session, view, player, onToast }: { session: RoomSession; view: RoomView; player: RoomPlayer; onToast: (text: string) => void }) => {
+  if (view.playback.status !== 'paused') return <UnmuteButton player={player} />;
+  return !player.failure && canControl(view) ? <ResumeButton session={session} view={view} onToast={onToast} /> : null;
 };
 
 type BarProps = StageProps & { item: QueueItem };
 
 export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, offlineFor, onRetryConnection, act, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: BarProps) => {
   const failed = player.failure !== null;
+  // Resume keeps its whole label on a phone, and that mustn't cost the line saying why it's there.
+  const stacked = view.playback.status === 'paused' && !failed && canControl(view);
   return (
     <section aria-label="Player controls" className="player-bar relative">
-      <div className="flex h-[var(--info)] items-center gap-4 px-4 phone:gap-3">
-        <div className="min-w-0 flex-1">
+      <div className={`flex items-center gap-4 px-4 phone:gap-3 ${stacked ? 'min-h-[var(--info)] phone:flex-wrap phone:gap-y-2 phone:py-2' : 'h-[var(--info)]'}`}>
+        <div className={`min-w-0 flex-1 ${stacked ? 'phone:basis-full' : ''}`}>
           <h2 title={item.title} className="truncate text-lg leading-6 font-semibold tracking-[-0.01em] phone:text-[15px] phone:leading-5">
             {item.title}
           </h2>
@@ -256,10 +250,9 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
 
         {railHidden && <ReactionTicker reactions={view.reactions} />}
 
-        <div className="flex shrink-0 items-center gap-2">
-          {isLocked(view) && <HostChip className="hidden phone:inline-flex" />}
-          <UnmuteButton player={player} />
-          {player.cold && !failed && canControl(view) && <ResumeButton session={session} view={view} onToast={onToast} />}
+        <div className={`flex shrink-0 items-center gap-2 ${stacked ? 'phone:w-full' : ''}`}>
+          {isLocked(view) && <DrivingChip view={view} className="hidden phone:inline-flex" />}
+          <MainAction session={session} view={view} player={player} onToast={onToast} />
           {canControl(view) && <SkipButton session={session} view={view} onToast={onToast} className="btn-quiet" />}
           {!failed && (
             <div className="hidden items-center lg:flex">

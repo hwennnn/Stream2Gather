@@ -17,7 +17,7 @@ export const ui = {
   upNext: (page) => page.getByRole('region', { name: 'Up next', exact: true }),
   bar: (page) => page.getByRole('region', { name: 'Player controls' }),
   hostSwitch: (page) => page.getByRole('switch'),
-  skip: (page) => page.getByRole('button', { name: /^(skip|finish)$/i }).first(),
+  skip: (page) => page.getByRole('button', { name: /^(skip|finish video)$/i }).first(),
   stageHeading: (page) => page.getByRole('heading', { name: /what are we watching|queue.s finished/i }),
   pill: (page, text) => page.getByRole('region', { name: 'Player controls' }).getByText(text),
 };

@@ -30,4 +30,16 @@ describe('Seats', () => {
     renderHook(() => useSeats({ ...view, members, vacated: [] } as unknown as RoomView));
     expect(hueOf(second)).toBe(alone);
   });
+
+  it.each([
+    ['buffering', 'catching up'],
+    ['stalled', 'at an ad'],
+    ['unavailable', 'can’t play'],
+  ])('keeps a friend’s name while they’re %s', (status, words) => {
+    render(<Seats view={{ ...view, viewerStates: { b: status } }} row={row} actor={null} onInvite={() => {}} onPeople={() => {}} />);
+    const seat = screen.getByText('Bo').closest('li');
+    expect(seat?.getAttribute('data-trouble')).toBe('true');
+    expect(seat?.textContent).toContain(`, ${words}`);
+    expect(seat?.getAttribute('title')).toBe(`Bo, ${words}`);
+  });
 });

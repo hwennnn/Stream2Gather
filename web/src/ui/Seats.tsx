@@ -6,7 +6,7 @@ import { firstName, hueOf } from './people';
 import { MAX_SEATS, placeSeats, rowLength, standing, type Row } from './seatRow';
 
 const STATES = new Map([
-  ['buffering', 'buffering'],
+  ['buffering', 'catching up'],
   ['stalled', 'at an ad'],
   ['correcting', 'catching up'],
   ['unavailable', 'can’t play'],
@@ -65,7 +65,7 @@ export const Seats = ({ view, row, actor, onInvite, onPeople, compact = false }:
         return (
           <li
             key={person.userId}
-            title={compact ? undefined : person.name}
+            title={compact ? undefined : state ? `${person.name}, ${state}` : person.name}
             data-acting={person.name === actor}
             data-speaking={view.speaking.includes(person.userId)}
             data-away={!here}
@@ -81,7 +81,10 @@ export const Seats = ({ view, row, actor, onInvite, onPeople, compact = false }:
                 </span>
               )}
             </span>
-            <span className="seat-name">{state ?? (own ? 'You' : firstName(person.name))}</span>
+            <span className="seat-name">
+              {own ? 'You' : firstName(person.name)}
+              {state && <span className="sr-only">, {state}</span>}
+            </span>
           </li>
         );
       })}

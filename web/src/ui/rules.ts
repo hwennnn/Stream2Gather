@@ -1,5 +1,6 @@
 import type { Media, Person } from '../api/http';
 import type { ChatEntry, RoomView } from '../room/session';
+import { firstName } from './people';
 
 export const isHost = (view: RoomView): boolean => view.self?.role === 'host';
 
@@ -18,6 +19,13 @@ export const canQueue = (view: RoomView): boolean => view.settings.queueMode ===
 
 export const isLocked = (view: RoomView): boolean =>
   view.settings.controlMode === 'hosts' || view.settings.queueMode === 'hosts';
+
+/** Who has the controls in a locked room. */
+export const drivingLine = (view: RoomView): string => {
+  if (isHost(view)) return 'You’re driving';
+  const host = view.members.find(({ role }) => role === 'host');
+  return host ? `${firstName(host.name)}’s driving` : 'The host’s driving';
+};
 
 export const isOffline = (view: RoomView): boolean => view.offlineSince !== null;
 

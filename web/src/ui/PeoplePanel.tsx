@@ -11,7 +11,7 @@ const VoiceSettings = lazy(() => import('../voice/VoiceButton').then(({ VoiceSet
 type Props = { session: RoomSession; view: RoomView; onToast: (text: string) => void };
 
 const STATUS_TEXT = new Map([
-  ['buffering', 'Buffering'],
+  ['buffering', 'Catching up'],
   ['stalled', 'Watching an ad'],
   ['correcting', 'Catching up'],
   ['unavailable', 'Can’t play this video'],

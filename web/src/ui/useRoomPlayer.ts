@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { watchAutoplay } from '../players/autoplay';
 import { createPlayer } from '../players/registry';
-import { notStarted, type PlayerAdapter, type PlayerError, type PlayerState } from '../players/types';
+import type { PlayerAdapter, PlayerError, PlayerState } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { expectedPosition, SyncController, type SyncReport } from '../sync/controller';
@@ -23,7 +23,6 @@ type Events = {
   onReport: (report: SyncReport) => void;
   onMuted: (muted: boolean) => void;
   onRefused: (refused: boolean) => void;
-  onCold: (cold: boolean) => void;
   onStarted: () => void;
 };
 
@@ -103,13 +102,9 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
     events.onRefused,
   );
 
-  const noteCold = () => events.onCold(session.getView().playback.status === 'paused' && notStarted(player.state()));
-  noteCold();
-
   const timer = window.setInterval(() => {
     sync.tick();
     events.onMuted(player.muted());
-    noteCold();
     const playback = session.getView().playback;
     if (playback.status === 'playing' && !item.isLive) {
       const drift = player.time() - expectedPosition(playback, session.clock.now());
@@ -221,8 +216,6 @@ export type RoomPlayer = {
   muted: boolean;
   /** The browser refused to start this player, even muted. */
   refused: boolean;
-  /** The room is paused and this player has not started, so it has no frame or controls yet. */
-  cold: boolean;
   unmute: () => void;
   /** Loads the same video again in place. The room carries on meanwhile. */
   retry: () => void;
@@ -237,7 +230,6 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   const [failed, setFailed] = useState<{ id: string; error: PlayerError } | null>(null);
   const [muted, setMuted] = useState(false);
   const [refused, setRefused] = useState(false);
-  const [cold, setCold] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const player = useRef<PlayerAdapter | null>(null);
 
@@ -250,7 +242,6 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     setStartedId(null);
     setMuted(false);
     setRefused(false);
-    setCold(false);
     return mountPlayer(stage.current, session, current, {
       onPlayer: (next) => {
         player.current = next;
@@ -260,7 +251,6 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
       onReport: reports.set,
       onMuted: setMuted,
       onRefused: setRefused,
-      onCold: setCold,
       onStarted: () => setStartedId(currentId),
     });
     // Only a new queue item or a retry replaces the player.
@@ -276,7 +266,6 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     failure: failed && failed.id === currentId ? failed.error : null,
     muted,
     refused,
-    cold,
     unmute: () => {
       player.current?.setMuted(false);
       setMuted(false);

@@ -19,7 +19,6 @@ flow('seats: everyone keeps their seat, and the status line says who came and we
   await joinRoom(c, room.url);
   const order = () => seats(a.page).getByRole('listitem').allInnerTexts();
   const names = (rows) => rows.map((row) => row.split('\n').at(-1)).filter(Boolean);
-  // By initial, since a seat shows "catching up" in place of a name while someone does.
   const initials = (rows) => rows.map((row) => row.split('\n')[0]);
   await t.until('Cal on the row', async () => initials(await order()).includes('C'));
   const before = names(await order());

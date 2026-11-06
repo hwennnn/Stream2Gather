@@ -1211,3 +1211,59 @@ func TestAJumpIsInTheHistory(t *testing.T) {
 		t.Fatalf("lines = %+v", welcome.Lines)
 	}
 }
+
+func chatFrom(t *testing.T, message frame) store.Message {
+	t.Helper()
+	var body struct {
+		Message store.Message `json:"message"`
+	}
+	if err := json.Unmarshal(message.D, &body); err != nil {
+		t.Fatal(err)
+	}
+	return body.Message
+}
+
+func TestARetriedLineIsStoredOnce(t *testing.T) {
+	r := newRig(t, testRedis)
+	id := r.newRoom(t, directVideo(t))
+	c := r.joined(t, id, "u", room.RoleMember)
+
+	c.sendWithID(t, "1", "chat.send", map[string]any{"text": "hi", "clientId": "line-1"})
+	first := chatFrom(t, c.expect(t, "chat"))
+	c.sendWithID(t, "2", "chat.send", map[string]any{"text": "hi", "clientId": "line-1"})
+	again := chatFrom(t, c.expect(t, "chat")) // Told again: the first telling may be what failed.
+	if again.ID != first.ID || again.ClientID != "line-1" {
+		t.Fatalf("first %+v, again %+v", first, again)
+	}
+	history, err := r.db.Messages(context.Background(), id, 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 1 || history[0].ClientID != "line-1" {
+		t.Fatalf("history = %+v", history)
+	}
+}
+
+func TestSameWordsTwiceAreTwoLines(t *testing.T) {
+	r := newRig(t, testRedis)
+	id := r.newRoom(t, directVideo(t))
+	one := r.joined(t, id, "u", room.RoleMember)
+	two := r.joined(t, id, "v", room.RoleMember)
+
+	one.sendWithID(t, "1", "chat.send", map[string]any{"text": "hi", "clientId": "a"})
+	one.sendWithID(t, "2", "chat.send", map[string]any{"text": "hi", "clientId": "b"})
+	two.sendWithID(t, "3", "chat.send", map[string]any{"text": "hi", "clientId": "a"}) // Ids are only unique per person.
+	two.sendWithID(t, "4", "chat.send", map[string]any{"text": "hi"})
+	two.sendWithID(t, "5", "chat.send", map[string]any{"text": "hi"}) // An old tab sends none.
+	eventually(t, "five lines stored", func() bool {
+		history, err := r.db.Messages(context.Background(), id, 0, 10)
+		return err == nil && len(history) == 5
+	})
+}
+
+func TestAnOversizedClientIDIsRefused(t *testing.T) {
+	r := newRig(t, testRedis)
+	c := r.joined(t, r.newRoom(t, directVideo(t)), "u", room.RoleMember)
+	c.sendWithID(t, "1", "chat.send", map[string]any{"text": "hi", "clientId": strings.Repeat("x", 65)})
+	c.expect(t, "error")
+}

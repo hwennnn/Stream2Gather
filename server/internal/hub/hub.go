@@ -27,11 +27,13 @@ import (
 const (
 	maxMessageBytes = 8 << 10
 	maxChatRunes    = 500
-	sendBuffer      = 128
-	writeTimeout    = 5 * time.Second
-	eventBuffer     = 1024
-	touchEvery      = 10 * time.Second
-	snapshotEvery   = 5 * time.Second
+	// maxClientIDBytes is plenty for a random id, and keeps the index small.
+	maxClientIDBytes = 64
+	sendBuffer       = 128
+	writeTimeout     = 5 * time.Second
+	eventBuffer      = 1024
+	touchEvery       = 10 * time.Second
+	snapshotEvery    = 5 * time.Second
 	// A room with viewers saves this often even if nothing changes. Saving is what
 	// extends its life, and a paused room full of chat must not expire under people.
 	keepAliveEvery = time.Hour

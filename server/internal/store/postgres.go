@@ -187,21 +187,39 @@ type Message struct {
 	Author    string    `json:"author"`
 	Body      string    `json:"body"`
 	CreatedAt time.Time `json:"createdAt"`
+	// ClientID is the sender's name for this line, the same on every retry.
+	ClientID string `json:"clientId,omitempty"`
 }
 
 // InsertMessage stores a chat line.
 func (p *Postgres) InsertMessage(ctx context.Context, roomID string, m Message) (Message, error) {
+	stored, _, err := p.SaveMessage(ctx, roomID, m)
+	return stored, err
+}
+
+// SaveMessage stores a chat line, once however often it is sent. The bool says
+// whether this call stored it. A repeat returns the line as first stored.
+func (p *Postgres) SaveMessage(ctx context.Context, roomID string, m Message) (Message, bool, error) {
 	err := p.pool.QueryRow(ctx, `
-		INSERT INTO messages (room_id, user_id, author_name, body) VALUES ($1, $2, $3, $4)
-		RETURNING id, created_at`, roomID, m.UserID, m.Author, m.Body,
+		INSERT INTO messages (room_id, user_id, author_name, body, client_id)
+		VALUES ($1, $2, $3, $4, NULLIF($5, ''))
+		ON CONFLICT (room_id, user_id, client_id) WHERE client_id IS NOT NULL DO NOTHING
+		RETURNING id, created_at`, roomID, m.UserID, m.Author, m.Body, m.ClientID,
 	).Scan(&m.ID, &m.CreatedAt)
-	return m, err
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return m, err == nil, err
+	}
+	err = p.pool.QueryRow(ctx, `
+		SELECT id, author_name, body, created_at FROM messages
+		WHERE room_id = $1 AND user_id = $2 AND client_id = $3`, roomID, m.UserID, m.ClientID,
+	).Scan(&m.ID, &m.Author, &m.Body, &m.CreatedAt)
+	return m, false, err
 }
 
 // Messages returns chat older than before, newest first. Zero means latest.
 func (p *Postgres) Messages(ctx context.Context, roomID string, before int64, limit int) ([]Message, error) {
 	rows, err := p.pool.Query(ctx, `
-		SELECT id, user_id, author_name, body, created_at FROM messages
+		SELECT id, user_id, author_name, body, created_at, COALESCE(client_id, '') FROM messages
 		WHERE room_id = $1 AND ($2 = 0 OR id < $2)
 		ORDER BY id DESC LIMIT $3`, roomID, before, limit)
 	if err != nil {
@@ -209,7 +227,7 @@ func (p *Postgres) Messages(ctx context.Context, roomID string, before int64, li
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Message, error) {
 		var m Message
-		return m, row.Scan(&m.ID, &m.UserID, &m.Author, &m.Body, &m.CreatedAt)
+		return m, row.Scan(&m.ID, &m.UserID, &m.Author, &m.Body, &m.CreatedAt, &m.ClientID)
 	})
 }
 

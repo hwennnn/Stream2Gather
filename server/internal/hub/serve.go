@@ -361,14 +361,15 @@ func (r *liveRoom) chat(c *conn, message Message) {
 		return
 	}
 	var request struct {
-		Text string `json:"text"`
+		Text     string `json:"text"`
+		ClientID string `json:"clientId"`
 	}
 	if err := json.Unmarshal(message.Data, &request); err != nil {
 		c.fail(message.ID, "bad_message", "That message could not be read.")
 		return
 	}
 	text, ok := room.CleanChat(request.Text)
-	if !ok {
+	if !ok || len(request.ClientID) > maxClientIDBytes {
 		c.fail(message.ID, "invalid", "That message could not be read.")
 		return
 	}
@@ -380,9 +381,16 @@ func (r *liveRoom) chat(c *conn, message Message) {
 	ctx, cancel := opContext()
 	defer cancel()
 	person := c.who()
-	stored, err := r.hub.db.InsertMessage(ctx, r.id, store.Message{
-		UserID: person.UserID, Author: person.Name, Body: text,
+	stored, fresh, err := r.hub.db.SaveMessage(ctx, r.id, store.Message{
+		UserID: person.UserID, Author: person.Name, Body: text, ClientID: request.ClientID,
 	})
+	if err == nil && fresh {
+		r.hub.recorder.Moment(r.id, Moment{
+			Kind: MomentChat, UserID: person.UserID, Author: person.Name, MessageID: stored.ID, At: stored.CreatedAt,
+		})
+	}
+	// A repeat is published too: the first attempt may have failed right here.
+	// Viewers drop a line they already have.
 	if err == nil {
 		err = r.hub.live.Publish(ctx, r.id, encode("chat", map[string]any{"message": stored}))
 	}
@@ -391,9 +399,6 @@ func (r *liveRoom) chat(c *conn, message Message) {
 		c.fail(message.ID, "unavailable", "Your message did not send.")
 		return
 	}
-	r.hub.recorder.Moment(r.id, Moment{
-		Kind: MomentChat, UserID: person.UserID, Author: person.Name, MessageID: stored.ID, At: stored.CreatedAt,
-	})
 	c.ack(message.ID)
 }
 

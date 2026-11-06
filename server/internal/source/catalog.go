@@ -166,6 +166,13 @@ func (c *Catalog) Search(ctx context.Context, sourceName, query, region string) 
 	if err != nil {
 		return nil, err
 	}
+	if len(items) == 0 {
+		// Nothing found costs the same quota as a full page, so it is kept too.
+		if err := c.db.PutSearch(ctx, sourceName, normalized, region, []string{}); err != nil {
+			c.log.Warn("search cache write failed", "error", err)
+		}
+		return []room.Media{}, nil
+	}
 	return c.remember(ctx, sourceName, normalized, region, items)
 }
 

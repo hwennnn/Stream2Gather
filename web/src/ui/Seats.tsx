@@ -68,6 +68,7 @@ export const Seats = ({ view, row, actor, onInvite, onPeople, compact = false }:
             key={person.userId}
             title={compact ? undefined : person.name}
             data-acting={person.name === actor}
+            data-speaking={view.speaking.includes(person.userId)}
             data-away={!here}
             data-trouble={state !== undefined}
             style={{ '--hue': hueOf(person.userId) } as React.CSSProperties}

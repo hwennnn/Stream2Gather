@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
 import { account } from '../auth/account';
 import type { RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
 import { isHost, isLocked, isOffline } from './rules';
+import { Slot } from './Slot';
 import { toastError } from './Toasts';
+
+const VoiceSettings = lazy(() => import('../voice/VoiceButton').then(({ VoiceSettingsSlot }) => ({ default: VoiceSettingsSlot })));
 
 type Props = { session: RoomSession; view: RoomView; onToast: (text: string) => void };
 
@@ -25,6 +28,8 @@ const MAX_NAME = 32;
 export const PeoplePanel = ({ session, view, onToast }: Props) => {
   const [editing, setEditing] = useState(false);
 
+  const inCall = view.members.some((person) => person.userId === view.self?.userId && person.voice);
+
   return (
     <div className="flex h-full flex-col">
       <ul className="rail-scroll min-h-0 flex-1 py-1">
@@ -32,7 +37,9 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
           const own = person.userId === view.self?.userId;
           const status = view.viewerStates[person.userId];
           const detail = (status && STATUS_TEXT.get(status)) ?? (person.role === 'host' ? 'Host' : '');
-          const badges = [person.member ? 'Crew' : undefined, VOICE_TEXT.get(person.voice ?? '')].filter(Boolean);
+          const speaking = view.speaking.includes(person.userId);
+          const voice = speaking ? 'Speaking' : VOICE_TEXT.get(person.voice ?? '');
+          const badges = [person.member ? 'Crew' : undefined, voice].filter(Boolean);
 
           if (own && editing) {
             return (
@@ -42,7 +49,7 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
             );
           }
           return (
-            <li key={person.userId} className="flex min-h-11 items-center gap-2.5">
+            <li key={person.userId} data-speaking={speaking} className="flex min-h-11 items-center gap-2.5">
               <Avatar person={person} className="size-7 text-xs" />
               <span className="flex min-w-0 flex-1 items-baseline gap-1 font-medium">
                 <span className="min-w-0 truncate">{person.name}</span>
@@ -62,6 +69,13 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
             </li>
           );
         })}
+        {inCall && (
+          <li>
+            <Slot>
+              <VoiceSettings session={session} />
+            </Slot>
+          </li>
+        )}
       </ul>
 
       {isHost(view) ? (

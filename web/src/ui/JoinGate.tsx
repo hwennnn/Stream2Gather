@@ -67,7 +67,7 @@ export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', 
     <Page>
       <form onSubmit={(event) => void submit(event)} className="enter land:grid land:grid-cols-2 land:items-start land:gap-6">
         {preview ? (
-          preview.nowPlaying && <Thumb src={preview.nowPlaying.thumbnailUrl} className="mb-5 w-full rounded-lg land:mb-0" />
+          preview.nowPlaying && <Thumb src={preview.nowPlaying.thumbnailUrl} large className="mb-5 w-full rounded-lg land:mb-0" />
         ) : (
           <div aria-hidden="true" className="skeleton mb-5 aspect-video rounded-lg land:mb-0" />
         )}

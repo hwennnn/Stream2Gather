@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Icon } from './Icon';
 
+/** The API's largest image is six times the bytes of this one, and a row draws it at 112px. */
+export const rowImage = (src: string) => src.replace(/(\/vi\/.+\/)[a-z]*default/, '$1mqdefault');
+
 /** A video thumbnail, with a placeholder when there isn't one or it won't load. */
-export const Thumb = ({ src, className = '' }: { src: string; className?: string }) => {
+export const Thumb = ({ src, className = '', large }: { src: string; className?: string; large?: boolean }) => {
   const [broken, setBroken] = useState(false);
   if (!src || broken) {
     return (
@@ -13,7 +16,7 @@ export const Thumb = ({ src, className = '' }: { src: string; className?: string
   }
   return (
     <img
-      src={src}
+      src={large ? src : rowImage(src)}
       alt=""
       loading="lazy"
       onError={() => setBroken(true)}

@@ -23,9 +23,11 @@ type Props = {
 };
 
 type SystemLine = Extract<ChatEntry, { kind: 'system' }>;
-type Block = { kind: 'system'; entry: SystemLine } | { kind: 'arrivals'; entries: SystemLine[] } | { kind: 'departures'; entries: SystemLine[] } | { kind: 'chat'; messages: ChatLine[] } | { kind: 'time'; at: string };
+type Block = { kind: 'system'; entry: SystemLine } | { kind: 'arrivals'; entries: SystemLine[] } | { kind: 'departures'; entries: SystemLine[] } | { kind: 'moves'; entries: SystemLine[] } | { kind: 'chat'; messages: ChatLine[] } | { kind: 'time'; at: string };
 
 const DEPARTED = / left$/;
+/** Someone moving the room along. Said one at a time, a run of these pushes what people wrote out of sight. */
+const MOVED = /^(.+?) (?:skipped to|jumped to|went back to) (.+)$/;
 
 const toBlocks = (entries: ChatEntry[]): Block[] => {
   const blocks: Block[] = [];
@@ -33,10 +35,12 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   for (const entry of entries) {
     if (entry.kind === 'system') {
       const before = blocks.at(-1);
-      const kind = entry.arrived ? 'arrivals' : DEPARTED.test(entry.text) ? 'departures' : null;
+      const kind = entry.arrived ? 'arrivals' : DEPARTED.test(entry.text) ? 'departures' : MOVED.test(entry.text) ? 'moves' : null;
       if (!kind) blocks.push({ kind: 'system', entry });
       else if (before?.kind === kind) before.entries.push(entry);
-      else blocks.push(kind === 'arrivals' ? { kind, entries: [entry] } : { kind, entries: [entry] });
+      else if (kind === 'arrivals') blocks.push({ kind, entries: [entry] });
+      else if (kind === 'departures') blocks.push({ kind, entries: [entry] });
+      else blocks.push({ kind, entries: [entry] });
       continue;
     }
     const gap = spoken ? Date.parse(entry.createdAt) - Date.parse(spoken.createdAt) : Infinity;
@@ -47,6 +51,17 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
     spoken = entry;
   }
   return blocks;
+};
+
+/** One move says itself. A run says who, how many, and where the room ended up. */
+const movedLine = (entries: SystemLine[]): string => {
+  const moves = entries.flatMap(({ text }) => {
+    const [, who, title] = MOVED.exec(text) ?? [];
+    return who && title ? [{ who, title }] : [];
+  });
+  const landed = moves.at(-1)?.title;
+  if (moves.length < 2 || !landed) return entries.at(-1)?.text ?? '';
+  return `${listNames([...new Set(moves.map(({ who }) => firstName(who)))])} went through ${moves.length} videos, now on ${landed}`;
 };
 
 const isSpoiler = (entry: ChatEntry) => entry.kind === 'chat' && entry.missed === true;
@@ -91,6 +106,13 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
           return (
             <p key={block.entries[0]?.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
               {listNames(block.entries.map(({ text }) => firstName(text.replace(DEPARTED, ''))))} left
+            </p>
+          );
+        }
+        if (block.kind === 'moves') {
+          return (
+            <p key={block.entries[0]?.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+              {movedLine(block.entries)}
             </p>
           );
         }

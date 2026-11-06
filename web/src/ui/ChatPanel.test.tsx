@@ -116,6 +116,30 @@ describe('ChatPanel comings and goings', () => {
   const went = (id: string, name: string): ChatEntry => ({ kind: 'system', id, text: `${name} left`, createdAt: '2026-11-06T00:00:00Z' });
   const log = () => screen.getByRole('log').textContent;
 
+  const moved = (id: string, text: string): ChatEntry => ({ kind: 'system', id, text, createdAt: '2026-11-06T00:00:00Z' });
+
+  it('leaves a single skip as it was said', () => {
+    setup([moved('a', 'Maya Patel skipped to Golden Hour')]);
+    expect(log()).toContain('Maya Patel skipped to Golden Hour');
+  });
+
+  it('folds a run of skips into who, how many, and where the room ended up', () => {
+    setup([moved('a', 'Maya skipped to One'), moved('b', 'Maya skipped to Two'), moved('c', 'Maya jumped to Three')]);
+    expect(log()).toContain('Maya went through 3 videos, now on Three');
+    expect(log()).not.toContain('skipped');
+  });
+
+  it('names everyone who took part', () => {
+    setup([moved('a', 'Maya Patel skipped to One'), moved('b', 'Sam skipped to Two')]);
+    expect(log()).toContain('Maya and Sam went through 2 videos, now on Two');
+  });
+
+  it('keeps runs apart when somebody says something between them', () => {
+    setup([moved('a', 'Maya skipped to One'), line({ id: 'm', body: 'wait' }), moved('c', 'Maya skipped to Two')]);
+    expect(log()).toContain('Maya skipped to One');
+    expect(log()).toContain('Maya skipped to Two');
+  });
+
   it('says one person sat down', () => {
     setup([came('a', 'Maya Patel')]);
     expect(log()).toContain('Maya took a seat');

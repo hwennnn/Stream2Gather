@@ -6,6 +6,7 @@ import { actionRoom, AddBox, MediaRow, MediaSkeleton, SearchResults, useSearch }
 import { followPointer } from './pointerDrag';
 import { firstName, hueOf } from './people';
 import { canControl, canQueue, isOffline } from './rules';
+import { SkipButton } from './SkipButton';
 import { sourceName } from './sources';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
@@ -62,6 +63,16 @@ export const QueuePanel = ({ session, view, onToast, extra }: Props) => {
           <SearchResults search={search} adder={adder} extra={extra} />
         ) : (
           <>
+            {/* Everywhere else this sits under the player. A phone keeps it a deliberate step away. */}
+            {canControl(view) && (
+              <section aria-label="Now playing" className="hidden items-center gap-3 border-b border-line pb-2 phone:flex land:hidden">
+                <p className="min-w-0 flex-1 truncate text-[13px] text-muted">
+                  <span className="sr-only">Now playing: </span>
+                  {current.title}
+                </p>
+                <SkipButton session={session} view={view} onToast={onToast} className="btn-sm shrink-0" />
+              </section>
+            )}
             <section aria-label="Up next">
               <h3 className="flex justify-between gap-3 py-1.5 text-[13px] font-semibold">
                 Up next

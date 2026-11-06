@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { AVATAR_COLORS, hueOf } from './people';
+import { afterEach, describe, expect, it } from 'vitest';
+import { AVATAR_COLORS, hueOf, roomHues } from './people';
 
 const channels = (hex: string) => [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255) as [number, number, number];
 
@@ -51,5 +51,18 @@ describe('avatar colours', () => {
     const seen = new Set(Array.from({ length: 400 }, (_, index) => hueOf(`g_${index * 7919}`)));
     expect(seen.size).toBe(AVATAR_COLORS.length);
     expect(hueOf('g_1')).toBe(hueOf('g_1'));
+  });
+});
+
+describe('hueOf', () => {
+  afterEach(() => roomHues.clear());
+
+  it('is someone’s usual colour outside a room, and the room’s inside one', () => {
+    const usual = hueOf('ada');
+    const other = AVATAR_COLORS.findIndex((hue) => hue !== usual);
+    roomHues.set('ada', other);
+    expect(hueOf('ada')).toBe(AVATAR_COLORS[other]);
+    roomHues.clear();
+    expect(hueOf('ada')).toBe(usual);
   });
 });

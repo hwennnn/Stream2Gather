@@ -204,6 +204,50 @@ flow('moments: the queue ends with what was on and whose idea it was', async (t)
   await t.see('and the second', credits.getByRole('listitem').filter({ hasText: train.title }).getByText('Ben'));
 });
 
+flow('hues: everyone in a room looks different, and stays that way through a reload', async (t) => {
+  const a = await t.person('Ana', { viewport: { width: 1440, height: 800 } });
+  const room = await startRoom(t, a, { url: golden.url });
+  const bots = await crowd(t, room.slug, 7);
+  const discs = ui.seats(a.page).locator('.seat-disc > :first-child');
+  await t.until('the row fills', async () => (await discs.count()) === 8, 8000);
+  const hues = () => discs.evaluateAll((list) => list.map((disc) => getComputedStyle(disc).backgroundColor));
+  const before = await hues();
+  t.eq('nobody shares a colour', new Set(before).size, 8);
+  await a.page.reload();
+  await reenter(a.page);
+  await t.until('the row is back', async () => (await discs.count()) === 8, 8000);
+  t.eq('the same colours after a reload', (await hues()).sort().join(), [...before].sort().join());
+  bots.forEach((one) => one.close());
+});
+
+flow('moments: a run of skips is one line, and what people said stays in sight', async (t) => {
+  const a = await t.person('Ana');
+  await startRoom(t, a, { url: golden.url });
+  await addByMessage(t, a.page, [train.url, video('Rainy Window').url]);
+  await sendChat(a.page, 'keep this in sight');
+  await ui.skip(a.page).click();
+  await t.see('one skip says itself', ui.chatLog(a.page).getByText(`Ana skipped to ${train.title}`));
+  await ui.skip(a.page).click();
+  await t.see('two are a line', ui.chatLog(a.page).getByText(/^Ana went through 2 videos, now on /));
+  t.eq('and not two', await ui.chatLog(a.page).getByText(/skipped to/).count(), 0);
+});
+
+flow('moments: the room is dark until something plays, and the lights come up at the end', async (t) => {
+  const a = await t.person('Ana', { viewport: { width: 1440, height: 800 } });
+  await startRoom(t, a);
+  const lights = () => a.page.locator('.room-shell').getAttribute('data-lights');
+  t.eq('dark, waiting', await lights(), 'down');
+  await t.see('and says so', a.page.getByText('The lights are down until someone picks something.'));
+  const ground = await a.page.locator('.stage').evaluate((el) => getComputedStyle(el).backgroundColor);
+  t.eq('no black screen standing in for a video', ground, 'rgba(0, 0, 0, 0)');
+  await addByMessage(t, a.page, [golden.url]);
+  await ui.skip(a.page).click();
+  await t.see('finished', ui.stageHeading(a.page));
+  t.eq('lights up for the credits', await lights(), 'up');
+  const seat = await ui.seats(a.page).locator('.seat-disc').first().evaluate((el) => el.getBoundingClientRect().width);
+  t.check('seats don’t outgrow the words', seat <= 52, String(seat));
+});
+
 flow('moments: theatre mode passes on what a friend says, off the video', async (t) => {
   const a = await t.person('Ana', { viewport: { width: 1440, height: 800 } });
   const b = await t.person('Ben');

@@ -14,7 +14,8 @@ import { firstName } from '../ui/people';
 import { RoomStatus, useLatestAct } from '../ui/RoomStatus';
 import { useSeats } from '../ui/Seats';
 import { PeoplePanel } from '../ui/PeoplePanel';
-import { MainAction, PlayerStage, SkipButton } from '../ui/PlayerStage';
+import { MainAction, PlayerStage } from '../ui/PlayerStage';
+import { SkipButton } from '../ui/SkipButton';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
 import { canControl, noticesToShow, offersInvite, onCrew } from '../ui/rules';
@@ -25,6 +26,7 @@ import { useMediaQuery } from '../ui/useMediaQuery';
 import { useOfflineNotice } from '../ui/useOfflineNotice';
 import { usePageVisible } from '../ui/usePageVisible';
 import { useBeat } from '../ui/useBeat';
+import { useRoomHues } from '../ui/useRoomHues';
 import { useRoomPlayer } from '../ui/useRoomPlayer';
 import { useShownView } from '../ui/useShownView';
 import { useWatched } from '../ui/useWatched';
@@ -192,6 +194,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const [theatre, setTheatre] = useState(false);
   const [inviting, setInviting] = useState(false);
   const [saved, setSaved] = useState(false);
+  useRoomHues(slug, view.members);
   const row = useSeats(view);
   const act = useLatestAct(view);
   const beat = useBeat(view);
@@ -323,7 +326,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const railToasts = !railHidden && toastStack('rail-edge shrink-0 pb-2 empty:hidden');
 
   return (
-    <div data-fullscreen={fullscreen.on} data-theatre={railHidden} data-lights={view.playback.status === 'playing' ? 'down' : 'up'} className="room-shell flex h-dvh flex-col bg-ink">
+    <div data-fullscreen={fullscreen.on} data-theatre={railHidden} data-lights={view.playback.status === 'playing' || (!current && !view.ranOut) ? 'down' : 'up'} className="room-shell flex h-dvh flex-col bg-ink">
       {!fullscreen.on && (
         <RoomHeader
           session={session}

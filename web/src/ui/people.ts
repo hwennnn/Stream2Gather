@@ -4,12 +4,20 @@
  */
 export const AVATAR_COLORS = ['#e0a884', '#d8bb6c', '#c8c864', '#a9c47c', '#8fce8f', '#79c4a6', '#7bcbc0', '#72bdd0', '#c0a6e2', '#d6a2dc', '#e3a3d2', '#e2a2bb'];
 
-/** A person's hue comes from their id alone, so they look the same on every page and in every room. */
-export const hueOf = (userId = ''): string => {
+/** Which of the colours each person has in this room. */
+export type Hues = Record<string, number>;
+
+export const usualHue = (userId: string): number => {
   let hash = 0x811c9dc5;
   for (let index = 0; index < userId.length; index += 1) hash = Math.imul(hash ^ userId.charCodeAt(index), 0x01000193) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? '#e0a884';
+  return hash % AVATAR_COLORS.length;
 };
+
+/** While a room is open, its colours are the ones every part of it shows. */
+export const roomHues = new Map<string, number>();
+
+/** A person's hue is the same on every page, except where someone in the same room already looks like it. */
+export const hueOf = (userId = ''): string => AVATAR_COLORS[roomHues.get(userId) ?? usualHue(userId)] ?? '#e0a884';
 
 export const firstName = (name: string): string => name.trim().split(/\s+/)[0] ?? name;
 

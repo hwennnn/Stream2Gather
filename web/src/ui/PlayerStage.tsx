@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import type { Media } from '../api/http';
 import type { PlayerError } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
@@ -12,6 +12,7 @@ import { RoomStatus } from './RoomStatus';
 import { canControl, canQueue, failureNote, isLocked, isOffline } from './rules';
 import { Seats } from './Seats';
 import { SeatTrack } from './SeatTrack';
+import { SkipButton } from './SkipButton';
 import { failureReason, openLabel } from './sources';
 import type { Row } from './seatRow';
 import { Thumb } from './Thumb';
@@ -82,8 +83,6 @@ export const PlayerStage = (props: StageProps) => {
       </div>
 
       {current && <PlayerBar {...props} item={current} />}
-      {/* Under the player rather than in chat, so it's there on every tab. */}
-      {current && <ReactionBar session={session} disabled={isOffline(view)} className="hidden justify-between border-b border-line px-3 phone:flex land:hidden short:hidden" />}
       {!current && <Suggestions session={session} view={view} />}
       {current && <UpNext session={session} view={view} onPickAnother={onPickAnother} onShowQueue={onShowQueue} onToast={onToast} />}
     </main>
@@ -175,6 +174,7 @@ const IdleStage = ({ session, view, watched, extra }: { session: RoomSession; vi
     <div data-searching={searching || undefined} className="stage-dock flex h-full w-full flex-col px-4 py-6 land:py-3">
       {rolling && <Credits items={watched} />}
       <h2 className={`text-xl leading-7 font-semibold tracking-[-0.015em] land:text-[15px] land:leading-5 ${rolling ? 'credits-end' : ''}`}>{finished ? 'The queue’s finished.' : 'What are we watching?'}</h2>
+      {!finished && <p className="mt-1 text-dim land:hidden">The lights are down until someone picks something.</p>}
       {!editable && <p className="mt-1 text-muted">The host picks what’s next.</p>}
 
       {editable && (
@@ -224,34 +224,13 @@ const Picks = ({ items, adder }: { items: Media[] | null; adder: Adder }) => {
   );
 };
 
-export const SkipButton = ({ session, view, onToast, className = '' }: { session: RoomSession; view: RoomView; onToast: (text: string) => void; className?: string }) => {
-  const [busy, setBusy] = useState(false);
-  const next = view.queue[1];
-  const skip = async () => {
-    setBusy(true);
-    try {
-      // A jump to the next video can be undone for a few seconds. Ending the last one can't.
-      if (next) await session.request('queue.play', { target: next.id });
-      else await session.request('skip', { item: view.playback.item });
-    } catch (error) {
-      toastError(onToast)(error);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <button type="button" disabled={busy || isOffline(view)} onClick={() => void skip()} className={`btn btn-quiet ${className}`}>
-      {next ? 'Skip' : 'Finish video'}
-    </button>
-  );
-};
-
+/** On a phone it's just the icon, at the player's corner, so the status keeps its line and chat keeps its height. */
 export const UnmuteButton = ({ player, className = '' }: { player: RoomPlayer; className?: string }) => {
   if (!player.muted || player.failure || player.refused) return null;
   return (
-    <button type="button" onClick={player.unmute} className={`btn btn-primary ${className}`}>
+    <button type="button" onClick={player.unmute} className={`btn btn-primary phone:ml-2 phone:size-11 phone:px-0 ${className}`}>
       <Icon name="muted" />
-      Tap to unmute
+      <span className="phone:sr-only">Tap to unmute</span>
     </button>
   );
 };
@@ -280,21 +259,24 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
   const stacked = view.playback.status === 'paused' && !failed && canControl(view);
   return (
     <section aria-label="Player controls" className="player-bar relative">
-      <div className={`flex items-center gap-4 px-4 phone:gap-3 ${stacked ? 'min-h-[var(--info)] phone:flex-wrap phone:gap-y-2 phone:py-2' : 'h-[var(--info)]'}`}>
+      <div className={`flex items-center gap-4 px-4 phone:gap-0 ${stacked ? 'min-h-[var(--info)] phone:flex-wrap phone:gap-y-2 phone:py-2' : 'h-[var(--info)]'}`}>
         <div className={`min-w-0 flex-1 ${stacked ? 'phone:basis-full' : ''}`}>
-          <h2 title={item.title} className="truncate text-lg leading-6 font-semibold tracking-[-0.01em] phone:text-[15px] phone:leading-5">
-            {item.title}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 title={item.title} className="min-w-0 flex-1 truncate text-lg leading-6 font-semibold tracking-[-0.01em] phone:text-[15px] phone:leading-5">
+              {item.title}
+            </h2>
+            {isLocked(view) && <DrivingChip view={view} className="hidden shrink-0 phone:inline-flex" />}
+          </div>
           <RoomStatus view={view} player={player} act={act} offlineFor={offlineFor} onRetry={onRetryConnection} />
         </div>
 
         {railHidden && <Whisper messages={view.messages} selfId={view.self?.userId} />}
         {railHidden && <ReactionBar session={session} disabled={isOffline(view)} className="flex" />}
 
+        {/* A phone's line belongs to the title and the status, so Skip waits in Queue, a deliberate step from sound. */}
         <div className={`flex shrink-0 items-center gap-2 ${stacked ? 'phone:w-full' : ''}`}>
-          {isLocked(view) && <DrivingChip view={view} className="hidden phone:inline-flex" />}
           <MainAction session={session} view={view} player={player} onToast={onToast} />
-          {canControl(view) && <SkipButton session={session} view={view} onToast={onToast} className="btn-quiet" />}
+          {canControl(view) && <SkipButton session={session} view={view} onToast={onToast} className="phone:hidden" />}
           {!failed && (
             <div className="hidden items-center lg:flex">
               {!fullscreen && (

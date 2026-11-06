@@ -122,7 +122,8 @@ export const openClient = async ({ browser }, name, options = {}) => {
     hasTouch: phone,
     locale: 'en-US',
     serviceWorkers: 'block',
-    extraHTTPHeaders: { 'x-forwarded-for': address },
+    // Sent everywhere, which YouTube's own requests can't take.
+    extraHTTPHeaders: options.realYouTube ? {} : { 'x-forwarded-for': address },
   });
   await context.addInitScript(fakeClipboard);
   await context.addInitScript(socketHook);
@@ -131,8 +132,11 @@ export const openClient = async ({ browser }, name, options = {}) => {
 
   const client = { name, context, address, errors: [], external: new Set(), page: null, pages: [] };
 
-  if (!options.realYouTube) {
-    await context.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => {
+  if (options.realYouTube) {
+    await context.route(/^https?:\/\/localhost/, (route) =>
+      route.continue({ headers: { ...route.request().headers(), 'x-forwarded-for': address } }));
+  } else {
+    await context.route(/^https?:\/\/(?!localhost)/, (route) => {
       const url = route.request().url();
       if (url.startsWith('https://www.youtube.com/iframe_api')) {
         return route.fulfill({ contentType: 'text/javascript', body: playerScript() });

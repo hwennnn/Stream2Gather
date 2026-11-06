@@ -11,7 +11,7 @@ flow('invite: the button copies the room link and a friend gets in with it', asy
   const room = await startRoom(t, host, { url: golden.url });
   await host.page.evaluate(() => navigator.clipboard.writeText('stale'));
   await ui.invite(host.page).click();
-  await t.see('a toast', host.page.getByText(/link copied/i));
+  await t.see('the button says so', host.page.getByRole('button', { name: 'Copied' }));
   const copied = await host.page.evaluate(() => navigator.clipboard.readText());
   t.eq('the room link', copied, room.url);
   await joinRoom(friend, copied);
@@ -37,7 +37,25 @@ flow('invite: when the browser refuses the clipboard, the link is still shown', 
     navigator.clipboard.writeText = () => Promise.reject(new Error('denied'));
   });
   await ui.invite(host.page).click();
-  await t.see('the link in a toast', host.page.getByText(room.url));
+  await t.see('the link to copy by hand', host.page.getByText(room.url.replace(/^https?:\/\//, '')));
+  t.eq('no claim it was copied', await host.page.getByRole('button', { name: 'Copied' }).count(), 0);
+});
+
+flow('invite: alone in an empty room, Invite answers', async (t) => {
+  const host = await t.person('host');
+  const room = await startRoom(t, host);
+  await ui.invite(host.page).click();
+  await t.see('the button says so', host.page.getByRole('button', { name: 'Copied' }));
+  t.eq('the room link', await host.page.evaluate(() => navigator.clipboard.readText()), room.url);
+});
+
+flow('invite: alone after chatting, Invite answers', async (t) => {
+  const host = await t.person('host');
+  const room = await startRoom(t, host, { url: golden.url });
+  await sendChat(host.page, 'anyone there');
+  await ui.invite(host.page).click();
+  await t.see('the link', host.page.getByText(room.url.replace(/^https?:\/\//, '')));
+  await t.see('the button says so', host.page.getByRole('button', { name: 'Copied' }));
 });
 
 flow('people: a second and third person arrive, and everyone sees everyone', async (t) => {
@@ -70,7 +88,8 @@ flow('people: someone leaving is noticed, and the last one left is alone again',
   await joinRoom(b, room.url);
   await joinRoom(c, room.url);
   await c.page.close();
-  await t.see('Ben leaving noticed', ui.chatLog(a.page).getByText('Cal left'));
+  // A dropped socket might be a reload, so the room waits ten seconds before saying so.
+  await t.see('Cal leaving noticed', ui.chatLog(a.page).getByText('Cal left'), 45_000);
   await t.see('by both', ui.chatLog(b.page).getByText('Cal left'));
   await openTab(a.page, 'People');
   await t.gone('Cal in the list', person(a.page, 'Cal'));

@@ -89,5 +89,5 @@ flow('toasts: a burst of copying does not pile up over the room', async (t) => {
   await startRoom(t, a, { url: sample(t.base) });
   for (let i = 0; i < 6; i += 1) await ui.invite(a.page).click();
   await t.sleep(200);
-  t.check('a few at most', (await a.page.getByText(/link copied/i).count()) <= 2, String(await a.page.getByText(/link copied/i).count()));
+  t.eq('one answer, on the button', await a.page.getByRole('button', { name: 'Copied' }).count(), 1);
 });

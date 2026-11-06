@@ -134,6 +134,7 @@ flow('chat: a line that gets no answer offers Retry and Remove', async (t) => {
   await ui.chatLog(a.page).getByRole('button', { name: 'Retry' }).click();
   await t.see('Ben gets it', ui.chatLog(b.page).getByText('into the void'));
   await t.gone('the failure', ui.chatLog(a.page).getByText(/not sent/i));
+  await t.sleep(1000); // Ana's answer can trail Ben's copy, and going deaf now would lose it.
   await a.page.evaluate(() => { window.__net.deaf = true; });
   await sendChat(a.page, 'changed my mind');
   await t.see('failed again', ui.chatLog(a.page).getByText(/not sent/i), 7000);

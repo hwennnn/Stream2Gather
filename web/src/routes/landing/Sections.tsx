@@ -1,6 +1,7 @@
 import type { Media, Person } from '../../api/http';
 import { Avatar } from '../../ui/Avatar';
 import { formatTime } from '../../ui/format';
+import { WIDE_COLUMN } from '../../ui/Page';
 import { firstName, hueOf, listNames } from '../../ui/people';
 import { Thumb } from '../../ui/Thumb';
 
@@ -133,7 +134,7 @@ export const RoomPicture = ({ media }: { media: Media | null }) => (
 
 export const Footer = () => (
   <footer className="border-t border-line">
-    <div className="mx-auto flex max-w-[1160px] flex-wrap justify-between gap-x-6 gap-y-1 px-6 py-4 text-[13px] text-dim phone:px-4">
+    <div className={`${WIDE_COLUMN} flex flex-wrap justify-between gap-x-6 gap-y-1 py-4 text-[13px] text-dim`}>
       <span>Videos play in each site’s own player.</span>
       <a href={REPO} target="_blank" rel="noreferrer" className="hover:text-text">
         GitHub

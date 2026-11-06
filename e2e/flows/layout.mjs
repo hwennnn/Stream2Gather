@@ -63,6 +63,10 @@ const messyRoom = async (t) => {
   return { host, room, bots };
 };
 
+/** One shell: the height of the bar, and where the mark sits in it. */
+const shellBar = (page) =>
+  page.getByRole('banner').evaluate((bar) => `${bar.getBoundingClientRect().height} tall, mark at ${bar.querySelector('svg').getBoundingClientRect().x}`);
+
 /** Touching, or close enough to read as touching. */
 const LEFT_MIN = 4;
 
@@ -222,6 +226,7 @@ for (const size of WIDTHS) {
     await t.see('the landing page', ui.linkBox(a.page));
     await checkSpills(t, `${width} landing`, a.page, a.page.locator('body'));
     await checkPage(t, `${width} landing`, a.page);
+    const bar = await shellBar(a.page);
 
     const host = await t.person('host');
     const longTitle = video('전곡 라이브');
@@ -230,10 +235,19 @@ for (const size of WIDTHS) {
     await t.see('the gate', ui.join(a.page));
     await checkSpills(t, `${width} gate`, a.page, a.page.locator('body'));
     await checkPage(t, `${width} gate`, a.page);
+    t.eq(`${width} gate keeps the landing's bar`, await shellBar(a.page), bar);
 
     await a.page.goto(`${t.base}/r/no-such-room`);
     await t.see('the missing page', a.page.getByRole('heading', { name: /room doesn.t exist/i }));
     await checkSpills(t, `${width} dead end`, a.page, a.page.locator('body'));
+    t.eq(`${width} dead end keeps the landing's bar`, await shellBar(a.page), bar);
+
+    // A phone's room has a way out where the mark would be.
+    if (phone) return;
+    await a.page.goto(room.url);
+    await ui.join(a.page).click();
+    await t.see('the room', ui.rail(a.page));
+    t.eq(`${width} room keeps the landing's bar`, await shellBar(a.page), bar);
   });
 
   flow(`layout ${width}: the empty stage holds its results`, { timeout: 60_000 }, async (t) => {

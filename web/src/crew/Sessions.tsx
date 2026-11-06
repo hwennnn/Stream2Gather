@@ -31,7 +31,7 @@ const SessionRow = ({ session }: { session: PastSession }) => (
         </span>
       ))}
     </span>
-    <span className="min-w-0 flex-1 truncate">
+    <span className="relative min-w-0 flex-1 truncate">
       {watched(session)}
       <span className="sr-only">, with {session.people.map((person) => person.name).join(', ')}</span>
     </span>

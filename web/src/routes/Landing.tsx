@@ -2,9 +2,9 @@ import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { looksLikeUrl, normalizeUrl } from '../ui/format';
+import { SiteHeader, WIDE_COLUMN } from '../ui/Page';
 import { Slot } from '../ui/Slot';
 import { useTrending } from '../ui/useTrending';
-import { Wordmark } from '../ui/Wordmark';
 import { badLink, emptyNote, failureFor, linkKinds, type Failure } from './landing/notes';
 import { useRecentRoom } from './landing/recent';
 import { Footer, inThere, Popular, ReturnRow, RoomPicture } from './landing/Sections';
@@ -66,16 +66,11 @@ export const Landing = () => {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="border-b border-line">
-        <div className="mx-auto flex h-14 max-w-[1160px] items-center justify-between px-6 phone:px-4">
-          <a href="/" aria-label="Stream2Gather home">
-            <Wordmark />
-          </a>
-          <AccountMenu />
-        </div>
-      </header>
+      <SiteHeader>
+        <AccountMenu />
+      </SiteHeader>
 
-      <main className="mx-auto flex w-full max-w-[1160px] flex-1 flex-col px-6 pt-10 pb-12 phone:px-4 phone:pt-6 land:pt-6">
+      <main className={`${WIDE_COLUMN} flex flex-1 flex-col pt-10 pb-12 phone:pt-6 land:pt-6`}>
         {recent && (
           <section aria-label="Your last room" className="mb-10 border-y border-line phone:mb-8">
             <ReturnRow href={`/r/${recent.slug}`} title={`Back to ${recent.name}`} note={inThere(recent.members)} people={recent.members} />

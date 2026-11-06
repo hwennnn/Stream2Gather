@@ -4,7 +4,7 @@
 #   E2E_PORT    port for the private server (18082)
 #   E2E_SAMPLE  the test video, made here if missing (.data/sample.mp4)
 #   E2E_OUT     where the scripts leave their screenshots (a temporary folder)
-#   E2E_SCRIPT  which scripts to run ("sync.mjs crews.mjs recaps.mjs")
+#   E2E_SCRIPT  which scripts to run ("sync.mjs crews.mjs recaps.mjs catchup.mjs")
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -14,7 +14,7 @@ work=$(mktemp -d)
 web=$work/web
 out=${E2E_OUT:-$work}
 base=http://localhost:$port
-scripts=${E2E_SCRIPT:-sync.mjs crews.mjs recaps.mjs}
+scripts=${E2E_SCRIPT:-sync.mjs crews.mjs recaps.mjs catchup.mjs}
 # crews.mjs signs its own cookies, so the server needs a key it knows. Nothing else uses this one.
 export SESSION_KEY=${SESSION_KEY:-$(openssl rand -base64 32)}
 export DATABASE_URL=${DATABASE_URL:-postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable}

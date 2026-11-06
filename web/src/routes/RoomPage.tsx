@@ -39,7 +39,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 const CONNECT_PATIENCE_MS = 15_000;
 
-const arrival = () => (window.history.state ?? {}) as { joined?: boolean; copied?: boolean };
+const arrival = () => (window.history.state ?? {}) as { joined?: boolean };
 
 const endingFor = (error: unknown): Ending => {
   if (error instanceof ApiError) {
@@ -54,17 +54,10 @@ const isFull = (preview: RoomPreview, userId: string | undefined): boolean =>
 
 export const RoomPage = ({ slug }: { slug: string }) => {
   const [joined, setJoined] = useState(() => arrival().joined === true);
-  const [copied] = useState(() => arrival().copied === true);
   const [preview, setPreview] = useState<RoomPreview | null>(null);
   const [ending, setEnding] = useState<Ending | null>(null);
   const [attempt, setAttempt] = useState(0);
   const { user } = useAccount();
-
-  // Only the arrival was copied. A reload must not claim it again.
-  useEffect(() => {
-    if (!arrival().copied) return;
-    window.history.replaceState({ ...arrival(), copied: false }, '');
-  }, []);
 
   useEffect(() => {
     if (joined) return undefined;
@@ -96,10 +89,10 @@ export const RoomPage = ({ slug }: { slug: string }) => {
       </Slot>
     );
   }
-  return <Room slug={slug} copied={copied} />;
+  return <Room slug={slug} />;
 };
 
-const Room = ({ slug, copied }: { slug: string; copied: boolean }) => {
+const Room = ({ slug }: { slug: string }) => {
   const session = useMemo(() => new RoomSession(slug), [slug]);
   const view = useSyncExternalStore(session.subscribe, session.getView);
 
@@ -122,7 +115,7 @@ const Room = ({ slug, copied }: { slug: string; copied: boolean }) => {
 
   if (view.connection === 'failed') return <RoomFailure slug={slug} failure={view.failure} />;
   if (!view.self) return <Waiting session={session} view={view} />;
-  return <RoomShell slug={slug} session={session} view={view} copied={copied} />;
+  return <RoomShell slug={slug} session={session} view={view} />;
 };
 
 /** The ticket only says no. The preview can say why. */
@@ -178,9 +171,9 @@ const Waiting = ({ session, view }: { session: RoomSession; view: RoomView }) =>
   );
 };
 
-type ShellProps = { slug: string; session: RoomSession; view: RoomView; copied: boolean };
+type ShellProps = { slug: string; session: RoomSession; view: RoomView };
 
-const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
+const RoomShell = ({ slug, session, view }: ShellProps) => {
   const [tab, setTab] = useState<Tab>('chat');
   const [theatre, setTheatre] = useState(false);
   const [finished, setFinished] = useState(false);
@@ -214,12 +207,6 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
     }
     if (id) seenItem.current = id;
   }, [current?.id]);
-
-  const welcomed = useRef(false);
-  useEffect(() => {
-    if (copied && !welcomed.current) toast('Link copied. Paste it to a friend.');
-    welcomed.current = true;
-  }, [copied, toast]);
 
   useEffect(() => rememberRoom(slug, view.name), [slug, view.name]);
 

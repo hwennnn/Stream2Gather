@@ -3,6 +3,12 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatEntry, ChatResult, RoomSession, RoomView } from '../room/session';
 import { ChatPanel } from './ChatPanel';
+import { splitLinks } from './format';
+
+vi.mock('./format', async (original) => {
+  const real = await original<typeof import('./format')>();
+  return { ...real, splitLinks: vi.fn(real.splitLinks) };
+});
 
 const self = { userId: 'me', name: 'Ada', role: 'member' as const };
 
@@ -136,5 +142,64 @@ describe('ChatPanel sending', () => {
   it('shows a settled line at full strength', () => {
     setup([line({ serverId: 7 })]);
     expect(screen.getByText('hello').className).not.toMatch(/opacity-55/);
+  });
+});
+
+describe('a long chat', () => {
+  const lines = Array.from({ length: 5 }, (_, n) => line({ id: n + 1, userId: `u${n}`, author: `Person ${n}`, body: `line ${n}` }));
+  const session = {} as RoomSession;
+  const onToast = () => {};
+  const panel = (next: RoomView) => (
+    <ChatPanel session={session} view={next} active inviteUrl="" inviteCopied={false} onCopyInvite={() => {}} onInvite={() => {}} onToast={onToast} />
+  );
+  const drawn = () => vi.mocked(splitLinks).mock.calls.length;
+
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+    vi.mocked(splitLinks).mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves its lines alone while someone types', () => {
+    render(panel(view(lines)));
+    const before = drawn();
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'h' } });
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'hi' } });
+    expect(drawn()).toBe(before);
+  });
+
+  it('leaves its lines alone when something else in the room changes', () => {
+    const { rerender } = render(panel(view(lines)));
+    const before = drawn();
+    rerender(panel(view(lines, { viewerStates: { u1: 'synced' }, reactions: [] })));
+    expect(drawn()).toBe(before);
+  });
+
+  it('draws only the new line when one arrives', () => {
+    const { rerender } = render(panel(view(lines)));
+    const before = drawn();
+    rerender(panel(view([...lines, line({ id: 6, userId: 'u9', author: 'New', body: 'new' })])));
+    expect(drawn()).toBe(before + 1);
+    expect(screen.getByText('new')).toBeTruthy();
+  });
+
+  it('redraws a line whose delivery changed', () => {
+    const sending = line({ id: 'c9', delivery: 'sending', body: 'on its way' });
+    const { container, rerender } = render(panel(view([...lines, sending])));
+    expect(container.querySelector('[data-delivery=sending]')).toBeTruthy();
+    rerender(panel(view([...lines, { ...sending, delivery: undefined } as ChatEntry])));
+    expect(container.querySelector('[data-delivery=sending]')).toBeNull();
+  });
+
+  it('still takes away the add button when the room goes offline', () => {
+    const video = line({ id: 7, userId: 'u8', body: 'https://youtu.be/aqz-KE-bpKQ' });
+    const { rerender } = render(panel(view([video])));
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Add to queue' }).disabled).toBe(false);
+    rerender(panel(view([video], { offlineSince: 1 })));
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Add to queue' }).disabled).toBe(true);
   });
 });

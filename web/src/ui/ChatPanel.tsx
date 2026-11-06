@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
 import { formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
@@ -56,9 +56,43 @@ export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCo
   const empty = text.trim().length === 0;
 
   const blocks = useMemo(() => toBlocks(entries), [entries]);
+  const selfId = view.self?.userId;
+  const canAdd = canQueue(view);
+  // Typing and everything else in the room redraw this panel, so the lines depend only on what they show.
+  const lines = useMemo(
+    () =>
+      blocks.map((block) => {
+        if (block.kind === 'time') {
+          return (
+            <time key={block.at} dateTime={block.at} className="fig mt-4 text-dim first:mt-auto">
+              {formatClock(block.at)}
+            </time>
+          );
+        }
+        if (block.kind === 'system') {
+          return (
+            <p key={block.entry.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+              {block.entry.text}
+              {block.entry.url && (
+                <>
+                  {' '}
+                  <a href={block.entry.url} target="_blank" rel="noreferrer noopener" className="underline">
+                    Open on YouTube
+                  </a>
+                </>
+              )}
+            </p>
+          );
+        }
+        return (
+          <MessageGroup key={block.messages[0]?.id} session={session} selfId={selfId} canAdd={canAdd} offline={offline} messages={block.messages} onToast={onToast} />
+        );
+      }),
+    [blocks, session, selfId, canAdd, offline, onToast],
+  );
   const last = entries.at(-1);
   const hasChat = entries.some((entry) => entry.kind === 'chat');
-  const mine = last?.kind === 'chat' && last.userId === view.self?.userId;
+  const mine = last?.kind === 'chat' && last.userId === selfId;
   const lastShown = useRef(last?.id);
 
   const toBottom = () => {
@@ -128,31 +162,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCo
             ) : (
               <p className="mt-auto text-muted">Nothing said yet.</p>
             ))}
-          {blocks.map((block) => {
-            if (block.kind === 'time') {
-              return (
-                <time key={block.at} dateTime={block.at} className="fig mt-4 text-dim first:mt-auto">
-                  {formatClock(block.at)}
-                </time>
-              );
-            }
-            if (block.kind === 'system') {
-              return (
-                <p key={block.entry.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
-                  {block.entry.text}
-                  {block.entry.url && (
-                    <>
-                      {' '}
-                      <a href={block.entry.url} target="_blank" rel="noreferrer noopener" className="underline">
-                        Open on YouTube
-                      </a>
-                    </>
-                  )}
-                </p>
-              );
-            }
-            return <MessageGroup key={block.messages[0]?.id} session={session} view={view} messages={block.messages} onToast={onToast} />;
-          })}
+          {lines}
         </div>
         {missed && (
           <button
@@ -213,19 +223,28 @@ const PickingCard = ({ onInvite }: { onInvite: () => void }) => (
   </div>
 );
 
-type GroupProps = { session: RoomSession; view: RoomView; messages: ChatLine[]; onToast: (text: string) => void };
+type LineProps = { session: RoomSession; canAdd: boolean; offline: boolean; onToast: (text: string) => void };
 
-const MessageGroup = ({ session, view, messages, onToast }: GroupProps) => {
+type GroupProps = LineProps & { selfId: string | undefined; messages: ChatLine[] };
+
+/** Runs are rebuilt with every new line, so it's what's in one that counts. */
+const sameGroup = ({ messages: a, ...before }: GroupProps, { messages: b, ...after }: GroupProps) =>
+  a.length === b.length &&
+  a.every((message, index) => message === b[index]) &&
+  (Object.keys(before) as (keyof typeof before)[]).every((key) => before[key] === after[key]);
+
+const MessageGroup = memo(({ session, selfId, canAdd, offline, messages, onToast }: GroupProps) => {
   const first = messages[0];
   if (!first) return null;
-  const own = first.userId === view.self?.userId;
+  const own = first.userId === selfId;
   return (
     <div className="mt-2.5 first:mt-auto">
       {messages.map((message, index) => (
         <Message
           key={message.id}
           session={session}
-          view={view}
+          canAdd={canAdd}
+          offline={offline}
           message={message}
           name={index === 0 ? (own ? 'You' : firstName(first.author)) : undefined}
           onToast={onToast}
@@ -233,11 +252,11 @@ const MessageGroup = ({ session, view, messages, onToast }: GroupProps) => {
       ))}
     </div>
   );
-};
+}, sameGroup);
 
-type MessageProps = { session: RoomSession; view: RoomView; message: ChatLine; name?: string; onToast: (text: string) => void };
+type MessageProps = LineProps & { message: ChatLine; name?: string };
 
-const Message = ({ session, view, message, name, onToast }: MessageProps) => {
+const Message = memo(({ session, canAdd, offline, message, name, onToast }: MessageProps) => {
   const parts = splitLinks(message.body);
   const video = parts.find((part) => part.kind === 'link' && isYouTubeUrl(part.href));
   const [busy, setBusy] = useState(false);
@@ -272,16 +291,16 @@ const Message = ({ session, view, message, name, onToast }: MessageProps) => {
           ),
         )}
       </p>
-      {message.delivery === 'failed' && <NotSent session={session} id={String(message.id)} offline={isOffline(view)} />}
-      {video?.kind === 'link' && canQueue(view) && !message.delivery && (
-        <button type="button" disabled={busy || isOffline(view)} onClick={() => void add(video.href)} className="btn btn-quiet btn-sm mt-1 mb-0.5">
+      {message.delivery === 'failed' && <NotSent session={session} id={String(message.id)} offline={offline} />}
+      {video?.kind === 'link' && canAdd && !message.delivery && (
+        <button type="button" disabled={busy || offline} onClick={() => void add(video.href)} className="btn btn-quiet btn-sm mt-1 mb-0.5">
           {busy ? <span className="spinner size-3" /> : <Icon name="film" className="size-3.5" />}
           Add to queue
         </button>
       )}
     </div>
   );
-};
+});
 
 const NotSent = ({ session, id, offline }: { session: RoomSession; id: string; offline: boolean }) => (
   <p className="mt-1 flex items-center gap-1.5 text-xs text-warn">

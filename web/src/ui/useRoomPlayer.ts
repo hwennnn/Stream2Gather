@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { watchAutoplay } from '../players/autoplay';
 import { createPlayer } from '../players/registry';
 import { notStarted, type PlayerAdapter, type PlayerError } from '../players/types';
@@ -176,11 +176,35 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
   return remove;
 };
 
+const WAITING: SyncReport = { health: 'waiting', drift: 0 };
+
+type ReportStore = { get: () => SyncReport; set: (report: SyncReport) => void; subscribe: (listener: () => void) => () => void };
+
+/** A report lands every second, so it must not pass through the room's own state. */
+const createReportStore = (): ReportStore => {
+  let report = WAITING;
+  const listeners = new Set<() => void>();
+  return {
+    get: () => report,
+    set: (next) => {
+      report = next;
+      for (const listener of listeners) listener();
+    },
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+};
+
+/** For whatever shows the report, so that nothing else redraws with it. */
+export const useSyncReport = ({ reports }: RoomPlayer): SyncReport => useSyncExternalStore(reports.subscribe, reports.get);
+
 export type RoomPlayer = {
   stage: React.RefObject<HTMLDivElement | null>;
   /** The player on the stage now, for anything outside sync that needs one. */
   adapter: () => PlayerAdapter | null;
-  report: SyncReport;
+  reports: ReportStore;
   ready: boolean;
   failure: PlayerError | null;
   muted: boolean;
@@ -196,7 +220,7 @@ export type RoomPlayer = {
 /** Keeps a player on the stage for whatever the room is watching. */
 export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer => {
   const stage = useRef<HTMLDivElement>(null);
-  const [report, setReport] = useState<SyncReport>({ health: 'waiting', drift: 0 });
+  const reports = useMemo(createReportStore, []);
   const [readyId, setReadyId] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ id: string; error: PlayerError } | null>(null);
   const [muted, setMuted] = useState(false);
@@ -210,7 +234,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
 
   useEffect(() => {
     if (!stage.current || !current || !currentId) return undefined;
-    setReport({ health: 'waiting', drift: 0 });
+    reports.set(WAITING);
     setMuted(false);
     setRefused(false);
     setCold(false);
@@ -220,7 +244,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
       },
       onReady: () => setReadyId(currentId),
       onFailure: (error) => setFailed({ id: currentId, error }),
-      onReport: setReport,
+      onReport: reports.set,
       onMuted: setMuted,
       onRefused: setRefused,
       onCold: setCold,
@@ -232,7 +256,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   return {
     stage,
     adapter: () => player.current,
-    report,
+    reports,
     ready: readyId === currentId,
     failure: failed && failed.id === currentId ? failed.error : null,
     muted,

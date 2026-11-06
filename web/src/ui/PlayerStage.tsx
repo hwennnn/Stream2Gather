@@ -16,7 +16,7 @@ import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { UpNext } from './UpNext';
 import { useAdder, type Adder } from './useAdder';
-import type { RoomPlayer } from './useRoomPlayer';
+import { useSyncReport, type RoomPlayer } from './useRoomPlayer';
 import type { Act } from './status';
 import { useTrending, notInRoom } from './useTrending';
 
@@ -195,7 +195,8 @@ const Picks = ({ items, adder }: { items: Media[] | null; adder: Adder }) => {
 
 /** Sideways on a phone there's no bar, so the room's state sits in the top bar in a word. */
 export const SyncPill = ({ view, player }: { view: RoomView; player: RoomPlayer }) => {
-  return <span className="max-w-40 truncate text-[13px] text-muted">{pillFor(view, player.report.health).text}</span>;
+  const { health } = useSyncReport(player);
+  return <span className="max-w-40 truncate text-[13px] text-muted">{pillFor(view, health).text}</span>;
 };
 
 export const SkipButton = ({ session, view, onToast, className = '' }: { session: RoomSession; view: RoomView; onToast: (text: string) => void; className?: string }) => {

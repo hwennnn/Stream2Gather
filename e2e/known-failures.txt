@@ -1,0 +1,10 @@
+# Bugs we know about, as `id | pattern`. The ids are in docs of the QA run; the
+# pattern is matched against "flow: failure". A known failure still prints and
+# still counts as failed. It only stops the run going red, so a new bug can't
+# hide among old ones. Fix the bug, delete its line.
+P-01 | a seek in the first moment after joining
+P-02 | a page that does not exist
+L-02 | no ellipsis
+L-05 | every control can be reached: Invite is under Link copied
+L-06 | small phone \(320x568\).*200 by 200
+L-07 | up next clears the left edge|shares one left gutter

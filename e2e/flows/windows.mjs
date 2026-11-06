@@ -74,8 +74,8 @@ flow('window phone: what a thumb has to hit is big enough', async (t) => {
     const small = await b.page.evaluate(() => [...document.querySelectorAll('button, a[href], input, [role=tab], [role=switch]')]
       .filter((el) => el.checkVisibility({ opacityProperty: true }) && el.getAttribute('aria-hidden') !== 'true' && el.getClientRects().length > 0)
       .map((el) => ({ box: el.getBoundingClientRect(), name: el.getAttribute('aria-label') ?? el.textContent?.trim() ?? el.tagName }))
-      .filter(({ box }) => box.height < 40 || box.width < 40)
+      .filter(({ box }) => box.height < 44 || box.width < 44)
       .map(({ box, name }) => `${name.slice(0, 20)} ${Math.round(box.width)}x${Math.round(box.height)}`));
-    t.check(`${tab}: nothing under 40px`, small.length === 0, small.join(', '));
+    t.check(`${tab}: nothing under 44px`, small.length === 0, small.join(', '));
   }
 });

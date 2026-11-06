@@ -285,6 +285,10 @@ body {
     min-width: 2.75rem;
   }
 
+  .tab {
+    min-width: 2.75rem;
+  }
+
   .field {
     min-height: 2.75rem;
     font-size: 1rem; /* Below 16px, iOS zooms the page on focus. */
@@ -724,9 +728,13 @@ body {
   clip-path: inset(50%);
 }
 
+/* Wider than its seat, over the plain discs beside it, so a thumb gets the full 44px. */
 .seats[data-compact='true'] .seat-invite {
-  height: 100%;
   justify-content: center;
+  width: 2.75rem;
+  height: 100%;
+  margin-inline: -0.3125rem;
+  padding-inline: 0.3125rem;
 }
 
 .seats[data-compact='true'] .seat-disc,

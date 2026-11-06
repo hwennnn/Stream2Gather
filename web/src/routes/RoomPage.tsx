@@ -8,6 +8,7 @@ import { DeadEnd, ENDINGS, fullRoom, type Ending } from '../ui/DeadEnd';
 import { JoinGate } from '../ui/JoinGate';
 import { PeoplePanel } from '../ui/PeoplePanel';
 import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerStage';
+import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
 import { canControl } from '../ui/rules';
@@ -324,6 +325,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           onPickAnother={openQueue}
           onShowQueue={() => setTab('queue')}
           onToast={toast}
+          railHidden={railHidden}
           toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink/90 px-4 empty:hidden', 1)}
         />
 
@@ -375,6 +377,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
             <PeoplePanel session={session} view={view} onToast={toast} />
           </div>
 
+          <ReactionLane reactions={view.reactions} />
           {!railHidden && toastStack(`absolute inset-x-3 ${tab === 'chat' ? 'bottom-[76px]' : 'bottom-3'}`)}
         </aside>
       </div>

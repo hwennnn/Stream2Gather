@@ -1,22 +1,47 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { RoomSession, RoomView } from '../room/session';
 import { Icon } from './Icon';
 
 const EMOJI = ['😂', '❤️', '🔥', '😮', '👏', '😭'];
 
-/** Floats reactions inside its parent. Clipped, so they stay out of the player. */
+const SPARKS = [-1, -0.4, 0.4, 1];
+
+const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
+
+/**
+ * Rises up the right of the rail, in the gutter chat lines leave for their time,
+ * so it crosses no one's words. It lives in the rail, so it can't reach the player.
+ */
 export const ReactionLane = ({ reactions }: { reactions: RoomView['reactions'] }) => (
   <div className="reaction-lane" aria-hidden="true">
-    {reactions.map((reaction) => (
-      <span key={reaction.id} style={{ right: `${12 + ((reaction.id * 37) % 180)}px` }} className="reaction">
-        {reaction.emoji}
+    {reactions.map(({ id, emoji, name }) => (
+      <span key={id} style={{ '--sway': `${((id * 37) % 21) - 10}px` } as CSSProperties} className="reaction">
+        {SPARKS.map((spread) => (
+          <span key={spread} style={{ '--spread': spread } as CSSProperties} className="reaction-spark">
+            {emoji}
+          </span>
+        ))}
+        <span className="reaction-emoji">{emoji}</span>
+        <span className="reaction-name">{firstName(name)}</span>
       </span>
     ))}
   </div>
 );
 
-export const ReactionBar = ({ session, disabled }: { session: RoomSession; disabled: boolean }) => (
-  <div className="relative flex shrink-0 phone:hidden land:hidden">
+/** Theatre mode hides the rail, so the bar keeps the last few, in a row of their own. */
+export const ReactionTicker = ({ reactions }: { reactions: RoomView['reactions'] }) => (
+  <div className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden" aria-hidden="true">
+    {reactions.slice(-3).map(({ id, emoji, name }) => (
+      <span key={id} className="chip enter text-text">
+        <span className="text-base leading-none">{emoji}</span>
+        {firstName(name)}
+      </span>
+    ))}
+  </div>
+);
+
+export const ReactionBar = ({ session, disabled, className }: { session: RoomSession; disabled: boolean; className: string }) => (
+  <div className={`shrink-0 ${className}`}>
     {EMOJI.map((emoji) => (
       <button
         key={emoji}
@@ -32,7 +57,7 @@ export const ReactionBar = ({ session, disabled }: { session: RoomSession; disab
   </div>
 );
 
-/** On phones reactions wait behind one button next to the chat box. */
+/** Where the bar is short of room, reactions wait behind one button next to the chat box. */
 export const ReactionPicker = ({ session, disabled }: { session: RoomSession; disabled: boolean }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -52,7 +77,7 @@ export const ReactionPicker = ({ session, disabled }: { session: RoomSession; di
   }, [open]);
 
   return (
-    <div ref={root} className="hidden shrink-0 phone:block land:block">
+    <div ref={root} className="hidden shrink-0 max-xl:block">
       {open && (
         <div className="enter absolute inset-x-3 bottom-full z-30 mb-1 flex justify-between rounded-xl border border-line bg-raised p-1 shadow-2xl">
           {EMOJI.map((emoji) => (

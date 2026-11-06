@@ -495,3 +495,235 @@ CREATE TABLE session_recaps (
 - A 4-person, 2-hour simulated session builds in under 1 second.
 - A shared link renders for a signed-out visitor, and stops within one request of revocation.
 
+## 7. Catch-up: time-shifted reactions
+
+**Competitors, plainly.** We found no evidence that Teleparty, Watch2Gether, Kosmi or Rave offers replay of a group's reactions at the same video position. That is based on public product pages and FAQs only, with no hands-on testing, and absence from a page is not proof **[U]**. All four are built around live sync. AniDachi, a Crunchyroll extension, says "Async catch-up with replayed reactions is planned, not available today", so the idea isn't unique and the window may be short. Danmaku on Bilibili and Niconico is the same mechanic for public audiences, from memory **[U]**. Friend-scoped replay is what we would own.
+
+Everything else in this phase is catch-up with the market: W2G has saved rooms with activity notifications, Kosmi has private rooms and voice, Rave has voice, and Teleparty sells voice in Premium.
+
+Long-distance couples are the core case: one of them missed the session, or lives eight hours away.
+
+### User flow
+
+- **First 10 seconds.** A member who was absent sees "You missed this. Catch up." on the crew home, or follows the recap's "Relive it". The page loads at `/r/{slug}/catchup/{sessionItemId}` with the player, the rail beside it (below it on phones), and a density strip under the player. Clicking Play is the gesture. Reactions appear in the rail as the video reaches each position, with the author: "Hana, 12:04, [emoji]".
+- **Reacting.** The same six reactions plus chat. The new moments are stored with `origin='catchup'`, so a partner sees them next time. "Relive it" starts at the moment minus 10 seconds, through `seek`.
+- **Empty state.** "Nobody reacted to this one yet. Your reactions will be here for the next person."
+- **Spoilers.** In the room, chat from sessions a member missed is collapsed behind a Catch up button. The crew home never shows chat.
+- **Embed blocked (Error 150, about a third of videos in our sample [V]).** Show the text timeline with timestamps and "Open on YouTube".
+- **Rules.** Members only. No WebSocket and no room join. Nothing overlays the player. No autoplay. Twitch live and purged videos have no catch-up.
+
+### Data model
+
+No new tables. Reads use `moments` and `session_items`. The existing index covers the query.
+
+### API and WebSocket
+
+- `GET /v1/crews/{slug}/moments?source=&id=&from=&to=` returns moments for the video across the crew's sessions, with chat bodies joined, in keyset pages of 500.
+- `POST /v1/crews/{slug}/moments {source, id, posMs, emoji?|body?}` validates the emoji against the allowlist and is rate limited like `react`.
+- No WebSocket changes.
+
+### Service boundaries
+
+`web/src/catchup/` is a lazy route using the existing `PlayerAdapter` alone, with no `RoomSession` and no sync controller. `main.tsx`'s path regex currently captures subpaths as a room slug **[V]**, so T0 changes it. `static.go`'s SPA fallback already serves the path **[V]**.
+
+**Firing rule.** Poll `adapter.time()` at 4 Hz and fire moments crossed during normal play within 0.25 seconds. A jump of more than 2 seconds resets the cursor without firing, so seeking never bursts.
+
+### Failure behavior
+
+| Failure | Behavior |
+|---|---|
+| Adapter errors | Text timeline |
+| Moments fetch fails | The video still plays; rail reads "Couldn't load reactions. Retry" |
+| Post fails | Retry once, then an inline note; playback is unaffected |
+| Ads | `time()` should hold during ads, so moments fire after them **[U]**; test with a real ad |
+| Video gone | Route shows "Video unavailable" and the crew link |
+
+### Tests
+
+- **Vitest:** firing rule with a fake adapter: normal play, seek forward and back, pause, rate 2x, jump reset.
+- **Go:** membership, allowlist, rate limit, pagination.
+- **e2e:** record reactions in a live session on the html5 fixture, open catch-up as a second user, assert each fires at the right position and that no WebSocket opened.
+- **`player-overlap.mjs`:** runs on this route.
+
+### Exit
+
+- On the html5 fixture and on YouTube, reactions fire within 500 ms of their stored position.
+- Seeking produces no burst.
+- Notification to first reaction takes at most 2 clicks.
+- `moments_catchup_per_session` is reported.
+
+## 8. More sources
+
+All use the existing contract: Go `Source` (`Match`, `Resolve`, optional `Search` and `Trending`) and web `PlayerAdapter` **[V]**. A new source adds two files and a switch line.
+
+| | Direct HLS | Vimeo | Twitch VOD | Twitch live | Dailymotion |
+|---|---|---|---|---|---|
+| **Order** | 1 | 2 | 3 | 4 | Deferred |
+| **Embed terms [V]** | Our player; host must allow CORS | Developer Addendum: no obscuring, no ads in player, public privacy policy, no fee without authorization | SSL, `parent` domain, min 400x300, not obscured, can't charge specifically for watching | Same | FAQ (2026-10-22): embedding and custom Player only on the paid Edge plan |
+| **Metadata** | None | oEmbed, no key | None in v1 (see below) | None | Authenticated API |
+| **Storage limit** | None | Normal `media` | Agreement allows only a 24-hour cache, so we store none | Same | Unknown |
+| **Rates** | `fine` (best sync) | `fine`, plan-gated **[U]** | `none`: no `setPlaybackRate` **[V]** | Not applicable | `discrete`, 0.25-2 steps **[V]** |
+| **Time** | Sync | Async, so cache from `timeupdate` (about 250 ms) and interpolate | Sync `getCurrentTime` | No shared position | `getState()` async **[V]** |
+| **Sync limit** | As html5 today | Near html5 if rate works, else seek-only | Seek only; drift target 1.5 s **[U]** | Same channel; each person sees their own live edge | Not assessed |
+| **Volume (ducking)** | Yes | `setVolume` | `setVolume` | `setVolume` | `setVolume` |
+| **Needs from owner** | Abuse stance | Eligible Vimeo account **[U]**, privacy policy | Production domain, phone decision | Same | Pay for Edge or drop |
+
+**Key choices:**
+
+- **Direct HLS is already built** (`direct.go`, `html5.ts`, lazy hls.js 185 kB gz) and sits behind `ALLOW_DIRECT_MEDIA` **[V]**. The remaining work is abuse stance, a clear CORS error and tests. VOD only; live HLS is **[U]**. We never proxy media.
+- **Twitch v1 is URL-only.** `Resolve` parses `twitch.tv/videos/{id}` and `twitch.tv/{channel}` and stores `Title: "Twitch video"` or the channel from the URL, with no thumbnail and no Helix call. The embed needs no client ID **[V]**. That removes the credentials dependency and the 24-hour storage problem, including inside `rooms.snapshot`, for the price of a plainer queue row. If titles are wanted later, add Helix with a per-source `MaxAge` of 20 hours and apply it to snapshots too.
+- **Twitch minimum width.** 400 px does not fit a 390 px phone **[V]**. Below the minimum, show "Rotate your phone or open on Twitch". Never shrink the embed.
+- **Twitch in history.** Generic "Twitch video" plus a link.
+- **Clips** have no JS control **[V]** and are refused at `Match`.
+- **Dailymotion deferred.** Its SDK could work, but the docs point to a paid plan **[V]** and a non-commercial clause needing review. Whether to pay is the owner's call.
+
+### Flow, data, API, boundaries
+
+- **User flow.** Paste a link in the omnibox and it queues in under a second. Sources without search show nothing in search; the omnibox placeholder reads "Search YouTube or paste a Vimeo, Twitch or .m3u8 link". Unsupported URL: "That link isn't supported yet." The source name shows on queue rows.
+- **Live items.** Hide seek and rate controls through `rules.ts`, and show "Live: everyone's on the same channel". Skip moments and catch-up. A join loads the channel at its live edge.
+- **Data.** No migration. Vimeo uses `media`. `source_id` holds `id` or `id:hash` for unlisted Vimeo videos.
+- **API and WebSocket.** No new routes or messages. `/v1/config` lists enabled sources.
+- **Contract changes.** `rates` gains `'none'`, and `controller.ts` corrects by seek only with a wider threshold. Optional `Source.MaxAge()`, unused in v1.
+- **CSP.** Vimeo `player.vimeo.com`, `i.vimeocdn.com`. Twitch `player.twitch.tv`. Enabled only when the source is on.
+- **Boundaries.** `@vimeo/player` and the Twitch script load lazily per source. `parent` comes from config: `localhost` in dev (127.0.0.1 is **[U]**).
+
+### Failure behavior
+
+| Failure | Behavior |
+|---|---|
+| Vimeo oEmbed 403/404 or `domain_status_code: 403` | Refused at `Resolve`: "This video can't be embedded here." |
+| Twitch sub-only or deleted VOD | Known only at play; adapter `onError` uses the existing `mediaError` path and skips, as for YouTube |
+| HLS CORS failure | "This stream doesn't allow playback here." |
+| Twitch pre-roll ad | Existing held state if detectable; otherwise a viewer lags then seek-corrects **[U]** |
+| Twitch or Vimeo script blocked | Same error path; other sources unaffected |
+
+### Tests
+
+- **Shared adapter conformance suite** in `web/src/players/conformance.test.ts`, against fakes of each SDK: play, pause, seek, `time()` sync and monotonic, `setVolume`, `rates` honored, `destroy`.
+- **Go:** table tests for `Match` and `Resolve` with recorded fixtures.
+- **`controller.test.ts`:** `rates:'none'` path.
+- **e2e:** a local HLS fixture in two contexts.
+- **Measured once by hand, in `measurements.md`:** Vimeo and Twitch drift between two browsers.
+
+### Exit
+
+- Each shipped source passes conformance, and queue-to-synced-playback works in two browsers.
+- p95 drift: Direct HLS equal to html5 today; Vimeo at or below 500 ms; Twitch VOD at or below 1.5 s. These are targets to confirm.
+- No source adds bytes to entry JS or the `RoomPage` chunk.
+- No Twitch metadata beyond the URL appears in Postgres or Redis.
+
+## 9. Tracks
+
+**Wait.** `api.go`, `hub.go`, `serve.go`, `live.go`, `postgres.go`, `RoomPage.tsx`, `session.ts`, `useRoomPlayer.ts`, `sync/*` and others are being edited now, and `00002_session_version.sql` is untracked. T0 starts after that work lands.
+
+**T0: shared seams, one small PR, one engineer, about half a day.** Every shared file is touched here, so the tracks do not collide.
+
+| File | Change |
+|---|---|
+| `server/internal/api/api.go` | `Handler()` calls `s.crewRoutes(mux)`, `s.voiceRoutes(mux)`, `s.pushRoutes(mux)`; `contentPolicy` takes a struct; `Permissions-Policy`; `/v1/config` features |
+| `server/internal/hub/{hub,serve}.go` | `Recorder` interface with a no-op default, calls from `mutate`, `join`, `leave`, `chat`, `react`; `voice` case calling `r.voice` |
+| `server/internal/store/live.go` | `Person.Member`, `Person.Voice`, `People` merge |
+| `server/internal/config/config.go` | LiveKit, VAPID, source fields |
+| `server/cmd/s2g/main.go` | `notifier` mode dispatch to `notifier.go` |
+| `server/internal/workflows/workflows.go` | Registration hooks for both tracks |
+| `web/src/main.tsx` | Route switch for `/r/{slug}`, `/r/{slug}/catchup/{id}`, `/s/{token}` |
+| `web/src/routes/{RoomPage,Landing}.tsx`, `web/src/ui/RoomHeader.tsx` | Lazy slots: `CrewHome`, `CrewRail`, `VoiceButton` |
+| `web/src/room/session.ts` | `crew` event callback |
+| `web/src/ui/{Omnibox,PeoplePanel,QueuePanel}.tsx` | Omnibox extra-group prop and placeholder from `/v1/config`; `member` and `voice` badges; source name on queue rows |
+| `web/src/players/types.ts`, `{youtube,html5}.ts`, `web/src/ui/useRoomPlayer.ts` | `setVolume`, `volume`, `rates:'none'`, `createPlayer` registry |
+| `web/scripts/bundle-budget.mjs` (new), `Makefile`, `deploy/compose.yaml` | CI budget check, `notifier` target, `livekit` service |
+
+**Migration numbers.** `goose.Up` is called with defaults **[V]**, which should refuse out-of-order files **[U: confirm for the pinned version]**. So do not reserve numbers per track. Each PR takes the next free number at merge. Nothing else references the numbers. Next free today: 00003.
+
+**Track A: Crews and memory.** Order: A1 crews + section 2 fixes, A2 capture, A3 recaps, A4 catch-up.
+
+| Owns | |
+|---|---|
+| Server | `server/internal/store/{crews,sessions,recaps}.go`, `server/internal/api/crews.go`, `server/internal/hub/record.go`, `server/internal/recap/`, `server/internal/workflows/sessions.go`, `server/internal/store/postgres.go` compliance changes, `room/apply.go` `media.refresh`, migrations `*_crews`, `*_capture`, `*_recaps` |
+| Web | `web/src/routes/CrewHome.tsx`, `web/src/crew/*`, `web/src/recap/*`, `web/src/catchup/*`, `web/src/ui/ChatPanel.tsx` (spoiler collapse), `web/scripts/player-overlap.mjs` |
+| Tests | `e2e/crews.mjs`, `e2e/mint-account/` |
+
+**Track B: Reach.** Order: B1 voice, B2 notifications, B3 sources.
+
+| Owns | |
+|---|---|
+| Server | `server/internal/voice/`, `server/internal/api/voice.go`, `server/internal/hub/voice.go`, `server/internal/notify/`, `server/cmd/s2g/notifier.go`, `server/internal/api/push.go`, `server/internal/api/static.go`, `server/internal/source/{vimeo,twitch}.go`, `server/internal/source/direct.go`, migration `*_push` |
+| Web | `web/src/voice/*`, `web/src/push/*`, `web/public/{sw.js,manifest.webmanifest,icons}`, `web/src/players/{vimeo,twitch}.ts`, `web/src/players/conformance.test.ts`, `web/src/sync/controller.ts` (`rates:'none'`), `web/src/ui/rules.ts` |
+| Infra and tests | `deploy/livekit/*`, `e2e/voice.mjs`, `e2e/push.mjs` |
+
+**Dependencies between tracks, all one-way:**
+
+- B2 needs A1 and A2's tables (`crews`, `crew_sessions`, `outbox`). A1 and A2 land while B works on voice, so B should not block. If A slips, B swaps B2 and B3.
+- A's crew-removal path calls `voice.Remove` from B1 through a small interface; the no-op default lets A merge first.
+- Crew home's push card is a slot in A's page, filled by B's lazy `web/src/push/Card.tsx`.
+
+**Overlap left after T0:** `web/src/crew/*` imports B's card through that one slot, and `DELETE /v1/me` (A) relies on FK cascade for B's tables. There is no shared file edit.
+
+## 10. Coolify on a single VPS
+
+Deployment itself is out of scope. Each new piece needs:
+
+| Service | Needs |
+|---|---|
+| **LiveKit** | Image pinned to v1.13.11. Domain `lk.<domain>` through Traefik to the signal port, for `wss`. **Direct host ports** outside the proxy: TCP 7881 and UDP 7882 (UDP mux instead of a 10k range), opened in the VPS firewall. Coolify says direct mappings require **disabling rolling updates** for that application **[V]**. `rtc.use_external_ip` or `node_ip`. `LIVEKIT_KEYS` as a Coolify secret. No volume. Own Redis is not needed on one node; do not share ours. Host networking is LiveKit's "optimal" setup **[V]** and is an alternative. Sizing: start at 1 vCPU and 512 MB and measure **[U]**. |
+| **TURN/TLS (optional)** | Needs 443, which Traefik holds **[V]**, a separate domain and cert, and a Traefik TCP SNI passthrough. v1 skips it; see section 12. |
+| **`s2g notifier`** | Same image, command `s2g notifier`. No public port. Reaches Postgres and Temporal, plus outbound 443 to push services. Secrets `VAPID_PRIVATE_KEY`, `VAPID_PUBLIC_KEY`, `VAPID_SUBJECT`. Health on **18090**. One replica. |
+| **`s2g serve`** | New env: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `VAPID_PUBLIC_KEY`. |
+| **`s2g worker`** | No new requirements. |
+
+Secrets stay in gitignored `server/.env.local` locally. New local ports, none in use on 2026-11-05 **[V]**: LiveKit 17880, 17881, 17882/udp; notifier health 18090.
+
+## 11. Unverified
+
+| Item | How to close it | Blocks |
+|---|---|---|
+| Echo cancellation against cross-origin iframe audio on speakers | Two laptops, real rooms | Voice default advice |
+| iOS: mic use changing audio routing or dropping iframe volume; AirPods switching to HFP | Real-device pass | Voice exit |
+| iOS: YouTube iframe `setVolume` ignored as expected | Real device | Ducking copy |
+| `RemoveParticipant` via hand-written Twirp | Compose integration test | B1 |
+| Token refresh past 10 minutes on self-hosted | 15-minute soak | B1 |
+| Voice over real networks, NAT, and how many fail without TURN | Two-network test, then VPS | Owner TURN call |
+| LiveKit VPS sizing | Measure on deploy | Deployment |
+| Are bare video IDs "API data"? | We take the strict reading; legal view if it matters | None |
+| `guest_access=false` read as gating under YouTube's playback rule | Likely fine, since it gates a private room, not YouTube; owner review | Default stays `true` |
+| Guests filling a 50-person crew room and locking members out | Watch usage; reserve slots if seen | None |
+| `time()` during YouTube ads in catch-up; ducking during ads | Test with a real ad | A4 |
+| Goose out-of-order behavior in the pinned version | Read source | T0 |
+| `webpush-go` v1.4.0 (January 2025) re-signs VAPID per send; Apple asks for hourly at most | Read source, otherwise cache the JWT in `notify` | B2 |
+| Vimeo `setPlaybackRate` by plan; `speed` default conflicts between docs; eligible account | Test on a real embed | Vimeo sync target |
+| Twitch `parent=127.0.0.1`, pre-roll ad detection, seek-only drift | Local test | B3 |
+| Live HLS | Not in v1 | None |
+| Competitor absence claims; Danmaku details | Hands-on trial before any marketing claim | None |
+| Safari and physical phones in general: still untested per `measurements.md` | Real-device pass | Voice, push exits |
+
+## 12. Owner decisions
+
+Each has a default, so no track blocks on them unless marked.
+
+| # | Decision | Default in this spec |
+|---|---|---|
+| 1 | **Ducking on YouTube.** Documented `setVolume`, but the policy bars modifying audio and ducking would also apply to ads **[U]** | Toggle exists, off for YouTube, on elsewhere |
+| 2 | **TURN/TLS on 443:** extra domain and Traefik passthrough, or accept failed voice on strict networks | Skip in v1 |
+| 3 | **Privacy policy page.** YouTube and Vimeo both require one, and crews now store chat and reactions. **Blocks public launch of crews and Vimeo** | Owner supplies text |
+| 4 | **Direct media abuse stance** (`plan.md` decision 6): open URLs let anyone stream anything via our UI, though we do not proxy | Stays off |
+| 5 | **Dailymotion:** pay for Edge or drop | Deferred |
+| 6 | **Twitch:** production domain for `parent`; accept that phones under 400 px wide must rotate; URL-only titles in v1 | Yes to both, after the domain is set |
+| 7 | **Vimeo account** for the Addendum, and note 3.5 bars charging users without written authorization. Twitch and YouTube limit charging too, so any future fees need review | Owner creates account |
+| 8 | **Guests talking in voice** | Allowed |
+| 9 | **Public recap sharing** | Available, off per recap |
+| 10 | **Retention for crew chat and moments** | Kept until crew deletion, or until the video leaves `media` |
+| 11 | **Production Clerk keys.** Local keys exist **[V]**; crews need them in every environment | Required at deployment |
+| 12 | **Email provider** | None; web push only |
+
+## 13. Sources
+
+Fetched 2026-11-05:
+
+- **YouTube:** [Developer Policies](https://developers.google.com/youtube/terms/developer-policies), [Required Minimum Functionality](https://developers.google.com/youtube/terms/required-minimum-functionality)
+- **LiveKit:** [docs](https://docs.livekit.io), [releases](https://github.com/livekit/livekit/releases)
+- **Coolify:** [docs](https://coolify.io/docs)
+- **Twitch:** [embed docs](https://dev.twitch.tv/docs/embed/), [Developer Agreement](https://legal.twitch.com/legal/developer-agreement/)
+- **Vimeo:** [oEmbed](https://developer.vimeo.com/api/oembed/videos), [Player SDK](https://developer.vimeo.com/player/sdk/reference), [Developer Addendum](https://developer.vimeo.com/guidelines/terms) (updated 2026-03-09)
+- **Dailymotion:** [Player Library Script](https://developers.dailymotion.com/docs/player-library-script), [Web SDK methods](https://developers.dailymotion.com/reference/web-sdk-player-methods), FAQ (2026-10-22)
+- **Apple:** Sending web push notifications in web apps and browsers; Declarative Web Push
+- **Competitors:** w2g.tv, kosmi.io, teleparty.com, rave.io public pages, and AniDachi

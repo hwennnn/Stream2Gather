@@ -3,7 +3,7 @@ import type { RoomSession, RoomView } from '../room/session';
 import { Icon } from './Icon';
 import { firstName } from './people';
 
-const EMOJI = ['😂', '❤️', '🔥', '😮', '👏', '😭'];
+export const EMOJI = ['😂', '❤️', '🔥', '😮', '👏', '😭'];
 
 const SPARKS = [-1, -0.4, 0.4, 1];
 

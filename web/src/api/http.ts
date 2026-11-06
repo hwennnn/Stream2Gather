@@ -57,6 +57,8 @@ export type ChatMessage = {
   createdAt: string;
   /** The sender's name for this line, the same on every retry. Old lines have none. */
   clientId?: string;
+  /** From a session this reader wasn't at, so it could spoil it. */
+  missed?: boolean;
 };
 
 export class ApiError extends Error {

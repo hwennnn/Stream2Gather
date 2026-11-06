@@ -118,7 +118,7 @@ flow('dock: Popular and Up next share one geometry, and watching never swaps the
   t.eq('and Popular does not come back', await popular.count(), 0);
 });
 
-flow('links: a catch-up link lands somewhere until that page exists, and a dead recap link says so', async (t) => {
+flow('links: a stranger with a catch-up link reaches the gate, and a dead recap link says so', async (t) => {
   const a = await t.person('Ana');
   const room = await startRoom(t, a, { url: golden.url });
   const b = await t.person('Ben');

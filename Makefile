@@ -1,4 +1,4 @@
-.PHONY: up down voice voice-keys web serve worker notifier temporal test sample e2e e2e-voice
+.PHONY: up down voice voice-keys web serve worker notifier temporal test sample e2e e2e-voice flows
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
@@ -50,3 +50,7 @@ e2e:
 
 e2e-voice:
 	E2E_SCRIPT=voice.mjs ./e2e/run.sh
+
+# Every user flow against a real server, Postgres and Redis. GREP narrows it.
+flows:
+	cd e2e && npm ci --silent && node flows.mjs $(if $(GREP),--grep '$(GREP)')

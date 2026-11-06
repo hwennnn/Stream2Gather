@@ -24,6 +24,31 @@ func TestDevicesStopAtTheLimit(t *testing.T) {
 	}
 }
 
+// Taking over a browser saved long ago mustn't lose it to the limit, which goes by age.
+func TestTakingOverAnOldBrowserKeepsIt(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	_, first := testCrew(t, db)
+	_, second := testCrew(t, db)
+	endpoint := testEndpoint()
+	if _, err := db.SavePushSubscription(ctx, first, endpoint, "p256dh", "auth", ""); err != nil {
+		t.Fatal(err)
+	}
+	for range maxDevices {
+		if _, err := db.SavePushSubscription(ctx, second, testEndpoint(), "p256dh", "auth", ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	id, err := db.SavePushSubscription(ctx, second, endpoint, "p256dh", "auth", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := db.DeletePushSubscription(ctx, second, id); err != nil {
+		t.Fatalf("saved %s, but it isn't there: %v", id, err)
+	}
+}
+
 func TestASecondAccountOnOneBrowserTakesItOver(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
 	_, first := testCrew(t, db)

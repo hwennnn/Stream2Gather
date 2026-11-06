@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"stream2gather/internal/notify/webpush"
@@ -13,6 +14,8 @@ const (
 	// A browser subscribes once, so this only stops a runaway client.
 	pushSavesPerMinute = 10
 	maxUserAgent       = 200
+	// Real ones are a few hundred characters. Much past this, the unique index refuses.
+	maxEndpoint = 2000
 )
 
 // pushRoutes adds the web push routes. serve only writes these rows: the notifier
@@ -39,7 +42,7 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	subscription := webpush.Subscription{Endpoint: request.Endpoint, P256dh: request.Keys.P256dh, Auth: request.Keys.Auth}
-	if !webpush.Allowed(subscription.Endpoint, !s.Secure) || !subscription.Valid() {
+	if len(subscription.Endpoint) > maxEndpoint || !webpush.Allowed(subscription.Endpoint, !s.Secure) || !subscription.Valid() {
 		writeProblem(w, http.StatusBadRequest, "invalid", "This browser's push details can't be used.")
 		return
 	}
@@ -56,6 +59,7 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 	if len(userAgent) > maxUserAgent {
 		userAgent = userAgent[:maxUserAgent]
 	}
+	userAgent = strings.ToValidUTF8(userAgent, "") // Postgres refuses half a character.
 	id, err := s.DB.SavePushSubscription(r.Context(), claims.Subject, subscription.Endpoint, subscription.P256dh, subscription.Auth, userAgent)
 	if err != nil {
 		s.internal(w, err)

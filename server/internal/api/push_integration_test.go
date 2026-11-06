@@ -95,6 +95,35 @@ func TestSigningOutStopsEveryDevicesPings(t *testing.T) {
 	}
 }
 
+func TestALongUserAgentIsCutOnACharacter(t *testing.T) {
+	s, _ := stackServer(t)
+	_, hana := signUp(t, s, "Hana")
+	key, auth := browserKeys(t)
+	browser := func(r *http.Request) {
+		hana(r)
+		r.Header.Set("User-Agent", "x"+strings.Repeat("界", maxUserAgent))
+	}
+	response, _ := serve(s, http.MethodPost, "/v1/push/subscriptions", subscribeBody(pushEndpoint(), key, auth), browser)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("subscribe: %d %s", response.Code, response.Body)
+	}
+}
+
+// Past what its unique index can hold, Postgres answers with an error, not a row.
+func TestAnEndpointTooLongToStoreIsRefused(t *testing.T) {
+	s, _ := stackServer(t)
+	_, hana := signUp(t, s, "Hana")
+	key, auth := browserKeys(t)
+	endpoint := pushEndpoint()
+	for len(endpoint) < 8000 {
+		endpoint += ids.New()
+	}
+	response, _ := serve(s, http.MethodPost, "/v1/push/subscriptions", subscribeBody(endpoint, key, auth), hana)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status %d: %s", response.Code, response.Body)
+	}
+}
+
 func TestOnlyAPushServiceAndRealKeysAreStored(t *testing.T) {
 	s, _ := stackServer(t)
 	s.Secure = true

@@ -49,10 +49,11 @@ type Activities struct {
 }
 
 // PlanSession reads who to ping now the timer is up. A session that ended, or a
-// crew that closed, has nobody.
+// crew that closed, has nobody. Nor does a false start: the sweeper gives a session
+// five minutes, so inside the timer the only sign of one is that everyone has gone.
 func (a *Activities) PlanSession(ctx context.Context, sessionID string) (Plan, error) {
 	notice, err := a.Store.SessionNotice(ctx, sessionID)
-	if errors.Is(err, store.ErrNotFound) || (err == nil && !notice.Open) {
+	if errors.Is(err, store.ErrNotFound) || (err == nil && (!notice.Open || !notice.Attended)) {
 		return Plan{}, nil
 	}
 	if err != nil {

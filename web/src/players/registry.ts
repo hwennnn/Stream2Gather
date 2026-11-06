@@ -10,6 +10,10 @@ type Factory = (element: HTMLElement, media: Playable, startAt: number, autoplay
 /** A source that needs its own SDK loads it from here with import(), to keep it out of this chunk. */
 const FACTORIES: Record<string, Factory> = {
   youtube: (element, media, startAt, autoplay) => createYouTubePlayer(element, media.sourceId, startAt, autoplay),
+  twitch: async (element, media, startAt, autoplay) => {
+    const { createTwitchPlayer } = await import('./twitch');
+    return createTwitchPlayer(element, media.sourceId, media.url, startAt, autoplay);
+  },
   vimeo: async (element, media, startAt, autoplay) => {
     const { createVimeoPlayer } = await import('./vimeo');
     return createVimeoPlayer(element, media.sourceId, startAt, autoplay);

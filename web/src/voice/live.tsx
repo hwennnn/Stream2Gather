@@ -63,9 +63,9 @@ const SwitchRow = ({ label, note, on, onChange }: RowProps) => (
       aria-checked={on}
       aria-label={label}
       onClick={() => onChange(!on)}
-      className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors ${on ? 'bg-accent' : 'bg-white/15'}`}
+      className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors ${on ? 'bg-primary' : 'bg-white/15'}`}
     >
-      <span className={`absolute top-1 left-1 size-5 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-5' : ''}`} />
+      <span className={`absolute top-1 left-1 size-5 rounded-full shadow transition-transform ${on ? 'translate-x-5 bg-on-primary' : 'bg-white'}`} />
     </button>
   </div>
 );

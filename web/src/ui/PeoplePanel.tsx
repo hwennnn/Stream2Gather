@@ -185,7 +185,7 @@ const HostSwitch = ({ session, view, onToast }: Props) => {
         onClick={() => void toggle()}
         className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${on ? 'bg-primary' : 'bg-line'}`}
       >
-        <span className={`absolute top-0.5 left-0.5 size-4 rounded bg-text transition-transform ${on ? 'translate-x-4' : ''}`} />
+        <span className={`absolute top-0.5 left-0.5 size-4 rounded transition-transform ${on ? 'translate-x-4 bg-on-primary' : 'bg-text'}`} />
       </button>
     </div>
   );

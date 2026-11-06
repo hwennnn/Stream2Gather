@@ -91,11 +91,17 @@ func worker(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	defer pool.Close()
+	sink, err := telemetry.NewSink(cfg.ClickHouseHTTP, log)
+	if err != nil {
+		return err
+	}
+	go sink.Run(ctx)
 	db := store.NewPostgres(pool)
 	return workflows.Run(ctx, cfg.TemporalAddr, cfg.TemporalNamespace, log, &workflows.Activities{
 		Rooms:    db,
 		Media:    catalogFor(cfg, db, log),
 		Sessions: db,
+		Metrics:  sink,
 	})
 }
 

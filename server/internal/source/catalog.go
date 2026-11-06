@@ -217,6 +217,28 @@ func (c *Catalog) RefreshStale(ctx context.Context, limit int) (refreshed, delet
 	return refreshed, deleted, nil
 }
 
+// StaleBacklog counts metadata past the refresh age that no run has reached. Above
+// zero, RefreshStale is falling behind and the 30-day limit is getting closer.
+func (c *Catalog) StaleBacklog(ctx context.Context) (int64, error) {
+	var total int64
+	for _, s := range c.sources {
+		if _, ok := s.(Batcher); !ok {
+			continue
+		}
+		count, err := c.db.CountStaleMedia(ctx, s.Name(), mediaMaxAge)
+		if err != nil {
+			return total, err
+		}
+		total += count
+	}
+	return total, nil
+}
+
+// PurgeSearches removes cached results too old for any search to use.
+func (c *Catalog) PurgeSearches(ctx context.Context) (int64, error) {
+	return c.db.PurgeSearches(ctx, searchMaxAge)
+}
+
 // IsUserError reports whether an error's text is safe and useful to show.
 func IsUserError(err error) bool {
 	return errors.Is(err, ErrUnsupportedURL) || errors.Is(err, ErrUnavailable) ||

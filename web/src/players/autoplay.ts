@@ -17,10 +17,12 @@ export const watchAutoplay = (
   stoppedOnPurpose: () => boolean,
   player: PlayerAdapter,
   onMuted: (muted: boolean) => void,
+  onRefused: (refused: boolean) => void = () => {},
 ): (() => void) => {
   let timer = 0;
   let waited = 0;
   let stopped = false;
+  let told = false;
   const startMuted = () => {
     if (stopped || !roomPlaying() || player.muted()) return;
     player.setMuted(true);
@@ -30,14 +32,23 @@ export const watchAutoplay = (
   const look = () => {
     const state = player.state();
     // It was allowed. A pause from here is the viewer's, even before the room hears of it.
-    if (state === 'playing') return;
+    if (state === 'playing') {
+      onRefused(false);
+      return;
+    }
     waited += LOOK_EVERY_MS;
     if (waited >= AUTOPLAY_CHECK_MS) {
       waited = 0;
-      if (!roomPlaying()) return;
-      if (refused(state) && !stoppedOnPurpose()) {
-        startMuted();
-        return;
+      const playing = roomPlaying();
+      if (!playing && !told) return;
+      if (playing && refused(state) && !stoppedOnPurpose()) {
+        // Still as well as muted, so only the viewer can start it.
+        if (player.muted()) {
+          told = true;
+          onRefused(true);
+        } else {
+          startMuted();
+        }
       }
     }
     timer = window.setTimeout(look, LOOK_EVERY_MS);

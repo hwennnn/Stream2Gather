@@ -19,6 +19,14 @@ describe('statusFor', () => {
     expect(line({ view: view({ playback: { status: 'paused', pausedBy: 'Maya' } as RoomView['playback'] }) })).toBe('Paused by Maya at 3:20');
   });
 
+  it('tells a viewer the browser refused to press play themselves', () => {
+    expect(line({ health: 'correcting', refused: true })).toBe('Press play on the video to join in');
+  });
+
+  it('never gives a live channel a position', () => {
+    expect(line({ live: true })).toBe('Live: everyone’s on the same channel');
+  });
+
   it('says you when it was you', () => {
     expect(line({ view: view({ playback: { status: 'paused', pausedBy: 'Ada' } as RoomView['playback'] }) })).toBe('Paused by you at 3:20');
   });

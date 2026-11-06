@@ -22,6 +22,7 @@ type Events = {
   onFailure: (error: PlayerError) => void;
   onReport: (report: SyncReport) => void;
   onMuted: (muted: boolean) => void;
+  onRefused: (refused: boolean) => void;
   onCold: (cold: boolean) => void;
 };
 
@@ -92,6 +93,7 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
     () => sync.stoppedOnPurpose(),
     player,
     events.onMuted,
+    events.onRefused,
   );
 
   const noteCold = () => events.onCold(session.getView().playback.status === 'paused' && notStarted(player.state()));
@@ -102,7 +104,7 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
     events.onMuted(player.muted());
     noteCold();
     const playback = session.getView().playback;
-    if (playback.status === 'playing') {
+    if (playback.status === 'playing' && !item.isLive) {
       const drift = player.time() - expectedPosition(playback, session.clock.now());
       track({ name: 'drift_ms', value: Math.abs(drift) * 1000, source: item.source });
     }
@@ -181,6 +183,8 @@ export type RoomPlayer = {
   ready: boolean;
   failure: PlayerError | null;
   muted: boolean;
+  /** The browser refused to start this player, even muted. */
+  refused: boolean;
   /** The room is paused and this player has not started, so it has no frame or controls yet. */
   cold: boolean;
   unmute: () => void;
@@ -193,6 +197,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   const [readyId, setReadyId] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ id: string; error: PlayerError } | null>(null);
   const [muted, setMuted] = useState(false);
+  const [refused, setRefused] = useState(false);
   const [cold, setCold] = useState(false);
   const player = useRef<PlayerAdapter | null>(null);
 
@@ -203,6 +208,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     if (!stage.current || !current || !currentId) return undefined;
     setReport({ health: 'waiting', drift: 0 });
     setMuted(false);
+    setRefused(false);
     setCold(false);
     return mountPlayer(stage.current, session, current, {
       onPlayer: (next) => {
@@ -212,6 +218,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
       onFailure: (error) => setFailed({ id: currentId, error }),
       onReport: setReport,
       onMuted: setMuted,
+      onRefused: setRefused,
       onCold: setCold,
     });
     // A new queue item is the only thing that replaces the player.
@@ -225,6 +232,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     ready: readyId === currentId,
     failure: failed && failed.id === currentId ? failed.error : null,
     muted,
+    refused,
     cold,
     unmute: () => {
       player.current?.setMuted(false);

@@ -27,6 +27,10 @@ type Input = {
   failed: boolean;
   act: Act | null;
   position: number;
+  /** The browser won't start this player, so only the viewer can. */
+  refused?: boolean;
+  /** A live channel has no position to share. */
+  live?: boolean;
 };
 
 const person = (view: RoomView, name: string, start: boolean): Part => {
@@ -37,7 +41,7 @@ const person = (view: RoomView, name: string, start: boolean): Part => {
 const WAITING = new Set(['buffering', 'correcting', 'stalled']);
 
 /** The one line that says what the room is doing. Names a person whenever one did it. */
-export const statusFor = ({ view, health, failed, act, position }: Input): Status => {
+export const statusFor = ({ view, health, failed, act, position, refused, live }: Input): Status => {
   const time = { fig: formatTime(position) };
   if (act) return { parts: [person(view, act.by, true), ` ${act.text}`, ...(act.fig ? [' ', { fig: act.fig }] : [])], tone: 'plain' };
   if (view.playback.status === 'paused') {
@@ -46,9 +50,11 @@ export const statusFor = ({ view, health, failed, act, position }: Input): Statu
     return { parts: ['Paused by ', person(view, pausedBy, false), ' at ', time], tone: 'plain' };
   }
   if (failed) return { parts: ['The room is at ', time], tone: 'plain' };
+  if (refused) return { parts: ['Press play on the video to join in'], tone: 'warn' };
   const behind = view.members.find(({ userId }) => userId !== view.self?.userId && WAITING.has(view.viewerStates[userId] ?? ''));
   if (health === 'correcting') return { parts: ['You’re catching up'], tone: 'warn' };
   if (behind) return { parts: [person(view, behind.name, true), ' is catching up'], tone: 'plain' };
   if (health !== 'synced') return { parts: ['Loading…'], tone: 'plain' };
+  if (live) return { parts: ['Live: everyone’s on the same channel'], tone: 'plain' };
   return { parts: ['Playing at ', time, view.alone ? '' : ', everyone together'], tone: 'plain' };
 };

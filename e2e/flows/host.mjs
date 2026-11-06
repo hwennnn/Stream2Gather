@@ -21,8 +21,8 @@ flow('host lock: only the host sees the switch, and turning it on reaches everyo
   const { host, guest } = await locked(t);
   await openTab(guest.page, 'People');
   t.eq('the guest has no switch', await ui.hostSwitch(guest.page).count(), 0);
-  await t.see('the guest is told', ui.rail(guest.page).getByText(/host controls playback and the queue/i));
-  await t.see('the chip', guest.page.getByText('Hana’s driving', { exact: true }));
+  await t.see('the guest is told who', ui.rail(guest.page).getByText('Hana’s driving', { exact: true }));
+  await t.see('the chip', guest.page.getByRole('banner').getByText('Hana’s driving', { exact: true }));
   await openTab(guest.page, 'Chat');
   await t.see('the chat says who', ui.chatLog(guest.page).getByText('Hana turned on host controls'));
   await openTab(host.page, 'Chat');

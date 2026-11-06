@@ -9,7 +9,7 @@ describe('landing notes', () => {
   });
 
   it('turns an unsupported link into the short note', () => {
-    expect(failureFor(new ApiError(400, 'bad_url', 'That link is not supported yet.'), 'YouTube')).toEqual({ text: 'That isn’t a YouTube link.', canStartRoom: true });
+    expect(failureFor(new ApiError(422, 'media', 'That link is not supported yet.'), 'YouTube')).toEqual({ text: 'That isn’t a YouTube link.', canStartRoom: true });
   });
 
   it('offers no new room when the limit is what stopped this one', () => {

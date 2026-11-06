@@ -195,3 +195,28 @@ flow('phone: the track sits under the seats, in a row kept for it, and a short p
   await a.page.setViewportSize({ width: 320, height: 568 });
   await t.until('a short phone keeps the height for chat', async () => !(await slot.isVisible()));
 });
+
+flow('phone: a small phone keeps real room for messages, even with a notice up, and the player its minimum', async (t) => {
+  const a = await phone(t, 'Ana', { width: 320, height: 568 });
+  const b = await t.person('Ben');
+  const room = await startRoom(t, a);
+  await addByMessage(t, a.page, [golden.url]);
+  await joinRoom(b, room.url);
+  for (const line of ['오늘 영상 진짜 재밌다 다음에는 뭐 볼까요?', 'a much longer line that has to wrap at least once in a rail this narrow', video('바이, 썸머').url]) await sendChat(b.page, line);
+  const log = ui.chatLog(a.page);
+  const textRoom = () => log.evaluate((el) => {
+    const { paddingTop, paddingBottom } = getComputedStyle(el);
+    return Math.round(el.clientHeight - parseFloat(paddingTop) - parseFloat(paddingBottom));
+  });
+  await t.see('the link', log.getByRole('button', { name: 'Add to queue' }));
+  t.check('five lines of text with nothing else up', (await textRoom()) >= 100, `${await textRoom()}px`);
+  await log.getByRole('button', { name: 'Add to queue' }).last().tap();
+  await t.see('a notice', ui.rail(a.page).locator('[aria-live] p'));
+  t.check('three lines of text with a notice up', (await textRoom()) >= 60, `${await textRoom()}px`);
+  const player = await a.page.locator('[data-player]').evaluate((el) => el.getBoundingClientRect().height);
+  t.check('the player keeps its 200px', player >= 200, `${player}px`);
+  await noSideScroll(t, a.page, 'the small phone');
+  await a.page.getByRole('button', { name: 'Send a reaction' }).filter({ visible: true }).tap();
+  await a.page.getByRole('button', { name: 'React 👏' }).filter({ visible: true }).tap();
+  await t.see('reactions still work, from beside the box', ui.rail(b.page).getByText('👏'));
+});

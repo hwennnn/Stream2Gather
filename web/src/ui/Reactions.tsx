@@ -76,7 +76,7 @@ export const ReactionPicker = ({ session, disabled }: { session: RoomSession; di
   }, [open]);
 
   return (
-    <div ref={root} className="shrink-0 phone:hidden xl:hidden land:block">
+    <div ref={root} className="shrink-0 phone:hidden xl:hidden land:block short:block">
       {open && (
         <div className="enter float absolute inset-x-3 bottom-full z-30 mb-1 flex justify-between p-1">
           {EMOJI.map((emoji) => (

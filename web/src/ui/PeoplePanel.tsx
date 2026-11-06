@@ -2,7 +2,7 @@ import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
 import { account } from '../auth/account';
 import type { RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
-import { isHost, isLocked, isOffline, rosterFor } from './rules';
+import { drivingLine, isHost, isLocked, isOffline, rosterFor } from './rules';
 import { Slot } from './Slot';
 import { toastError } from './Toasts';
 
@@ -84,7 +84,7 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
       ) : (
         isLocked(view) && (
           <p className="rail-edge border-t border-line py-3 text-[13px] text-muted">
-            The host controls playback and the queue.
+            {drivingLine(view)}
           </p>
         )
       )}

@@ -30,6 +30,9 @@ type Reaction = { id: number; emoji: string; name: string };
 
 type Notice = { id: number; text: string; url?: string };
 
+/** Someone replaced the current video, and the room can still go back. */
+type Jump = { id: string; by: string; title: string };
+
 export type RoomView = {
   connection: 'connecting' | 'live' | 'reconnecting' | 'failed';
   failure: string | null;
@@ -49,6 +52,7 @@ export type RoomView = {
   reactions: Reaction[];
   notices: Notice[];
   lastAction: { by: string; cause: string } | null;
+  jump: Jump | null;
 };
 
 export type StateMessage = {
@@ -79,11 +83,13 @@ const initialView: RoomView = {
   reactions: [],
   notices: [],
   lastAction: null,
+  jump: null,
 };
 
 const MAX_BACKOFF_MS = 5000;
 const REACTION_LIFE_MS = 2600;
 const NOTICE_LIFE_MS = 8000;
+const UNDO_LIFE_MS = 5000;
 const MAX_ENTRIES = 300;
 const PING_EVERY_MS = 3000;
 /** Only every third ping samples the clock and compares versions, so both keep their pace. */
@@ -155,6 +161,7 @@ export class RoomSession {
   private behindAt: number | null = null;
   private resyncAt: number | null = null;
   private historyLoaded = false;
+  private jumpTimer: number | null = null;
   private narrator = new Narrator({
     say: (text) => this.say(text),
     rewrite: (lineId, text) => this.rewrite(lineId, text),
@@ -490,8 +497,22 @@ export class RoomSession {
       lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
       viewerStates: itemChanged ? {} : previous.viewerStates,
     });
+    if (itemChanged) this.noteJump(message);
     if (!snapshot) this.narrator.stateChanged(message, previous);
     this.playbackListener(message.playback, snapshot);
+  }
+
+  /** Any video change ends the offer, and only a jump starts a new one. */
+  private noteJump({ by, cause, queue }: StateMessage): void {
+    if (this.jumpTimer !== null) clearTimeout(this.jumpTimer);
+    const item = queue?.[0];
+    const jump = cause === 'queue.play' && by && item ? { id: item.id, by, title: item.title } : null;
+    this.update({ jump });
+    if (jump) this.jumpTimer = window.setTimeout(() => this.update({ jump: null }), UNDO_LIFE_MS);
+  }
+
+  undoJump(target: string): Promise<void> {
+    return this.request('queue.undo', { target });
   }
 
   private rewrite(lineId: string, text: string): boolean {

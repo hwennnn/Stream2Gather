@@ -47,7 +47,10 @@ export class Narrator {
       return;
     }
     const current = message.queue?.[0];
-    if (current && playback.item !== previous.playback.item) this.lines.say(`Up next: ${current.title}`);
+    if (!current || playback.item === previous.playback.item) return;
+    if (by && cause === 'queue.play') this.lines.say(`${by} jumped to ${current.title}`);
+    else if (by && cause === 'queue.undo') this.lines.say(`${by} went back to ${current.title}`);
+    else this.lines.say(`Up next: ${current.title}`);
   }
 
   /** Only the host's own toggle has an author. The server announces its own handovers. */

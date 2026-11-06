@@ -11,7 +11,7 @@ import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerSta
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
 import { canControl } from '../ui/rules';
-import { ToastStack, useToasts } from '../ui/Toasts';
+import { JumpToast, ToastStack, useToasts } from '../ui/Toasts';
 import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
 import { useMediaQuery } from '../ui/useMediaQuery';
 import { useOfflineNotice } from '../ui/useOfflineNotice';
@@ -278,7 +278,9 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
   };
 
   const toastStack = (where: string, limit?: number) => (
-    <ToastStack toasts={toasts} notices={view.notices} limit={limit} className={where} />
+    <ToastStack toasts={toasts} notices={view.notices} limit={limit} className={where}>
+      <JumpToast session={session} view={view} onToast={toast} />
+    </ToastStack>
   );
 
   return (

@@ -899,6 +899,57 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('jumps', () => {
+    const queued = async () => {
+      const { session, socket } = await connected();
+      const base = playingWelcome('a');
+      const queue = [item('a'), item('b'), item('c')];
+      socket.deliver('welcome', { ...base, state: { ...base.state, queue } });
+      await vi.advanceTimersByTimeAsync(0);
+      const moved = { version: 2, playback: { ...idle, item: 'c' }, queue: [item('c'), item('b')], cause: 'queue.play', by: 'Asha' };
+      return { session, socket, moved };
+    };
+
+    it('offers an undo for five seconds', async () => {
+      const { session, socket, moved } = await queued();
+      socket.deliver('state', moved);
+      expect(session.getView().jump).toEqual({ id: 'c', by: 'Asha', title: 'Video c' });
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(session.getView().jump).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(200);
+      expect(session.getView().jump).toBeNull();
+    });
+
+    it('asks the server to put it back', async () => {
+      const { session, socket, moved } = await queued();
+      socket.deliver('state', moved);
+      const undone = session.undoJump('c');
+      expect(socket.ofType('queue.undo').at(-1)?.d).toEqual({ target: 'c' });
+      socket.ack();
+      await expect(undone).resolves.toBeUndefined();
+    });
+
+    it('withdraws the offer when the video changes again', async () => {
+      const { session, socket, moved } = await queued();
+      socket.deliver('state', moved);
+      socket.deliver('state', { version: 3, playback: { ...idle, item: 'b' }, queue: [item('b')], cause: 'skip', by: 'Pia' });
+      expect(session.getView().jump).toBeNull();
+    });
+
+    it('offers nothing for a video that simply came up next', async () => {
+      const { session, socket } = await queued();
+      socket.deliver('state', { version: 2, playback: { ...idle, item: 'b' }, queue: [item('b'), item('c')], cause: 'ended' });
+      expect(session.getView().jump).toBeNull();
+    });
+
+    it('says what happened in the chat', async () => {
+      const { session, socket, moved } = await queued();
+      socket.deliver('state', moved);
+      socket.deliver('state', { version: 3, playback: { ...idle, item: 'a' }, queue: [item('a')], cause: 'queue.undo', by: 'Pia' });
+      expect(lines(session)).toEqual(['Asha jumped to Video c', 'Pia went back to Video a']);
+    });
+  });
+
   describe('viewer health', () => {
     it('starts over when the video changes', async () => {
       const { session, socket } = await connected();

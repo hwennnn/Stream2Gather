@@ -18,7 +18,11 @@ import (
 func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews", s.createCrew)
 	mux.HandleFunc("GET /v1/crews/{slug}", s.crewHome)
+	mux.HandleFunc("PATCH /v1/crews/{slug}", s.updateCrew)
+	mux.HandleFunc("DELETE /v1/crews/{slug}", s.closeCrew)
 	mux.HandleFunc("POST /v1/crews/{slug}/join", s.joinCrew)
+	mux.HandleFunc("POST /v1/crews/{slug}/invite", s.rotateInvite)
+	mux.HandleFunc("PATCH /v1/crews/{slug}/me", s.setCrewNotify)
 	mux.HandleFunc("POST /v1/rooms/{slug}/crew", s.promoteRoom)
 }
 
@@ -115,6 +119,8 @@ func (s *Server) crewFailed(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusForbidden, "invalid_invite", "This invite link has expired. Ask for a new one.")
 	case errors.Is(err, store.ErrRoomClosed):
 		writeProblem(w, http.StatusGone, "room_closed", "This room has closed.")
+	case errors.Is(err, store.ErrNotMember):
+		writeProblem(w, http.StatusConflict, "not_member", "That person isn't on this crew.")
 	default:
 		s.internal(w, err)
 	}
@@ -161,6 +167,107 @@ func (s *Server) createCrew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"slug": record.Slug, "name": name, "inviteToken": crew.InviteToken})
+}
+
+// ownedCrew is findCrew for routes only the owner may use.
+func (s *Server) ownedCrew(w http.ResponseWriter, r *http.Request) (store.Crew, bool) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return store.Crew{}, false
+	}
+	_, crew, ok := s.findCrew(w, r)
+	if !ok {
+		return store.Crew{}, false
+	}
+	if crew.OwnerID != claims.Subject {
+		writeProblem(w, http.StatusForbidden, "forbidden", "Only the crew's owner can do that.")
+		return store.Crew{}, false
+	}
+	return crew, true
+}
+
+func (s *Server) updateCrew(w http.ResponseWriter, r *http.Request) {
+	crew, ok := s.ownedCrew(w, r)
+	if !ok {
+		return
+	}
+	var request struct {
+		Name        *string `json:"name"`
+		GuestAccess *bool   `json:"guestAccess"`
+		OwnerID     *string `json:"ownerId"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	if request.Name != nil {
+		name, valid := room.CleanName(*request.Name)
+		if !valid {
+			writeProblem(w, http.StatusBadRequest, "invalid", "Crew names can be up to 32 characters.")
+			return
+		}
+		request.Name = &name
+	}
+	change := store.CrewChange{Name: request.Name, GuestAccess: request.GuestAccess, OwnerID: request.OwnerID}
+	if err := s.DB.UpdateCrew(r.Context(), crew, change); err != nil {
+		s.crewFailed(w, err)
+		return
+	}
+	s.publishCrew(r.Context(), crew.RoomID, "settings")
+	writeJSON(w, http.StatusOK, map[string]bool{"saved": true})
+}
+
+// closeCrew ends the room for good. Anyone still in it finds out from their next
+// fetch, which says the room has closed.
+func (s *Server) closeCrew(w http.ResponseWriter, r *http.Request) {
+	crew, ok := s.ownedCrew(w, r)
+	if !ok {
+		return
+	}
+	if err := s.DB.CloseCrew(r.Context(), crew); err != nil {
+		s.internal(w, err)
+		return
+	}
+	s.publishCrew(r.Context(), crew.RoomID, "settings")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) rotateInvite(w http.ResponseWriter, r *http.Request) {
+	crew, ok := s.ownedCrew(w, r)
+	if !ok {
+		return
+	}
+	token := ids.New()
+	if err := s.DB.RotateInvite(r.Context(), crew.ID, token); err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"inviteToken": token})
+}
+
+func (s *Server) setCrewNotify(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	var request struct {
+		Notify string `json:"notify"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	if request.Notify != "all" && request.Notify != "off" {
+		writeProblem(w, http.StatusBadRequest, "invalid", "That setting isn't available.")
+		return
+	}
+	_, crew, ok := s.findCrew(w, r)
+	if !ok {
+		return
+	}
+	if err := s.DB.SetCrewNotify(r.Context(), crew.ID, claims.Subject, request.Notify); err != nil {
+		s.crewFailed(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"notify": request.Notify})
 }
 
 // promoteRoom is "Keep this room": the link and everyone's connection stay put.

@@ -23,6 +23,7 @@ var (
 	ErrCrewFull      = errors.New("crew is full")
 	ErrInvalidInvite = errors.New("invalid invite")
 	ErrRoomClosed    = errors.New("room closed")
+	ErrNotMember     = errors.New("not on the crew")
 )
 
 // Crew is a group's permanent home. Its room holds the name and the owner.
@@ -195,6 +196,85 @@ func (p *Postgres) JoinCrew(ctx context.Context, crewID, userID, token string) e
 		return ErrCrewFull
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO crew_members (crew_id, user_id) VALUES ($1, $2)`, crewID, userID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// CrewChange is what an owner can change, with nil for what stays as it is.
+type CrewChange struct {
+	Name        *string
+	GuestAccess *bool
+	OwnerID     *string
+}
+
+// UpdateCrew applies a whole change or none of it. A new owner has to be on the
+// roster and have a crew to spare.
+func (p *Postgres) UpdateCrew(ctx context.Context, crew Crew, change CrewChange) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if change.OwnerID != nil && *change.OwnerID != crew.OwnerID {
+		var member bool
+		err := tx.QueryRow(ctx, `
+			SELECT EXISTS (SELECT 1 FROM crew_members WHERE crew_id = $1 AND user_id = $2)`, crew.ID, *change.OwnerID,
+		).Scan(&member)
+		if err != nil {
+			return err
+		}
+		if !member {
+			return ErrNotMember
+		}
+		if err := reserveCrew(ctx, tx, *change.OwnerID); err != nil {
+			return err
+		}
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE rooms SET name = coalesce($2, name), owner_id = coalesce($3, owner_id) WHERE id = $1`,
+		crew.RoomID, change.Name, change.OwnerID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `UPDATE crews SET guest_access = coalesce($2, guest_access) WHERE id = $1`, crew.ID, change.GuestAccess)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// RotateInvite retires the current link.
+func (p *Postgres) RotateInvite(ctx context.Context, crewID, token string) error {
+	_, err := p.pool.Exec(ctx, `UPDATE crews SET invite_token = $2 WHERE id = $1`, crewID, token)
+	return err
+}
+
+// SetCrewNotify records whether this member wants pings from this crew.
+func (p *Postgres) SetCrewNotify(ctx context.Context, crewID, userID, notify string) error {
+	tag, err := p.pool.Exec(ctx, `UPDATE crew_members SET notify = $3 WHERE crew_id = $1 AND user_id = $2`, crewID, userID, notify)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotMember
+	}
+	return err
+}
+
+// CloseCrew ends the room and everything the crew kept. Its address stays taken,
+// so an old link says the room closed rather than finding someone else's.
+func (p *Postgres) CloseCrew(ctx context.Context, crew Crew) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	_, err = tx.Exec(ctx, `UPDATE rooms SET closed_at = now(), snapshot = NULL WHERE id = $1`, crew.RoomID)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM messages WHERE room_id = $1`, crew.RoomID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM crews WHERE id = $1`, crew.ID); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)

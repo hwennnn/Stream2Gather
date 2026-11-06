@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/http';
 import { account, useAccount } from '../auth/account';
 import type { RoomSession, RoomView } from '../room/session';
+import { LeaveLink } from '../ui/LeaveLink';
 import { isHost, onCrew } from '../ui/rules';
 import { crewApi, WANTS_JOIN } from './api';
 
@@ -9,6 +10,12 @@ import { crewApi, WANTS_JOIN } from './api';
 const WANTS_KEEP = 's2g:keep-room';
 
 const tokenInUrl = () => new URLSearchParams(window.location.search).get('join');
+
+/** The home is this same address, and a link there would keep the entry that says we're in the room. */
+const goHome = (url: string) => {
+  window.history.replaceState(null, '', url);
+  window.location.reload();
+};
 
 /** The room header's crew action: keep a temporary room, join one, or go to its home. */
 export default function KeepRoom({ session, view }: { session: RoomSession; view: RoomView }) {
@@ -93,9 +100,9 @@ export default function KeepRoom({ session, view }: { session: RoomSession; view
 
   if (crew && member) {
     return (
-      <a href={`/r/${slug}`} className="btn btn-ghost btn-sm phone:hidden land:hidden">
+      <LeaveLink session={session} to={`/r/${slug}`} go={goHome} className="btn btn-ghost btn-sm phone:hidden land:hidden">
         Crew home
-      </a>
+      </LeaveLink>
     );
   }
 

@@ -99,7 +99,8 @@ check('a link joins the watchlist', await visible(hana.page.getByRole('button', 
 await enter(hana);
 await hana.page.getByRole('region', { name: 'Your watchlist' }).getByRole('button', { name: /Queue sample|Play now: sample/ }).first().click();
 check('the watchlist plays through the queue', await visible(hana.page.locator('video')));
-await hana.page.goto(`${hana.page.url().split('?')[0]}`);
+await hana.page.getByRole('link', { name: 'Crew home' }).click();
+check('crew home leaves the room', await visible(hana.page.getByRole('switch', { name: 'Guests can enter the room' })));
 
 // Members only: the owner shuts the door, and a guest can't get in.
 await button(hana, 'Guests can enter the room').or(hana.page.getByRole('switch', { name: 'Guests can enter the room' })).first().click();
@@ -155,7 +156,7 @@ check('a member’s Invite carries the join link', kept.includes('?join='), kept
 await host.page.setViewportSize({ width: 390, height: 844 });
 await sleep(300);
 await host.page.screenshot({ path: `${OUT}/crew-room-phone.png` });
-await friend.page.goto(roomUrl.split('?')[0]);
+await friend.page.getByRole('link', { name: 'Crew home' }).click();
 await friend.page.setViewportSize({ width: 390, height: 844 });
 await button(friend, /Join the room/).waitFor();
 await friend.page.screenshot({ path: `${OUT}/crew-home-phone.png`, fullPage: true });

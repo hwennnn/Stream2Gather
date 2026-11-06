@@ -16,6 +16,7 @@ const fakeSession = () => {
   const listeners = new Set<Crew>();
   const session = {
     slug: 'movie-night',
+    leave: () => Promise.resolve(),
     onCrew: (listener: Crew) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -100,6 +101,18 @@ describe('KeepRoom', () => {
     expect(signIn).toHaveBeenCalled();
     expect(sessionStorage.getItem(WANTS_JOIN)).toBe('movie-night');
     expect(window.location.search).toBe('?join=tok');
+  });
+
+  it('leaves the room on the way home, so the same address opens the home and not the room again', async () => {
+    signedIn();
+    roomIs({ memberCount: 2, isMember: true, guestAccess: true });
+    const { session } = fakeSession();
+    const leave = vi.spyOn(session, 'leave');
+    window.history.replaceState({ joined: true }, '');
+    render(<KeepRoom session={session} view={viewAs('member', true)} />);
+    fireEvent.click(await screen.findByRole('link', { name: 'Crew home' }));
+    await waitFor(() => expect(window.history.state).toBeNull());
+    expect(leave).toHaveBeenCalledOnce();
   });
 
   it('shows members the way home, and hides everything without any way to sign in', async () => {

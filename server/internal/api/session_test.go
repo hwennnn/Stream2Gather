@@ -292,10 +292,10 @@ func TestSignedInCookieForAMissingUserIsRefused(t *testing.T) {
 }
 
 func TestContentPolicyOnlyAllowsClerkWhenConfigured(t *testing.T) {
-	if strings.Contains(contentPolicy("", "", false), "clerk") {
+	if strings.Contains(contentPolicy(policy{}), "clerk") {
 		t.Fatal("clerk allowed without keys")
 	}
-	policy := contentPolicy("x.clerk.accounts.dev", "", false)
+	policy := contentPolicy(policy{ClerkHost: "x.clerk.accounts.dev"})
 	for _, want := range []string{"script-src 'self' https://www.youtube.com https://s.ytimg.com https://x.clerk.accounts.dev", "https://img.clerk.com"} {
 		if !strings.Contains(policy, want) {
 			t.Errorf("policy missing %q: %s", want, policy)

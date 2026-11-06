@@ -136,6 +136,8 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 			PublicOrigin: cfg.PublicOrigin, WebDir: cfg.WebDir, Secure: cfg.Env != "dev",
 			DirectMedia: cfg.AllowDirectMedia, TrustedProxy: cfg.TrustedProxy,
 			Clerk: clerkVerifier(cfg), ClerkPublishableKey: cfg.ClerkPublishable,
+			Voice: cfg.LiveKit, VAPIDPublicKey: cfg.VAPID.PublicKey,
+			Vimeo: cfg.EnableVimeo, Twitch: cfg.EnableTwitch, TwitchParent: cfg.TwitchParent,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

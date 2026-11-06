@@ -62,6 +62,8 @@ flow('track: one dot each, a friend behind sits behind, and the player does not 
   const lefts = () => dots.evaluateAll((list) => list.map((dot) => dot.getBoundingClientRect().left).sort((x, y) => x - y));
   const together = await lefts();
   t.check('together, side by side', together[1] - together[0] < 24, together.join());
+  // Ben's own first reports would replace the one sent here, so they go first.
+  await t.until('Ben is on the room\'s time', async () => (await b.sample())?.health === 'synced', 8000);
   await b.page.evaluate(() => window.__net.send('status', { state: 'correcting', drift: -12 }));
   await t.until('Ben falls behind on the track', async () => {
     const [behind = 0, here = 0] = await lefts();

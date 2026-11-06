@@ -208,7 +208,7 @@ flow('theatre: T hides the rail, keeps a draft and brings it back', async (t) =>
   await a.page.keyboard.press('t');
   await t.gone('the rail', ui.rail(a.page));
   await react(b.page, '🔥');
-  await t.see('a reaction shows in the bar', ui.bar(a.page).getByText('🔥'));
+  await t.see('a reaction shows in the bar', ui.bar(a.page).locator('[aria-hidden=true]').getByText('🔥'));
   await a.page.keyboard.press('t');
   await t.see('the rail', ui.rail(a.page));
   t.eq('the draft survives', await ui.chatBox(a.page).inputValue(), 'half a thought');

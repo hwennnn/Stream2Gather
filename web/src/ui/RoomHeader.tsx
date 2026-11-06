@@ -42,7 +42,7 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
     </LeaveLink>
     <h1 className="min-w-0 truncate text-[15px] font-semibold phone:flex-1 land:sr-only">{view.name}</h1>
     {isLocked(view) && <DrivingChip view={view} className="phone:hidden" />}
-    <div className="hidden min-w-0 phone:order-last phone:block phone:w-full phone:px-3 phone:pb-1 land:order-none land:block land:w-auto land:p-0">
+    <div className="room-header-seats hidden min-w-0 phone:order-last phone:block phone:w-full phone:px-3 phone:pb-1 land:order-none land:block land:w-auto land:p-0">
       <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} compact />
       <div className="seat-track-slot">{view.queue[0] && <SeatTrack view={view} />}</div>
     </div>

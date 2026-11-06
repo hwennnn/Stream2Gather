@@ -7,7 +7,7 @@ import { Seats, useSeats } from './Seats';
 
 const ada = { userId: 'a', name: 'Ada', role: 'member' };
 const bo = { userId: 'b', name: 'Bo', role: 'member' };
-const view = { self: ada, members: [ada, bo], speaking: ['b'], viewerStates: {}, reactions: [], alone: false } as unknown as RoomView;
+const view = { self: ada, members: [ada, bo], speaking: ['b'], viewerStates: {}, reactions: [], alone: false, playback: { status: 'playing' } } as unknown as RoomView;
 const row = [
   { person: ada, here: true },
   { person: bo, here: true },
@@ -41,6 +41,18 @@ describe('Seats', () => {
     expect(seat?.getAttribute('data-trouble')).toBe('true');
     expect(seat?.textContent).toContain(`, ${words}`);
     expect(seat?.getAttribute('title')).toBe(`Bo, ${words}`);
+  });
+
+  it.each(['buffering', 'correcting', 'stalled'])('puts no ring on someone reporting %s in a paused room', (status) => {
+    render(<Seats view={{ ...view, viewerStates: { b: status }, playback: { status: 'paused' } } as unknown as RoomView} row={row} actor={null} onInvite={() => {}} onPeople={() => {}} />);
+    const seat = screen.getByText('Bo').closest('li');
+    expect(seat?.getAttribute('data-trouble')).toBe('false');
+    expect(seat?.getAttribute('title')).toBe('Bo');
+  });
+
+  it('still says who can’t play in a paused room', () => {
+    render(<Seats view={{ ...view, viewerStates: { b: 'unavailable' }, playback: { status: 'paused' } } as unknown as RoomView} row={row} actor={null} onInvite={() => {}} onPeople={() => {}} />);
+    expect(screen.getByText('Bo').closest('li')?.getAttribute('data-trouble')).toBe('true');
   });
 
   it('still offers Invite when a full row has people standing', () => {

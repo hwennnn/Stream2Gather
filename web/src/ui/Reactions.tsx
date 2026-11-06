@@ -9,7 +9,8 @@ const SPARKS = [-1, -0.4, 0.4, 1];
 
 /**
  * Rises up the right of the rail, in the room chat lines leave for it, so it
- * crosses no one's words. It lives in the rail, so it can't reach the player.
+ * crosses no one's words. It lives in the rail, or in theatre mode the strip kept
+ * clear beside the video, and clips what it holds, so it can't reach the player.
  */
 export const ReactionLane = ({ reactions }: { reactions: RoomView['reactions'] }) => (
   <div className="reaction-lane" aria-hidden="true">

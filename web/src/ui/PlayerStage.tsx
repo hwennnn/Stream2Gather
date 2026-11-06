@@ -48,6 +48,8 @@ type StageProps = {
   railHidden: boolean;
   /** Toasts in theatre mode, when there's no rail to hold them. */
   toastSlot: ReactNode;
+  /** Floating reactions in theatre mode. Beside the screen, never in it. */
+  laneSlot?: ReactNode;
 };
 
 export const PlayerStage = (props: StageProps) => {
@@ -56,16 +58,19 @@ export const PlayerStage = (props: StageProps) => {
 
   return (
     <main className="room-main">
-      <div className={current ? 'stage aspect-video' : 'stage stage-idle'}>
-        <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
-        {!current && <IdleStage session={session} view={view} extra={props.extra} />}
-        {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} onRetry={player.retry} />}
-        {current && !player.failure && !player.ready && <Poster item={current} />}
+      <div className="stage-well">
+        <div className={current ? 'stage aspect-video' : 'stage stage-idle'}>
+          <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
+          {!current && <IdleStage session={session} view={view} extra={props.extra} />}
+          {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} onRetry={player.retry} />}
+          {current && !player.failure && !player.ready && <Poster item={current} />}
+        </div>
+        {props.laneSlot}
       </div>
 
       <div className="front-row" data-idle={!current || undefined}>
         <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} />
-        {current && <ReactionBar session={session} disabled={isOffline(view)} className={railHidden ? 'flex' : 'hidden xl:flex land:hidden'} />}
+        {current && !railHidden && <ReactionBar session={session} disabled={isOffline(view)} className="hidden xl:flex land:hidden" />}
         {current && <SeatTrack view={view} />}
       </div>
 
@@ -252,6 +257,7 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
         </div>
 
         {railHidden && <ReactionTicker reactions={view.reactions} />}
+        {railHidden && <ReactionBar session={session} disabled={isOffline(view)} className="flex" />}
 
         <div className={`flex shrink-0 items-center gap-2 ${stacked ? 'phone:w-full' : ''}`}>
           {isLocked(view) && <DrivingChip view={view} className="hidden phone:inline-flex" />}

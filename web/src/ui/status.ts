@@ -64,9 +64,15 @@ const person = (view: RoomView, name: string, start: boolean): Part => {
 
 const WAITING = new Set(['buffering', 'correcting', 'stalled']);
 
+/** What to say about someone. Nobody is behind a room that isn't moving, so a pause leaves only not being able to play. */
+export const viewerState = (view: RoomView, userId: string): string | undefined => {
+  const state = view.viewerStates[userId];
+  return view.playback.status === 'paused' && state !== 'unavailable' ? undefined : state;
+};
+
 /** The first friend who is behind the room. */
 export const laggingFriend = (view: RoomView) =>
-  view.members.find(({ userId }) => userId !== view.self?.userId && WAITING.has(view.viewerStates[userId] ?? ''));
+  view.members.find(({ userId }) => userId !== view.self?.userId && WAITING.has(viewerState(view, userId) ?? ''));
 
 /** "Everyone together" is a claim about every seat, so one that can't play breaks it too. */
 const together = (view: RoomView): boolean =>

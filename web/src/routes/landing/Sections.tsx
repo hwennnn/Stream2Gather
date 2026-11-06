@@ -91,7 +91,7 @@ export const RoomPicture = ({ media }: { media: Media | null }) => (
         <div className="aspect-video bg-stage">
           <img src={media?.thumbnailUrl ?? '/room-still.svg'} alt="" className="size-full object-cover" />
         </div>
-        <ul className="seats px-3 pt-3">
+        <ul data-picture={true} className="seats px-3 pt-3">
           {CAST.map((person, index) => (
             <li key={person.userId} data-acting={index === 0} style={{ '--hue': hueOf(person.userId) } as React.CSSProperties} className="seat">
               <span className="seat-disc">

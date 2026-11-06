@@ -618,6 +618,18 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('seats', () => {
+    it('remembers who has really gone, until they come back', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', { ...welcome(1), members: [ada, maya] });
+      socket.deliver('vacated', { userId: maya.userId });
+      socket.deliver('members', { members: [ada] });
+      expect(session.getView().vacated).toEqual([maya.userId]);
+      socket.deliver('members', { members: [ada, maya] });
+      expect(session.getView().vacated).toEqual([]);
+    });
+  });
+
   describe('chat history', () => {
     const history = (...ids: number[]) =>
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({

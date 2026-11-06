@@ -982,7 +982,10 @@ func (r *liveRoom) settleDepartures(ctx context.Context) {
 			continue
 		}
 		if _, claimed, err := r.hub.live.TakeGone(ctx, r.id, departure.UserID); err == nil && claimed {
-			r.say(ctx, departure.Name+" left", "")
+			if !departure.Quiet {
+				r.say(ctx, departure.Name+" left", "")
+			}
+			r.vacate(ctx, departure.UserID)
 		}
 	}
 }
@@ -1076,15 +1079,23 @@ func (r *liveRoom) full(ctx context.Context, person store.Person, limit int) boo
 // departed is the chat's side of someone's last socket closing. A host's going is
 // told by the handover, and anyone else's waits in case it is only a reload.
 func (r *liveRoom) departed(ctx context.Context, person store.Person, said, hosting bool) {
-	switch {
-	case hosting:
-	case said:
-		r.say(ctx, person.Name+" left", "")
-	default:
-		gone := store.Departure{UserID: person.UserID, Name: person.Name, At: time.Now().UnixMilli()}
+	if !said {
+		gone := store.Departure{UserID: person.UserID, Name: person.Name, At: time.Now().UnixMilli(), Quiet: hosting}
 		if err := r.hub.live.MarkGone(ctx, r.id, gone); err != nil {
 			r.hub.log.Warn("departure write failed", "room", r.id, "error", err)
 		}
+		return
+	}
+	if !hosting {
+		r.say(ctx, person.Name+" left", "")
+	}
+	r.vacate(ctx, person.UserID)
+}
+
+// vacate tells viewers to stop keeping someone's seat.
+func (r *liveRoom) vacate(ctx context.Context, userID string) {
+	if err := r.hub.live.Publish(ctx, r.id, encode("vacated", map[string]string{"userId": userID})); err != nil {
+		r.hub.log.Warn("vacated failed", "room", r.id, "error", err)
 	}
 }
 

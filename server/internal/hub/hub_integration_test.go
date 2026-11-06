@@ -1078,6 +1078,76 @@ func TestAHostLeavingIsOneLine(t *testing.T) {
 	}
 }
 
+func TestAHostReloadSaysNothing(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	host := r.joined(t, id, "Maya", room.RoleHost)
+	watching := r.joined(t, id, "a", room.RoleMember)
+	host.expect(t, "line")
+	watching.next("line", 200*time.Millisecond)
+
+	_ = host.ws.CloseNow()
+	time.Sleep(50 * time.Millisecond)
+	r.joined(t, id, "Maya", room.RoleHost)
+	if message, ok := watching.next("line", 500*time.Millisecond); ok {
+		t.Fatalf("a reload was narrated: %s", message.D)
+	}
+}
+
+func vacatedID(t *testing.T, message frame) string {
+	t.Helper()
+	var seat struct {
+		UserID string `json:"userId"`
+	}
+	if err := json.Unmarshal(message.D, &seat); err != nil {
+		t.Fatal(err)
+	}
+	return seat.UserID
+}
+
+func TestLeavingFreesTheSeatAtOnce(t *testing.T) {
+	r := newRig(t, testRedis) // The real quiet window, so only Leave can be this fast.
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	leaving := r.joined(t, id, "b", room.RoleMember)
+
+	leaving.send(t, "leave", nil)
+	if got := vacatedID(t, watching.expect(t, "vacated")); got != "b" {
+		t.Fatalf("vacated %q", got)
+	}
+}
+
+func TestASeatWaitsOutAReload(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	reloading := r.joined(t, id, "b", room.RoleMember)
+
+	_ = reloading.ws.CloseNow()
+	time.Sleep(50 * time.Millisecond)
+	r.joined(t, id, "b", room.RoleMember)
+	if message, ok := watching.next("vacated", 500*time.Millisecond); ok {
+		t.Fatalf("a reload lost its seat: %s", message.D)
+	}
+}
+
+func TestAHostWhoDropsGivesUpTheSeatInSilence(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	host := r.joined(t, id, "Maya", room.RoleHost)
+	watching := r.joined(t, id, "a", room.RoleMember)
+	host.expect(t, "line")
+	watching.next("line", 200*time.Millisecond)
+
+	_ = host.ws.CloseNow()
+	if got := vacatedID(t, watching.expect(t, "vacated")); got != "Maya" {
+		t.Fatalf("vacated %q", got)
+	}
+	if message, ok := watching.next("line", 100*time.Millisecond); ok {
+		t.Fatalf("the handover tells this: %s", message.D)
+	}
+}
+
 func TestASecondTabIsNotAnArrival(t *testing.T) {
 	r := newRig(t, testRedis, fastLines)
 	id := r.newRoom(t, directVideo(t))

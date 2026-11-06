@@ -3,7 +3,7 @@ import type { RoomView } from '../room/session';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
 import { firstName, hueOf, seatHues } from './people';
-import { placeSeats, rowLength, standing, type Row } from './seatRow';
+import { MAX_SEATS, placeSeats, rowLength, standing, type Row } from './seatRow';
 
 const STATES = new Map([
   ['buffering', 'buffering'],
@@ -14,7 +14,7 @@ const STATES = new Map([
 
 export const useSeats = (view: RoomView): Row => {
   const row = useRef<Row>([]);
-  row.current = placeSeats(row.current, view.members);
+  row.current = placeSeats(row.current, view.members, MAX_SEATS, view.vacated);
   seatHues(view.members.map((person) => person.userId));
   return row.current;
 };

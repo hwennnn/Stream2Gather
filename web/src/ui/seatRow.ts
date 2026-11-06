@@ -8,16 +8,19 @@ export type Taken = { person: Person; here: boolean };
 export type Row = (Taken | null)[];
 
 /**
- * Seats never move. A person keeps theirs for the visit, and it waits for them
- * if they step out. Only a newcomer with nowhere else to sit takes an empty one.
+ * Seats never move. A person's seat waits through a reload, and goes once the
+ * server says they have really left. Only a newcomer with nowhere else to sit
+ * takes one that is still waiting.
  */
-export const placeSeats = (row: Row, members: Person[], max = MAX_SEATS): Row => {
+export const placeSeats = (row: Row, members: Person[], max = MAX_SEATS, vacated: string[] = []): Row => {
   const present = new Map(members.map((person) => [person.userId, person]));
   const next: Row = row.map((seat) => {
     if (!seat) return null;
     const person = present.get(seat.person.userId);
-    return person ? { person, here: true } : { ...seat, here: false };
+    if (person) return { person, here: true };
+    return vacated.includes(seat.person.userId) ? null : { ...seat, here: false };
   });
+  while (next.length > 0 && next.at(-1) === null) next.pop();
   const seated = new Set(next.flatMap((seat) => (seat ? [seat.person.userId] : [])));
   for (const person of members) {
     if (seated.has(person.userId)) continue;

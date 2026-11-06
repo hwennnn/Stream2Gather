@@ -212,6 +212,8 @@ CREATE INDEX ON outbox (id) WHERE done_at IS NULL;
   ```
 
   All four are non-blocking sends to a bounded channel (4096). One goroutine per node looks up crew by room (cached 30s, negative results included, so promotion needs no ticket change), reads `Live` state once per room per flush, computes `pos_ms` with `State.PositionAt(at)`, and batch-writes every second. A session opens with `INSERT ... ON CONFLICT DO NOTHING` plus an outbox row in one transaction, which also issues `NOTIFY outbox`.
+
+  A watchlist item is ticked after 30 seconds of unbroken play by our clock, with a member seated for those 30 seconds (`store.WatchedAfter`). Pausing or seeking restarts the count, and a video's own length is never used. A clip under 30 seconds stays on the list. This is a threshold, not schema, so changing it needs no migration and touches no stored rows.
 - **`room.Apply`** is unchanged apart from `media.refresh`.
 - **`s2g worker`** gains the `SweepSessions` schedule. It ends sessions and builds recaps inline (section 6), so Track A never depends on the notifier.
 

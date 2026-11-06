@@ -81,6 +81,7 @@ type recorded struct {
 	state  *room.State
 	before *room.State
 	actor  string
+	at     time.Time
 	joined *store.Person
 	left   string
 	moment *Moment
@@ -121,7 +122,7 @@ func (c *capture) send(event recorded) {
 }
 
 func (c *capture) Applied(roomID, actorID string, before, after room.State) {
-	c.send(recorded{roomID: roomID, state: &after, before: &before, actor: actorID})
+	c.send(recorded{roomID: roomID, state: &after, before: &before, actor: actorID, at: time.Now()})
 }
 func (c *capture) Joined(roomID string, p store.Person) { c.send(recorded{roomID: roomID, joined: &p}) }
 func (c *capture) Left(roomID, userID string)           { c.send(recorded{roomID: roomID, left: userID}) }
@@ -210,6 +211,7 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 	for _, event := range events {
 		switch {
 		case event.state != nil:
+			batch.Played = appendRun(batch.Played, *event.before, event.at)
 			placed = *event.state
 			batch.Active = true
 			if batch.PressedPlay == "" && pressedPlay(event) {
@@ -228,6 +230,7 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 			}
 		}
 	}
+	batch.Played = appendRun(batch.Played, placed, batch.At)
 	if item, ok := playingItem(placed); ok {
 		batch.Source, batch.SourceID = item.Source, item.SourceID
 		batch.Playing = placed.Playback.Status == room.StatusPlaying
@@ -239,6 +242,18 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 // that opens for any other reason names nobody.
 func pressedPlay(event recorded) bool {
 	return event.before.Playback.Status != room.StatusPlaying && event.state.Playback.Status == room.StatusPlaying
+}
+
+// appendRun adds how long s had been playing by until, if that's long enough to
+// count. A run ends at any pause or seek, so it can only understate what played.
+// The clock is ours: a video's own length is never used for this.
+func appendRun(runs []store.PlayedRun, s room.State, until time.Time) []store.PlayedRun {
+	item, ok := playingItem(s)
+	from := time.UnixMilli(s.Playback.At)
+	if !ok || s.Playback.Status != room.StatusPlaying || until.Sub(from) < store.WatchedAfter {
+		return runs
+	}
+	return append(runs, store.PlayedRun{Source: item.Source, SourceID: item.SourceID, From: from, To: until})
 }
 
 func playingItem(s room.State) (room.Item, bool) {

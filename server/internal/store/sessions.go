@@ -25,6 +25,19 @@ type CapturedMoment struct {
 	At        time.Time
 }
 
+// WatchedAfter is how much unbroken play ticks a video off the list, with a member
+// there for it. Too high costs a stray row someone can remove. Too low hides a video
+// nobody watched, so this errs high. It's only a number, and no data depends on it.
+const WatchedAfter = 30 * time.Second
+
+// PlayedRun is one unbroken stretch of a video playing.
+type PlayedRun struct {
+	Source   string
+	SourceID string
+	From     time.Time
+	To       time.Time
+}
+
 // Capture is what one crew room did since the last flush.
 type Capture struct {
 	CrewID string
@@ -41,6 +54,8 @@ type Capture struct {
 	Present []Person
 	Joined  []Person
 	Left    []string
+	// Played is what ran long enough to count as watched.
+	Played []PlayedRun
 	// Active keeps the session from timing out.
 	Active  bool
 	Moments []CapturedMoment
@@ -190,6 +205,9 @@ func recordSession(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) 
 	if err := recordItem(ctx, tx, sessionID, c); err != nil {
 		return err
 	}
+	if err := tickWatched(ctx, tx, sessionID, c); err != nil {
+		return err
+	}
 	if !c.Active {
 		return nil
 	}
@@ -198,7 +216,7 @@ func recordSession(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) 
 	return err
 }
 
-// recordItem starts a row when the video changes, and marks it watched on the list.
+// recordItem starts a row when the video changes.
 func recordItem(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) error {
 	var itemID int64
 	var source string
@@ -224,14 +242,24 @@ func recordItem(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) err
 	_, err = tx.Exec(ctx, `
 		INSERT INTO session_items (session_id, source, source_id, started_at) VALUES ($1, $2, $3, $4)`,
 		sessionID, c.Source, c.SourceID, c.At)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `
-		UPDATE watchlist_items SET watched_session_id = $1
-		WHERE crew_id = $2 AND source = $3 AND source_id = $4 AND removed_at IS NULL AND watched_session_id IS NULL`,
-		sessionID, c.CrewID, c.Source, c.SourceID)
 	return err
+}
+
+// tickWatched marks a video watched once a member was here for enough of it playing.
+// A video left paused, or played to a room of guests, stays on the list.
+func tickWatched(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) error {
+	for _, run := range c.Played {
+		_, err := tx.Exec(ctx, `
+			UPDATE watchlist_items SET watched_session_id = $1
+			WHERE crew_id = $2 AND source = $3 AND source_id = $4 AND removed_at IS NULL AND watched_session_id IS NULL
+			  AND EXISTS (SELECT 1 FROM session_people h WHERE h.session_id = $1 AND NOT h.is_guest
+				AND least(coalesce(h.left_at, $6::timestamptz), $6::timestamptz) - greatest(h.joined_at, $5::timestamptz) >= $7::interval)`,
+			sessionID, c.CrewID, run.Source, run.SourceID, run.From, run.To, WatchedAfter)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func recordMoments(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) error {

@@ -35,7 +35,13 @@ func TestAWatchedVideoCanBeLinedUpAgain(t *testing.T) {
 	if err := db.AddWatch(ctx, crewID, "youtube", "again", owner); err != nil {
 		t.Fatal(err)
 	}
-	err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: "again"})
+	start, end := time.Now().Add(-time.Minute), time.Now()
+	hana := Person{UserID: owner, Name: "Hana", Member: true}
+	if err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: start, Playing: true, Source: "youtube", SourceID: "again", Present: []Person{hana}}); err != nil {
+		t.Fatal(err)
+	}
+	err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: end, Playing: true, Source: "youtube", SourceID: "again",
+		Played: []PlayedRun{{Source: "youtube", SourceID: "again", From: start, To: end}}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -119,8 +119,75 @@ func TestAChangeOfVideoClosesTheLastAndTicksTheWatchlist(t *testing.T) {
 		WHERE s.crew_id = $1 AND i.ended_at IS NOT NULL AND i.source_id = 'a'`, crewID); got != 1 {
 		t.Fatalf("%d closed rows for the first video", got)
 	}
+	if got := count(t, db, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND watched_session_id IS NOT NULL`, crewID); got != 0 {
+		t.Fatalf("%d ticked at first sight", got)
+	}
+}
+
+func TestAVideoIsTickedByAMemberBeingThereForRealPlay(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	start := time.Now().Add(-time.Hour)
+	long := 5 * time.Minute
+	for name, tc := range map[string]struct {
+		member, guest bool
+		// seated and left are how far into the run someone came and went.
+		seated, left time.Duration
+		want         int
+	}{
+		"a member for all of it":         {member: true, want: 1},
+		"a member who left after enough": {member: true, left: WatchedAfter + time.Second, want: 1},
+		"a member who left too soon":     {member: true, left: WatchedAfter - time.Second},
+		"a member who came for the end":  {member: true, seated: long - time.Second},
+		"a guest alone":                  {guest: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			crewID, owner := testCrew(t, db)
+			if err := db.AddWatch(ctx, crewID, "youtube", "b", owner); err != nil {
+				t.Fatal(err)
+			}
+			person := Person{UserID: owner, Name: "Hana", Member: tc.member}
+			at := start.Add(tc.seated)
+			if err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: at, Playing: true, Source: "youtube", SourceID: "b", Present: []Person{person}}); err != nil {
+				t.Fatal(err)
+			}
+			end := start.Add(long)
+			final := Capture{CrewID: crewID, At: end, Playing: true, Source: "youtube", SourceID: "b",
+				Played: []PlayedRun{{Source: "youtube", SourceID: "b", From: start, To: end}}}
+			if tc.left > 0 {
+				if _, err := db.pool.Exec(ctx, `UPDATE session_people SET left_at = $1`+
+					` WHERE session_id = (SELECT id FROM crew_sessions WHERE crew_id = $2)`, start.Add(tc.left), crewID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := db.RecordCapture(ctx, final); err != nil {
+				t.Fatal(err)
+			}
+			if got := count(t, db, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND watched_session_id IS NOT NULL`, crewID); got != tc.want {
+				t.Fatalf("%d ticked, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLeavingInTheFlushThatEndsARunStillCounts(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	crewID, owner := testCrew(t, db)
+	if err := db.AddWatch(ctx, crewID, "youtube", "b", owner); err != nil {
+		t.Fatal(err)
+	}
+	start := time.Now().Add(-time.Hour)
+	end := start.Add(5 * time.Minute)
+	hana := Person{UserID: owner, Name: "Hana", Member: true}
+	if err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: start, Playing: true, Source: "youtube", SourceID: "b", Present: []Person{hana}}); err != nil {
+		t.Fatal(err)
+	}
+	err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: end, Playing: true, Source: "youtube", SourceID: "b", Left: []string{owner},
+		Played: []PlayedRun{{Source: "youtube", SourceID: "b", From: start, To: end}}})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got := count(t, db, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND watched_session_id IS NOT NULL`, crewID); got != 1 {
-		t.Fatalf("%d watched", got)
+		t.Fatalf("%d ticked after the last member left at the end", got)
 	}
 }
 

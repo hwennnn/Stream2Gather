@@ -127,6 +127,23 @@ describe('SyncController', () => {
     );
   });
 
+  it('corrects at once when the clock is tuned after the first move, on a computer set ahead', () => {
+    // Before the first ping answers, the clock is the computer's, 90 seconds out here.
+    let skew = 90_000;
+    const skewed = new SyncController(player, { now: () => timers.now + skew }, () => {}, () => {}, timers);
+    const room = playing(10, timers.now);
+    player.status = 'playing';
+    skewed.apply(room);
+    expect(player.time()).toBeGreaterThan(95);
+    skew = 0;
+    for (let i = 0; i < 3; i += 1) {
+      timers.advance(1000);
+      player.advance(1);
+      skewed.tick();
+    }
+    expect(Math.abs(drift(room))).toBeLessThan(1);
+  });
+
   it('holds until a shared start time, then plays', () => {
     sync.apply(playing(0, timers.now + 1500));
     expect(player.status).toBe('paused');

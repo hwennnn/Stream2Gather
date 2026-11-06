@@ -88,6 +88,14 @@ export const expectedPosition = (playback: Playback, serverNow: number): number 
 };
 
 /**
+ * How long ago a moment was. The clock runs on the computer's own time until the
+ * first ping answers, so a moment from then can sit ahead of now, by as much as
+ * the computer is wrong. That says nothing about how long ago it was, and treating
+ * it as just now would hold off every correction until the clock caught up.
+ */
+const since = (moment: number, now: number): number => (moment > now ? Infinity : now - moment);
+
+/**
  * Keeps one player on the room's timeline. It owns all sync decisions and
  * touches the player only through the adapter, so it runs under test with a
  * fake player and clock.
@@ -356,7 +364,7 @@ export class SyncController {
     const seekOnly = this.player.rates === 'none';
     if (size < (seekOnly ? SEEK_ONLY_OK_S : DRIFT_OK_S)) return;
     const ahead = drift > 0;
-    const mayJump = !this.settling(now) && now - this.lastSeekAt >= SEEK_COOLDOWN_MS;
+    const mayJump = !this.settling(now) && since(this.lastSeekAt, now) >= SEEK_COOLDOWN_MS;
     if (this.wasBuffering && !ahead && size >= STALL_SEEK_S && mayJump) {
       this.cancelNudge();
       this.jumpToRoom(expected, now);
@@ -507,7 +515,7 @@ export class SyncController {
   }
 
   private settling(now: number): boolean {
-    return this.held !== null || now - this.settleFrom < SETTLE_MS;
+    return this.held !== null || since(this.settleFrom, now) < SETTLE_MS;
   }
 
   private holdPause(time: number, ms: number): void {

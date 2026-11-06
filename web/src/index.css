@@ -33,17 +33,18 @@
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* A dark room: the ground, a black screen in it, and the rail a step up. */
-  --color-ink: #0a0a0a;
+  --color-ink: #171a23;
   --color-stage: #000;
-  --color-panel: #141414;
-  --color-raised: #1f1f1f;
-  --color-line: #262626;
-  --color-text: #f1efeb;
-  --color-muted: #a9a7a2;
-  --color-dim: #918f8a;
+  --color-panel: #191f2b;
+  --color-raised: #2a3241;
+  --color-line: #2d3544;
+  --color-text: #eef1f6;
+  --color-muted: #a7b0c0;
+  --color-dim: #8f99ab;
 
   /* One job: the action that matters, and what's selected. */
-  --color-primary: #4f57ee;
+  --color-primary: #90cef3;
+  --color-on-primary: #121929;
 
   /* Each has one job, and always comes with a word. */
   --color-good: #6fbf94;
@@ -128,11 +129,11 @@ body {
 
   .btn-primary {
     background: var(--color-primary);
-    color: #fff;
+    color: var(--color-on-primary);
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: #5e66f2;
+    background: #a9daf6;
   }
 
   .btn-quiet {

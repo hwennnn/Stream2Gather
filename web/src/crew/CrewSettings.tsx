@@ -144,7 +144,7 @@ const CrewSettings = ({ slug, home, onChange }: Props) => {
             onClick={() => apply(crewApi.edit(slug, { guestAccess: !home.guestAccess }))}
             className={`relative h-7 w-12 shrink-0 cursor-pointer rounded-full transition-colors ${home.guestAccess ? 'bg-primary' : 'bg-white/15'}`}
           >
-            <span className={`absolute top-1 left-1 size-5 rounded-full bg-white shadow transition-transform ${home.guestAccess ? 'translate-x-5' : ''}`} />
+            <span className={`absolute top-1 left-1 size-5 rounded-full shadow transition-transform ${home.guestAccess ? 'translate-x-5 bg-on-primary' : 'bg-white'}`} />
           </button>
         </div>
         <div className="flex min-h-11 items-center justify-between gap-4 py-1">

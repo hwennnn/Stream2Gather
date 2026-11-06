@@ -301,7 +301,7 @@ func (c *Catalog) PurgeSearches(ctx context.Context) (int64, error) {
 
 // IsUserError reports whether an error's text is safe and useful to show.
 func IsUserError(err error) bool {
-	return errors.Is(err, ErrUnsupportedURL) || errors.Is(err, ErrUnavailable) ||
+	return errors.Is(err, ErrUnsupportedURL) || errors.Is(err, ErrUnavailable) || errors.Is(err, ErrNoEmbed) ||
 		errors.Is(err, ErrOverBudget) || errors.Is(err, ErrNoSearch) || errors.Is(err, ErrLive) ||
 		errors.Is(err, ErrTooManyLinks) || errors.Is(err, ErrLinksResting)
 }

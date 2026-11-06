@@ -104,26 +104,36 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      # The sample videos, and real Korean and emoji for the layout checks to measure.
-      # Cached because apt can hang for longer than this whole job, and that says nothing
-      # about the code. A PR reads master's cache, so apt only runs on a key bump or an
-      # eviction, and a hang there fails this named step, not the flows. Bump the key when
-      # the samples in e2e/lib/stack.mjs change.
+      # Nothing here can stop the flows running. apt has hung for longer than this whole
+      # job, which says nothing about the code, so it's never needed for a run to go ahead.
+      # Bump the samples key when the samples in e2e/lib/stack.mjs change.
       - uses: actions/cache@v4
-        id: assets
+        id: samples
         with:
-          path: |
-            .data
-            ~/.local/share/fonts
-          key: flows-assets-v1
-      - name: Get what the cache didn't have
-        if: steps.assets.outputs.cache-hit != 'true'
-        timeout-minutes: 6
+          path: .data
+          key: flows-samples-v1
+      - uses: actions/cache@v4
+        id: fonts
+        with:
+          path: ~/.local/share/fonts
+          key: flows-fonts-v1
+      # stack.mjs makes the samples with ffmpeg. The services need Docker Hub anyway, so
+      # taking ffmpeg from there adds no new way to fail.
+      - name: Use ffmpeg from Docker
+        if: steps.samples.outputs.cache-hit != 'true'
         run: |
-          for try in 1 2; do
-            timeout 60 sudo apt-get -qq -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update &&
-              timeout 90 sudo apt-get install -y -qq --no-install-recommends ffmpeg fonts-noto-cjk fonts-noto-color-emoji && break
-          done
+          mkdir -p .data "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec docker run --rm -v "%s:%s" linuxserver/ffmpeg:7.1.1 "$@"\n' "$PWD/.data" "$PWD/.data" > "$RUNNER_TEMP/bin/ffmpeg"
+          chmod +x "$RUNNER_TEMP/bin/ffmpeg"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # Real Korean and emoji for the layout checks to measure. Best effort: without them
+      # the flows still pass, and the next run tries again.
+      - name: Fonts, if apt will give them
+        if: steps.fonts.outputs.cache-hit != 'true'
+        continue-on-error: true
+        timeout-minutes: 3
+        run: |
+          timeout 150 sudo sh -c 'apt-get -qq -o Acquire::Retries=1 -o Acquire::http::Timeout=20 update && apt-get install -y -qq --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji'
           mkdir -p ~/.local/share/fonts
           cp /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc /usr/share/fonts/truetype/noto/NotoColorEmoji.ttf ~/.local/share/fonts/
       - run: fc-cache -f

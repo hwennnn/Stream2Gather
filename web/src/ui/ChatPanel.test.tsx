@@ -42,6 +42,48 @@ const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
   return { session, box, send, answer: (result: ChatResult) => act(async () => finish(result)) };
 };
 
+let resized = () => {};
+
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: () => void) {
+      resized = callback;
+    }
+    observe() {}
+    disconnect() {}
+  });
+});
+
+describe('ChatPanel when a notice shortens the log', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const scroll = (log: HTMLElement, height: number, top: number) => {
+    Object.defineProperty(log, 'scrollHeight', { configurable: true, value: height });
+    Object.defineProperty(log, 'clientHeight', { configurable: true, value: 100 });
+    log.scrollTop = top;
+  };
+
+  it('keeps the latest line in view', () => {
+    setup([line({})]);
+    const log = screen.getByRole('log');
+    scroll(log, 900, 800);
+    resized();
+    expect(log.scrollTop).toBe(900);
+  });
+
+  it('leaves someone reading back where they are', () => {
+    setup([line({})]);
+    const log = screen.getByRole('log');
+    scroll(log, 900, 200);
+    fireEvent.scroll(log);
+    resized();
+    expect(log.scrollTop).toBe(200);
+  });
+});
+
 describe('ChatPanel system lines', () => {
   beforeEach(() => {
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));

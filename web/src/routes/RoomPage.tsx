@@ -18,7 +18,7 @@ import { MainAction, PlayerStage, SkipButton } from '../ui/PlayerStage';
 import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
-import { canControl, noticesToShow, offersInvite, onCrew, toastLift } from '../ui/rules';
+import { canControl, noticesToShow, offersInvite, onCrew } from '../ui/rules';
 import { Slot } from '../ui/Slot';
 import { JumpToast, ToastStack, useToasts } from '../ui/Toasts';
 import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
@@ -311,6 +311,9 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
     </ToastStack>
   );
 
+  // In the rail's own flow, so it takes room from a list and can't sit on anything in it.
+  const railToasts = !railHidden && toastStack('rail-edge shrink-0 pb-2 empty:hidden');
+
   return (
     <div data-fullscreen={fullscreen.on} className="room-shell flex h-dvh flex-col bg-ink">
       {!fullscreen.on && (
@@ -405,6 +408,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
               view={view}
               active={tab === 'chat'}
               onToast={toast}
+              toasts={tab === 'chat' && railToasts}
             />
           </div>
           <div id="panel-queue" role="tabpanel" aria-labelledby="tab-queue" hidden={tab !== 'queue'} className="min-h-0 flex-1">
@@ -414,8 +418,8 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
             <PeopleTab session={session} view={peopleView} onToast={toast} />
           </div>
 
+          {tab !== 'chat' && railToasts}
           <ReactionLane reactions={view.reactions} />
-          {!railHidden && toastStack(`absolute inset-x-[var(--gutter)] ${toastLift(tab)}`)}
         </aside>
       </div>
     </div>

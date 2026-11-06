@@ -59,7 +59,7 @@ const merge = (toasts: Local[], notices: RoomView['notices']): Shown[] => {
 
 type StackProps = { toasts: Local[]; notices: RoomView['notices']; limit?: number; className: string; children?: ReactNode };
 
-/** Lives in the rail, or in the bar in theatre mode. Never over the player. */
+/** Takes its own room in the rail, or sits in the bar in theatre mode. Never over the player or a list. */
 export const ToastStack = ({ toasts, notices, limit = MAX_SHOWN, className, children }: StackProps) => (
   <div aria-live="polite" className={`pointer-events-none z-20 flex flex-col items-center gap-2 ${className}`}>
     {merge(toasts, notices)

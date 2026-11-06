@@ -155,6 +155,9 @@ const inTimeOrder = (entries: ChatEntry[]) =>
 
 const serverIdOf = (entry: ChatEntry) => (entry.kind === 'chat' ? (entry.serverId ?? entry.id) : entry.id);
 
+/** Random rather than a counter: it has to stay unique across reloads, and tabs. */
+const newClientId = () => Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+
 /** Settles the viewer's own waiting line with the message the server made of it. */
 const confirmOwn = (entries: ChatEntry[], message: ChatMessage): ChatEntry[] | null => {
   const sentAt = Date.parse(message.createdAt);
@@ -163,9 +166,9 @@ const confirmOwn = (entries: ChatEntry[], message: ChatMessage): ChatEntry[] | n
       entry.kind === 'chat' &&
       typeof entry.id === 'string' &&
       entry.serverId === undefined &&
-      entry.userId === message.userId &&
-      entry.body === message.body &&
-      sentAt >= Date.parse(entry.createdAt) - STAMP_SLACK_MS,
+      (message.clientId
+        ? entry.clientId === message.clientId
+        : entry.userId === message.userId && entry.body === message.body && sentAt >= Date.parse(entry.createdAt) - STAMP_SLACK_MS),
   );
   if (!own) return null;
   const settled = { ...own, serverId: message.id, createdAt: message.createdAt, delivery: undefined };
@@ -611,8 +614,9 @@ export class RoomSession {
     const id = `c${this.nextId++}`;
     const { userId = '', name: author = '' } = this.view.self ?? {};
     const createdAt = new Date(this.clock.now()).toISOString();
-    this.append({ kind: 'chat', id, userId, author, body, createdAt, delivery: 'sending' });
-    return { id, limited: await this.deliver(id, body) };
+    const clientId = newClientId();
+    this.append({ kind: 'chat', id, userId, author, body, clientId, createdAt, delivery: 'sending' });
+    return { id, limited: await this.deliver(id, body, clientId) };
   }
 
   /** Sends a failed line again, from the end of the chat, where it will now land. */
@@ -623,7 +627,7 @@ export class RoomSession {
     this.update({
       messages: [...this.view.messages.filter((entry) => entry !== line), { ...line, createdAt, delivery: 'sending' }],
     });
-    void this.deliver(id, line.body);
+    void this.deliver(id, line.body, line.clientId);
   }
 
   discardChat(id: string): void {
@@ -631,9 +635,9 @@ export class RoomSession {
   }
 
   /** True when the server refused the line for speed. */
-  private async deliver(id: string, body: string): Promise<boolean> {
+  private async deliver(id: string, body: string, clientId?: string): Promise<boolean> {
     try {
-      await this.request('chat.send', { text: body }, SEND_PATIENCE_MS);
+      await this.request('chat.send', { text: body, clientId }, SEND_PATIENCE_MS);
       this.markLine(id, undefined);
       return false;
     } catch (error) {

@@ -2,7 +2,6 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormE
 import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
 import { formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
-import { InviteSheet } from './InviteSheet';
 import { firstName, hueOf } from './people';
 import { ReactionPicker } from './Reactions';
 import { canQueue, chatScroll, countUnread, isOffline } from './rules';
@@ -17,10 +16,6 @@ type Props = {
   session: RoomSession;
   view: RoomView;
   active: boolean;
-  inviteUrl: string;
-  inviteCopied: boolean;
-  onCopyInvite: () => void;
-  onInvite: () => void;
   onToast: (text: string) => void;
 };
 
@@ -44,7 +39,7 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   return blocks;
 };
 
-export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCopyInvite, onInvite, onToast }: Props) => {
+export const ChatPanel = ({ session, view, active, onToast }: Props) => {
   const [text, setText] = useState('');
   const [slow, setSlow] = useState(false);
   const [missed, setMissed] = useState(false);
@@ -150,18 +145,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCo
           className="rail-scroll flex h-full flex-col py-3 outline-offset-[-2px]"
         >
           {!hasChat &&
-            (view.alone ? (
-              view.queue.length === 0 ? (
-                <PickingCard onInvite={onInvite} />
-              ) : (
-                <div className="mt-auto">
-                  <p className="mb-3 font-semibold">Only you so far.</p>
-                  <InviteSheet view={view} url={inviteUrl} copied={inviteCopied} onCopy={onCopyInvite} />
-                </div>
-              )
-            ) : (
-              <p className="mt-auto text-muted">Nothing said yet.</p>
-            ))}
+            (view.alone ? <p className="mt-auto font-semibold">Only you so far.</p> : <p className="mt-auto text-muted">Nothing said yet.</p>)}
           {lines}
         </div>
         {missed && (
@@ -211,17 +195,6 @@ export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCo
     </div>
   );
 };
-
-/** Search and trending belong to the stage here, so this side only has to get people in. */
-const PickingCard = ({ onInvite }: { onInvite: () => void }) => (
-  <div className="enter mt-auto">
-    <p className="font-semibold">Invite someone while you pick</p>
-    <button type="button" onClick={onInvite} className="btn btn-quiet mt-3 w-full">
-      <Icon name="link" />
-      Invite
-    </button>
-  </div>
-);
 
 type LineProps = { session: RoomSession; canAdd: boolean; offline: boolean; onToast: (text: string) => void };
 

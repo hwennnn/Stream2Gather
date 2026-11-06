@@ -111,10 +111,29 @@ flow('phone: chat works above the keyboard line, with reactions behind one butto
   await t.see('Ben gets it', ui.chatLog(b.page).getByText('from a phone'));
   await sendChat(b.page, 'to a phone');
   await t.see('Ana gets it', ui.chatLog(a.page).getByText('to a phone'));
-  await a.page.getByRole('button', { name: 'Send a reaction' }).tap();
-  await a.page.getByRole('button', { name: 'React 👏' }).tap();
+  await a.page.getByRole('button', { name: 'React 👏' }).filter({ visible: true }).tap();
   await t.see('Ben sees it', ui.rail(b.page).getByText('👏'));
   await noSideScroll(t, a.page, 'the chat');
+});
+
+flow('phone: the room has its name, a labelled Leave, seats you can hit, and reactions on every tab', async (t) => {
+  const a = await t.person('Ana', { viewport: { width: 390, height: 844 }, phone: true });
+  const b = await t.person('Ben');
+  const room = await startRoom(t, a, { url: golden.url, name: 'Ana' });
+  await joinRoom(b, room.url);
+  await t.see('the room name', a.page.getByRole('heading', { level: 1 }).filter({ visible: true }));
+  await t.see('Leave says Leave', a.page.getByRole('link', { name: 'Leave room' }).filter({ hasText: 'Leave', visible: true }));
+  const seats = a.page.getByRole('list', { name: 'In the room' }).filter({ visible: true });
+  const widths = await seats.locator('.seat-disc').evaluateAll((discs) => discs.map((disc) => disc.offsetWidth));
+  t.check('every seat is at least 40px', widths.length > 0 && widths.every((width) => width >= 40), widths.join());
+  for (const tab of ['Queue', 'People', 'Chat']) {
+    await openTab(a.page, tab);
+    const row = a.page.getByRole('button', { name: /^React / }).filter({ visible: true });
+    t.eq(`all six reactions show on ${tab}`, await row.count(), 6);
+  }
+  const rest = await a.page.getByRole('button', { name: 'React 🔥' }).filter({ visible: true }).evaluate((button) => getComputedStyle(button).filter);
+  t.eq('in full colour at rest', rest, 'none');
+  await noSideScroll(t, a.page, 'the room');
 });
 
 flow('phone: turning sideways keeps the room, the draft and the controls', async (t) => {

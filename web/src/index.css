@@ -625,11 +625,13 @@ body {
 .seat {
   position: relative;
   display: flex;
-  flex: none;
+  /* A full row gives up name width, never its last place: that one is Invite. */
+  flex: 0 1 auto;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.25rem;
   width: 4.5rem;
+  min-width: 2.5rem;
   color: var(--color-muted);
   font-size: 0.75rem;
   line-height: 1rem;
@@ -757,7 +759,9 @@ body {
 }
 
 .seats[data-compact='true'] .seat {
+  flex: none;
   width: 2.125rem;
+  min-width: 0;
   height: 2.75rem;
   justify-content: center;
 }
@@ -795,6 +799,50 @@ body {
   font-size: 1.375rem;
 }
 
+/* A phone held upright has the width to itself: seats a thumb can read, in a row that
+ * slides under the count and Invite when it's longer than the phone. */
+@media (max-width: 639px) and (min-height: 501px) {
+  .seats[data-compact='true'] {
+    gap: 0.25rem;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .seats[data-compact='true'] .seat {
+    width: 2.5rem;
+  }
+
+  .seats[data-compact='true'] .seat-disc,
+  .seats[data-compact='true'] .seat-empty,
+  .seats[data-compact='true'] .seat-more {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .seats[data-compact='true'] .seat-disc span {
+    font-size: 0.8125rem;
+  }
+
+  /* A row that scrolls clips what hangs outside a seat, so this seat is the thumb's full 44px. */
+  .seats[data-compact='true'] .seat-invite {
+    align-items: center;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+
+  .seats[data-compact='true'] .seat-pin {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    width: 2.75rem;
+    background: var(--color-ink);
+  }
+
+  .seats[data-compact='true'] .seat-pin[data-count] {
+    right: 2.75rem;
+  }
+}
+
 @keyframes seat-arrive {
   from {
     transform: scale(0.9);
@@ -829,10 +877,7 @@ body {
   flex: 1 1 5.5rem;
 }
 
-/* Grey until someone means it. Colour in this room belongs to what people did. */
 .react {
-  filter: grayscale(1);
-  opacity: 0.75;
   transition:
     background-color 140ms var(--ease-room),
     filter 140ms var(--ease-room),
@@ -843,11 +888,11 @@ body {
 .react:hover:not(:disabled),
 .react:focus-visible {
   background: var(--color-raised);
-  filter: none;
-  opacity: 1;
 }
 
+/* Grey means it can't be pressed right now, and only that. */
 .react:disabled {
+  filter: grayscale(1);
   opacity: 0.4;
 }
 

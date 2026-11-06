@@ -18,16 +18,18 @@ flow('invite: the button copies the room link and a friend gets in with it', asy
   await t.see('the friend in the room', ui.bar(friend.page).getByRole('heading', { name: golden.title }));
 });
 
-flow('invite: while alone the chat offers the link, and it goes once someone comes', async (t) => {
+flow('invite: while alone the rail offers the link, and it goes once someone comes', async (t) => {
   const host = await t.person('host');
   const friend = await t.person('friend');
   const room = await startRoom(t, host, { url: golden.url });
   const shown = room.url.replace(/^https?:\/\//, '');
-  await t.see('the card', ui.chatLog(host.page).getByText(shown));
-  await ui.chatLog(host.page).getByRole('button', { name: /copy link/i }).click();
+  const sheet = host.page.getByRole('region', { name: 'Invite' });
+  await t.see('the card', sheet.getByText(shown));
+  await t.see('saying what it is', sheet.getByText('What friends will see'));
+  await sheet.getByRole('button', { name: /copy link/i }).click();
   t.eq('copied', await host.page.evaluate(() => navigator.clipboard.readText()), room.url);
   await joinRoom(friend, room.url);
-  await t.gone('the card', ui.chatLog(host.page).getByText(shown));
+  await t.gone('the card', sheet.getByText(shown));
 });
 
 flow('invite: when the browser refuses the clipboard, the link is still shown', async (t) => {

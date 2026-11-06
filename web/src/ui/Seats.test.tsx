@@ -42,4 +42,13 @@ describe('Seats', () => {
     expect(seat?.textContent).toContain(`, ${words}`);
     expect(seat?.getAttribute('title')).toBe(`Bo, ${words}`);
   });
+
+  it('still offers Invite when a full row has people standing', () => {
+    const crowd = Array.from({ length: 28 }, (_, index) => ({ userId: `p${index}`, name: `P${index}`, role: 'member' }));
+    const packed = { ...view, members: crowd } as unknown as RoomView;
+    const full = crowd.slice(0, 8).map((person) => ({ person, here: true })) as never;
+    render(<Seats view={packed} row={full} actor={null} onInvite={() => {}} onPeople={() => {}} />);
+    expect(screen.getByRole('button', { name: '20 more people' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Invite' })).toBeTruthy();
+  });
 });

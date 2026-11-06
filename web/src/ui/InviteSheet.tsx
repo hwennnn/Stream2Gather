@@ -5,11 +5,12 @@ import { Thumb } from './Thumb';
 
 type Props = { view: RoomView; url: string; copied: boolean; onCopy: () => void; onClose?: () => void };
 
-/** What the friend gets, so you can see it before you send it. Lives in the rail, off the player. */
+/** The one way to invite: what the friend gets, then the link. Lives at the top of the rail, off the player. */
 export const InviteSheet = ({ view, url, copied, onCopy, onClose }: Props) => {
   const video = view.queue[0];
   return (
-    <section aria-label="Invite" className={onClose ? 'enter rail-edge shrink-0 border-b border-line py-4' : 'enter'}>
+    <section aria-label="Invite" className="enter rail-edge shrink-0 border-b border-line py-4">
+      <p className="mb-2 text-xs text-dim">What friends will see</p>
       <div className="flex items-center gap-3">
         {video && <Thumb src={video.thumbnailUrl} className="w-20 rounded-md" />}
         <div className="min-w-0 flex-1">

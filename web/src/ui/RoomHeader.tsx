@@ -5,7 +5,7 @@ import { AccountMenu } from './AccountMenu';
 import { Icon } from './Icon';
 import { LeaveLink } from './LeaveLink';
 import { Mark } from './Mark';
-import { isHost, isLocked } from './rules';
+import { isLocked } from './rules';
 import { Seats } from './Seats';
 import type { Row } from './seatRow';
 import { Slot } from './Slot';
@@ -55,11 +55,9 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
       <Slot>
         <VoiceButton session={session} view={view} adapter={adapter} />
       </Slot>
-      {isHost(view) && (
-        <Slot>
-          <KeepRoom session={session} view={view} />
-        </Slot>
-      )}
+      <Slot>
+        <KeepRoom session={session} view={view} />
+      </Slot>
       <LeaveLink session={session} className="btn btn-quiet btn-sm phone:hidden land:hidden">
         Leave
       </LeaveLink>

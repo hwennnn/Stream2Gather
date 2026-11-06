@@ -127,6 +127,8 @@ type crewEvent struct {
 	MembersOnly bool `json:"membersOnly,omitempty"`
 	// Host moves the host's role on sockets already open, after a handover.
 	Host string `json:"host,omitempty"`
+	// Invite goes to those present when a room becomes a crew, who hold no link that can join it.
+	Invite string `json:"invite,omitempty"`
 }
 
 // publishCrew tells the room. The change has already been made, so failing to say
@@ -527,7 +529,7 @@ func (s *Server) promoteRoom(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
-	s.publishCrew(r.Context(), record.ID, crewEvent{Changed: "settings", UserID: claims.Subject, Member: true})
+	s.publishCrew(r.Context(), record.ID, crewEvent{Changed: "settings", UserID: claims.Subject, Member: true, Invite: crew.InviteToken})
 	writeJSON(w, http.StatusOK, map[string]string{"slug": record.Slug, "name": record.Name, "inviteToken": crew.InviteToken})
 }
 

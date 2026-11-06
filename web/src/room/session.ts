@@ -31,7 +31,7 @@ export type QueueMode = 'now' | 'next' | 'end';
 /** Who paused is the room's business, not the sync engine's. */
 export type RoomPlayback = Playback & { pausedBy?: string; pausedById?: string };
 
-/** What changed about the room's crew. The event carries no data, so refetch it. */
+/** What changed about the room's crew. The event carries no data, so refetch it. The one exception is the invite, sent to whoever is present when a room becomes a crew. */
 export type CrewChange = 'settings' | 'members' | 'watchlist';
 
 type Reaction = { id: number; emoji: string; name: string };
@@ -196,7 +196,7 @@ export class RoomSession {
   private socket: WebSocket | null = null;
   private listeners = new Set<() => void>();
   private playbackListener: (playback: Playback, resync: boolean) => void = () => {};
-  private crewListeners = new Set<(changed: CrewChange) => void>();
+  private crewListeners = new Set<(changed: CrewChange, invite?: string) => void>();
   private pinger: number | null = null;
   private reconnectTimer: number | null = null;
   private attempts = 0;
@@ -242,7 +242,7 @@ export class RoomSession {
     this.playbackListener = listener;
   }
 
-  onCrew(listener: (changed: CrewChange) => void): () => void {
+  onCrew(listener: (changed: CrewChange, invite?: string) => void): () => void {
     this.crewListeners.add(listener);
     return () => this.crewListeners.delete(listener);
   }
@@ -468,9 +468,11 @@ export class RoomSession {
       case 'notice':
         this.notice(d);
         break;
-      case 'crew':
-        for (const listener of this.crewListeners) listener((d as { changed: CrewChange }).changed);
+      case 'crew': {
+        const { changed, invite } = d as { changed: CrewChange; invite?: string };
+        for (const listener of this.crewListeners) listener(changed, invite);
         break;
+      }
       case 'error':
         this.failed(d);
         break;

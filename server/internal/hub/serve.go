@@ -400,7 +400,10 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 		r.noteEmbedBlock(ctx, item, userID)
 	}
 
-	failures, err := r.hub.live.CountFailure(ctx, r.id, report.Item, userID)
+	if err := r.hub.live.AddFailure(ctx, r.id, report.Item, userID); err != nil {
+		return
+	}
+	failing, err := r.hub.live.Failing(ctx, r.id, report.Item)
 	if err != nil {
 		return
 	}
@@ -411,14 +414,11 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 	_ = r.hub.live.Publish(ctx, r.id, encode("member.status", map[string]any{
 		"userId": userID, "state": "unavailable", "item": report.Item,
 	}))
-	if failures*2 <= int64(len(people)) {
+	if !mostAreFailing(people, failing) {
 		return
 	}
 
-	notice := map[string]string{"kind": "skipped", "text": skipNotice(item, refused)}
-	if item.Source == "youtube" {
-		notice["url"] = item.URL
-	}
+	notice := skippedNotice(item, refused)
 	r.do(func() {
 		skipCtx, done := opContext()
 		defer done()
@@ -427,6 +427,14 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 			r.publishNotice(skipCtx, notice)
 		}
 	})
+}
+
+func skippedNotice(item room.Item, refused bool) map[string]string {
+	notice := map[string]string{"kind": "skipped", "text": skipNotice(item, refused)}
+	if item.Source == "youtube" {
+		notice["url"] = item.URL
+	}
+	return notice
 }
 
 func skipNotice(item room.Item, refused bool) string {

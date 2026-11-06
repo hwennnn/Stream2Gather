@@ -350,18 +350,23 @@ func (l *Live) TakeTicket(ctx context.Context, id string) (Ticket, bool, error) 
 	return ticket, true, json.Unmarshal([]byte(doc), &ticket)
 }
 
-// CountFailure records that a viewer could not play an item, and returns how
-// many distinct viewers have failed on it recently.
-func (l *Live) CountFailure(ctx context.Context, roomID, itemID, userID string) (int64, error) {
-	key := "room:" + roomID + ":failed:" + itemID
+func failedKey(roomID, itemID string) string { return "room:" + roomID + ":failed:" + itemID }
+
+// AddFailure records that a viewer could not play an item. It lasts as long as a
+// video can, because a viewer reports once and someone else leaving may be what
+// finally decides it.
+func (l *Live) AddFailure(ctx context.Context, roomID, itemID, userID string) error {
+	key := failedKey(roomID, itemID)
 	pipe := l.rdb.TxPipeline()
 	pipe.SAdd(ctx, key, userID)
-	count := pipe.SCard(ctx, key)
-	pipe.Expire(ctx, key, time.Minute)
-	if _, err := pipe.Exec(ctx); err != nil {
-		return 0, err
-	}
-	return count.Val(), nil
+	pipe.Expire(ctx, key, liveTTL)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// Failing returns who has reported they can't play an item.
+func (l *Live) Failing(ctx context.Context, roomID, itemID string) ([]string, error) {
+	return l.rdb.SMembers(ctx, failedKey(roomID, itemID)).Result()
 }
 
 // ReportEmbedBlocked records that a person's player refused a video, wherever

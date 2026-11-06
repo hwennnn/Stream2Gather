@@ -835,6 +835,56 @@ func TestAStandInWhoLeavesPassesItOn(t *testing.T) {
 	}
 }
 
+func TestOneLeavingCanTipARoomIntoSkipping(t *testing.T) {
+	r := newRig(t, testRedis)
+	ctx := context.Background()
+	id := r.newRoom(t, directVideo(t))
+	state, _, _ := r.live.Load(ctx, id)
+	item := state.Queue[0]
+
+	failing := r.joined(t, id, "a", room.RoleMember)
+	watching := r.joined(t, id, "b", room.RoleMember)
+	failing.send(t, "media_error", map[string]any{"item": item.ID, "code": 0})
+	failing.expect(t, "member.status")
+	if message, ok := failing.next("notice", 200*time.Millisecond); ok {
+		t.Fatalf("one of two can still watch: %s", message.D)
+	}
+
+	_ = watching.ws.CloseNow()
+	if got := noticeOf(t, failing.expect(t, "notice"))["kind"]; got != "skipped" {
+		t.Fatalf("notice kind = %q", got)
+	}
+	eventually(t, "the room stayed on a video nobody here can play", func() bool {
+		now, _, _ := r.live.Load(ctx, id)
+		return now.Playback.ItemID != item.ID
+	})
+}
+
+func TestSomeoneWhoLeftNoLongerCountsAsFailing(t *testing.T) {
+	r := newRig(t, testRedis)
+	ctx := context.Background()
+	id := r.newRoom(t, directVideo(t))
+	state, _, _ := r.live.Load(ctx, id)
+	item := state.Queue[0]
+
+	gone := r.joined(t, id, "a", room.RoleMember)
+	second := r.joined(t, id, "b", room.RoleMember)
+	third := r.joined(t, id, "c", room.RoleMember)
+	gone.send(t, "media_error", map[string]any{"item": item.ID, "code": 0})
+	second.expect(t, "member.status")
+	_ = gone.ws.CloseNow()
+	eventually(t, "the seat outlived the socket", func() bool {
+		people, err := r.live.People(ctx, id)
+		return err == nil && len(people) == 2
+	})
+
+	second.send(t, "media_error", map[string]any{"item": item.ID, "code": 0})
+	third.expectWhere(t, "member.status", func(raw json.RawMessage) bool { return strings.Contains(string(raw), `"b"`) })
+	if message, ok := third.next("notice", 300*time.Millisecond); ok {
+		t.Fatalf("half of those here is not most of them: %s", message.D)
+	}
+}
+
 func TestTwoServersPassingTheHostAtOnceAnnounceOnce(t *testing.T) {
 	one, two := newRig(t, testRedis), newRig(t, testRedis)
 	ctx := context.Background()

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { PlayerAdapter, PlayerError, PlayerRates, PlayerState } from '../players/types';
 import { ServerClock } from './clock';
-import { DRIFT_OK_S, expectedPosition, SyncController, type LocalCommand, type Playback, type SyncReport } from './controller';
+import { DRIFT_OK_S, expectedPosition, outOfReach, SyncController, type LocalCommand, type Playback, type SyncReport } from './controller';
 
 /** A player whose clock only moves when the test says so. */
 class FakePlayer implements PlayerAdapter {
@@ -96,6 +96,7 @@ describe('SyncController', () => {
   let commands: LocalCommand[];
   let reports: SyncReport[];
   let sync: SyncController;
+  let unseen: boolean;
 
   const playing = (pos: number, at: number, item = 'a'): Playback => ({ item, status: 'playing', pos, at, rate: 1 });
 
@@ -118,19 +119,21 @@ describe('SyncController', () => {
     timers = new FakeTimers();
     commands = [];
     reports = [];
+    unseen = false;
     sync = new SyncController(
       player,
       { now: () => timers.now },
       (command) => commands.push(command),
       (report) => reports.push(report),
       timers,
+      () => unseen,
     );
   });
 
   it('corrects at once when the clock is tuned after the first move, on a computer set ahead', () => {
     // Before the first ping answers, the clock is the computer's, 90 seconds out here.
     let skew = 90_000;
-    const skewed = new SyncController(player, { now: () => timers.now + skew }, () => {}, () => {}, timers);
+    const skewed = new SyncController(player, { now: () => timers.now + skew }, () => {}, () => {}, timers, () => unseen);
     const room = playing(10, timers.now);
     player.status = 'playing';
     skewed.apply(room);
@@ -284,6 +287,56 @@ describe('SyncController', () => {
     player.fire('paused');
     pauseHeld();
     expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+  });
+
+  describe('a tab out of sight', () => {
+    it('keeps the room playing when the browser stops the player', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      unseen = true;
+      player.fire('paused');
+      pauseHeld();
+      run(3);
+      expect(commands).toEqual([]);
+    });
+
+    it('starts its own player again, and the room never hears of it', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      unseen = true;
+      player.fire('paused');
+      run(2);
+      expect(player.status).toBe('playing');
+      expect(commands).toEqual([]);
+    });
+
+    it('hears the viewer again once the tab is back', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      unseen = true;
+      player.fire('paused');
+      run(2);
+      unseen = false;
+      run(2);
+      player.fire('paused');
+      pauseHeld();
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('still sends a pause the viewer made just before leaving', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.fire('paused');
+      unseen = true;
+      pauseHeld();
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('counts a picture-in-picture window as still in reach', () => {
+      expect(outOfReach({ hidden: true, pictureInPictureElement: null })).toBe(true);
+      expect(outOfReach({ hidden: false, pictureInPictureElement: null })).toBe(false);
+      expect(outOfReach({ hidden: true, pictureInPictureElement: {} as Element })).toBe(false);
+    });
   });
 
   it('does not echo its own pause back to the room', () => {
@@ -878,7 +931,7 @@ describe('SyncController', () => {
       const echoing = new EchoingPlayer();
       echoing.status = start;
       player = echoing;
-      sync = new SyncController(player, { now: () => timers.now }, (command) => commands.push(command), (report) => reports.push(report), timers);
+      sync = new SyncController(player, { now: () => timers.now }, (command) => commands.push(command), (report) => reports.push(report), timers, () => unseen);
       return echoing;
     };
 

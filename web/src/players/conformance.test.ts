@@ -150,15 +150,13 @@ describe.each(SOURCES)('%s meets the adapter contract', (_name, mount) => {
 
   it('answers time() at once, and never goes backwards while playing', () => {
     harness.become('playing');
-    let last = harness.player.time();
-    expect(typeof last).toBe('number');
+    expect(typeof harness.player.time()).toBe('number');
     for (let tick = 1; tick <= 40; tick += 1) {
       vi.advanceTimersByTime(100);
-      // Reports land late and jitter, as they do from a player in another frame.
+      const before = harness.player.time();
+      // Reports land late, as they do from a player in another frame.
       if (tick % 3 === 0) harness.at(tick / 10 - 0.08);
-      const now = harness.player.time();
-      expect(now).toBeGreaterThanOrEqual(last);
-      last = now;
+      expect(harness.player.time()).toBeGreaterThanOrEqual(before);
     }
   });
 

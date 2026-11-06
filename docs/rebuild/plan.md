@@ -103,7 +103,7 @@ Never touch the owner's Temporal on 7233. Run k6 only through `grafana/k6`.
 - **Versions.** The client applies only the next version. A gap makes it send `sync` and wait for a snapshot, a `state` with `cause: "sync"`, which it takes whatever version it holds. Failing that, a pong disagreeing with its version on two pongs in a row makes it reconnect. Disagreement covers both directions, since Redis can go backwards.
 - **Dead connections.** The server closes a socket after 90s of silence; hidden tabs run timers once a minute, so it must not be shorter. The client tears down after 3 unanswered heartbeat pings, without waiting for `onclose`, which a dead network can delay for minutes. The join burst doesn't count.
 - **Reconnect.** Backoff 250ms to 5s with jitter, then a new ticket and a fresh `welcome`. The client keeps playing by extrapolation while offline. On shutdown the server closes sockets with 1001 after saving the room.
-- **Native controls stay on.** User intent inside the iframe is inferred from state changes and time discontinuities over 1s with no pending programmatic operation. Player events are ignored for up to 1.5s after applying a remote command.
+- **Native controls stay on.** User intent inside the iframe is inferred from state changes and time discontinuities over 1s. The controller records each `pause()`, `play()` and `seek()` it makes, and only the report of that operation is treated as an echo; there is no time window. Events that repeat the same playback don't touch the player. A resync from the server always applies, which is how a refused command snaps back.
 - **Inferring a seek.** It moves the whole room, so only this counts: two consecutive `playing` ticks at most 2.5s apart, the player's own time having moved by more than the threshold, to somewhere other than our own pending seek. While the room is paused, a player must first be seen resting on the room's position; one that never got there, like a joiner still at 0, is seeked locally and reports nothing.
 - **Who may control.** Roles are host and member, and guests count as members. `control_mode` is `everyone` (default) or `hosts`; `queue_mode` likewise. A viewer without permission is snapped back with a toast. Anything that changes what is on screen needs control permission, even when it arrives as a queue command: `queue.add` with mode `now`, removing the current video, and `ended` when the duration is unknown. Limits: 5 playback commands per second per connection; seek is sent on release.
 
@@ -160,19 +160,20 @@ HTTP, JSON, under `/v1`:
 
 | Route | Purpose |
 |---|---|
-| `GET /config` | `{clerkEnabled, sources[]}` |
-| `POST /session/guest {name?}` | Sets the httpOnly guest cookie |
-| `GET /me`, `GET /me/rooms` | Identity and own rooms |
-| `POST /rooms {url?}` | Creates a room; creates a guest session if none |
+| `GET /config` | `{sources[], clerkPublishableKey}` |
+| `GET /me` | Identity, or `{user: null}` for a visitor with no session yet |
+| `PATCH /me {name}` | Renames; creates a guest session if none |
+| `POST /session/clerk` | Swaps a Clerk token (`Authorization: Bearer`) for the session cookie |
+| `DELETE /session` | Signs out, and revokes every copy of an account's cookie |
+| `POST /rooms {url?}` | Creates a room; creates a guest session if none. 120 rooms an hour per IP; a rejected link costs nothing |
 | `GET /rooms/{slug}` | Public preview: name, now playing, `playback{status,pos}`, members, `maxMembers`. Problem codes `room_not_found`, `room_closed` |
-| `PATCH`, `DELETE /rooms/{slug}` | Host only |
 | `POST /rooms/{slug}/ticket` | Single-use WS ticket, 30s |
 | `GET /rooms/{slug}/messages?before=` | Keyset pagination. Needs a session cookie |
 | `GET /media/search?q=` | Returns `{items}`. 20 an hour per IP, on top of the daily budget |
 | `GET /media/trending` | Cached trending |
 | `POST /telemetry` | Batched; `sendBeacon` allowed |
-| `POST /webhooks/clerk` | Svix-verified |
-| `GET /healthz`, `/readyz` | Health |
+
+Outside `/v1`: `GET /healthz`, `GET /readyz`, and `GET /r/{slug}`, the app with link-preview tags for that room.
 
 WebSocket `/v1/ws?ticket=`, envelope `{t, id?, d}`:
 
@@ -188,7 +189,8 @@ The client sends only URLs or ids. The server resolves all titles and thumbnails
 
 - **Guests can create and join rooms from a link with no account.** This is what lets everything work without Clerk keys. A guest gets a server-signed EdDSA token in an httpOnly cookie, with `sub = g_<ulid>` and an editable generated name.
 - **Clerk** is enabled only when its keys are present. The server verifies JWTs against JWKS; `ClerkProvider` mounts only if `VITE_CLERK_PUBLISHABLE_KEY` is set; otherwise the sign-in button is hidden.
-- **Signing in** claims the guest's rooms and makes them permanent. Guest rooms expire after 24h idle.
+- **Signing in** creates a new `u_` account and moves the guest's rooms to it, but never reuses the guest's id: the old guest cookie stays a plain guest. Guest rooms expire after 24h idle.
+- **Signing out** bumps `users.session_version`. Signed-in cookies carry the version and are checked against it, cached for 5s per server, so sign-out invalidates every copy of the cookie on every device.
 
 ## 8. Data model and migration
 

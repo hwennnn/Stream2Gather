@@ -23,8 +23,8 @@ test:
 	cd server && go test -race ./...
 	cd web && npm test
 
-# The browser test needs a local video in the web build.
-SAMPLE ?= web/dist/sample.mp4
+# The browser test serves this from its own build.
+SAMPLE ?= .data/sample.mp4
 
 sample:
 	ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=30:duration=300 \

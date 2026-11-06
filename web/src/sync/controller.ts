@@ -206,6 +206,11 @@ export class SyncController {
     this.report({ health: 'waiting', drift: 0 });
   }
 
+  /** The player is stopped because the viewer or a correction stopped it, not the browser. */
+  stoppedOnPurpose(): boolean {
+    return this.held !== null || this.nudging || this.asked === 'paused';
+  }
+
   /** Runs once a second while mounted. */
   tick(): void {
     const playback = this.playback;

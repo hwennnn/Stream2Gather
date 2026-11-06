@@ -5,8 +5,21 @@ import type { PlayerAdapter, PlayerState } from './types';
 const CHECK_MS = 2500;
 
 const fakePlayer = (state: PlayerState) => {
-  const player = { state: () => state, setMuted: vi.fn(), play: vi.fn() };
-  return { player: player as unknown as PlayerAdapter, setState: (next: PlayerState) => { state = next; }, ...player };
+  let muted = false;
+  let blocked = () => {};
+  const player = {
+    state: () => state,
+    muted: () => muted,
+    setMuted: vi.fn((next: boolean) => { muted = next; }),
+    play: vi.fn(),
+    onBlocked: (listener: () => void) => { blocked = listener; },
+  };
+  return {
+    player: player as unknown as PlayerAdapter,
+    setState: (next: PlayerState) => { state = next; },
+    block: () => blocked(),
+    ...player,
+  };
 };
 
 describe('watchAutoplay', () => {
@@ -23,7 +36,7 @@ describe('watchAutoplay', () => {
   it.each<PlayerState>(['paused', 'ready'])('mutes a player left %s', (state) => {
     const fake = fakePlayer(state);
     const onMuted = vi.fn();
-    watchAutoplay(() => true, fake.player, onMuted);
+    watchAutoplay(() => true, () => false, fake.player, onMuted);
     vi.advanceTimersByTime(CHECK_MS);
     expect(fake.setMuted).toHaveBeenCalledWith(true);
     expect(fake.play).toHaveBeenCalled();
@@ -32,14 +45,14 @@ describe('watchAutoplay', () => {
 
   it.each<PlayerState>(['loading', 'buffering'])('does not mute a slow load that is %s', (state) => {
     const fake = fakePlayer(state);
-    watchAutoplay(() => true, fake.player, vi.fn());
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
     expect(fake.setMuted).not.toHaveBeenCalled();
   });
 
   it('leaves a slow load alone once it plays', () => {
     const fake = fakePlayer('loading');
-    watchAutoplay(() => true, fake.player, vi.fn());
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
     fake.setState('playing');
     vi.advanceTimersByTime(CHECK_MS * 3);
@@ -48,7 +61,7 @@ describe('watchAutoplay', () => {
 
   it('takes a pause after the video has played for the viewer pausing', () => {
     const fake = fakePlayer('loading');
-    watchAutoplay(() => true, fake.player, vi.fn());
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
     fake.setState('playing');
     vi.advanceTimersByTime(CHECK_MS - 300);
     // The room still says playing, because a viewer's pause is held before it is sent.
@@ -60,7 +73,7 @@ describe('watchAutoplay', () => {
 
   it('still catches a slow load that was then refused', () => {
     const fake = fakePlayer('loading');
-    watchAutoplay(() => true, fake.player, vi.fn());
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
     fake.setState('paused');
     vi.advanceTimersByTime(CHECK_MS);
@@ -69,18 +82,62 @@ describe('watchAutoplay', () => {
 
   it('leaves a paused room alone', () => {
     const fake = fakePlayer('paused');
-    watchAutoplay(() => false, fake.player, vi.fn());
+    watchAutoplay(() => false, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.setMuted).not.toHaveBeenCalled();
+  });
+
+  it('does not take a stop somebody meant for a refusal', () => {
+    const fake = fakePlayer('paused');
+    watchAutoplay(() => true, () => true, fake.player, vi.fn());
+    vi.advanceTimersByTime(CHECK_MS * 3);
+    expect(fake.setMuted).not.toHaveBeenCalled();
+  });
+
+  it('still catches a refusal once that stop is over', () => {
+    const fake = fakePlayer('paused');
+    let onPurpose = true;
+    watchAutoplay(() => true, () => onPurpose, fake.player, vi.fn());
+    vi.advanceTimersByTime(CHECK_MS);
+    onPurpose = false;
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.setMuted).toHaveBeenCalledWith(true);
+  });
+
+  it('mutes the moment the browser refuses, even long after joining', () => {
+    const fake = fakePlayer('buffering');
+    const onMuted = vi.fn();
+    watchAutoplay(() => true, () => false, fake.player, onMuted);
+    vi.advanceTimersByTime(CHECK_MS * 10);
+    fake.block();
+    expect(fake.setMuted).toHaveBeenCalledWith(true);
+    expect(fake.play).toHaveBeenCalled();
+    expect(onMuted).toHaveBeenCalledWith(true);
+  });
+
+  it('does not loop if a muted start is refused too', () => {
+    const fake = fakePlayer('buffering');
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
+    fake.block();
+    fake.block();
+    expect(fake.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a refusal in a paused room', () => {
+    const fake = fakePlayer('ready');
+    watchAutoplay(() => false, () => false, fake.player, vi.fn());
+    fake.block();
     expect(fake.setMuted).not.toHaveBeenCalled();
   });
 
   it('stops when the player goes', () => {
     const fake = fakePlayer('loading');
-    const stop = watchAutoplay(() => true, fake.player, vi.fn());
+    const stop = watchAutoplay(() => true, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
     stop();
     fake.setState('paused');
     vi.advanceTimersByTime(CHECK_MS * 3);
+    fake.block();
     expect(fake.setMuted).not.toHaveBeenCalled();
   });
 });

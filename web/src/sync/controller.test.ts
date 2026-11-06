@@ -26,6 +26,7 @@ class FakePlayer implements PlayerAdapter {
   volume() { return 1; }
   onState(listener: (state: PlayerState) => void) { this.listener = listener; }
   onError(_listener: (error: PlayerError) => void) {}
+  onBlocked(_listener: () => void) {}
   destroy() {}
 
   fire(state: PlayerState) { this.status = state; this.listener(state); }
@@ -312,6 +313,27 @@ describe('SyncController', () => {
     player.status = 'playing';
     run(12);
     expect(commands).toEqual([]);
+  });
+
+  describe('a stop somebody meant', () => {
+    it('covers a pause the room has yet to hear about, or answer', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      expect(sync.stoppedOnPurpose()).toBe(false);
+      player.fire('paused');
+      expect(sync.stoppedOnPurpose()).toBe(true);
+      pauseHeld();
+      expect(sync.stoppedOnPurpose()).toBe(true);
+    });
+
+    it('covers falling back to the room', () => {
+      sync.apply(playing(0, timers.now));
+      run(2);
+      player.current += 0.8;
+      run(1);
+      expect(player.status).toBe('paused');
+      expect(sync.stoppedOnPurpose()).toBe(true);
+    });
   });
 
   describe('what the viewer is told', () => {

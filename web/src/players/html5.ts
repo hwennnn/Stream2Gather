@@ -1,4 +1,4 @@
-import { createErrorChannel, type PlayerAdapter, type PlayerState } from './types';
+import { createBlockedChannel, createErrorChannel, type PlayerAdapter, type PlayerState } from './types';
 
 /** Plays a media file directly, which gives the tightest sync of any source. */
 export const createHtml5Player = async (
@@ -15,6 +15,7 @@ export const createHtml5Player = async (
   let state: PlayerState = 'loading';
   let stateListener: (state: PlayerState) => void = () => {};
   const errors = createErrorChannel();
+  const blocked = createBlockedChannel();
   const set = (next: PlayerState) => {
     state = next;
     stateListener(next);
@@ -59,7 +60,10 @@ export const createHtml5Player = async (
   return {
     rates: 'fine',
     play: () => {
-      void video.play().catch(() => {});
+      // A pause that interrupts a play also rejects, and means nothing.
+      void video.play().catch((error: unknown) => {
+        if (error instanceof Error && error.name === 'NotAllowedError') blocked.report();
+      });
     },
     pause: () => video.pause(),
     seek: (seconds) => {
@@ -86,6 +90,7 @@ export const createHtml5Player = async (
       stateListener = listener;
     },
     onError: errors.listen,
+    onBlocked: blocked.listen,
     destroy: () => {
       destroyHls();
       video.removeAttribute('src');

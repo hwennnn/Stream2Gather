@@ -87,6 +87,12 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
 
   session.onPlayback((playback, resync) => sync.apply(playback, resync));
   sync.apply(session.getView().playback);
+  const stopWatchingAutoplay = watchAutoplay(
+    () => session.getView().playback.status === 'playing',
+    () => sync.stoppedOnPurpose(),
+    player,
+    events.onMuted,
+  );
 
   const noteCold = () => events.onCold(session.getView().playback.status === 'paused' && notStarted(player.state()));
   noteCold();
@@ -107,6 +113,7 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
   return () => {
     window.clearInterval(timer);
     stopExposing();
+    stopWatchingAutoplay();
     sync.destroy();
     session.onPlayback(() => {});
   };
@@ -157,7 +164,6 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
       cleanups.push(
         watchReady(created, item, events.onReady),
         watchFirstFrame(created, item),
-        watchAutoplay(() => session.getView().playback.status === 'playing', created, events.onMuted),
         startSync(session, created, item, events),
       );
     },

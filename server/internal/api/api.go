@@ -557,9 +557,9 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	record := store.Room{ID: ids.New(), Name: ids.RoomName(), OwnerID: claims.Subject}
+	record := store.Room{ID: ids.New(), OwnerID: claims.Subject}
 	record.Slug, err = claimSlug(ids.Slug, func(slug string) error {
-		record.Slug = slug
+		record.Slug, record.Name = slug, ids.RoomNameFor(slug)
 		return s.DB.CreateRoom(r.Context(), record)
 	})
 	if err != nil {

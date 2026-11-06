@@ -35,10 +35,13 @@ func Slug() string {
 	return pick(adjectives) + "-" + pick(nouns) + "-" + encoding.EncodeToString(buffer)
 }
 
-// RoomName returns a friendly default name.
-func RoomName() string {
-	word := pick(adjectives)
-	return strings.ToUpper(word[:1]) + word[1:] + " " + pick(nouns) + " room"
+// RoomNameFor names a room after its address, so people see one name and not two.
+func RoomNameFor(slug string) string {
+	words := strings.Split(slug, "-")
+	if len(words) < 2 || words[0] == "" {
+		return "Room"
+	}
+	return strings.ToUpper(words[0][:1]) + words[0][1:] + " " + words[1] + " room"
 }
 
 // GuestName returns a friendly default display name.

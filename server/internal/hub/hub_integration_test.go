@@ -439,6 +439,37 @@ func TestChatIsAcknowledged(t *testing.T) {
 	c.expect(t, "ack")
 }
 
+func TestReactionsDoNotSpendTheChatLimit(t *testing.T) {
+	r := newRig(t, testRedis)
+	c := r.joined(t, r.newRoom(t, directVideo(t)), "u", room.RoleMember)
+	for range 20 {
+		c.send(t, "react", map[string]any{"emoji": "🔥"})
+	}
+	c.sendWithID(t, "3", "chat.send", map[string]any{"text": "hi"})
+	c.expect(t, "ack")
+	if _, limited := c.next("error", 100*time.Millisecond); limited {
+		t.Fatal("chat was limited by reactions")
+	}
+}
+
+func TestReactionsHaveTheirOwnLimit(t *testing.T) {
+	r := newRig(t, testRedis)
+	c := r.joined(t, r.newRoom(t, directVideo(t)), "u", room.RoleMember)
+	for range 20 {
+		c.send(t, "react", map[string]any{"emoji": "🔥"})
+	}
+	seen := 0
+	for {
+		if _, ok := c.next("react", 200*time.Millisecond); !ok {
+			break
+		}
+		seen++
+	}
+	if seen == 0 || seen >= 20 {
+		t.Fatalf("%d of 20 reactions delivered", seen)
+	}
+}
+
 func youtubeVideo(t *testing.T, r *rig, sourceID string) room.State {
 	t.Helper()
 	media := room.Media{Source: "youtube", SourceID: sourceID, URL: "https://www.youtube.com/watch?v=" + sourceID, Title: "Zelda trailer"}
@@ -625,7 +656,7 @@ func TestHubCloseSendsGoingAwayAndRunsLeaves(t *testing.T) {
 func TestSocketCapPerPerson(t *testing.T) {
 	r := newRig(t, testRedis)
 	id := r.newRoom(t, directVideo(t))
-	for range maxSocketsPerUser {
+	for range MaxSocketsPerUser {
 		r.joined(t, id, "tabby", room.RoleMember)
 	}
 	extra := r.dial(t, id, "tabby", room.RoleMember)

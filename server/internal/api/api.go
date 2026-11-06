@@ -41,9 +41,9 @@ const (
 	searchesPerHour = 20
 	// Tabs flush every ten seconds. This leaves room for a shared address.
 	telemetryPerMinute = 240
-	// Per person, per room. The hub holds the same line for anyone racing past.
-	maxSocketsPerUser = 10
-	slugAttempts      = 5
+	// Counts rooms that exist, so a mistyped link costs nothing.
+	roomsPerHour = 120
+	slugAttempts = 5
 )
 
 // ClerkVerifier turns a Clerk session token into the person it belongs to.
@@ -434,11 +434,23 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		s.sessionFailed(w, err)
 		return
 	}
-	allowed, err := s.Live.Limit(r.Context(), "rooms:"+s.clientIP(r), 30, time.Hour)
+	limit := "rooms:" + s.clientIP(r)
+	allowed, err := s.Live.Limit(r.Context(), limit, roomsPerHour, time.Hour)
 	if err != nil {
 		s.internal(w, err)
 		return
 	}
+	// Taken up front so parallel requests can't overrun the limit, and handed
+	// back below by anything that doesn't end in a room.
+	created := false
+	defer func() {
+		if created {
+			return
+		}
+		if err := s.Live.Refund(context.WithoutCancel(r.Context()), limit); err != nil {
+			s.Log.Warn("room limit refund failed", "error", err)
+		}
+	}()
 	if !allowed {
 		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many new rooms. Try again later.")
 		return
@@ -472,6 +484,7 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
+	created = true
 	writeJSON(w, http.StatusCreated, map[string]string{"slug": record.Slug, "name": record.Name})
 }
 
@@ -583,7 +596,7 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
-	if sockets >= maxSocketsPerUser {
+	if sockets >= hub.MaxSocketsPerUser {
 		writeProblem(w, http.StatusConflict, "too_many_connections", "You have this room open in too many tabs.")
 		return
 	}

@@ -39,8 +39,8 @@ const (
 	hostGrace = 30 * time.Second
 	// An empty room keeps running briefly, so a reload resumes seamlessly.
 	emptyGraceMS = 60_000
-	// Per person, per room, across every server.
-	maxSocketsPerUser = 10
+	// MaxSocketsPerUser is per person, per room, across every server.
+	MaxSocketsPerUser = 10
 	// How many distinct people must report an embed block before it is believed.
 	embedBlockReports = 2
 )
@@ -285,7 +285,9 @@ type conn struct {
 	reason  string
 	control *rate.Limiter
 	chat    *rate.Limiter
-	reports *rate.Limiter
+	// reactions has its own limit, so a burst of them can't cost a chat message.
+	reactions *rate.Limiter
+	reports   *rate.Limiter
 
 	mu     sync.RWMutex
 	person store.Person
@@ -680,7 +682,7 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 
 	// The ticket checks this too. This is the check that races can't get past,
 	// and the reconnect it causes gets the reason from the ticket.
-	if open, err := r.hub.live.Sockets(ctx, r.id, person.UserID); err == nil && open >= maxSocketsPerUser {
+	if open, err := r.hub.live.Sockets(ctx, r.id, person.UserID); err == nil && open >= MaxSocketsPerUser {
 		c.shut(websocket.StatusPolicyViolation, "too many connections")
 		return
 	}

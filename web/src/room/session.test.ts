@@ -224,6 +224,18 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('crew events', () => {
+    it('tells listeners what changed until they stop listening', async () => {
+      const { session, socket } = await connected();
+      const heard: string[] = [];
+      const stop = session.onCrew((changed) => heard.push(changed));
+      socket?.deliver('crew', { changed: 'watchlist' });
+      stop();
+      socket?.deliver('crew', { changed: 'members' });
+      expect(heard).toEqual(['watchlist']);
+    });
+  });
+
   describe('send and request', () => {
     it('says whether a message left', async () => {
       const { session, socket } = await connected();

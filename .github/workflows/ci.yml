@@ -38,11 +38,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Keep first-load JS under 150 kB gzipped
-        run: |
-          size=$(gzip -c dist/assets/index-*.js | wc -c)
-          echo "first-load JS: $size bytes"
-          test "$size" -lt 153600
+      - run: node scripts/bundle-budget.mjs
 
   secrets:
     runs-on: ubuntu-latest

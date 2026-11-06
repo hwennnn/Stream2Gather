@@ -2,8 +2,8 @@ import { Component, type ReactNode } from 'react';
 
 type State = { failed: boolean };
 
-/** The last line of defence: a friendly page instead of a blank one. */
-export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
+/** The last line of defence: a friendly page instead of a blank one, unless given something else. */
+export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: ReactNode }, State> {
   override state: State = { failed: false };
 
   static getDerivedStateFromError(): State {
@@ -12,6 +12,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   override render() {
     if (!this.state.failed) return this.props.children;
+    if (this.props.fallback !== undefined) return this.props.fallback;
     return (
       <main className="glow flex h-full items-center justify-center px-6 text-center">
         <div className="enter max-w-sm">

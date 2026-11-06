@@ -1,13 +1,18 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { looksLikeUrl, normalizeUrl } from '../ui/format';
+import { Slot } from '../ui/Slot';
 import { useTrending } from '../ui/useTrending';
 import { HeroPreview } from './landing/HeroPreview';
 import { BAD_LINK, EMPTY, failureFor, type Failure } from './landing/notes';
 import { Footer, HowItWorks, InsideARoom, Trending } from './landing/Sections';
 import { loadRoomPage, startRoom } from './router';
 
+const CrewRail = lazy(() => import('../crew/CrewRail'));
+
 export const Landing = () => {
+  const { user } = useAccount();
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<Failure | null>(null);
@@ -149,6 +154,11 @@ export const Landing = () => {
           <HeroPreview thumbnail={trending?.[0]?.thumbnailUrl ?? ''} title={trending?.[0]?.title ?? 'Tonight’s movie'} />
         </section>
 
+        {user?.signedIn && (
+          <Slot>
+            <CrewRail />
+          </Slot>
+        )}
         <Trending items={trending} busy={busy} disabled={working} onPick={(media) => void start(media.sourceId, media.url)} />
         <InsideARoom items={trending} />
         <HowItWorks disabled={working} onStart={focusInput} />

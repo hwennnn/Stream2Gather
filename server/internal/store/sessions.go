@@ -65,9 +65,12 @@ func (p *Postgres) RecordCapture(ctx context.Context, c Capture) error {
 		return err
 	}
 	if sessionID != "" {
-		if err := seat(ctx, tx, sessionID, c.Joined, c.At); err != nil {
+		if err := recordSession(ctx, tx, sessionID, c); err != nil {
 			return err
 		}
+	}
+	if err := recordMoments(ctx, tx, sessionID, c); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }
@@ -128,4 +131,144 @@ func seat(ctx context.Context, tx pgx.Tx, sessionID string, people []Person, at 
 		}
 	}
 	return nil
+}
+
+func recordSession(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) error {
+	if err := seat(ctx, tx, sessionID, c.Joined, c.At); err != nil {
+		return err
+	}
+	if len(c.Left) > 0 {
+		_, err := tx.Exec(ctx, `
+			UPDATE session_people SET left_at = $3
+			WHERE session_id = $1 AND user_id = ANY($2) AND left_at IS NULL`, sessionID, c.Left, c.At)
+		if err != nil {
+			return err
+		}
+	}
+	if err := recordItem(ctx, tx, sessionID, c); err != nil {
+		return err
+	}
+	if !c.Active {
+		return nil
+	}
+	_, err := tx.Exec(ctx, `
+		UPDATE crew_sessions SET last_activity_at = greatest(last_activity_at, $2) WHERE id = $1`, sessionID, c.At)
+	return err
+}
+
+// recordItem starts a row when the video changes, and marks it watched on the list.
+func recordItem(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) error {
+	var itemID int64
+	var source string
+	var sourceID *string
+	err := tx.QueryRow(ctx, `
+		SELECT id, source, source_id FROM session_items
+		WHERE session_id = $1 AND ended_at IS NULL ORDER BY id DESC LIMIT 1`, sessionID).Scan(&itemID, &source, &sourceID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	open := err == nil
+	if open && source == c.Source && sourceID != nil && *sourceID == c.SourceID {
+		return nil
+	}
+	if open {
+		if _, err := tx.Exec(ctx, `UPDATE session_items SET ended_at = $2 WHERE id = $1`, itemID, c.At); err != nil {
+			return err
+		}
+	}
+	if c.SourceID == "" {
+		return nil
+	}
+	_, err = tx.Exec(ctx, `
+		INSERT INTO session_items (session_id, source, source_id, started_at) VALUES ($1, $2, $3, $4)`,
+		sessionID, c.Source, c.SourceID, c.At)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `
+		UPDATE watchlist_items SET watched_session_id = $1
+		WHERE crew_id = $2 AND source = $3 AND source_id = $4 AND removed_at IS NULL AND watched_session_id IS NULL`,
+		sessionID, c.CrewID, c.Source, c.SourceID)
+	return err
+}
+
+func recordMoments(ctx context.Context, tx pgx.Tx, sessionID string, c Capture) error {
+	if len(c.Moments) == 0 {
+		return nil
+	}
+	var session *string
+	if sessionID != "" {
+		session = &sessionID
+	}
+	rows := make([][]any, len(c.Moments))
+	for i, m := range c.Moments {
+		var emoji *string
+		if m.Emoji != "" {
+			emoji = &m.Emoji
+		}
+		var messageID *int64
+		if m.MessageID != 0 {
+			messageID = &m.MessageID
+		}
+		rows[i] = []any{c.CrewID, session, m.Source, m.SourceID, m.PosMs, m.Kind, m.UserID, m.Author, emoji, messageID, m.At}
+	}
+	_, err := tx.CopyFrom(ctx, pgx.Identifier{"moments"},
+		[]string{"crew_id", "session_id", "source", "source_id", "pos_ms", "kind", "user_id", "author_name", "emoji", "message_id", "at"},
+		pgx.CopyFromRows(rows))
+	return err
+}
+
+// OpenSession is a session the sweeper has to decide about.
+type OpenSession struct {
+	ID           string
+	RoomID       string
+	LastActivity time.Time
+	// LastLeft is when someone last left, and zero if nobody has.
+	LastLeft time.Time
+}
+
+// OpenSessions lists every session still running.
+func (p *Postgres) OpenSessions(ctx context.Context) ([]OpenSession, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT s.id, c.room_id, s.last_activity_at,
+		       coalesce((SELECT max(left_at) FROM session_people WHERE session_id = s.id), 'epoch')
+		FROM crew_sessions s JOIN crews c ON c.id = s.crew_id
+		WHERE s.ended_at IS NULL`)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (OpenSession, error) {
+		var s OpenSession
+		return s, row.Scan(&s.ID, &s.RoomID, &s.LastActivity, &s.LastLeft)
+	})
+}
+
+// TouchSession records that a session is still going, for a video nobody touches.
+func (p *Postgres) TouchSession(ctx context.Context, sessionID string, at time.Time) error {
+	_, err := p.pool.Exec(ctx, `
+		UPDATE crew_sessions SET last_activity_at = greatest(last_activity_at, $2) WHERE id = $1`, sessionID, at)
+	return err
+}
+
+// EndSession closes a session and everything left open in it, including what a
+// crashed server never got to close. It reports false if it had ended already.
+func (p *Postgres) EndSession(ctx context.Context, sessionID string, at time.Time) (bool, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `UPDATE crew_sessions SET ended_at = $2 WHERE id = $1 AND ended_at IS NULL`, sessionID, at)
+	if err != nil || tag.RowsAffected() == 0 {
+		return false, err
+	}
+	for _, statement := range []string{
+		`UPDATE session_items SET ended_at = $2 WHERE session_id = $1 AND ended_at IS NULL`,
+		`UPDATE session_people SET left_at = $2 WHERE session_id = $1 AND left_at IS NULL`,
+	} {
+		if _, err := tx.Exec(ctx, statement, sessionID, at); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
 }

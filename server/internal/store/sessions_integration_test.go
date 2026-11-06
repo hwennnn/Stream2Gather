@@ -65,6 +65,9 @@ func TestOnlyPlayingOpensASessionAndItComesWithOneOutboxRow(t *testing.T) {
 	if got := count(t, db, `SELECT count(*) FROM outbox WHERE kind = 'session.started' AND ref = $1`, sessionID); got != 1 {
 		t.Fatalf("%d outbox rows", got)
 	}
+	if got := count(t, db, `SELECT count(*) FROM session_items WHERE session_id = $1`, sessionID); got != 1 {
+		t.Fatalf("%d item rows for one video", got)
+	}
 	if got := count(t, db, `SELECT count(*) FROM session_people WHERE session_id = $1`, sessionID); got != 1 {
 		t.Fatalf("%d people seated", got)
 	}
@@ -89,5 +92,80 @@ func TestFirstPlaysOnSeveralServersOpenOneSession(t *testing.T) {
 	}
 	if got := count(t, db, `SELECT count(*) FROM outbox o JOIN crew_sessions s ON s.id = o.ref WHERE s.crew_id = $1`, crewID); got != 1 {
 		t.Fatalf("%d outbox rows", got)
+	}
+}
+
+func TestAChangeOfVideoClosesTheLastAndTicksTheWatchlist(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	crewID, owner := testCrew(t, db)
+	if err := db.AddWatch(ctx, crewID, "youtube", "b", owner); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, video := range []string{"a", "b"} {
+		err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: video})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if got := count(t, db, `
+		SELECT count(*) FROM session_items i JOIN crew_sessions s ON s.id = i.session_id
+		WHERE s.crew_id = $1 AND i.ended_at IS NULL AND i.source_id = 'b'`, crewID); got != 1 {
+		t.Fatalf("%d open rows for the second video", got)
+	}
+	if got := count(t, db, `
+		SELECT count(*) FROM session_items i JOIN crew_sessions s ON s.id = i.session_id
+		WHERE s.crew_id = $1 AND i.ended_at IS NOT NULL AND i.source_id = 'a'`, crewID); got != 1 {
+		t.Fatalf("%d closed rows for the first video", got)
+	}
+	if got := count(t, db, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND watched_session_id IS NOT NULL`, crewID); got != 1 {
+		t.Fatalf("%d watched", got)
+	}
+}
+
+func TestMomentsKeepTheirPlaceAndEndingClosesWhatACrashLeftOpen(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	crewID, owner := testCrew(t, db)
+	hana := Person{UserID: owner, Name: "Hana", Member: true}
+	at := time.Now()
+
+	err := db.RecordCapture(ctx, Capture{
+		CrewID: crewID, At: at, Playing: true, Source: "youtube", SourceID: "a", Present: []Person{hana}, Active: true,
+		Moments: []CapturedMoment{{Kind: "reaction", UserID: owner, Author: "Hana", Emoji: "🔥", Source: "youtube", SourceID: "a", PosMs: 61_500, At: at}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := count(t, db, `SELECT count(*) FROM moments WHERE crew_id = $1 AND pos_ms = 61500 AND session_id IS NOT NULL`, crewID); got != 1 {
+		t.Fatalf("%d moments", got)
+	}
+
+	open, err := db.OpenSessions(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sessionID string
+	for _, session := range open {
+		if count(t, db, `SELECT count(*) FROM crew_sessions WHERE id = $1 AND crew_id = $2`, session.ID, crewID) == 1 {
+			sessionID = session.ID
+		}
+	}
+	if sessionID == "" {
+		t.Fatal("the session isn't listed as open")
+	}
+
+	ended := at.Add(time.Minute)
+	if done, err := db.EndSession(ctx, sessionID, ended); err != nil || !done {
+		t.Fatal(done, err)
+	}
+	if done, err := db.EndSession(ctx, sessionID, ended); err != nil || done {
+		t.Fatalf("second end: %v %v", done, err)
+	}
+	if got := count(t, db, `SELECT count(*) FROM session_people WHERE session_id = $1 AND left_at IS NULL`, sessionID); got != 0 {
+		t.Fatalf("%d people still seated", got)
+	}
+	if got := count(t, db, `SELECT count(*) FROM session_items WHERE session_id = $1 AND ended_at IS NULL`, sessionID); got != 0 {
+		t.Fatalf("%d items still open", got)
 	}
 }

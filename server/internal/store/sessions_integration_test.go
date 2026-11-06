@@ -46,7 +46,7 @@ func TestOnlyPlayingOpensASessionAndItComesWithOneOutboxRow(t *testing.T) {
 		t.Fatalf("%d sessions before anything played", got)
 	}
 
-	play := Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: "a", Present: []Person{hana}}
+	play := Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: "a", Present: []Person{hana}, PressedPlay: owner}
 	for range 2 {
 		if err := db.RecordCapture(ctx, play); err != nil {
 			t.Fatal(err)
@@ -202,5 +202,38 @@ func TestOnlyCrewsPastTheirFortnightCountTowardsComingBack(t *testing.T) {
 	}
 	if cohort-cohortBefore != 3 || returned-returnedBefore != 1 {
 		t.Fatalf("cohort up %d, returned up %d", cohort-cohortBefore, returned-returnedBefore)
+	}
+}
+
+func TestASessionNamesWhoPressedPlayOrNobody(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	for name, pick := range map[string]func(member string) (pressed, named string){
+		"the newer member, not the longest standing": func(member string) (string, string) { return member, member },
+		"nobody, when nobody pressed it":             func(string) (string, string) { return "", "" },
+		"nobody, when a guest did":                   func(string) (string, string) { return "g_" + ids.New(), "" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			crewID, owner := testCrew(t, db)
+			member := "u_" + ids.New()
+			if err := db.EnsureUser(ctx, member, "Bo"); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.pool.Exec(ctx, `INSERT INTO crew_members (crew_id, user_id) VALUES ($1, $2)`, crewID, member); err != nil {
+				t.Fatal(err)
+			}
+			pressed, want := pick(member)
+			present := []Person{{UserID: owner, Name: "Hana", Member: true}, {UserID: member, Name: "Bo", Member: true}}
+			err := db.RecordCapture(ctx, Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: "a", Present: present, PressedPlay: pressed})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var startedBy string
+			if err := db.pool.QueryRow(ctx, `SELECT COALESCE(started_by, '') FROM crew_sessions WHERE crew_id = $1`, crewID).Scan(&startedBy); err != nil {
+				t.Fatal(err)
+			}
+			if startedBy != want {
+				t.Fatalf("started by %q, want %q", startedBy, want)
+			}
+		})
 	}
 }

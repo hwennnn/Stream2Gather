@@ -20,6 +20,8 @@ export interface PlayerAdapter {
   cue(seconds: number): void;
   setRate(rate: number): void;
   time(): number;
+  /** In seconds, or null until the player knows. */
+  duration(): number | null;
   state(): PlayerState;
   setMuted(muted: boolean): void;
   muted(): boolean;

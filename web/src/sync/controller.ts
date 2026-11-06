@@ -52,6 +52,10 @@ const STALL_SEEK_S = 0.4;
 const JUMP_BEHIND_S = 1;
 /** A jump that lasted this long worked, so the next stall is a new problem, not the same one. */
 const SEEK_HELD_MS = 3000;
+/** A seek stops this far short of the end. YouTube can restart a video sent past it. */
+const END_MARGIN_S = 1;
+/** A report of the end can be lost or come early, so it is repeated until the room moves on. */
+const ENDED_RETRY_MS = 2000;
 /**
  * How long a player we just moved, or a viewer's command the room has not
  * answered, is left alone before being corrected. It only ever delays a
@@ -97,6 +101,8 @@ export class SyncController {
   private measuringSeek = false;
   private onRoomSince: number | null = null;
   private retriedJump = false;
+  private finished = false;
+  private endedAt = -Infinity;
   private lastTickAt = 0;
   /**
    * Where the player last was at a tick, running or resting on the room's paused
@@ -142,8 +148,11 @@ export class SyncController {
    */
   apply(playback: Playback, resync = false): void {
     const previous = this.playback;
-    if (!resync && previous && samePlayback(previous, playback)) return;
+    const repeat = previous !== null && samePlayback(previous, playback);
+    if (!resync && repeat) return;
     this.playback = playback;
+    if (!repeat) this.finished = false;
+    if (this.finished) return; // Only the room moving on, or going back, changes anything now.
     this.asked = null;
     this.measuringSeek = false;
     if (this.held && playback.status === 'playing') {
@@ -180,9 +189,8 @@ export class SyncController {
     const off = this.player.time() - expected;
     const jumped = Math.abs(off) > NUDGE_BEHIND_MAX_S;
     // A new timeline is a command: everyone goes there now, however short the move.
-    const sameTimeline = previous !== null && samePlayback(previous, playback);
     this.act(() => {
-      if (jumped || !sameTimeline) {
+      if (jumped || !repeat) {
         if (Math.abs(this.player.time() - expected) > DRIFT_OK_S) this.seekTo(expected);
       }
       this.player.setRate(playback.rate);
@@ -235,6 +243,12 @@ export class SyncController {
 
     const expected = expectedPosition(playback, now);
     const drift = time - expected;
+
+    if (this.finished || this.pastTheEnd(expected)) {
+      this.reportDrift(drift);
+      this.reportEnded(now);
+      return;
+    }
 
     if (state === 'buffering' || state === 'loading') {
       this.report({ health: 'buffering', drift });
@@ -430,7 +444,20 @@ export class SyncController {
   }
 
   private seekTo(expected: number): void {
-    this.seekPlayer(expected + this.seekLead());
+    const target = expected + this.seekLead();
+    const length = this.player.duration();
+    this.seekPlayer(length === null ? target : Math.min(target, length - END_MARGIN_S));
+  }
+
+  private pastTheEnd(expected: number): boolean {
+    const length = this.player.duration();
+    return length !== null && expected >= length;
+  }
+
+  private reportEnded(now: number): void {
+    if (now - this.endedAt < ENDED_RETRY_MS) return;
+    this.endedAt = now;
+    this.emit({ type: 'ended' });
   }
 
   private seekLead(): number {
@@ -516,9 +543,11 @@ export class SyncController {
     if (!playback) return;
 
     if (state === 'ended') {
-      this.emit({ type: 'ended' });
+      this.finished = true;
+      this.reportEnded(this.clock.now());
       return;
     }
+    if (this.finished) return; // Whatever it does now, nobody asked for it.
     if (state === 'buffering' || state === 'loading') this.wasBuffering = true;
     if (state === 'buffering' && this.expecting === 'playing') {
       this.expecting = null; // It has left paused, so a pause from here is the viewer's.

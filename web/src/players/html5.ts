@@ -86,6 +86,7 @@ export const createHtml5Player = async (
       video.volume = volume;
     },
     volume: () => video.volume,
+    duration: () => (Number.isFinite(video.duration) ? video.duration : null),
     onState: (listener) => {
       stateListener = listener;
     },

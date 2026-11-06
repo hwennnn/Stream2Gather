@@ -11,6 +11,7 @@ class FakePlayer implements PlayerAdapter {
   status: PlayerState = 'paused';
   seeks: number[] = [];
   cues: number[] = [];
+  length: number | null = null;
   private listener: (state: PlayerState) => void = () => {};
 
   play() { this.status = 'playing'; }
@@ -24,6 +25,7 @@ class FakePlayer implements PlayerAdapter {
   muted() { return false; }
   setVolume() {}
   volume() { return 1; }
+  duration() { return this.length; }
   onState(listener: (state: PlayerState) => void) { this.listener = listener; }
   onError(_listener: (error: PlayerError) => void) {}
   onBlocked(_listener: () => void) {}
@@ -333,6 +335,92 @@ describe('SyncController', () => {
       run(1);
       expect(player.status).toBe('paused');
       expect(sync.stoppedOnPurpose()).toBe(true);
+    });
+  });
+
+  describe('the end of a video', () => {
+    /** What YouTube can do with a seek past the end: start the video again. */
+    const restartsOnSeek = () => {
+      player.seek = (target) => { player.seeks.push(target); player.current = 0; player.fire('playing'); };
+    };
+    const finish = () => {
+      player.length = 195;
+      const room = playing(190, timers.now);
+      sync.apply(room);
+      run(3);
+      player.current = 195;
+      player.fire('ended');
+      player.seeks = [];
+      commands.length = 0;
+      return room;
+    };
+    const ended = () => commands.filter((command) => command.type === 'ended');
+
+    it('does not blame a viewer when the report of the end got lost', () => {
+      finish();
+      restartsOnSeek();
+      run(8);
+      expect(commands.filter((command) => command.type === 'seek')).toEqual([]);
+      expect(player.seeks).toEqual([]);
+    });
+
+    it('keeps telling the room until it moves on', () => {
+      finish();
+      run(6);
+      expect(ended().length).toBeGreaterThanOrEqual(2);
+      expect(ended().length).toBeLessThanOrEqual(3);
+    });
+
+    it('stops once the room has moved on', () => {
+      finish();
+      sync.apply(playing(0, timers.now));
+      commands.length = 0;
+      run(4);
+      expect(ended()).toEqual([]);
+    });
+
+    it('does not start a finished video again when the room repeats itself', () => {
+      const room = finish();
+      player.play = () => { throw new Error('played a finished video'); };
+      sync.apply(room, true);
+      expect(player.seeks).toEqual([]);
+    });
+
+    it('ignores a video that starts itself again', () => {
+      finish();
+      player.current = 0;
+      player.fire('playing');
+      run(2);
+      expect(commands.filter((command) => command.type === 'seek')).toEqual([]);
+    });
+
+    it('follows the room back when someone really does go back', () => {
+      finish();
+      sync.apply(playing(20, timers.now));
+      expect(player.seeks).toHaveLength(1);
+      expect(player.status).toBe('playing');
+    });
+
+    it('tells the room when its clock has run past the end, even if this player never got there', () => {
+      player.length = 195;
+      sync.apply(playing(190, timers.now));
+      player.current = 100;
+      commands.length = 0;
+      timers.advance(6000);
+      sync.tick();
+      expect(ended()).toHaveLength(1);
+    });
+
+    it('never corrects to a spot past the end', () => {
+      player.length = 195;
+      sync.apply(playing(194.9, timers.now));
+      expect(player.seeks).toHaveLength(1);
+      expect(player.seeks[0]).toBeLessThan(195);
+    });
+
+    it('carries on as before when the length is not known', () => {
+      sync.apply(playing(100, timers.now));
+      expect(player.seeks).toEqual([100.25]);
     });
   });
 

@@ -1,0 +1,22 @@
+{
+ "type": "video",
+ "version": "1.0",
+ "provider_name": "Vimeo",
+ "provider_url": "https://vimeo.com/",
+ "title": "The New Vimeo Player (You Know, For Videos)",
+ "author_name": "Vimeo",
+ "author_url": "https://vimeo.com/staff",
+ "is_plus": "0",
+ "account_type": "enterprise",
+ "html": "<iframe></iframe>",
+ "width": 480,
+ "height": 270,
+ "duration": 62,
+ "description": "(trimmed)",
+ "thumbnail_url": "https://i.vimeocdn.com/video/452001751-8216e0571c251a09d7a8387550942d89f7f86f6398f8ed886e639b0dd50d3c90-d_295x166?region=us",
+ "thumbnail_width": 295,
+ "thumbnail_height": 166,
+ "upload_date": "2013-10-15 14:08:29",
+ "video_id": 76979871,
+ "uri": "/videos/76979871"
+}

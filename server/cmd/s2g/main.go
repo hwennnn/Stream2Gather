@@ -81,6 +81,9 @@ func catalogFor(cfg config.Config, db *store.Postgres, log *slog.Logger) *source
 	if cfg.AllowDirectMedia {
 		sources = append(sources, source.Direct{HTTPSOnly: cfg.Env != "dev"})
 	}
+	if cfg.EnableVimeo {
+		sources = append(sources, source.NewVimeo(""))
+	}
 	catalog := source.NewCatalog(db, cfg.SearchDailyBudget, log, sources...)
 	catalog.LookupBudget = cfg.LookupDailyBudget
 	return catalog

@@ -14,6 +14,7 @@ var (
 	ErrUnsupportedURL = errors.New("this link is not supported")
 	ErrUnavailable    = errors.New("This video can’t be played here. Try another.")
 	ErrNoSearch       = errors.New("this source has no search")
+	ErrNoEmbed        = errors.New("This video can’t be embedded here.")
 	ErrOverBudget     = errors.New("search is resting until tomorrow")
 	ErrLive           = errors.New("Live streams aren’t supported yet.")
 	ErrTooManyLinks   = errors.New("Too many new links. Try again later.")
@@ -38,7 +39,8 @@ type Source interface {
 	Trending(ctx context.Context) ([]room.Media, error)
 }
 
-// Metered is a source whose lookups spend the API quota the whole site shares.
+// Metered is a source whose lookups spend something the whole site shares, such
+// as an API quota, so a link it has to look up is charged and counted.
 type Metered interface {
 	Metered()
 }

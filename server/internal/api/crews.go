@@ -39,6 +39,11 @@ func (s *Server) crewPreview(r *http.Request, record store.Room) (*crewSummary, 
 	return &crewSummary{MemberCount: access.MemberCount, IsMember: access.Member, GuestAccess: access.GuestAccess}, nil
 }
 
+// crewPrivate reports whether a room is closed to this person, who may be nobody.
+func crewPrivate(access store.CrewAccess) bool {
+	return access.Exists && !access.Member && !access.GuestAccess
+}
+
 // crewEntry runs before a ticket is issued. It reports whether this person is on
 // the crew, and false in ok after writing the refusal for a members-only room.
 func (s *Server) crewEntry(w http.ResponseWriter, r *http.Request, record store.Room, claims auth.Claims) (member, ok bool) {
@@ -47,7 +52,7 @@ func (s *Server) crewEntry(w http.ResponseWriter, r *http.Request, record store.
 		s.internal(w, err)
 		return false, false
 	}
-	if access.Exists && !access.Member && !access.GuestAccess {
+	if crewPrivate(access) {
 		writeProblem(w, http.StatusForbidden, "members_only", "This room is for its crew.")
 		return false, false
 	}

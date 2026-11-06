@@ -227,6 +227,26 @@ func (p *Postgres) GetMedia(ctx context.Context, source, sourceID string, maxAge
 	return m, err == nil, err
 }
 
+// FreshMedia returns current metadata for what the state queues, leaving out
+// whatever is gone or past the 30-day limit.
+func (p *Postgres) FreshMedia(ctx context.Context, queue []room.Item) ([]room.Media, error) {
+	sources, sourceIDs := make([]string, len(queue)), make([]string, len(queue))
+	for i, item := range queue {
+		sources[i], sourceIDs[i] = item.Source, item.SourceID
+	}
+	rows, err := p.pool.Query(ctx, `
+		SELECT source, source_id, url, title, author, thumbnail_url, duration_ms, is_live
+		FROM media WHERE (source, source_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
+		  AND fetched_at > now() - interval '30 days'`, sources, sourceIDs)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (room.Media, error) {
+		var m room.Media
+		return m, row.Scan(&m.Source, &m.SourceID, &m.URL, &m.Title, &m.Author, &m.ThumbnailURL, &m.DurationMS, &m.IsLive)
+	})
+}
+
 // PutMedia stores fresh metadata. A known embed block is kept.
 func (p *Postgres) PutMedia(ctx context.Context, items []room.Media) error {
 	batch := &pgx.Batch{}

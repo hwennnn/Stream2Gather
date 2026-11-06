@@ -25,6 +25,8 @@ const viewFor = (role: string, controlMode: string) =>
     connection: 'live',
   }) as unknown as RoomView;
 
+const report = { health: 'ok' };
+
 const bar = (view: RoomView) =>
   render(
     <PlayerBar
@@ -32,7 +34,7 @@ const bar = (view: RoomView) =>
         session: {} as RoomSession,
         view,
         item,
-        player: { failure: { kind: 'embed_blocked' }, cold: false, muted: false, report: { health: 'ok' } },
+        player: { failure: { kind: 'embed_blocked' }, cold: false, muted: false, reports: { get: () => report, subscribe: () => () => {} } },
         onToast: vi.fn(),
       } as unknown as ComponentProps<typeof PlayerBar>)}
     />,

@@ -41,7 +41,7 @@ export const Popular = ({ items, busy, disabled, onPick }: PopularProps) => {
 export const RecentRoomRow = ({ room }: { room: RecentRoom }) => {
   const names = room.members.map(({ name }) => firstName(name));
   return (
-    <a href={`/r/${room.slug}`} className="mt-6 flex max-w-md items-center gap-3 border-t border-line pt-4">
+    <a href={`/r/${room.slug}`} className="mt-6 flex lg:max-w-md items-center gap-3 border-t border-line pt-4">
       {room.members.length > 0 && (
         <span className="flex shrink-0 -space-x-1.5">
           {room.members.slice(0, 3).map((person) => (

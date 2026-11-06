@@ -13,6 +13,10 @@
 
 Powered by web sockets, **Stream2Gather** allows real-time communication within rooms through live chats. Currently, the platform fully supports YouTube, and the next update will introduce support for Dailymotion and Twitch.
 
+> **Rebuild in progress.** `server/` (Go) and `web/` (Vite, React) replace `backend/` and `frontend/`. See [the plan](docs/rebuild/plan.md) and [the measurements](docs/rebuild/measurements.md).
+>
+> To run it, add `YOUTUBE_API_KEY` to `server/.env.local`, then run `make up web serve` and open <http://127.0.0.1:18080>. Background jobs need `make temporal` and `make worker`.
+
 ## Quick Demo
 
 ### Video Controls and Playback

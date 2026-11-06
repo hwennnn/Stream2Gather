@@ -1,0 +1,622 @@
+// Package api serves the HTTP routes.
+package api
+
+import (
+	"bytes"
+	"compress/gzip"
+	"context"
+	"encoding/json"
+	"errors"
+	"html"
+	"io"
+	"log/slog"
+	"mime"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/coder/websocket"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
+
+	"stream2gather/internal/auth"
+	"stream2gather/internal/hub"
+	"stream2gather/internal/ids"
+	"stream2gather/internal/room"
+	"stream2gather/internal/source"
+	"stream2gather/internal/store"
+	"stream2gather/internal/telemetry"
+)
+
+const (
+	sessionCookie = "s2g_session"
+	sessionTTL    = 90 * 24 * time.Hour
+	maxBodyBytes  = 64 << 10
+)
+
+// Server holds what the routes need.
+type Server struct {
+	DB           *store.Postgres
+	Live         *store.Live
+	Pool         *pgxpool.Pool
+	Redis        *redis.Client
+	Hub          *hub.Hub
+	Catalog      *source.Catalog
+	Issuer       *auth.Issuer
+	Sink         *telemetry.Sink
+	Log          *slog.Logger
+	PublicOrigin string
+	WebDir       string
+	Secure       bool
+
+	assets sync.Map
+}
+
+// Handler returns the route table.
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) })
+	mux.HandleFunc("GET /readyz", s.ready)
+	mux.HandleFunc("GET /v1/config", s.config)
+	mux.HandleFunc("GET /v1/me", s.me)
+	mux.HandleFunc("PATCH /v1/me", s.rename)
+	mux.HandleFunc("POST /v1/rooms", s.createRoom)
+	mux.HandleFunc("GET /v1/rooms/{slug}", s.roomPreview)
+	mux.HandleFunc("POST /v1/rooms/{slug}/ticket", s.ticket)
+	mux.HandleFunc("GET /v1/rooms/{slug}/messages", s.messages)
+	mux.HandleFunc("POST /v1/media/resolve", s.resolve)
+	mux.HandleFunc("GET /v1/media/search", s.search)
+	mux.HandleFunc("GET /v1/media/trending", s.trending)
+	mux.HandleFunc("POST /v1/telemetry", s.telemetry)
+	mux.HandleFunc("GET /v1/ws", s.socket)
+	mux.HandleFunc("GET /r/{slug}", s.roomPage)
+	mux.HandleFunc("GET /", s.static)
+	return securityHeaders(mux)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	const policy = "default-src 'self'; " +
+		"script-src 'self' https://www.youtube.com https://s.ytimg.com; " +
+		"frame-src https://www.youtube.com https://www.youtube-nocookie.com; " +
+		"img-src 'self' https://i.ytimg.com data:; " +
+		"media-src 'self' https: blob:; " +
+		"style-src 'self' 'unsafe-inline'; " +
+		"connect-src 'self' ws: wss:; " +
+		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := w.Header()
+		header.Set("Content-Security-Policy", policy)
+		// YouTube's player needs the origin to identify the embedding site.
+		header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
+		header.Set("X-Content-Type-Options", "nosniff")
+		next.ServeHTTP(w, r)
+	})
+}
+
+type problem struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeProblem(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, problem{Code: code, Message: message})
+}
+
+func (s *Server) internal(w http.ResponseWriter, err error) {
+	s.Log.Error("request failed", "error", err)
+	writeProblem(w, http.StatusInternalServerError, "unavailable", "Something went wrong. Try again.")
+}
+
+func decode(w http.ResponseWriter, r *http.Request, into any) bool {
+	body := http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	if err := json.NewDecoder(body).Decode(into); err != nil && !errors.Is(err, io.EOF) {
+		writeProblem(w, http.StatusBadRequest, "bad_request", "That request could not be read.")
+		return false
+	}
+	return true
+}
+
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	if err := s.Pool.Ping(ctx); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	if err := s.Redis.Ping(ctx).Err(); err != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) config(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{"sources": s.Catalog.Names(), "clerkEnabled": false})
+}
+
+// session returns the caller's identity, if any.
+func (s *Server) session(r *http.Request) (auth.Claims, bool) {
+	cookie, err := r.Cookie(sessionCookie)
+	if err != nil {
+		return auth.Claims{}, false
+	}
+	claims, err := s.Issuer.Verify(cookie.Value)
+	return claims, err == nil
+}
+
+func (s *Server) setSession(w http.ResponseWriter, subject, name string) (auth.Claims, error) {
+	token, err := s.Issuer.Issue(subject, name, sessionTTL)
+	if err != nil {
+		return auth.Claims{}, err
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookie,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(sessionTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   s.Secure,
+		SameSite: http.SameSiteLaxMode,
+	})
+	return auth.Claims{Subject: subject, Name: name}, nil
+}
+
+// ensureSession signs a visitor in as a guest the first time they act, so no
+// one has to create an account to watch.
+func (s *Server) ensureSession(w http.ResponseWriter, r *http.Request) (auth.Claims, error) {
+	if claims, ok := s.session(r); ok {
+		return claims, s.DB.EnsureUser(r.Context(), claims.Subject, claims.Name)
+	}
+	allowed, err := s.Live.Limit(r.Context(), "guest:"+clientIP(r), 60, time.Hour)
+	if err != nil {
+		return auth.Claims{}, err
+	}
+	if !allowed {
+		return auth.Claims{}, errRateLimited
+	}
+	claims, err := s.setSession(w, "g_"+ids.New(), ids.GuestName())
+	if err != nil {
+		return auth.Claims{}, err
+	}
+	return claims, s.DB.EnsureUser(r.Context(), claims.Subject, claims.Name)
+}
+
+var errRateLimited = errors.New("rate limited")
+
+func (s *Server) sessionFailed(w http.ResponseWriter, err error) {
+	if errors.Is(err, errRateLimited) {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many new sessions. Try again later.")
+		return
+	}
+	s.internal(w, err)
+}
+
+func (s *Server) me(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.session(r)
+	if !ok {
+		writeJSON(w, http.StatusOK, map[string]any{"user": nil})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": map[string]string{"id": claims.Subject, "name": claims.Name}})
+}
+
+func (s *Server) rename(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Name string `json:"name"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	name := strings.TrimSpace(request.Name)
+	if name == "" || len([]rune(name)) > 32 {
+		writeProblem(w, http.StatusBadRequest, "invalid", "Names can be up to 32 characters.")
+		return
+	}
+	claims, err := s.ensureSession(w, r)
+	if err != nil {
+		s.sessionFailed(w, err)
+		return
+	}
+	if _, err := s.setSession(w, claims.Subject, name); err != nil {
+		s.internal(w, err)
+		return
+	}
+	if err := s.DB.EnsureUser(r.Context(), claims.Subject, name); err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": map[string]string{"id": claims.Subject, "name": name}})
+}
+
+func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		URL string `json:"url"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	claims, err := s.ensureSession(w, r)
+	if err != nil {
+		s.sessionFailed(w, err)
+		return
+	}
+	allowed, err := s.Live.Limit(r.Context(), "rooms:"+clientIP(r), 30, time.Hour)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !allowed {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many new rooms. Try again later.")
+		return
+	}
+
+	state := room.New()
+	if request.URL != "" {
+		media, err := s.Catalog.Resolve(r.Context(), request.URL)
+		if err != nil {
+			s.mediaFailed(w, err)
+			return
+		}
+		state, _, err = room.Apply(state, room.Actor{ID: claims.Subject, Name: claims.Name, Role: room.RoleHost},
+			room.Command{Type: room.CmdQueueAdd, Media: &media, NewItemID: ids.New()}, time.Now().UnixMilli())
+		if err != nil {
+			s.internal(w, err)
+			return
+		}
+	}
+
+	record := store.Room{ID: ids.New(), Slug: ids.Slug(), Name: ids.RoomName(), OwnerID: claims.Subject}
+	if err := s.DB.CreateRoom(r.Context(), record); err != nil {
+		s.internal(w, err)
+		return
+	}
+	if err := s.Live.Seed(r.Context(), record.ID, state); err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"slug": record.Slug, "name": record.Name})
+}
+
+func (s *Server) mediaFailed(w http.ResponseWriter, err error) {
+	if source.IsUserError(err) {
+		writeProblem(w, http.StatusUnprocessableEntity, "media", err.Error())
+		return
+	}
+	s.internal(w, err)
+}
+
+func (s *Server) findRoom(w http.ResponseWriter, r *http.Request) (store.Room, bool) {
+	record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug"))
+	if errors.Is(err, store.ErrNotFound) {
+		writeProblem(w, http.StatusNotFound, "not_found", "This room does not exist.")
+		return store.Room{}, false
+	}
+	if err != nil {
+		s.internal(w, err)
+		return store.Room{}, false
+	}
+	if record.ClosedAt != nil {
+		writeProblem(w, http.StatusGone, "closed", "This room has closed.")
+		return store.Room{}, false
+	}
+	return record, true
+}
+
+// preview is what someone sees before joining.
+type preview struct {
+	Slug       string         `json:"slug"`
+	Name       string         `json:"name"`
+	NowPlaying *room.Media    `json:"nowPlaying"`
+	Members    []store.Person `json:"members"`
+}
+
+func (s *Server) buildPreview(ctx context.Context, record store.Room) (preview, error) {
+	out := preview{Slug: record.Slug, Name: record.Name, Members: []store.Person{}}
+	state, found, err := s.Live.Load(ctx, record.ID)
+	if err != nil {
+		return out, err
+	}
+	if !found {
+		if state, err = s.DB.LoadSnapshot(ctx, record.ID); err != nil {
+			return out, err
+		}
+	}
+	if len(state.Queue) > 0 {
+		out.NowPlaying = &state.Queue[0].Media
+	}
+	people, err := s.Live.People(ctx, record.ID)
+	if err != nil {
+		return out, err
+	}
+	out.Members = people
+	return out, nil
+}
+
+func (s *Server) roomPreview(w http.ResponseWriter, r *http.Request) {
+	record, ok := s.findRoom(w, r)
+	if !ok {
+		return
+	}
+	out, err := s.buildPreview(r.Context(), record)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
+	record, ok := s.findRoom(w, r)
+	if !ok {
+		return
+	}
+	claims, err := s.ensureSession(w, r)
+	if err != nil {
+		s.sessionFailed(w, err)
+		return
+	}
+
+	people, err := s.Live.People(r.Context(), record.ID)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	present := false
+	for _, person := range people {
+		present = present || person.UserID == claims.Subject
+	}
+	if !present && len(people) >= record.MaxMembers {
+		writeProblem(w, http.StatusConflict, "room_full", "This room is full.")
+		return
+	}
+
+	role := room.RoleMember
+	if claims.Subject == record.OwnerID {
+		role = room.RoleHost
+	}
+	id := ids.New()
+	err = s.Live.PutTicket(r.Context(), id, store.Ticket{
+		RoomID:   record.ID,
+		RoomSlug: record.Slug,
+		RoomName: record.Name,
+		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role},
+	})
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"ticket": id})
+}
+
+func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
+	ticket, found, err := s.Live.TakeTicket(r.Context(), r.URL.Query().Get("ticket"))
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !found {
+		writeProblem(w, http.StatusUnauthorized, "bad_ticket", "This connection has expired.")
+		return
+	}
+
+	origin, err := url.Parse(s.PublicOrigin)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	ws, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{origin.Host}})
+	if err != nil {
+		return
+	}
+	defer ws.CloseNow()
+	s.Hub.Serve(context.WithoutCancel(r.Context()), ws, ticket)
+}
+
+func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
+	record, ok := s.findRoom(w, r)
+	if !ok {
+		return
+	}
+	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
+	items, err := s.DB.Messages(r.Context(), record.ID, before, 50)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) resolve(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		URL string `json:"url"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	media, err := s.Catalog.Resolve(r.Context(), request.URL)
+	if err != nil {
+		s.mediaFailed(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, media)
+}
+
+func (s *Server) search(w http.ResponseWriter, r *http.Request) {
+	allowed, err := s.Live.Limit(r.Context(), "search:"+clientIP(r), 60, time.Hour)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !allowed {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many searches. Try again later.")
+		return
+	}
+	query := r.URL.Query()
+	items, err := s.Catalog.Search(r.Context(), "youtube", query.Get("q"), query.Get("region"))
+	if err != nil {
+		s.mediaFailed(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) trending(w http.ResponseWriter, r *http.Request) {
+	items, err := s.Catalog.Trending(r.Context(), "youtube", r.URL.Query().Get("region"))
+	if err != nil {
+		s.mediaFailed(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (s *Server) telemetry(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Events []struct {
+			Name   string  `json:"name"`
+			Value  float64 `json:"value"`
+			Room   string  `json:"room"`
+			Source string  `json:"source"`
+			Detail string  `json:"detail"`
+		} `json:"events"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	claims, _ := s.session(r)
+	at := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+	for i, event := range request.Events {
+		if i >= 100 {
+			break
+		}
+		s.Sink.Add(telemetry.Event{
+			At: at, Name: event.Name, Value: event.Value, RoomID: event.Room,
+			UserID: claims.Subject, Source: event.Source, Detail: event.Detail,
+		})
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// roomPage serves the app with link-preview tags for this room.
+func (s *Server) roomPage(w http.ResponseWriter, r *http.Request) {
+	page, err := os.ReadFile(filepath.Join(s.WebDir, "index.html"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	title, description, image := "Join a watch party", "Watch together, perfectly in sync.", ""
+	record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug"))
+	if err == nil {
+		title = record.Name
+		if out, err := s.buildPreview(r.Context(), record); err == nil && out.NowPlaying != nil {
+			description = "Watching " + out.NowPlaying.Title
+			image = out.NowPlaying.ThumbnailURL
+		}
+	}
+
+	tags := `<meta property="og:title" content="` + html.EscapeString(title) + `">` +
+		`<meta property="og:description" content="` + html.EscapeString(description) + `">`
+	if image != "" {
+		tags += `<meta property="og:image" content="` + html.EscapeString(image) + `">`
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write([]byte(strings.Replace(string(page), "</head>", tags+"</head>", 1)))
+}
+
+func (s *Server) static(w http.ResponseWriter, r *http.Request) {
+	clean := filepath.Clean(r.URL.Path)
+	path := filepath.Join(s.WebDir, clean)
+	if info, err := os.Stat(path); err == nil && !info.IsDir() {
+		if strings.HasPrefix(clean, "/assets/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		s.serveFile(w, r, path, info)
+		return
+	}
+
+	index := filepath.Join(s.WebDir, "index.html")
+	info, err := os.Stat(index)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-cache")
+	s.serveFile(w, r, index, info)
+}
+
+var compressible = map[string]bool{".html": true, ".js": true, ".css": true, ".svg": true}
+
+// serveFile compresses text assets once and keeps the result, since build
+// output never changes while a server runs.
+func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, path string, info os.FileInfo) {
+	extension := filepath.Ext(path)
+	if !compressible[extension] {
+		http.ServeFile(w, r, path)
+		return
+	}
+	w.Header().Add("Vary", "Accept-Encoding")
+	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		http.ServeFile(w, r, path)
+		return
+	}
+
+	compressed, err := s.compressed(path, info)
+	if err != nil {
+		http.ServeFile(w, r, path)
+		return
+	}
+	w.Header().Set("Content-Type", mime.TypeByExtension(extension))
+	w.Header().Set("Content-Encoding", "gzip")
+	http.ServeContent(w, r, "", info.ModTime(), bytes.NewReader(compressed))
+}
+
+type compressedFile struct {
+	modified time.Time
+	body     []byte
+}
+
+func (s *Server) compressed(path string, info os.FileInfo) ([]byte, error) {
+	if cached, ok := s.assets.Load(path); ok {
+		if file := cached.(compressedFile); file.modified.Equal(info.ModTime()) {
+			return file.body, nil
+		}
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var buffer bytes.Buffer
+	writer, err := gzip.NewWriterLevel(&buffer, gzip.BestCompression)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := writer.Write(raw); err != nil {
+		return nil, err
+	}
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+	s.assets.Store(path, compressedFile{modified: info.ModTime(), body: buffer.Bytes()})
+	return buffer.Bytes(), nil
+}

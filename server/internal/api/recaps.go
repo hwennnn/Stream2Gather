@@ -109,5 +109,8 @@ func (s *Server) sessionRecap(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
+	if stored.ShareToken != "" {
+		view.ShareURL = s.recapURL(stored.ShareToken)
+	}
 	writeJSON(w, http.StatusOK, view)
 }

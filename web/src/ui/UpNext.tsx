@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoomSession, RoomView } from '../room/session';
+import { firstName, hueOf } from './people';
 import { canControl, canQueue, isOffline } from './rules';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
@@ -58,7 +59,7 @@ export const UpNext = ({ session, view, onPickAnother, onShowQueue, onToast }: U
 
   return (
     <section ref={ref} aria-label="Up next in the queue" className="up-next">
-      <div className="up-next-inner h-full items-center gap-3 border-t border-line px-4 py-3">
+      <div className="up-next-inner h-full items-center gap-3 px-4 py-3">
         <h3 className="w-16 shrink-0 text-[13px] leading-snug font-semibold">Up next</h3>
         {upcoming.length === 0 ? (
           <p className="flex min-w-0 flex-1 items-center gap-3 text-[13px] text-muted">
@@ -78,12 +79,14 @@ export const UpNext = ({ session, view, onPickAnother, onShowQueue, onToast }: U
                   disabled={!playable}
                   title={playable ? `Play ${item.title} now` : item.title}
                   onClick={() => void session.request('queue.play', { target: item.id }).catch(toastError(onToast))}
-                  className="up-next-card flex w-full items-center gap-2.5 rounded-lg p-1 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-white/[0.05]"
+                  className="up-next-card flex w-full items-center gap-2.5 rounded-md p-1 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-raised"
                 >
                   <Thumb src={item.thumbnailUrl} className="up-next-thumb w-24 rounded-md" />
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</span>
-                    <span className="mt-0.5 block truncate text-xs text-muted">{item.addedByName}</span>
+                    <span style={{ color: hueOf(item.addedBy) }} className="mt-0.5 block truncate text-xs">
+                      {firstName(item.addedByName)}
+                    </span>
                   </span>
                 </button>
               </li>
@@ -94,7 +97,7 @@ export const UpNext = ({ session, view, onPickAnother, onShowQueue, onToast }: U
                   type="button"
                   onClick={onShowQueue}
                   aria-label={`${strip.more} more in the queue`}
-                  className="flex size-full min-h-14 cursor-pointer items-center justify-center rounded-lg bg-white/[0.05] text-[13px] font-semibold transition-colors hover:bg-white/[0.1]"
+                  className="flex size-full min-h-14 cursor-pointer items-center justify-center rounded-md bg-raised text-[13px] font-semibold transition-colors hover:bg-line"
                 >
                   +{strip.more} more
                 </button>

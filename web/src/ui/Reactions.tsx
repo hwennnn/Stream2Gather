@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { RoomSession, RoomView } from '../room/session';
 import { Icon } from './Icon';
+import { firstName } from './people';
 
 const EMOJI = ['😂', '❤️', '🔥', '😮', '👏', '😭'];
 
 const SPARKS = [-1, -0.4, 0.4, 1];
-
-const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
 /**
  * Rises up the right of the rail, in the gutter chat lines leave for their time,
@@ -32,7 +31,7 @@ export const ReactionLane = ({ reactions }: { reactions: RoomView['reactions'] }
 export const ReactionTicker = ({ reactions }: { reactions: RoomView['reactions'] }) => (
   <div className="flex min-w-0 shrink items-center gap-1.5 overflow-hidden" aria-hidden="true">
     {reactions.slice(-3).map(({ id, emoji, name }) => (
-      <span key={id} className="chip enter text-text">
+      <span key={id} className="enter inline-flex items-center gap-1 text-xs text-muted">
         <span className="text-base leading-none">{emoji}</span>
         {firstName(name)}
       </span>
@@ -49,7 +48,7 @@ export const ReactionBar = ({ session, disabled, className }: { session: RoomSes
         aria-label={`React ${emoji}`}
         disabled={disabled}
         onClick={() => session.send('react', { emoji })}
-        className="flex size-9 cursor-pointer items-center justify-center rounded-lg text-[19px] transition hover:scale-110 hover:bg-white/[0.08] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:bg-transparent"
+        className="react flex size-9 cursor-pointer items-center justify-center rounded-md text-[20px] disabled:cursor-not-allowed"
       >
         {emoji}
       </button>
@@ -77,16 +76,16 @@ export const ReactionPicker = ({ session, disabled }: { session: RoomSession; di
   }, [open]);
 
   return (
-    <div ref={root} className="hidden shrink-0 max-xl:block">
+    <div ref={root} className="shrink-0 xl:hidden land:block">
       {open && (
-        <div className="enter absolute inset-x-3 bottom-full z-30 mb-1 flex justify-between rounded-xl border border-line bg-raised p-1 shadow-2xl">
+        <div className="enter float absolute inset-x-3 bottom-full z-30 mb-1 flex justify-between p-1">
           {EMOJI.map((emoji) => (
             <button
               key={emoji}
               type="button"
               aria-label={`React ${emoji}`}
               onClick={() => session.send('react', { emoji })}
-              className="flex size-11 cursor-pointer items-center justify-center rounded-lg text-[22px] active:bg-white/10"
+              className="flex size-11 cursor-pointer items-center justify-center rounded-md text-[22px] active:bg-raised"
             >
               {emoji}
             </button>
@@ -99,7 +98,7 @@ export const ReactionPicker = ({ session, disabled }: { session: RoomSession; di
         aria-expanded={open}
         disabled={disabled}
         onClick={() => setOpen(!open)}
-        className="btn btn-quiet btn-icon"
+        className="btn btn-ghost btn-icon"
       >
         <Icon name="smile" className="size-5" />
       </button>

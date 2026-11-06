@@ -64,13 +64,13 @@ export const ToastStack = ({ toasts, notices, limit = MAX_SHOWN, className, chil
     {merge(toasts, notices)
       .slice(-limit)
       .map(({ text, count, url }) => (
-        <p key={text} className="enter pointer-events-auto max-w-full rounded-xl border border-line bg-raised px-3.5 py-2 text-[13px] leading-snug shadow-xl">
+        <p key={text} className="enter float pointer-events-auto max-w-full px-3 py-2 text-[13px] leading-[18px]">
           {text}
           {count > 1 && <span className="text-muted"> ×{count}</span>}
           {url && (
             <>
               {' '}
-              <a href={url} target="_blank" rel="noreferrer noopener" className="text-accent underline-offset-2 hover:underline">
+              <a href={url} target="_blank" rel="noreferrer noopener" className="text-link underline underline-offset-2">
                 Open on YouTube
               </a>
             </>
@@ -89,7 +89,7 @@ export const JumpToast = ({ session, view, onToast }: JumpProps) => {
   if (!jump) return null;
   const who = jump.by === view.self?.name ? 'You' : jump.by;
   return (
-    <p key={jump.id} className="enter pointer-events-auto relative flex w-full items-center gap-3 overflow-hidden rounded-xl border border-line bg-raised py-2 pr-2 pl-3.5 text-[13px] leading-snug shadow-xl">
+    <p key={jump.id} className="enter float pointer-events-auto relative flex w-full items-center gap-3 overflow-hidden py-2 pr-2 pl-3 text-[13px] leading-[18px]">
       <span className="min-w-0 flex-1 truncate">
         <span className="font-semibold">{who}</span> jumped to {jump.title}
       </span>
@@ -103,7 +103,7 @@ export const JumpToast = ({ session, view, onToast }: JumpProps) => {
           Undo
         </button>
       )}
-      <span aria-hidden="true" className="undo-clock absolute inset-x-0 bottom-0 h-0.5 origin-left bg-accent" />
+      <span aria-hidden="true" className="undo-clock absolute inset-x-0 bottom-0 h-0.5 origin-left bg-primary" />
     </p>
   );
 };

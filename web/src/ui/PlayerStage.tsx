@@ -10,6 +10,7 @@ import { DrivingChip } from './RoomHeader';
 import { RoomStatus } from './RoomStatus';
 import { canControl, canQueue, failureNote, isLocked, isOffline } from './rules';
 import { Seats } from './Seats';
+import { SeatTrack } from './SeatTrack';
 import { failureReason, openLabel } from './sources';
 import type { Row } from './seatRow';
 import { Thumb } from './Thumb';
@@ -66,6 +67,7 @@ export const PlayerStage = (props: StageProps) => {
       <div className="front-row" data-idle={!current || undefined}>
         <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} />
         {current && <ReactionBar session={session} disabled={isOffline(view)} className={railHidden ? 'flex' : 'hidden xl:flex land:hidden'} />}
+        {current && <SeatTrack view={view} />}
       </div>
 
       {current && <PlayerBar {...props} item={current} />}

@@ -39,7 +39,7 @@ export const useLatestAct = (view: RoomView): Act | null => {
   return act;
 };
 
-const useTick = (running: boolean) => {
+export const useTick = (running: boolean) => {
   const [, tick] = useState(0);
   useEffect(() => {
     if (!running) return undefined;

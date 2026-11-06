@@ -24,6 +24,7 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews/{slug}/invite", s.rotateInvite)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/members/{userId}", s.removeMember)
 	mux.HandleFunc("GET /v1/me/crews", s.myCrews)
+	mux.HandleFunc("DELETE /v1/me", s.deleteMe)
 	mux.HandleFunc("PATCH /v1/crews/{slug}/me", s.setCrewNotify)
 	mux.HandleFunc("POST /v1/rooms/{slug}/crew", s.promoteRoom)
 }
@@ -354,6 +355,27 @@ func (s *Server) myCrews(w http.ResponseWriter, r *http.Request) {
 		items[i] = line{Slug: crew.Slug, Name: crew.Name, Here: len(people)}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// deleteMe removes the account now rather than on a schedule, and signs out.
+func (s *Server) deleteMe(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	rooms, err := s.DB.DeleteAccount(r.Context(), claims.Subject)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	s.versions.forget(claims.Subject)
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Secure, SameSite: http.SameSiteLaxMode,
+	})
+	for _, roomID := range rooms {
+		s.publishCrew(r.Context(), roomID, crewEvent{Changed: "settings"})
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": nil})
 }
 
 // promoteRoom is "Keep this room": the link and everyone's connection stay put.

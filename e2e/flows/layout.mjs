@@ -340,3 +340,20 @@ for (const { width, height } of [{ width: 1440, height: 900 }, { width: 1024, he
     bots.forEach((bot) => bot.close());
   });
 }
+
+flow('layout short windows: chat keeps room to read, and a sideways bar stays on screen', { timeout: 60_000 }, async (t) => {
+  const stacked = await t.person('host', { viewport: { width: 606, height: 679 } });
+  const room = await startRoom(t, stacked, { url: video('Golden Hour').url });
+  const box = await stacked.page.getByRole('textbox', { name: 'Message' }).boundingBox();
+  t.check('606x679 alone: the message box is on screen', (box?.y ?? 9999) + (box?.height ?? 0) <= 679, `${box?.y}`);
+  const guest = await t.person('guest');
+  await joinRoom(guest, room.url);
+  await t.see('the guest', stacked.page.getByText('guest').first());
+  const log = await ui.chatLog(stacked.page).boundingBox();
+  t.check('606x679 with a friend: chat has room for a few lines', (log?.height ?? 0) >= 60, `${log?.height}px`);
+
+  const sideways = await t.person('side', { viewport: { width: 667, height: 375 }, phone: true });
+  await startRoom(t, sideways, { url: video('Golden Hour').url });
+  const spill = await sideways.page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  t.check('667x375 bar stays on screen', spill <= 0, `${spill}px over`);
+});

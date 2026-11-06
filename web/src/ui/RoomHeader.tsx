@@ -47,15 +47,18 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
       <div className="seat-track-slot">{view.queue[0] && <SeatTrack view={view} />}</div>
     </div>
 
-    <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 phone:gap-1 land:gap-1.5">
+    <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 phone:gap-1 land:shrink land:gap-1.5">
       {note}
-      <div className="hidden items-center gap-1.5 land:flex">{landscapeControls}</div>
+      <div className="hidden min-w-0 items-center gap-1.5 land:flex">{landscapeControls}</div>
       <Slot>
         <VoiceButton session={session} view={view} adapter={adapter} />
       </Slot>
-      <Slot>
-        <KeepRoom session={session} view={view} />
-      </Slot>
+      {/* A phone on its side has no width to spare, and turning it upright brings this back. */}
+      <div className="land:hidden">
+        <Slot>
+          <KeepRoom session={session} view={view} />
+        </Slot>
+      </div>
       <LeaveLink session={session} className="btn btn-quiet btn-sm phone:hidden land:hidden">
         Leave
       </LeaveLink>

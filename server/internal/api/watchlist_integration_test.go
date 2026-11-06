@@ -67,6 +67,35 @@ func TestWatchlistStoresOnlyIdsAndJoinsTitlesFresh(t *testing.T) {
 	}
 }
 
+func TestWatchlistCreditsWhoAddedItUntilTheAccountGoes(t *testing.T) {
+	s, _ := stackServer(t)
+	ctx := context.Background()
+	_, as := signUp(t, s, "Hana")
+	slug, token := newCrew(t, s, as)
+	mika, mikaAs := signUp(t, s, "Mika")
+	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, mikaAs); response.Code != http.StatusOK {
+		t.Fatalf("join: %d %s", response.Code, response.Body)
+	}
+	path := "/v1/crews/" + slug + "/watchlist"
+	if response, _ := serve(s, http.MethodPost, path, watchBody(seedMedia(t, s, "test", "Marker title")), mikaAs); response.Code != http.StatusOK {
+		t.Fatalf("add: %d %s", response.Code, response.Body)
+	}
+
+	_, body := serve(s, http.MethodGet, path, "", as)
+	adder, _ := body["items"].([]any)[0].(map[string]any)["addedBy"].(map[string]any)
+	if adder["userId"] != mika.Subject || adder["name"] != "Mika" {
+		t.Fatalf("credit: %v", adder)
+	}
+
+	if _, err := s.DB.DeleteAccount(ctx, mika.Subject); err != nil {
+		t.Fatal(err)
+	}
+	_, body = serve(s, http.MethodGet, path, "", as)
+	if adder := body["items"].([]any)[0].(map[string]any)["addedBy"]; adder != nil {
+		t.Fatalf("a deleted account is still credited: %v", adder)
+	}
+}
+
 func TestOnlyMembersUseTheWatchlist(t *testing.T) {
 	s, _ := stackServer(t)
 	_, as := signUp(t, s, "Hana")

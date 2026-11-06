@@ -381,6 +381,8 @@ func (p *Postgres) OpenSessionStart(ctx context.Context, roomID string) (time.Ti
 
 // SessionPerson is someone at a watch party.
 type SessionPerson struct {
+	// UserID is empty once the account has gone, so a former member keeps no identity.
+	UserID  string `json:"userId,omitempty"`
 	Name    string `json:"name"`
 	IsGuest bool   `json:"isGuest"`
 }
@@ -432,8 +434,9 @@ func (p *Postgres) CrewSessions(ctx context.Context, crewID string, before time.
 
 func (p *Postgres) sessionPeople(ctx context.Context, sessionIDs []string, byID map[string]*PastSession) error {
 	rows, err := p.pool.Query(ctx, `
-		SELECT session_id, display_name, is_guest FROM session_people
-		WHERE session_id = ANY($1) ORDER BY joined_at, user_id`, sessionIDs)
+		SELECT sp.session_id, coalesce(u.id, ''), sp.display_name, sp.is_guest
+		FROM session_people sp LEFT JOIN users u ON u.id = sp.user_id
+		WHERE sp.session_id = ANY($1) ORDER BY sp.joined_at, sp.user_id`, sessionIDs)
 	if err != nil {
 		return err
 	}
@@ -441,7 +444,7 @@ func (p *Postgres) sessionPeople(ctx context.Context, sessionIDs []string, byID 
 	for rows.Next() {
 		var sessionID string
 		var person SessionPerson
-		if err := rows.Scan(&sessionID, &person.Name, &person.IsGuest); err != nil {
+		if err := rows.Scan(&sessionID, &person.UserID, &person.Name, &person.IsGuest); err != nil {
 			return err
 		}
 		byID[sessionID].People = append(byID[sessionID].People, person)

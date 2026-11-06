@@ -110,6 +110,8 @@ check('it names the video', text.includes('sample'));
 check('it finds the biggest moment', text.includes('Biggest moment'));
 check('it can be relived', (await card.getByRole('link', { name: 'Relive it' }).getAttribute('href'))?.includes('/catchup/'));
 check('the page says where the numbers come from', await visible(hana.page.getByText('come from Stream2Gather, not YouTube')));
+const faces = hana.page.getByRole('list', { name: 'Past sessions' }).locator('[title]');
+check('past faces carry their person\'s colour', (await faces.evaluateAll((all) => all.map((face) => face.style.backgroundColor))).every(Boolean) && (await faces.count()) > 0);
 await hana.page.screenshot({ path: `${OUT}/recap-home.png`, fullPage: true });
 await hana.page.setViewportSize({ width: 390, height: 844 });
 await hana.page.screenshot({ path: `${OUT}/recap-home-phone.png` });

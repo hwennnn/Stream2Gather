@@ -2,11 +2,28 @@ import { useMemo, useState } from 'react';
 import { ApiError, type Media } from '../api/http';
 import { Icon } from '../ui/Icon';
 import { AddBox, SearchResults, useSearch } from '../ui/Omnibox';
+import { firstName } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import type { Adder } from '../ui/useAdder';
 import { crewApi, type WatchItem } from './api';
 
-type Props = { slug: string; items: WatchItem[]; onChange: () => void };
+type Props = { slug: string; items: WatchItem[]; selfId?: string; onChange: () => void };
+
+/** Who to thank for a video. What you added yourself needs no credit. */
+const creditFor = ({ addedBy }: WatchItem, selfId?: string): string | null =>
+  addedBy && addedBy.userId !== selfId ? `Added by ${firstName(addedBy.name)}` : null;
+
+/** The credit keeps its place however long the channel's name runs. */
+const Byline = ({ author, credit }: { author?: string; credit: string | null }) => {
+  if (!author && !credit) return null;
+  return (
+    <span className="flex gap-1 text-xs text-dim">
+      {author && <span className="truncate">{author}</span>}
+      {author && credit && <span aria-hidden="true">·</span>}
+      {credit && <span className="shrink-0">{credit}</span>}
+    </span>
+  );
+};
 
 /** The omnibox, pointed at the crew's list instead of a room's queue. */
 const useWatchAdder = ({ slug, items, onChange }: Props): Adder => {
@@ -58,7 +75,7 @@ export const Watchlist = (props: Props) => {
               {item.media && <Thumb src={item.media.thumbnailUrl} className="w-16 rounded-md" />}
               <span className="min-w-0 flex-1">
                 <span className={`block truncate text-sm ${item.media ? '' : 'text-muted'}`}>{item.media?.title ?? 'Video unavailable'}</span>
-                {item.media?.author && <span className="block truncate text-xs text-dim">{item.media.author}</span>}
+                <Byline author={item.media?.author} credit={creditFor(item, props.selfId)} />
               </span>
               <button
                 type="button"

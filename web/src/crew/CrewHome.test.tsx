@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type RoomPreview } from '../api/http';
 import CrewHome from '../routes/CrewHome';
 import { recapApi } from '../recap/api';
-import { crewApi, type CrewDocument } from './api';
+import { crewApi, type CrewDocument, type WatchItem } from './api';
 
 const accountState = vi.hoisted(() => ({ view: { user: null as unknown, publishableKey: 'pk', clerkWanted: false, problem: null } }));
 const signIn = vi.hoisted(() => vi.fn());
@@ -129,7 +129,7 @@ describe('CrewHome', () => {
 
   it('says a video is unavailable when its details are gone, and never guesses a title', async () => {
     signIntoAccount();
-    const watchlist = [{ id: 7, source: 'youtube', sourceId: 'abc', addedAt: '2026-11-06T00:00:00Z', media: null }];
+    const watchlist = [{ id: 7, source: 'youtube', sourceId: 'abc', addedAt: '2026-11-06T00:00:00Z', addedBy: null, media: null }];
     vi.spyOn(crewApi, 'home').mockResolvedValue({ ...document([hana]), watchlist });
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
     expect(await screen.findByText('Video unavailable')).toBeTruthy();
@@ -184,6 +184,45 @@ describe('CrewHome', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
     await waitFor(() => expect(field.className).toContain('field'));
     expect(screen.queryByRole('button', { name: 'Copied' })).toBeNull();
+  });
+
+  it('credits a friend for what they added, but not you for your own', async () => {
+    signIntoAccount();
+    const row = (id: number, sourceId: string, addedBy: WatchItem['addedBy']): WatchItem => ({
+      id,
+      source: 'youtube',
+      sourceId,
+      addedAt: '2026-11-06T00:00:00Z',
+      addedBy,
+      media: { source: 'youtube', sourceId, url: 'https://a.test', title: `Title ${sourceId}`, author: 'A channel', thumbnailUrl: '', durationMs: 0, isLive: false },
+    });
+    const watchlist = [row(1, 'friend', { userId: 'u_mika', name: 'Mika Tan' }), row(2, 'mine', { userId: 'u1', name: 'Hana' }), row(3, 'gone', null)];
+    vi.spyOn(crewApi, 'home').mockResolvedValue({ ...document([hana]), watchlist });
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={vi.fn()} />);
+    expect(await screen.findByText('Added by Mika')).toBeTruthy();
+    expect(screen.getAllByText(/^Added by/)).toHaveLength(1);
+  });
+
+  it('gives a face its person\'s colour, and a former member none', async () => {
+    signIntoAccount();
+    vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana]));
+    vi.spyOn(recapApi, 'read').mockRejectedValue(new Error('offline'));
+    vi.spyOn(crewApi, 'sessions').mockResolvedValue({
+      items: [
+        {
+          id: 's',
+          startedAt: '2026-11-01T20:00:00Z',
+          endedAt: '2026-11-01T21:30:00Z',
+          people: [{ userId: 'u_mika', name: 'Mika', isGuest: false }, { name: 'Former member', isGuest: false }],
+          videos: [],
+        },
+      ],
+    });
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={vi.fn()} />);
+    await screen.findByRole('list', { name: 'Past sessions' });
+    const face = (name: string) => window.document.querySelector<HTMLElement>(`[title="${name}"]`);
+    expect(face('Mika')?.style.backgroundColor).not.toBe('');
+    expect(face('Former member')?.style.backgroundColor).toBe('');
   });
 
   it('lists past sessions with fresh titles, and says when there are none', async () => {

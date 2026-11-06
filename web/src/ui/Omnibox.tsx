@@ -7,6 +7,7 @@ import { Icon, type IconName } from './Icon';
 import { addPrompt } from './sources';
 import { Thumb } from './Thumb';
 import type { Adder, AddStatus } from './useAdder';
+import { viewerRegion } from './region';
 
 
 export type Search = {
@@ -59,7 +60,7 @@ export const useSearch = (adder: Adder): Search => {
     setResults(null);
     setSearching(true);
     try {
-      const { items } = await api.search(text);
+      const { items } = await api.search(text, viewerRegion(navigator.language));
       if (run === latest.current) setResults(items);
     } catch (error) {
       if (run !== latest.current) return;
@@ -269,6 +270,7 @@ export const MediaRow = ({ media, status, onAdd }: RowProps) => {
         )}
       </div>
       {media.refused && <p className="mt-1 text-xs text-warn">Often won’t play here. YouTube has refused it for other viewers.</p>}
+      {media.regionBlocked && !media.refused && <p className="mt-1 text-xs text-warn">May be blocked where you are.</p>}
       {tray && !label && (
         <div className="row-tray">
           {ACTIONS.map(({ mode, label: text }) => (

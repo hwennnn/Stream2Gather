@@ -26,6 +26,11 @@ describe('a search result', () => {
     expect(screen.getByRole('button', { name: 'Play now: A video' })).toBeTruthy();
   });
 
+  it('warns about a video the viewer’s region may not be able to watch', () => {
+    render(<MediaRow media={media({ regionBlocked: true })} status="idle" onAdd={vi.fn()} />);
+    expect(screen.getByText('May be blocked where you are.')).toBeTruthy();
+  });
+
   it('says nothing about a video that plays', () => {
     render(<MediaRow media={media()} status="idle" onAdd={vi.fn()} />);
     expect(screen.queryByText(/won’t play here/)).toBeNull();

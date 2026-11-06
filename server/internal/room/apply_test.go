@@ -729,3 +729,19 @@ func TestMediaRefreshIsSilentWithNothingToDoAndNeverAClientCommand(t *testing.T)
 		t.Fatalf("from a client: %v", err)
 	}
 }
+
+// Queue items lose their region lists on the way through room state, so fresh
+// metadata carrying them must not read as a change. A change drops a pending jump.
+func TestRenewIgnoresWhatOnlyASearchKnows(t *testing.T) {
+	media := Media{Source: "youtube", SourceID: "a", Title: "A"}
+	fresh := media
+	fresh.AllowedRegions, fresh.BlockedRegions, fresh.Refused, fresh.RegionBlocked = "KR JP", "RU", true, true
+	s := State{Queue: []Item{{ID: "1", Media: media}}}
+
+	if s.Renew([]Media{fresh}, 0) {
+		t.Fatal("search-only fields counted as a change to the queue")
+	}
+	if s.Queue[0].Media != media {
+		t.Fatalf("queue kept %+v", s.Queue[0].Media)
+	}
+}

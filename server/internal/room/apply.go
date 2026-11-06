@@ -394,7 +394,7 @@ func applyMediaRefresh(s *State, actor Actor, cmd Command, now int64) error {
 func (s *State) Renew(fresh []Media, now int64) bool {
 	current := make(map[[2]string]Media, len(fresh))
 	for _, media := range fresh {
-		current[[2]string{media.Source, media.SourceID}] = media
+		current[[2]string{media.Source, media.SourceID}] = media.Queued()
 	}
 	kept := make([]Item, 0, len(s.Queue))
 	changed := false
@@ -404,7 +404,7 @@ func (s *State) Renew(fresh []Media, now int64) bool {
 			changed = true
 			continue
 		}
-		changed = changed || media != item.Media
+		changed = changed || media != item.Media.Queued()
 		item.Media = media
 		kept = append(kept, item)
 	}

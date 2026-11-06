@@ -34,10 +34,9 @@ export const useAdder = (session: RoomSession, view: RoomView): Adder => {
     (media: Media): AddStatus => {
       const key = mediaKey(media);
       if (adding.has(key)) return 'adding';
-      const addedAt = added.current.get(key);
-      const present = inQueue.has(key) || key === playing;
-      if (addedAt !== undefined && (present || Date.now() - addedAt < ADDED_GRACE_MS)) return 'added';
       if (key === playing) return 'playing';
+      const addedAt = added.current.get(key);
+      if (addedAt !== undefined && (inQueue.has(key) || Date.now() - addedAt < ADDED_GRACE_MS)) return 'added';
       return inQueue.has(key) ? 'queued' : 'idle';
     },
     [adding, inQueue, playing],

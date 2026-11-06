@@ -187,6 +187,79 @@ describe('RoomSession', () => {
       expect(socket.closed).toBe(1);
     });
 
+    describe('queue patches', () => {
+      const queued = (...ids: string[]) => ({ ...welcome(5), state: { ...welcome(5).state, queue: ids.map(item) } });
+      const order = (session: RoomSession) => session.getView().queue.map(({ id }) => id);
+      const patch = (fields: object) => ({ version: 6, playback: idle, cause: 'queue.move', patch: fields });
+
+      it('applies a move using the items it already has', async () => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a', 'b', 'c', 'd'));
+        socket.deliver('state', patch({ at: 1, remove: 2, ids: ['c', 'b'], size: 4 }));
+        expect(order(session)).toEqual(['a', 'c', 'b', 'd']);
+        expect(session.getView().version).toBe(6);
+        expect(socket.ofType('sync')).toHaveLength(0);
+      });
+
+      it('takes a newer copy of an item it already has', async () => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a'));
+        const newer = { ...item('a'), title: 'Renamed' };
+        socket.deliver('state', patch({ at: 0, remove: 1, ids: ['a'], items: [newer], size: 1 }));
+        expect(session.getView().queue[0]?.title).toBe('Renamed');
+      });
+
+      it('empties the queue, so the last video leaves the screen', async () => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a'));
+        socket.deliver('state', patch({ at: 0, remove: 1, ids: [], size: 0 }));
+        expect(order(session)).toEqual([]);
+      });
+
+      it('leaves the queue alone when a change carries neither', async () => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a'));
+        socket.deliver('state', {
+          version: 6,
+          playback: idle,
+          settings: { controlMode: 'hosts', queueMode: 'everyone' },
+          cause: 'settings',
+        });
+        expect(order(session)).toEqual(['a']);
+        expect(session.getView().settings.controlMode).toBe('hosts');
+      });
+
+      it.each([
+        ['names an item it never sent', { at: 0, remove: 1, ids: ['z'], size: 2 }],
+        ['leads to the wrong size', { at: 0, remove: 1, ids: [], size: 5 }],
+      ])('asks for a snapshot when a patch %s', async (_, fields) => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a', 'b'));
+        socket.deliver('state', patch(fields));
+        expect(order(session)).toEqual(['a', 'b']);
+        expect(session.getView().version).toBe(5);
+        expect(socket.ofType('sync')).toHaveLength(1);
+      });
+
+      it('never applies a patch across a gap', async () => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a', 'b'));
+        socket.deliver('state', { ...patch({ at: 0, remove: 2, ids: ['b', 'a'], size: 2 }), version: 7 });
+        expect(order(session)).toEqual(['a', 'b']);
+        expect(socket.ofType('sync')).toHaveLength(1);
+      });
+
+      it('recovers through the snapshot it asked for', async () => {
+        const { session, socket } = await connected();
+        socket.deliver('welcome', queued('a'));
+        socket.deliver('state', patch({ at: 0, remove: 1, ids: ['z'], size: 1 }));
+        socket.deliver('state', { version: 6, playback: idle, queue: [item('z')], cause: 'sync' });
+        expect(order(session)).toEqual(['z']);
+        socket.deliver('state', { ...patch({ at: 1, remove: 0, ids: ['y'], items: [item('y')], size: 2 }), version: 7 });
+        expect(order(session)).toEqual(['z', 'y']);
+      });
+    });
+
     it('applies the next version normally and drops repeats', async () => {
       const { session, socket } = await connected();
       socket.deliver('welcome', welcome(5));

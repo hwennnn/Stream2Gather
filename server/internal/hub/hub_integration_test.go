@@ -334,7 +334,8 @@ func TestLastVideoEndingClearsTheQueueOnTheWire(t *testing.T) {
 	c := r.joined(t, r.newRoom(t, directVideo(t)), "u", room.RoleMember)
 	c.send(t, room.CmdSkip, map[string]any{"item": "item1"})
 	message := c.expect(t, "state")
-	if !strings.Contains(string(message.D), `"queue":[]`) {
+	patch := decodeState(t, message).Patch
+	if patch == nil || patch.Size != 0 || patch.Remove != 1 || len(patch.IDs) != 0 {
 		t.Fatalf("state = %s", message.D)
 	}
 }

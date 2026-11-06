@@ -31,7 +31,7 @@ func TestASlowLookupDoesNotStopTheSocketAnswering(t *testing.T) {
 	c.expect(t, "pong")
 
 	close(slow.release)
-	if got := decodeState(t, c.expect(t, "state")); len(got.Queue) != 2 {
-		t.Fatalf("queue = %+v", got.Queue)
+	if got := decodeState(t, c.expect(t, "state")); got.Patch == nil || got.Patch.Size != 2 || len(got.Patch.Items) != 1 {
+		t.Fatalf("patch = %+v", got.Patch)
 	}
 }

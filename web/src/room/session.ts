@@ -71,10 +71,14 @@ export type RoomView = {
   jump: Jump | null;
 };
 
+/** Replaces `remove` items at `at` with `ids`. `items` holds any we can't already have. */
+type QueuePatch = { at: number; remove: number; ids: string[]; items?: QueueItem[]; size: number };
+
 export type StateMessage = {
   version: number;
   playback: RoomPlayback;
   queue?: QueueItem[];
+  patch?: QueuePatch;
   settings?: Settings;
   cause: string;
   by?: string;
@@ -125,6 +129,14 @@ const STAMP_SLACK_MS = 2000;
 /** How long a requested snapshot may take before pongs may force a reconnect. */
 const RESYNC_WAIT_MS = 5000;
 const LEAVE_PATIENCE_MS = 1000;
+
+/** The queue a patch leads to, or null if it wasn't made from this one. */
+const patched = (queue: QueueItem[], { at, remove, ids, items = [], size }: QueuePatch): QueueItem[] | null => {
+  const known = new Map([...queue, ...items].map((item) => [item.id, item]));
+  const middle = ids.flatMap((id) => known.get(id) ?? []);
+  const next = [...queue.slice(0, at), ...middle, ...queue.slice(at + remove)];
+  return middle.length === ids.length && next.length === size ? next : null;
+};
 
 const ranOut = ({ cause, by, queue }: StateMessage, before: boolean): boolean => {
   if (queue === undefined) return before;
@@ -532,17 +544,23 @@ export class RoomSession {
     this.send('sync');
   }
 
-  private stateChanged(message: StateMessage): void {
+  private stateChanged(received: StateMessage): void {
     if (this.view.connection !== 'live') return;
-    const snapshot = message.cause === 'sync';
+    const snapshot = received.cause === 'sync';
     if (!snapshot) {
-      if (message.version <= this.view.version) return;
-      if (message.version > this.view.version + 1) {
+      if (received.version <= this.view.version) return;
+      if (received.version > this.view.version + 1) {
         // Jumping forward would keep a queue that missed its update.
         this.requestResync();
         return;
       }
     }
+    const queue = received.patch ? patched(this.view.queue, received.patch) : received.queue;
+    if (queue === null) {
+      this.requestResync();
+      return;
+    }
+    const message = { ...received, queue };
     this.resyncAt = snapshot ? null : this.resyncAt;
 
     const previous = this.view;

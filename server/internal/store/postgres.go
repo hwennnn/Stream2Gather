@@ -371,6 +371,44 @@ func (p *Postgres) DeleteMedia(ctx context.Context, source string, sourceIDs []s
 	return err
 }
 
+// SavedRoom is a permanent room's saved state.
+type SavedRoom struct {
+	ID    string
+	State room.State
+}
+
+// DueSnapshots returns permanent rooms whose saved titles are close to the 30-day
+// limit, oldest first.
+func (p *Postgres) DueSnapshots(ctx context.Context, limit int) ([]SavedRoom, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, snapshot FROM rooms
+		WHERE closed_at IS NULL AND NOT is_temporary AND snapshot IS NOT NULL
+		  AND coalesce(snapshot_checked_at, created_at) < now() - interval '20 days'
+		ORDER BY coalesce(snapshot_checked_at, created_at) LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (SavedRoom, error) {
+		var saved SavedRoom
+		var doc []byte
+		if err := row.Scan(&saved.ID, &doc); err != nil {
+			return saved, err
+		}
+		return saved, json.Unmarshal(doc, &saved.State)
+	})
+}
+
+// PutCheckedSnapshot stores a state whose titles have just been checked. It leaves
+// updated_at alone: that says when the room's position was saved.
+func (p *Postgres) PutCheckedSnapshot(ctx context.Context, roomID string, state room.State) error {
+	doc, err := json.Marshal(state)
+	if err != nil {
+		return err
+	}
+	_, err = p.pool.Exec(ctx, `UPDATE rooms SET snapshot = $2, snapshot_checked_at = now() WHERE id = $1`, roomID, doc)
+	return err
+}
+
 // CountStaleMedia says how much metadata is past maxAge, so past due for a refresh.
 func (p *Postgres) CountStaleMedia(ctx context.Context, source string, maxAge time.Duration) (int64, error) {
 	var count int64

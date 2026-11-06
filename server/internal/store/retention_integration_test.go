@@ -99,6 +99,63 @@ func TestStaleCountSeesOnlyWhatIsPastDue(t *testing.T) {
 	}
 }
 
+func TestDueSnapshotsFindsOnlyOldKeptRoomsAndChecksLeaveTheSaveTimeAlone(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	id, temporary := ids.New(), ids.New()
+	owner := newOwner(t, db)
+	for _, roomID := range []string{id, temporary} {
+		if err := db.CreateRoom(ctx, Room{ID: roomID, Slug: roomID, Name: "Room", OwnerID: owner}); err != nil {
+			t.Fatal(err)
+		}
+		if err := db.SaveSnapshot(ctx, roomID, room.New()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err := db.pool.Exec(ctx, `UPDATE rooms SET created_at = now() - interval '21 days' WHERE id = ANY($1)`, []string{id, temporary})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.pool.Exec(ctx, `UPDATE rooms SET is_temporary = false, expires_at = NULL WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	due, err := db.DueSnapshots(ctx, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]bool{}
+	for _, saved := range due {
+		found[saved.ID] = true
+	}
+	if !found[id] || found[temporary] {
+		t.Fatalf("due = %v", found)
+	}
+
+	_, before, err := db.LoadSnapshot(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.PutCheckedSnapshot(ctx, id, room.New()); err != nil {
+		t.Fatal(err)
+	}
+	_, after, err := db.LoadSnapshot(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !before.Equal(after) {
+		t.Fatalf("the save time moved from %v to %v, which would resume the room in the wrong place", before, after)
+	}
+	due, err = db.DueSnapshots(ctx, 1000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, saved := range due {
+		if saved.ID == id {
+			t.Fatal("a checked room is still due")
+		}
+	}
+}
+
 func TestFreshMediaLeavesOutWhatIsPastTheLimit(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
 	source := "test-" + ids.New()

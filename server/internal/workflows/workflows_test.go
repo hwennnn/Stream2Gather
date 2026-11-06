@@ -7,6 +7,8 @@ import (
 
 	"go.temporal.io/sdk/testsuite"
 
+	"stream2gather/internal/room"
+	"stream2gather/internal/store"
 	"stream2gather/internal/telemetry"
 )
 
@@ -38,8 +40,34 @@ type fakeMetrics struct{ events []telemetry.Event }
 
 func (f *fakeMetrics) Add(event telemetry.Event) { f.events = append(f.events, event) }
 
+type fakeSessions struct {
+	due     []store.SavedRoom
+	fresh   []room.Media
+	written map[string]room.State
+}
+
+func (f *fakeSessions) DueSnapshots(context.Context, int) ([]store.SavedRoom, error) {
+	return f.due, nil
+}
+
+func (f *fakeSessions) FreshMedia(context.Context, []room.Item) ([]room.Media, error) {
+	return f.fresh, nil
+}
+
+func (f *fakeSessions) PutCheckedSnapshot(_ context.Context, id string, state room.State) error {
+	f.written[id] = state
+	return nil
+}
+
+type fakePresence map[string][]store.Person
+
+func (f fakePresence) People(_ context.Context, id string) ([]store.Person, error) { return f[id], nil }
+
 func run(t *testing.T, activities *Activities) (Summary, error) {
 	t.Helper()
+	if activities.Sessions == nil {
+		activities.Sessions = &fakeSessions{}
+	}
 	var suite testsuite.WorkflowTestSuite
 	env := suite.NewTestWorkflowEnvironment()
 	env.RegisterActivity(activities)
@@ -82,6 +110,29 @@ func TestMaintenanceReportsTheBacklogAndPurgesSearches(t *testing.T) {
 	}
 	if len(metrics.events) != 1 || metrics.events[0].Name != "media_stale_backlog" || metrics.events[0].Value != 12 {
 		t.Fatalf("metrics = %+v", metrics.events)
+	}
+}
+
+func TestSnapshotRefreshRewritesEmptyRoomsAndLeavesWatchedOnes(t *testing.T) {
+	saved := func(id string) store.SavedRoom {
+		state := room.New()
+		state.Queue = []room.Item{{ID: "a", Media: room.Media{Source: "youtube", SourceID: "A", Title: "Old"}}}
+		return store.SavedRoom{ID: id, State: state}
+	}
+	sessions := &fakeSessions{
+		due:     []store.SavedRoom{saved("empty"), saved("watched")},
+		fresh:   []room.Media{{Source: "youtube", SourceID: "A", Title: "New"}},
+		written: map[string]room.State{},
+	}
+	summary, err := run(t, &Activities{
+		Rooms: &fakeRooms{}, Media: &fakeMedia{}, Sessions: sessions,
+		Presence: fakePresence{"watched": {{UserID: "someone"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Snapshots != 1 || len(sessions.written) != 1 || sessions.written["empty"].Queue[0].Title != "New" {
+		t.Fatalf("summary = %+v, written = %+v", summary, sessions.written)
 	}
 }
 

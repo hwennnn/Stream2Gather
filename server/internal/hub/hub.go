@@ -586,16 +586,14 @@ func (r *liveRoom) ensureState(ctx context.Context) (room.State, error) {
 	if err != nil || found {
 		return state, err
 	}
-	state, err = r.hub.db.LoadSnapshot(ctx, r.id)
+	state, savedAt, err := r.hub.db.LoadSnapshot(ctx, r.id)
 	if err != nil {
 		return room.State{}, err
 	}
 	now := time.Now().UnixMilli()
 	state.Version = max(state.Version+1, now)
-	if state.Playback.Status == room.StatusPlaying && len(r.conns) == 0 {
-		state.Playback.Pos = state.Playback.Position(now)
-		state.Playback.At = now
-		state.Playback.Status = room.StatusPaused
+	if len(r.conns) == 0 {
+		state = state.Rested(savedAt.UnixMilli(), now)
 	}
 	if err := r.hub.live.Seed(ctx, r.id, state); err != nil {
 		return room.State{}, err
@@ -632,7 +630,7 @@ func (r *liveRoom) settleEmptyRoom(ctx context.Context) {
 	r.applySystem(ctx, room.Command{
 		Type: room.CmdPause,
 		Item: state.Playback.ItemID,
-		Pos:  state.Playback.Position(emptiedAt),
+		Pos:  state.PositionAt(emptiedAt),
 		CT:   now,
 	})
 }

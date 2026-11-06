@@ -497,18 +497,21 @@ type playbackPeek struct {
 
 func (s *Server) buildPreview(ctx context.Context, record store.Room) (preview, error) {
 	out := preview{Slug: record.Slug, Name: record.Name, Members: []store.Person{}, MaxMembers: record.MaxMembers}
+	now := time.Now().UnixMilli()
 	state, found, err := s.Live.Load(ctx, record.ID)
 	if err != nil {
 		return out, err
 	}
 	if !found {
-		if state, err = s.DB.LoadSnapshot(ctx, record.ID); err != nil {
+		var savedAt time.Time
+		if state, savedAt, err = s.DB.LoadSnapshot(ctx, record.ID); err != nil {
 			return out, err
 		}
+		state = state.Rested(savedAt.UnixMilli(), now)
 	}
 	if len(state.Queue) > 0 {
 		out.NowPlaying = &state.Queue[0].Media
-		out.Playback = &playbackPeek{Status: state.Playback.Status, Pos: state.Playback.Position(time.Now().UnixMilli())}
+		out.Playback = &playbackPeek{Status: state.Playback.Status, Pos: state.PositionAt(now)}
 	}
 	people, err := s.Live.People(ctx, record.ID)
 	if err != nil {

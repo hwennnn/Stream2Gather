@@ -258,15 +258,15 @@ func TestRedisStateLossRehydrates(t *testing.T) {
 	}
 }
 
-func TestRehydratingAnEmptyRoomLeavesItPaused(t *testing.T) {
-	r := newRig(t, testRedis)
+// rehydrated restores a saved state into an empty room, saved ago in the past.
+func rehydrated(t *testing.T, r *rig, state room.State, savedAgo time.Duration) room.State {
+	t.Helper()
 	ctx := context.Background()
-	id := r.newRoom(t, directVideo(t))
-	state, _, _ := r.live.Load(ctx, id)
+	id := r.forgottenRoom(t)
 	if err := r.db.SaveSnapshot(ctx, id, state); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.rdb.Del(ctx, "room:"+id+":state").Err(); err != nil {
+	if _, err := r.pool.Exec(ctx, `UPDATE rooms SET updated_at = $2 WHERE id = $1`, id, time.Now().Add(-savedAgo)); err != nil {
 		t.Fatal(err)
 	}
 	c := r.dial(t, id, "u", room.RoleMember)
@@ -276,8 +276,43 @@ func TestRehydratingAnEmptyRoomLeavesItPaused(t *testing.T) {
 	if err := json.Unmarshal(c.expect(t, "welcome").D, &welcome); err != nil {
 		t.Fatal(err)
 	}
-	if welcome.State.Playback.Status != room.StatusPaused || len(welcome.State.Queue) != 1 {
-		t.Fatalf("welcome = %+v", welcome.State)
+	return welcome.State
+}
+
+func playingSince(t *testing.T, ago time.Duration, duration time.Duration) room.State {
+	t.Helper()
+	state := withVideo(t, room.Media{
+		Source: "direct", SourceID: "x", URL: "https://a.test/a.mp4", Title: "a", DurationMS: duration.Milliseconds(),
+	})
+	state.Playback.At = time.Now().Add(-ago).UnixMilli()
+	return state
+}
+
+func TestRehydratingAnEmptyRoomLeavesItPausedWhereItWasSaved(t *testing.T) {
+	r := newRig(t, testRedis)
+	// Started 3700s ago and saved 3650s ago, so it was 50s in.
+	state := rehydrated(t, r, playingSince(t, 3700*time.Second, 600*time.Second), 3650*time.Second)
+	if state.Playback.Status != room.StatusPaused || len(state.Queue) != 1 {
+		t.Fatalf("state = %+v", state)
+	}
+	if pos := state.Playback.Pos; pos < 49 || pos > 51 {
+		t.Fatalf("pos = %v, want 50", pos)
+	}
+}
+
+func TestRehydratingAnEmptyRoomStopsAtTheEndOfTheVideo(t *testing.T) {
+	r := newRig(t, testRedis)
+	state := rehydrated(t, r, playingSince(t, 3700*time.Second, 600*time.Second), 0)
+	if state.Playback.Status != room.StatusPaused || state.Playback.Pos != 600 {
+		t.Fatalf("playback = %+v, want paused at 600", state.Playback)
+	}
+}
+
+func TestRehydratingAVideoOfUnknownLengthIsNotClamped(t *testing.T) {
+	r := newRig(t, testRedis)
+	state := rehydrated(t, r, playingSince(t, 3700*time.Second, 0), 0)
+	if pos := state.Playback.Pos; pos < 3699 || pos > 3701 {
+		t.Fatalf("pos = %v, want 3700", pos)
 	}
 }
 
@@ -567,7 +602,7 @@ func TestHubCloseSendsGoingAwayAndRunsLeaves(t *testing.T) {
 	if people, _ := r.live.People(ctx, id); len(people) != 0 {
 		t.Fatalf("leave did not run: %+v", people)
 	}
-	saved, err := r.db.LoadSnapshot(ctx, id)
+	saved, _, err := r.db.LoadSnapshot(ctx, id)
 	if err != nil {
 		t.Fatal(err)
 	}

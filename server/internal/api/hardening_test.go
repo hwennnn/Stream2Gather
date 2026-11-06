@@ -274,6 +274,36 @@ func TestTelemetryIsRateLimited(t *testing.T) {
 	}
 }
 
+func TestPreviewOfARoomRedisLostShowsWhereItWillResume(t *testing.T) {
+	s, _ := stackServer(t)
+	ctx := context.Background()
+	owner := "g_" + ids.New()
+	if err := s.DB.EnsureUser(ctx, owner, "Owner"); err != nil {
+		t.Fatal(err)
+	}
+	record := store.Room{ID: ids.New(), Slug: ids.Slug(), Name: "Room", OwnerID: owner}
+	if err := s.DB.CreateRoom(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UnixMilli()
+	state, _, err := room.Apply(room.New(), room.Actor{ID: "h", Role: room.RoleHost}, room.Command{
+		Type: room.CmdQueueAdd, NewItemID: "a", Media: &room.Media{Source: "direct", Title: "a", DurationMS: 600_000},
+	}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.Playback.At = now - 3_700_000
+	if err := s.DB.SaveSnapshot(ctx, record.ID, state); err != nil {
+		t.Fatal(err)
+	}
+
+	_, body := serve(s, http.MethodGet, "/v1/rooms/"+record.Slug, "")
+	playback, _ := body["playback"].(map[string]any)
+	if playback["status"] != room.StatusPaused || playback["pos"] != 600.0 {
+		t.Fatalf("playback = %v, want paused at 600", body["playback"])
+	}
+}
+
 func TestTicketRefusesAnEleventhTab(t *testing.T) {
 	s, _ := stackServer(t)
 	ctx := context.Background()

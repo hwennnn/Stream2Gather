@@ -36,7 +36,8 @@ const (
 	// endToleranceMS is how early an "ended" report is believed.
 	endToleranceMS = 5000
 	maxQueue       = 200
-	maxNameRunes   = 32
+	// MaxNameRunes is the longest display name.
+	MaxNameRunes = 32
 )
 
 // Rejected commands. A stale command refers to a video that is no longer
@@ -115,12 +116,33 @@ func (p Playback) Position(now int64) float64 {
 	return p.Pos + float64(now-p.At)/1000*p.Rate
 }
 
+// PositionAt is Position, stopped at the end of a video of known length. A room
+// nobody is watching can otherwise run on well past it.
+func (s State) PositionAt(now int64) float64 {
+	pos := s.Playback.Position(now)
+	if len(s.Queue) > 0 && s.Queue[0].DurationMS > 0 {
+		return min(pos, float64(s.Queue[0].DurationMS)/1000)
+	}
+	return pos
+}
+
+// Rested is a room restored from a snapshot with nobody watching: paused where
+// it was when saved at savedAt, not wherever the clock would have taken it since.
+func (s State) Rested(savedAt, now int64) State {
+	if s.Playback.Status == StatusPlaying {
+		s.Playback.Pos = s.PositionAt(savedAt)
+		s.Playback.At = now
+		s.Playback.Status = StatusPaused
+	}
+	return s
+}
+
 // CleanName returns a display name fit to store, or false if it is not one.
 // Control characters are refused because Postgres rejects NUL and every viewer
 // would otherwise render the rest.
 func CleanName(raw string) (string, bool) {
 	name := strings.TrimSpace(raw)
-	if name == "" || utf8.RuneCountInString(name) > maxNameRunes || !utf8.ValidString(name) {
+	if name == "" || utf8.RuneCountInString(name) > MaxNameRunes || !utf8.ValidString(name) {
 		return "", false
 	}
 	if strings.ContainsFunc(name, unicode.IsControl) {

@@ -88,6 +88,16 @@ func newRig(t *testing.T, redisAddr string, tune ...func(*Hub)) *rig {
 
 func (r *rig) newRoom(t *testing.T, state room.State) string {
 	t.Helper()
+	id := r.forgottenRoom(t)
+	if err := r.live.Seed(context.Background(), id, state); err != nil {
+		t.Fatal(err)
+	}
+	return id
+}
+
+// forgottenRoom is a room Redis knows nothing about, as after losing its data.
+func (r *rig) forgottenRoom(t *testing.T) string {
+	t.Helper()
 	ctx := context.Background()
 	owner := "g_" + ids.New()
 	if err := r.db.EnsureUser(ctx, owner, "Owner"); err != nil {
@@ -95,9 +105,6 @@ func (r *rig) newRoom(t *testing.T, state room.State) string {
 	}
 	id := ids.New()
 	if err := r.db.CreateRoom(ctx, store.Room{ID: id, Slug: id, Name: "Room", OwnerID: owner}); err != nil {
-		t.Fatal(err)
-	}
-	if err := r.live.Seed(ctx, id, state); err != nil {
 		t.Fatal(err)
 	}
 	return id

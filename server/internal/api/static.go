@@ -18,6 +18,13 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(clean, "/assets/") {
 			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
 		}
+		// A browser checks a worker for updates against this, so it must never go stale.
+		if clean == "/sw.js" {
+			w.Header().Set("Cache-Control", "no-cache")
+		}
+		if clean == "/manifest.webmanifest" {
+			w.Header().Set("Content-Type", "application/manifest+json")
+		}
 		s.serveFile(w, r, path, info)
 		return
 	}

@@ -115,6 +115,7 @@ const SIGNED_OUT = 4401;
 /** Push-to-talk flips fast, and only where it ended up matters to the room. */
 const VOICE_REPORT_MS = 200;
 const REACTION_LIFE_MS = 3000;
+const ECHO_PATIENCE_MS = 3000;
 const NOTICE_LIFE_MS = 8000;
 const UNDO_LIFE_MS = 5000;
 const MAX_ENTRIES = 300;
@@ -218,6 +219,7 @@ export class RoomSession {
   private voice: VoiceState | 'off' = 'off';
   private voiceTimer: number | null = null;
   private closing: () => void = () => {};
+  private ownReactions: { emoji: string; at: number }[] = [];
   readonly marks: { joinMs?: number } = {};
 
   constructor(readonly slug: string) {}
@@ -706,9 +708,25 @@ export class RoomSession {
     this.update({ messages: this.view.messages.map((entry) => (entry === line ? { ...line, delivery } : entry)) });
   }
 
-  private reaction(data: { emoji: string; name: string }): void {
+  /** Draws it now. The server's copy of it is then the one to skip. */
+  react(emoji: string): void {
+    if (!this.send('react', { emoji })) return;
+    this.ownReactions.push({ emoji, at: Date.now() });
+    this.showReaction(emoji, this.view.self?.name ?? '');
+  }
+
+  private reaction({ emoji, name, userId }: { emoji: string; name: string; userId: string }): void {
+    // The server drops reactions sent too fast, so an echo may never come.
+    const recent = Date.now() - ECHO_PATIENCE_MS;
+    this.ownReactions = this.ownReactions.filter((own) => own.at >= recent);
+    const own = this.ownReactions.findIndex((sent) => sent.emoji === emoji);
+    if (userId === this.view.self?.userId && own >= 0) this.ownReactions.splice(own, 1);
+    else this.showReaction(emoji, name);
+  }
+
+  private showReaction(emoji: string, name: string): void {
     const id = this.nextId++;
-    this.update({ reactions: [...this.view.reactions, { id, ...data }] });
+    this.update({ reactions: [...this.view.reactions, { id, emoji, name }] });
     window.setTimeout(
       () => this.update({ reactions: this.view.reactions.filter((reaction) => reaction.id !== id) }),
       REACTION_LIFE_MS,

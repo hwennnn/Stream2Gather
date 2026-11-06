@@ -47,7 +47,7 @@ export const ReactionBar = ({ session, disabled, className }: { session: RoomSes
         type="button"
         aria-label={`React ${emoji}`}
         disabled={disabled}
-        onClick={() => session.send('react', { emoji })}
+        onClick={() => session.react(emoji)}
         className="react flex size-9 cursor-pointer items-center justify-center rounded-md text-[20px] disabled:cursor-not-allowed"
       >
         {emoji}
@@ -84,7 +84,7 @@ export const ReactionPicker = ({ session, disabled }: { session: RoomSession; di
               key={emoji}
               type="button"
               aria-label={`React ${emoji}`}
-              onClick={() => session.send('react', { emoji })}
+              onClick={() => session.react(emoji)}
               className="flex size-11 cursor-pointer items-center justify-center rounded-md text-[22px] active:bg-raised"
             >
               {emoji}

@@ -8,11 +8,27 @@ on:
 jobs:
   server:
     runs-on: ubuntu-latest
+    # The same services and ports as deploy/compose.yaml. Nothing else uses this
+    # Redis, so TEST_REDIS_ADDR lets the tests that delete keys run too.
     services:
       redis:
         image: redis:8-alpine
         ports:
           - 63809:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 3s --health-retries 20
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: s2g
+          POSTGRES_PASSWORD: s2g
+          POSTGRES_DB: s2g
+        ports:
+          - 54339:5432
+        options: >-
+          --health-cmd "pg_isready -U s2g" --health-interval 2s --health-timeout 3s --health-retries 20
+    env:
+      TEST_REDIS_ADDR: 127.0.0.1:63809
     defaults:
       run:
         working-directory: server
@@ -23,7 +39,15 @@ jobs:
           go-version-file: server/go.mod
       - run: test -z "$(gofmt -l .)"
       - run: go vet ./...
-      - run: go test -race ./...
+      - run: go run ./cmd/s2g migrate
+      # A test that cannot reach its service skips, and a skip looks like a pass.
+      # Here every service is up, so any skip means a test silently stopped running.
+      - name: Test, and fail on any skip
+        shell: bash
+        run: |
+          go test -race -count=1 -v ./... 2>&1 | tee test.log
+          echo "passed: $(grep -cE '^ *--- PASS' test.log), skipped: $(grep -cE '^ *--- SKIP' test.log || true)"
+          ! grep -E '^ *--- SKIP' test.log
 
   web:
     runs-on: ubuntu-latest

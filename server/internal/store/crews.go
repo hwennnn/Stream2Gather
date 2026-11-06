@@ -324,6 +324,41 @@ func (p *Postgres) CloseCrew(ctx context.Context, crew Crew) error {
 	return tx.Commit(ctx)
 }
 
+// DeleteAccount removes a person and what they wrote, at once, and returns the
+// rooms of the crews they owned. Each goes to its longest-standing member. A crew
+// with nobody else goes with its room, as do their temporary rooms: a room has to
+// have an owner, and the cascade takes everything kept under it.
+func (p *Postgres) DeleteAccount(ctx context.Context, userID string) ([]string, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+	rows, err := tx.Query(ctx, `
+		UPDATE rooms r SET owner_id = coalesce((
+		         SELECT m.user_id FROM crew_members m JOIN crews c ON c.id = m.crew_id
+		         WHERE c.room_id = r.id AND m.user_id <> $1 ORDER BY m.joined_at, m.user_id LIMIT 1), r.owner_id)
+		WHERE r.owner_id = $1 AND EXISTS (SELECT 1 FROM crews c WHERE c.room_id = r.id)
+		RETURNING r.id`, userID)
+	if err != nil {
+		return nil, err
+	}
+	rooms, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, err
+	}
+	for _, statement := range []string{
+		`DELETE FROM rooms WHERE owner_id = $1`,
+		`DELETE FROM messages WHERE user_id = $1`,
+		`DELETE FROM users WHERE id = $1`,
+	} {
+		if _, err := tx.Exec(ctx, statement, userID); err != nil {
+			return nil, err
+		}
+	}
+	return rooms, tx.Commit(ctx)
+}
+
 // CrewRoster lists members, longest-standing first.
 func (p *Postgres) CrewRoster(ctx context.Context, crewID string) ([]CrewMember, error) {
 	rows, err := p.pool.Query(ctx, `

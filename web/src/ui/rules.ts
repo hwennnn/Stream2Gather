@@ -48,6 +48,10 @@ export const failureNote = (view: RoomView): string => {
 /** Chat keeps its box and People its host switch along the bottom of the rail, clear of toasts. */
 export const toastLift = (tab: string): string => (tab === 'queue' ? 'bottom-3' : 'bottom-[84px]');
 
+/** The chat's own invite card. It goes at the first line of chat, and with it the place Invite answers. */
+export const chatOffersInvite = (view: RoomView, tab: string): boolean =>
+  tab === 'chat' && view.alone && view.queue.length > 0 && !view.messages.some(({ kind }) => kind === 'chat');
+
 /** These are chat lines too. Over an open chat a toast only covers the same words, unless it has a link the line doesn't. */
 const CHAT_NOTICES = new Set(['host', 'skipped']);
 

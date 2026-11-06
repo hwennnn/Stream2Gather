@@ -108,7 +108,7 @@ export default function CrewRail() {
   if (!signedIn && !publishableKey) return null;
 
   return (
-    <section aria-label="Your crews" className="mx-auto max-w-6xl px-6 pb-10">
+    <section aria-label="Your crews" className="mt-12 phone:mt-8">
       {crews.length > 0 && (
         <ul className="mb-3 divide-y divide-line border-y border-line">
           {crews.map((crew) => (

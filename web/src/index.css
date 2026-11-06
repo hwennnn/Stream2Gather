@@ -653,6 +653,13 @@ body {
     0 0 0 4px var(--hue);
 }
 
+/* Someone talking, in their own hue. Trouble below still wins, as it needs a reaction. */
+.seat[data-speaking='true'] .seat-disc {
+  box-shadow:
+    0 0 0 2px var(--color-ink),
+    0 0 0 3px var(--hue);
+}
+
 .seat[data-away='true'] .seat-disc {
   opacity: 0.35;
 }

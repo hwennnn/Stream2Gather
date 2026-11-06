@@ -27,6 +27,7 @@ import { usePageVisible } from '../ui/usePageVisible';
 import { useRoomPlayer } from '../ui/useRoomPlayer';
 
 const CrewHome = lazy(() => import('./CrewHome'));
+const VoiceButton = lazy(() => import('../voice/VoiceButton'));
 
 type Tab = 'chat' | 'queue' | 'people';
 
@@ -355,6 +356,12 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           railHidden={railHidden}
           toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink px-4 empty:hidden', 1)}
         />
+
+        <div className="flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5 empty:hidden">
+          <Slot>
+            <VoiceButton session={session} view={view} adapter={player.adapter} place="bar" />
+          </Slot>
+        </div>
 
         {/* Hidden rather than removed, so a chat draft survives theatre mode. */}
         <aside aria-label="Room" hidden={railHidden} className="room-rail">

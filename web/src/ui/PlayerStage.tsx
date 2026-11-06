@@ -65,7 +65,7 @@ export const PlayerStage = (props: StageProps) => {
         {current && !player.failure && !player.ready && <Poster item={current} changing={changing} />}
       </div>
 
-      <div className="front-row">
+      <div className="front-row" data-idle={!current || undefined}>
         <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} />
         {current && <ReactionBar session={session} disabled={isOffline(view)} className={railHidden ? 'flex' : 'hidden xl:flex land:hidden'} />}
       </div>
@@ -146,8 +146,8 @@ const IdleStage = ({ session, view, extra }: { session: RoomSession; view: RoomV
   const searching = search.query !== null;
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-xl flex-col justify-center px-4 py-6 land:py-3">
-      <h2 className="text-[28px] leading-9 font-semibold tracking-[-0.015em] phone:text-xl phone:leading-7 land:text-[15px] land:leading-5">{finished ? 'The queue’s finished.' : 'What are we watching?'}</h2>
+    <div data-searching={searching || undefined} className="stage-dock flex h-full w-full flex-col px-4 py-6 land:py-3">
+      <h2 className="text-xl leading-7 font-semibold tracking-[-0.015em] land:text-[15px] land:leading-5">{finished ? 'The queue’s finished.' : 'What are we watching?'}</h2>
       {!editable && <p className="mt-1 text-muted">The host picks what’s next.</p>}
 
       {editable && (

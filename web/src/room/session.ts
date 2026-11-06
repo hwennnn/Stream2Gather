@@ -26,6 +26,9 @@ export type ChatResult = { id: string; limited: boolean };
 
 export type QueueMode = 'now' | 'next' | 'end';
 
+/** Who paused is the room's business, not the sync engine's. */
+export type RoomPlayback = Playback & { pausedBy?: string; pausedById?: string };
+
 type Reaction = { id: number; emoji: string; name: string };
 
 type Notice = { id: number; text: string; url?: string };
@@ -41,7 +44,7 @@ export type RoomView = {
   self: Person | null;
   name: string;
   version: number;
-  playback: Playback;
+  playback: RoomPlayback;
   queue: QueueItem[];
   settings: Settings;
   members: Person[];
@@ -51,13 +54,12 @@ export type RoomView = {
   messages: ChatEntry[];
   reactions: Reaction[];
   notices: Notice[];
-  lastAction: { by: string; cause: string } | null;
   jump: Jump | null;
 };
 
 export type StateMessage = {
   version: number;
-  playback: Playback;
+  playback: RoomPlayback;
   queue?: QueueItem[];
   settings?: Settings;
   cause: string;
@@ -82,7 +84,6 @@ const initialView: RoomView = {
   messages: [],
   reactions: [],
   notices: [],
-  lastAction: null,
   jump: null,
 };
 
@@ -394,7 +395,7 @@ export class RoomSession {
   private welcome(data: {
     self: Person;
     room: { name: string };
-    state: { version: number; playback: Playback; queue: QueueItem[]; settings: Settings };
+    state: { version: number; playback: RoomPlayback; queue: QueueItem[]; settings: Settings };
     members: Person[];
   }): void {
     this.attempts = 0;
@@ -494,7 +495,6 @@ export class RoomSession {
       playback: message.playback,
       queue: message.queue ?? previous.queue,
       settings: message.settings ?? previous.settings,
-      lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
       viewerStates: itemChanged ? {} : previous.viewerStates,
     });
     if (itemChanged) this.noteJump(message);

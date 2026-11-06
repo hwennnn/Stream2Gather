@@ -13,14 +13,27 @@ const view = (patch: Partial<RoomView>): RoomView =>
 
 describe('pillFor', () => {
   it('puts being offline above everything', () => {
-    expect(pillFor(view({ offlineSince: 1 }), 'synced', null).text).toBe('Offline');
+    expect(pillFor(view({ offlineSince: 1 }), 'synced').text).toBe('Offline');
   });
 
+  const paused = (pausedBy?: string, pausedById?: string) =>
+    view({ playback: { item: 'x', status: 'paused', pos: 0, at: 0, rate: 1, pausedBy, pausedById } });
+
   it('names who paused, and says you when it was you', () => {
-    const paused = view({ playback: { item: 'x', status: 'paused', pos: 0, at: 0, rate: 1 } });
-    expect(pillFor(paused, 'synced', 'Maya').text).toBe('Paused by Maya');
-    expect(pillFor(paused, 'synced', 'Ada').text).toBe('Paused by you');
-    expect(pillFor(paused, 'synced', null).text).toBe('Paused');
+    expect(pillFor(paused('Maya', 'b'), 'synced').text).toBe('Paused by Maya');
+    expect(pillFor(paused('Ada', 'a'), 'synced').text).toBe('Paused by you');
+  });
+
+  it('does not mistake someone with the same name for you', () => {
+    expect(pillFor(paused('Ada', 'b'), 'synced').text).toBe('Paused by Ada');
+  });
+
+  it('never leaves a pause unexplained', () => {
+    expect(pillFor(paused(), 'synced').text).toBe('Paused when everyone left');
+  });
+
+  it('marks a pause as something to notice', () => {
+    expect(pillFor(paused('Maya', 'b'), 'synced').tone).toBe('paused');
   });
 
   it.each([
@@ -30,7 +43,7 @@ describe('pillFor', () => {
     ['waiting', 'Loading'],
     ['stalled', 'Loading'],
   ] as const)('shows %s as %s', (health, text) => {
-    expect(pillFor(view({}), health, null).text).toBe(text);
+    expect(pillFor(view({}), health).text).toBe(text);
   });
 });
 

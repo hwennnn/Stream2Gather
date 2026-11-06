@@ -173,6 +173,13 @@ body {
     white-space: nowrap;
   }
 
+  /* Someone stopped the video for everyone, so this one has to be seen. */
+  .chip-paused {
+    background: var(--color-text);
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+
   .skeleton {
     background: var(--color-raised);
     animation: breathe 1.4s ease-in-out infinite;

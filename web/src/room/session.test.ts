@@ -496,14 +496,6 @@ describe('RoomSession', () => {
       socket.deliver('members', { members: [ada] });
       expect(session.getView().alone).toBe(true);
     });
-
-    it('keeps the last action with its author', async () => {
-      const { session, socket } = await connected();
-      socket.deliver('welcome', welcome(1));
-      socket.deliver('playback', { version: 2, playback: { ...idle, status: 'paused' }, cause: 'pause', by: 'Maya' });
-      socket.deliver('state', { version: 3, playback: idle, queue: [], cause: 'ended' });
-      expect(session.getView().lastAction).toEqual({ by: 'Maya', cause: 'pause' });
-    });
   });
 
   describe('system lines', () => {

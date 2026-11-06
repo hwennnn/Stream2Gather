@@ -6,12 +6,16 @@ export const formatTime = (seconds: number): string => {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
 };
 
-const COLORS = ['#8fa8ff', '#7dd3fc', '#a78bfa', '#5eead4', '#f0abfc', '#fcd34d'];
+/** Bright enough to read as a name on the panel, and to carry dark initials. */
+export const AVATAR_COLORS = [
+  '#8fa8ff', '#7dd3fc', '#a78bfa', '#5eead4', '#f0abfc', '#fcd34d',
+  '#fb7185', '#86efac', '#fdba74', '#bef264', '#f9a8d4', '#a0f08c',
+];
 
 export const avatarColor = (id: string): string => {
   let hash = 0;
   for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return COLORS[hash % COLORS.length] ?? '#8fa8ff';
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? '#8fa8ff';
 };
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });

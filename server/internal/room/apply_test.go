@@ -260,6 +260,31 @@ func TestUndoNeedsTheRightToControlPlayback(t *testing.T) {
 	}
 }
 
+func TestAPauseRemembersWhoPaused(t *testing.T) {
+	s := add(t, New(), "a", 0)
+	s, _, err := Apply(s, member, Command{Type: CmdPause, Item: "a", Pos: 5, CT: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := s.Playback; p.PausedBy != member.Name || p.PausedByID != member.ID {
+		t.Fatalf("playback = %+v", p)
+	}
+	s, _, err = Apply(s, host, Command{Type: CmdSeek, Item: "a", Pos: 9, CT: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Playback.PausedBy != member.Name {
+		t.Fatalf("a seek changed who paused: %+v", s.Playback)
+	}
+	s, _, err = Apply(s, host, Command{Type: CmdPlay, Item: "a", Pos: 9, CT: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := s.Playback; p.PausedBy != "" || p.PausedByID != "" {
+		t.Fatalf("playback = %+v", p)
+	}
+}
+
 func TestRemovingCurrentVideoAdvances(t *testing.T) {
 	s := add(t, add(t, New(), "a", 0), "b", 0)
 	next, change, err := Apply(s, member, Command{Type: CmdQueueRemove, Target: "a"}, now)

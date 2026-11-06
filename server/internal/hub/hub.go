@@ -46,6 +46,8 @@ const (
 	// A host who reloads or loses signal for a moment stays the host. One who
 	// says they're leaving doesn't get this.
 	hostGrace = 30 * time.Second
+	// A reload shows as leaving and joining, and within this it shows as nothing.
+	rejoinQuiet = 10 * time.Second
 	// An empty room keeps running briefly, so a reload resumes seamlessly.
 	emptyGraceMS = 60_000
 	// sessionCheckEvery bounds how long a signed-out socket stays open.
@@ -72,6 +74,7 @@ type Hub struct {
 	// Timings are fields so tests need not wait them out.
 	idleTimeout     time.Duration
 	hostGrace       time.Duration
+	rejoinQuiet     time.Duration
 	touchEvery      time.Duration
 	snapshots       time.Duration
 	keepAlive       time.Duration
@@ -102,6 +105,7 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 
 		idleTimeout:     idleTimeout,
 		hostGrace:       hostGrace,
+		rejoinQuiet:     rejoinQuiet,
 		touchEvery:      touchEvery,
 		snapshots:       snapshotEvery,
 		keepAlive:       keepAliveEvery,
@@ -628,6 +632,7 @@ func (r *liveRoom) touchAll() {
 		r.publishMembers(ctx)
 	}
 	r.settleHost(ctx)
+	r.settleDepartures(ctx)
 }
 
 // settleHost hands the room to the next person when its host has been gone a
@@ -917,6 +922,39 @@ func (r *liveRoom) say(ctx context.Context, text, url string) {
 	}
 }
 
+// arrived says someone joined, unless they never really went. Another tab isn't
+// an arrival, and nor is whoever opens an empty room.
+func (r *liveRoom) arrived(ctx context.Context, person store.Person, tabs, others int) {
+	if tabs > 0 {
+		return
+	}
+	gone, found, err := r.hub.live.TakeGone(ctx, r.id, person.UserID)
+	if err != nil {
+		r.hub.log.Warn("departure read failed", "room", r.id, "error", err)
+	}
+	reloaded := found && time.Now().UnixMilli()-gone.At < r.hub.rejoinQuiet.Milliseconds()
+	if !reloaded && others > 0 {
+		r.say(ctx, person.Name+" joined", "")
+	}
+}
+
+// settleDepartures says who left, once they have been gone too long for a reload.
+func (r *liveRoom) settleDepartures(ctx context.Context) {
+	departures, err := r.hub.live.Departures(ctx, r.id)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().UnixMilli() - r.hub.rejoinQuiet.Milliseconds()
+	for _, departure := range departures {
+		if departure.At > cutoff {
+			continue
+		}
+		if _, claimed, err := r.hub.live.TakeGone(ctx, r.id, departure.UserID); err == nil && claimed {
+			r.say(ctx, departure.Name+" left", "")
+		}
+	}
+}
+
 func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 	if r.hub.isClosing() {
 		c.shut(websocket.StatusGoingAway, "server restarting")
@@ -958,10 +996,13 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 		state = latest
 	}
 
+	tabs, _ := r.hub.live.Sockets(ctx, r.id, person.UserID)
+	here, _ := r.hub.live.People(ctx, r.id)
 	if err := r.hub.live.Touch(ctx, r.id, c.id, person); err != nil {
 		r.hub.log.Warn("presence write failed", "room", r.id, "error", err)
 	}
 	r.conns[c] = struct{}{}
+	r.arrived(ctx, person, tabs, len(here))
 	r.hub.recorder.Joined(r.id, person)
 
 	people, err := r.roster(ctx)
@@ -999,6 +1040,21 @@ func (r *liveRoom) full(ctx context.Context, person store.Person, limit int) boo
 	return !here && len(people) >= limit
 }
 
+// departed is the chat's side of someone's last socket closing. A host's going is
+// told by the handover, and anyone else's waits in case it is only a reload.
+func (r *liveRoom) departed(ctx context.Context, person store.Person, said, hosting bool) {
+	switch {
+	case hosting:
+	case said:
+		r.say(ctx, person.Name+" left", "")
+	default:
+		gone := store.Departure{UserID: person.UserID, Name: person.Name, At: time.Now().UnixMilli()}
+		if err := r.hub.live.MarkGone(ctx, r.id, gone); err != nil {
+			r.hub.log.Warn("departure write failed", "room", r.id, "error", err)
+		}
+	}
+}
+
 // leave runs for every closed socket. said is true when the viewer pressed Leave,
 // and a drop or reload gets the grace period instead.
 func (r *liveRoom) leave(c *conn, said bool) {
@@ -1015,8 +1071,11 @@ func (r *liveRoom) leave(c *conn, said bool) {
 	r.publishMembers(ctx)
 
 	person := c.who()
-	if state, found, err := r.hub.live.Load(ctx, r.id); err == nil && found &&
-		state.RoleOf(person.UserID, person.Role) == room.RoleHost {
+	hosting := false
+	if state, found, err := r.hub.live.Load(ctx, r.id); err == nil && found {
+		hosting = state.RoleOf(person.UserID, person.Role) == room.RoleHost
+	}
+	if hosting {
 		// The grace period counts from now, not from the last presence refresh.
 		seen := time.Now().UnixMilli()
 		if said {
@@ -1028,6 +1087,7 @@ func (r *liveRoom) leave(c *conn, said bool) {
 	people, err := r.hub.live.People(ctx, r.id)
 	if err == nil && !slices.ContainsFunc(people, func(p store.Person) bool { return p.UserID == person.UserID }) {
 		r.hub.recorder.Left(r.id, person.UserID)
+		r.departed(ctx, person, said, hosting)
 	}
 	if err == nil && len(people) > 0 {
 		r.settleHost(ctx)

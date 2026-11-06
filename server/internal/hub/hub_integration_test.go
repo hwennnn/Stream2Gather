@@ -969,6 +969,11 @@ func TestAWatchedRoomDoesNotExpireUnderItsViewers(t *testing.T) {
 	eventually(t, "a room in use was left to expire", func() bool { return !expired() })
 }
 
+func fastLines(h *Hub) {
+	h.rejoinQuiet = 200 * time.Millisecond
+	h.touchEvery = 40 * time.Millisecond
+}
+
 func lineText(t *testing.T, message frame) string {
 	t.Helper()
 	var line store.Line
@@ -978,8 +983,107 @@ func lineText(t *testing.T, message frame) string {
 	return line.Text
 }
 
+func TestSomeoneArrivingLaterReadsTheSameHistory(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	first := r.joined(t, id, "a", room.RoleMember)
+	r.joined(t, id, "b", room.RoleMember)
+	if got := lineText(t, first.expect(t, "line")); got != "b joined" {
+		t.Fatalf("line = %q", got)
+	}
+
+	late := r.dial(t, id, "c", room.RoleMember)
+	if got := lineText(t, first.expect(t, "line")); got != "c joined" {
+		t.Fatalf("line = %q", got)
+	}
+	var welcome struct {
+		Lines []store.Line `json:"lines"`
+	}
+	if err := json.Unmarshal(late.expect(t, "welcome").D, &welcome); err != nil {
+		t.Fatal(err)
+	}
+	if len(welcome.Lines) != 2 || welcome.Lines[0].Text != "b joined" || welcome.Lines[1].Text != "c joined" {
+		t.Fatalf("lines = %+v", welcome.Lines)
+	}
+}
+
+func TestAReloadSaysNothing(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	reloading := r.joined(t, id, "b", room.RoleMember)
+	watching.expect(t, "line")
+
+	_ = reloading.ws.CloseNow()
+	time.Sleep(50 * time.Millisecond)
+	r.joined(t, id, "b", room.RoleMember)
+	if message, ok := watching.next("line", 500*time.Millisecond); ok {
+		t.Fatalf("a reload was narrated: %s", message.D)
+	}
+}
+
+func TestSomeoneWhoStaysGoneIsSaidToHaveLeft(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	gone := r.joined(t, id, "b", room.RoleMember)
+	watching.expect(t, "line")
+
+	_ = gone.ws.CloseNow()
+	if got := lineText(t, watching.expect(t, "line")); got != "b left" {
+		t.Fatalf("line = %q", got)
+	}
+	if message, ok := watching.next("line", 300*time.Millisecond); ok {
+		t.Fatalf("said twice: %s", message.D)
+	}
+}
+
+func TestLeavingIsSaidAtOnce(t *testing.T) {
+	r := newRig(t, testRedis) // The real quiet window, so only Leave can be this fast.
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	leaving := r.joined(t, id, "b", room.RoleMember)
+	watching.expect(t, "line")
+
+	leaving.send(t, "leave", nil)
+	if got := lineText(t, watching.expect(t, "line")); got != "b left" {
+		t.Fatalf("line = %q", got)
+	}
+}
+
+func TestAHostLeavingIsOneLine(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	host := r.joined(t, id, "Maya", room.RoleHost)
+	watching := r.joined(t, id, "a", room.RoleMember)
+	host.expect(t, "line")
+	watching.next("line", 200*time.Millisecond) // Their own arrival, if it came after the welcome.
+
+	host.send(t, "leave", nil)
+	if got := lineText(t, watching.expect(t, "line")); got != "Maya left, so a is the host now." {
+		t.Fatalf("line = %q", got)
+	}
+	if message, ok := watching.next("line", 400*time.Millisecond); ok {
+		t.Fatalf("said twice: %s", message.D)
+	}
+}
+
+func TestASecondTabIsNotAnArrival(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	r.joined(t, id, "b", room.RoleMember)
+	watching.expect(t, "line")
+
+	second := r.joined(t, id, "b", room.RoleMember)
+	_ = second.ws.CloseNow()
+	if message, ok := watching.next("line", 400*time.Millisecond); ok {
+		t.Fatalf("a tab was narrated: %s", message.D)
+	}
+}
+
 func TestAJumpIsInTheHistory(t *testing.T) {
-	r := newRig(t, testRedis)
+	r := newRig(t, testRedis, fastLines)
 	state := directVideo(t)
 	state.Queue = append(state.Queue, room.Item{ID: "next", Media: room.Media{Title: "Next one"}})
 	id := r.newRoom(t, state)

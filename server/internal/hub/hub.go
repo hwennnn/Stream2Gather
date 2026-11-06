@@ -222,6 +222,8 @@ func (h *Hub) closeSignedOut(ctx context.Context) {
 		here := seat{roomID, c.who().UserID}
 		if version, found := versions[here.user]; !found || version != c.version {
 			c.shut(statusSignedOut, "signed out")
+			// Gone from here now, or the next check would owe the call again.
+			h.accounts.Delete(c)
 			h.owesCall(here)
 		} else {
 			staying[here] = true

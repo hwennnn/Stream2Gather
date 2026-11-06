@@ -602,16 +602,93 @@ describe('RoomSession', () => {
       expect(lines(session)).toEqual(['Maya turned on host controls', 'Maya turned off host controls']);
     });
 
-    it('does not blame anyone for a handover', async () => {
+    it('leaves a handover to the server, in the toast’s own words', async () => {
       const { session, socket } = await live();
       socket.deliver('state', locked);
       socket.deliver('state', { version: 3, playback: idle, queue: [], settings: settings('everyone'), cause: 'settings.release' });
+      socket.deliver('notice', { kind: 'host', text: 'Golden Otter left, so anyone can control playback.' });
       socket.deliver('state', { version: 4, playback: idle, queue: [], settings: settings('hosts'), cause: 'settings.restore' });
+      socket.deliver('notice', { kind: 'host', text: 'Golden Otter is back, so they control playback again.' });
       expect(lines(session)).toEqual([
         'Maya turned on host controls',
-        'Host controls are off until the host is back',
-        'Host controls are back on',
+        'Golden Otter left, so anyone can control playback.',
+        'Golden Otter is back, so they control playback again.',
       ]);
+      expect(session.getView().notices.map((notice) => notice.text)).toEqual([
+        'Golden Otter left, so anyone can control playback.',
+        'Golden Otter is back, so they control playback again.',
+      ]);
+    });
+
+    it('records a skip in the chat, but not every notice', async () => {
+      const { session, socket } = await live();
+      socket.deliver('notice', { kind: 'skipped', text: 'Skipped “Clip” because it wouldn’t load.' });
+      socket.deliver('notice', { text: 'That didn’t go through.' });
+      expect(lines(session)).toEqual(['Skipped “Clip” because it wouldn’t load.']);
+    });
+
+    describe('pauses that were not pauses', () => {
+      const playing = async (durationMs = 300_000) => {
+        const { session, socket } = await connected();
+        const video = { ...item('a'), durationMs };
+        const base = welcome(1);
+        const playback = { ...idle, item: 'a', status: 'playing', pos: 10, at: Date.now() };
+        socket.deliver('welcome', { ...base, state: { ...base.state, playback, queue: [video] }, members: [ada] });
+        await vi.advanceTimersByTimeAsync(0);
+        const at = (status: string, pos: number) => ({ ...idle, item: 'a', status, pos, at: Date.now() });
+        return { session, socket, at };
+      };
+
+      it('still says when someone really paused', async () => {
+        const { session, socket, at } = await playing();
+        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
+        await vi.advanceTimersByTimeAsync(5000);
+        socket.deliver('playback', { version: 3, playback: at('playing', 10), cause: 'play', by: 'Asha' });
+        expect(lines(session)).toEqual(['Asha paused at 0:10']);
+      });
+
+      it('writes nothing when the video ran out, for any number of viewers', async () => {
+        const { session, socket, at } = await playing(25_000);
+        socket.deliver('playback', { version: 2, playback: at('paused', 25), cause: 'pause', by: 'Asha' });
+        socket.deliver('playback', { version: 3, playback: at('paused', 25), cause: 'pause', by: 'Pia' });
+        expect(lines(session)).toEqual([]);
+      });
+
+      it('takes the line back when a video of unknown length ends', async () => {
+        const { session, socket, at } = await playing(0);
+        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
+        socket.deliver('playback', { version: 3, playback: at('paused', 10), cause: 'pause', by: 'Pia' });
+        socket.deliver('state', { version: 4, playback: idle, queue: [], cause: 'ended' });
+        expect(lines(session)).toEqual([]);
+      });
+
+      it('calls a pause away from the room’s position a jump', async () => {
+        const { session, socket, at } = await playing();
+        socket.deliver('playback', { version: 2, playback: at('paused', 25), cause: 'pause', by: 'Asha' });
+        socket.deliver('playback', { version: 3, playback: at('playing', 25), cause: 'play', by: 'Asha' });
+        expect(lines(session)).toEqual(['Asha jumped to 0:25']);
+      });
+
+      it('folds a pause and a play that moved the picture into one jump', async () => {
+        const { session, socket, at } = await playing();
+        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
+        socket.deliver('playback', { version: 3, playback: at('playing', 25), cause: 'play', by: 'Asha' });
+        expect(lines(session)).toEqual(['Asha jumped to 0:25']);
+      });
+
+      it('leaves no line for a pause undone at once', async () => {
+        const { session, socket, at } = await playing();
+        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
+        socket.deliver('playback', { version: 3, playback: at('playing', 10), cause: 'play', by: 'Asha' });
+        expect(lines(session)).toEqual([]);
+      });
+
+      it('keeps a pause that someone else resumed', async () => {
+        const { session, socket, at } = await playing();
+        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
+        socket.deliver('playback', { version: 3, playback: at('playing', 10), cause: 'play', by: 'Pia' });
+        expect(lines(session)).toEqual(['Asha paused at 0:10']);
+      });
     });
 
     it('stays quiet when settings change nothing about control', async () => {

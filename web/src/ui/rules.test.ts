@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatEntry, RoomView } from '../room/session';
-import { canControl, canQueue, chatScroll, countUnread, pillFor } from './rules';
+import { canControl, canQueue, chatScroll, countUnread, failureNote, pillFor } from './rules';
 
 const view = (patch: Partial<RoomView>): RoomView =>
   ({
@@ -31,6 +31,28 @@ describe('pillFor', () => {
     ['stalled', 'Loading'],
   ] as const)('shows %s as %s', (health, text) => {
     expect(pillFor(view({}), health, null).text).toBe(text);
+  });
+});
+
+describe('failureNote', () => {
+  const people = (...ids: string[]) => ids.map((userId) => ({ userId, name: userId, role: 'member' as const }));
+  const self = { userId: 'a', name: 'a', role: 'member' as const };
+
+  it('never claims others are watching when nobody is', () => {
+    const everyone = view({ self, members: people('a', 'b'), viewerStates: { a: 'unavailable', b: 'unavailable' } });
+    expect(failureNote(everyone)).toBe('Skipping.');
+  });
+
+  it('says so when others can still watch', () => {
+    expect(failureNote(view({ self, members: people('a', 'b'), viewerStates: { a: 'unavailable', b: 'synced' } }))).toBe('Others are still watching.');
+  });
+
+  it('counts this viewer before their own report comes back', () => {
+    expect(failureNote(view({ self, members: people('a', 'b', 'c'), viewerStates: { b: 'unavailable' } }))).toBe('Skipping.');
+  });
+
+  it('has nothing to say to someone alone in a room that will move on', () => {
+    expect(failureNote(view({ self, members: people('a'), viewerStates: {}, alone: true }))).toBe('Skipping.');
   });
 });
 

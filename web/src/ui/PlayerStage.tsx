@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import { AddBox, SearchResults, useSearch } from './Omnibox';
 import { ReactionBar, ReactionLane } from './Reactions';
 import { HostChip } from './RoomHeader';
-import { canControl, canQueue, isLocked, isOffline, pillFor } from './rules';
+import { canControl, canQueue, failureNote, isLocked, isOffline, pillFor } from './rules';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { useAdder, type Adder } from './useAdder';
@@ -82,8 +82,7 @@ const FailurePanel = ({ item, error, view, onPickAnother }: { item: QueueItem; e
       <div className="enter">
         <h2 className="text-xl font-semibold tracking-tight phone:text-lg">This video won’t play here</h2>
         <p className="mt-1.5 max-w-md text-sm text-muted">
-          {reason}
-          {!view.alone && ' Others are still watching.'}
+          {reason} {failureNote(view)}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           {canQueue(view) && (

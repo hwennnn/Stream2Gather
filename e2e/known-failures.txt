@@ -4,7 +4,6 @@
 # hide among old ones. Fix the bug, delete its line.
 P-01 | a seek in the first moment after joining
 P-02 | a page that does not exist
-L-06 | small phone \(320x568\).*200 by 200
 L-07 | up next clears the left edge|shares one left gutter
 L-09 | with the Undo notice: every control can be reached: Add to queue is under
 P-07 | Cal is not told of Cal

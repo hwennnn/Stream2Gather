@@ -9,6 +9,7 @@ const BASE = process.env.BASE ?? 'http://127.0.0.1:18082';
 const OUT = process.argv[2] ?? '.';
 const YOUTUBE_OK = process.env.YOUTUBE_OK ?? 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
 const YOUTUBE_BLOCKED = process.env.YOUTUBE_BLOCKED ?? '';
+const YOUTUBE_LENGTH_S = Number(process.env.YOUTUBE_LENGTH_S ?? 634);
 
 const browser = await chromium.launch({
   channel: 'chrome',
@@ -40,6 +41,7 @@ const viewer = async (name, { latencyMs = 0 } = {}) => {
     window.__sockets = [];
     window.__roomEvents = 0;
     window.__sent = [];
+    window.__drop = [];
     window.WebSocket = class extends Native {
       #onmessage = null;
       constructor(...args) {
@@ -47,6 +49,7 @@ const viewer = async (name, { latencyMs = 0 } = {}) => {
         window.__sockets.push(this);
         super.addEventListener('message', (event) => {
           if (/^\{"t":"(state|playback)"/.test(event.data)) window.__roomEvents += 1;
+          window.__item = /"item":"([^"]+)"/.exec(event.data)?.[1] ?? window.__item;
           if (delay === 0) this.#onmessage?.(event);
           else setTimeout(() => this.#onmessage?.(event), delay);
         });
@@ -58,7 +61,9 @@ const viewer = async (name, { latencyMs = 0 } = {}) => {
         this.#onmessage = handler;
       }
       send(data) {
-        window.__sent.push(JSON.parse(data).t);
+        const type = JSON.parse(data).t;
+        window.__sent.push(type);
+        if (window.__drop.includes(type)) return;
         if (delay === 0) super.send(data);
         else setTimeout(() => this.readyState === Native.OPEN && super.send(data), delay);
       }
@@ -109,7 +114,7 @@ const measure = async (viewers, seconds) => {
     trace.push(samples.map((s) => s && `${s.state}/${s.health} ${(s.time - s.expected).toFixed(2)}`).join(' | '));
     if (samples.every((s) => s && s.state === 'playing')) drifts.push(pairwiseDrift(samples) * 1000);
   }
-  if (!drifts.length || Math.max(...drifts) >= 400) console.log(trace.join('\n'));
+  if (drifts.length < seconds || Math.max(...drifts) >= 400) console.log(trace.join('\n'));
   return { n: drifts.length, p50: Math.round(percentile(drifts, 0.5)), p95: Math.round(percentile(drifts, 0.95)), max: Math.round(percentile(drifts, 1)) };
 };
 
@@ -441,7 +446,14 @@ const waitPlaying = async (viewers, timeout = 15000) => {
     // Someone arriving in a paused room gets the video cued where the room stopped.
     const box = await a.page.locator('[data-player] iframe').boundingBox();
     await a.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    check('youtube: a click pauses everyone', await waitFor(() => allInState([a, b], 'paused'), 4000), '');
+    const clicked = await waitFor(() => allInState([a, b], 'paused'), 4000);
+    // When this fails, what the player showed and what the viewer sent are the whole story.
+    if (!clicked) await a.page.screenshot({ path: `${OUT}/click-did-not-pause.png` });
+    const after = clicked ? '' : JSON.stringify({
+      samples: await sampleAll([a, b]),
+      sent: await a.page.evaluate(() => window.__sent.filter((type) => type !== 'ping' && type !== 'status').slice(-8)),
+    });
+    check('youtube: a click pauses everyone', clicked, after);
     const late = await viewer('late');
     await join(late, room.url);
     const cued = await waitFor(() => allInState([late], 'ready'), 20000);
@@ -475,6 +487,33 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   }
   await a.page.screenshot({ path: `${OUT}/room-youtube.png` });
   report.youtubeErrors = [...new Set([...a.errors, ...b.errors])].slice(0, 5);
+  await Promise.all([a, b].map((v) => v.context.close()));
+}
+
+// The end of a video. A report of it can be lost, as on a dropped socket, and
+// nobody may be blamed for whatever the player does next.
+{
+  const [a, b] = await Promise.all(['a', 'b'].map(viewer));
+  const room = await createRoom(a, YOUTUBE_OK);
+  await join(b, room.url);
+  if (await waitPlaying([a, b], 25000)) {
+    await sendOnSocket(a, 'queue.add', { url: `${BASE}/sample.mp4?video=after`, mode: 'end' });
+    const eachViewer = (work) => Promise.all([a, b].map((v) => v.page.evaluate(work)));
+    await eachViewer(() => { window.__drop = ['ended']; });
+    const [{ serverNow }] = await sampleAll([a]);
+    const item = await a.page.evaluate(() => window.__item);
+    await sendOnSocket(a, 'seek', { item, pos: YOUTUBE_LENGTH_S - 6, ct: serverNow });
+    const reached = await waitFor(async () => (await sampleAll([a, b])).some((s) => s?.state === 'ended'), 15000);
+    await eachViewer(() => { window.__sent.length = 0; });
+    await sleep(12000); // The room's clock runs past the end, with nobody able to say so.
+    const seeks = await eachViewer(() => window.__sent.filter((type) => type === 'seek').length);
+    const samples = await sampleAll([a, b]);
+    check('end: a video ends for someone', reached, JSON.stringify(samples));
+    check('end: nobody is blamed for what follows', seeks.every((n) => n === 0), JSON.stringify({ seeks, samples }));
+    await eachViewer(() => { window.__drop = []; });
+    const moved = await waitFor(async () => (await videoSources([a, b])).every((src) => src.includes('video=after')), 10000);
+    check('end: the room moves on once a report gets through', moved, JSON.stringify(await sampleAll([a, b])));
+  }
   await Promise.all([a, b].map((v) => v.context.close()));
 }
 

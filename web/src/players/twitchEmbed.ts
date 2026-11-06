@@ -4,6 +4,7 @@ export type Embed = {
   play(): void;
   pause(): void;
   seek(seconds: number): void;
+  isPaused(): boolean;
   getCurrentTime(): number;
   getDuration(): number;
   getMuted(): boolean;

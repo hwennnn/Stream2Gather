@@ -11,10 +11,10 @@ import { InviteSheet } from '../ui/InviteSheet';
 import { rememberRoom } from './landing/recent';
 import { Page } from '../ui/Page';
 import { firstName } from '../ui/people';
-import { OfflineNote, useLatestAct } from '../ui/RoomStatus';
+import { RoomStatus, useLatestAct } from '../ui/RoomStatus';
 import { useSeats } from '../ui/Seats';
 import { PeoplePanel } from '../ui/PeoplePanel';
-import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerStage';
+import { PlayerStage, SkipButton, UnmuteButton } from '../ui/PlayerStage';
 import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
@@ -295,7 +295,8 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
     setTheatre(false);
   };
 
-  const offlineNote = offlineFor !== null ? <OfflineNote elapsed={offlineFor} onRetry={() => session.retry()} /> : null;
+  const retryConnection = () => session.retry();
+  const roomStatus = (className: string) => <RoomStatus view={view} player={player} act={act} offlineFor={offlineFor} onRetry={retryConnection} compact className={className} />;
 
   const moveTab = (event: KeyboardEvent) => {
     const index = TABS.findIndex(({ id }) => id === tab);
@@ -329,14 +330,14 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           adapter={player.adapter}
           row={row}
           actor={actor}
-          note={current ? <span className="hidden land:inline">{offlineNote}</span> : offlineNote}
+          note={!current && offlineFor !== null ? roomStatus('') : null}
           onAccountOpen={() => setTheatre(false)}
           onInvite={() => void invite()}
           onPeople={openPeople}
           landscapeControls={
             current && (
               <>
-                {!player.failure && <SyncPill view={view} player={player} />}
+                {roomStatus('max-w-40')}
                 <UnmuteButton player={player} />
                 {canControl(view) && <SkipButton session={session} view={view} onToast={toast} />}
               </>
@@ -365,7 +366,8 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           act={act}
           actor={actor}
           queueOpen={tab === 'queue'}
-          offlineNote={offlineNote}
+          offlineFor={offlineFor}
+          onRetryConnection={retryConnection}
           onToast={toast}
           railHidden={railHidden}
           toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink px-4 empty:hidden', 1)}

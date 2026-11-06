@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatEntry, RoomView } from '../room/session';
-import { canControl, canQueue, chatOffersInvite, chatScroll, countUnread, failureNote, noticesToShow, pillFor, toastLift } from './rules';
+import { canControl, canQueue, chatOffersInvite, chatScroll, countUnread, failureNote, noticesToShow, toastLift } from './rules';
 
 const view = (patch: Partial<RoomView>): RoomView =>
   ({
@@ -10,42 +10,6 @@ const view = (patch: Partial<RoomView>): RoomView =>
     playback: { item: 'x', status: 'playing', pos: 0, at: 0, rate: 1 },
     ...patch,
   }) as RoomView;
-
-describe('pillFor', () => {
-  it('puts being offline above everything', () => {
-    expect(pillFor(view({ offlineSince: 1 }), 'synced').text).toBe('Offline');
-  });
-
-  const paused = (pausedBy?: string, pausedById?: string) =>
-    view({ playback: { item: 'x', status: 'paused', pos: 0, at: 0, rate: 1, pausedBy, pausedById } });
-
-  it('names who paused, and says you when it was you', () => {
-    expect(pillFor(paused('Maya', 'b'), 'synced').text).toBe('Paused by Maya');
-    expect(pillFor(paused('Ada', 'a'), 'synced').text).toBe('Paused by you');
-  });
-
-  it('does not mistake someone with the same name for you', () => {
-    expect(pillFor(paused('Ada', 'b'), 'synced').text).toBe('Paused by Ada');
-  });
-
-  it('never leaves a pause unexplained', () => {
-    expect(pillFor(paused(), 'synced').text).toBe('Paused when everyone left');
-  });
-
-  it('marks a pause as something to notice', () => {
-    expect(pillFor(paused('Maya', 'b'), 'synced').tone).toBe('paused');
-  });
-
-  it.each([
-    ['synced', 'In sync'],
-    ['correcting', 'Catching up'],
-    ['buffering', 'Loading'],
-    ['waiting', 'Loading'],
-    ['stalled', 'Loading'],
-  ] as const)('shows %s as %s', (health, text) => {
-    expect(pillFor(view({}), health).text).toBe(text);
-  });
-});
 
 describe('failureNote', () => {
   const people = (...ids: string[]) => ids.map((userId) => ({ userId, name: userId, role: 'member' as const }));

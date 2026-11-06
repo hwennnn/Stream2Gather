@@ -58,33 +58,34 @@ const Piece = ({ part }: { part: Part }) => {
   );
 };
 
-type Props = { view: RoomView; player: RoomPlayer; act: Act | null };
+type Props = {
+  view: RoomView;
+  player: RoomPlayer;
+  act: Act | null;
+  offlineFor: number | null;
+  onRetry: () => void;
+  /** Just the first clause, where a sideways phone has no bar to hold the sentence. */
+  compact?: boolean;
+  className?: string;
+};
 
-/** One line, always in the same place, that says what the room is doing and who did it. */
-export const RoomStatus = ({ view, player, act }: Props) => {
+/** The room's state, in the one fixed slot that shows it. Nothing else may word it for itself. */
+export const RoomStatus = ({ view, player, act, offlineFor, onRetry, compact = false, className = '' }: Props) => {
   const playing = view.playback.status === 'playing';
   useTick(playing);
   const position = playing ? expectedPosition(view.playback, Date.now()) : view.playback.pos;
   const { health } = useSyncReport(player);
-  const { parts, tone } = statusFor({ view, health, failed: player.failure !== null, act, position, refused: player.refused, live: view.queue[0]?.isLive });
+  const failed = player.failure !== null;
+  const { state, parts, tail, tone, retry } = statusFor({ view, health, failed, act, position, offlineFor, refused: player.refused, live: view.queue[0]?.isLive });
   return (
-    <p className={`truncate text-[13px] leading-5 ${tone === 'warn' ? 'text-warn' : 'text-muted'}`}>
-      {parts.map((part, index) => (
-        <Piece key={index} part={part} />
-      ))}
-    </p>
-  );
-};
-
-const STILL_TRYING_MS = 30_000;
-
-/** Takes the place of the status line, so a dropped connection moves nothing. */
-export const OfflineNote = ({ elapsed, onRetry }: { elapsed: number; onRetry: () => void }) => {
-  const long = elapsed >= STILL_TRYING_MS;
-  return (
-    <p role="status" className="flex items-center gap-2 truncate text-[13px] leading-5 text-warn">
-      {long ? 'Still trying. Check your connection.' : 'Reconnecting. The video keeps playing.'}
-      {long && (
+    <p data-room-status={state} role={state === 'offline' ? 'status' : undefined} className={`flex min-w-0 items-center gap-2 text-[13px] leading-5 ${tone === 'warn' ? 'text-warn' : 'text-muted'} ${className}`}>
+      <span className="truncate">
+        {parts.map((part, index) => (
+          <Piece key={index} part={part} />
+        ))}
+        {!compact && tail}
+      </span>
+      {retry && (
         <button type="button" onClick={onRetry} className="shrink-0 cursor-pointer text-text underline underline-offset-2">
           Try again
         </button>

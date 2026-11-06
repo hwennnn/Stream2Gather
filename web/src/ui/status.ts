@@ -4,7 +4,19 @@ import { formatTime } from './format';
 
 /** Words, a person, or a figure. Colour and type come from which it is. */
 export type Part = string | { who: string; userId?: string } | { fig: string };
-export type Status = { parts: Part[]; tone: 'plain' | 'warn' };
+
+/** What the room is doing for this viewer. Every surface that shows the room's state reads this. */
+export type RoomState = 'offline' | 'act' | 'failed' | 'paused' | 'refused' | 'loading' | 'ad' | 'behind' | 'friend' | 'playing';
+
+export type Status = {
+  state: RoomState;
+  parts: Part[];
+  /** The rest of the sentence, for where there's room for it. */
+  tail?: string;
+  tone: 'plain' | 'warn';
+  /** Waiting has stopped helping, so the viewer gets a button. */
+  retry?: boolean;
+};
 
 export type Act = { by: string; text: string; fig?: string };
 
@@ -27,11 +39,15 @@ type Input = {
   failed: boolean;
   act: Act | null;
   position: number;
+  /** How long the connection has been gone, or null while it's fine. */
+  offlineFor?: number | null;
   /** The browser won't start this player, so only the viewer can. */
   refused?: boolean;
   /** A live channel has no position to share. */
   live?: boolean;
 };
+
+const STILL_TRYING_MS = 30_000;
 
 const person = (view: RoomView, name: string, start: boolean): Part => {
   if (name === view.self?.name) return { who: start ? 'You' : 'you', userId: view.self.userId };
@@ -40,21 +56,49 @@ const person = (view: RoomView, name: string, start: boolean): Part => {
 
 const WAITING = new Set(['buffering', 'correcting', 'stalled']);
 
-/** The one line that says what the room is doing. Names a person whenever one did it. */
-export const statusFor = ({ view, health, failed, act, position, refused, live }: Input): Status => {
+/** The first friend who is behind the room. */
+export const laggingFriend = (view: RoomView) =>
+  view.members.find(({ userId }) => userId !== view.self?.userId && WAITING.has(view.viewerStates[userId] ?? ''));
+
+/** "Everyone together" is a claim about every seat, so one that can't play breaks it too. */
+const together = (view: RoomView): boolean =>
+  !view.alone && !laggingFriend(view) && !view.members.some(({ userId }) => userId !== view.self?.userId && view.viewerStates[userId] === 'unavailable');
+
+const offlineLine = (view: RoomView, failed: boolean, offlineFor: number): Status => {
+  if (offlineFor >= STILL_TRYING_MS) return { state: 'offline', parts: ['Still trying. Check your connection.'], tone: 'warn', retry: true };
+  const hasPicture = view.queue[0] !== undefined && !failed;
+  const tail = !hasPicture ? undefined : view.playback.status === 'paused' ? ' Your video stays paused.' : ' The video keeps playing.';
+  return { state: 'offline', parts: ['Reconnecting.'], tail, tone: 'warn' };
+};
+
+/** Whoever paused may have gone since, and then the name only asks where they went. */
+const pausedLine = (view: RoomView, time: Part): Status => {
+  const { pausedBy, pausedById } = view.playback;
+  if (!pausedBy) return { state: 'paused', parts: ['Paused when everyone left'], tone: 'plain' };
+  const here = view.members.find(({ userId, name }) => (pausedById ? userId === pausedById : name === pausedBy));
+  if (!here) return { state: 'paused', parts: ['Paused at ', time], tone: 'plain' };
+  return { state: 'paused', parts: ['Paused by ', person(view, here.name, false), ' at ', time], tone: 'plain' };
+};
+
+/** The one description of what the room is doing. Names a person whenever one did it. */
+export const statusFor = ({ view, health, failed, act, position, offlineFor = null, refused, live }: Input): Status => {
   const time = { fig: formatTime(position) };
-  if (act) return { parts: [person(view, act.by, true), ` ${act.text}`, ...(act.fig ? [' ', { fig: act.fig }] : [])], tone: 'plain' };
-  if (view.playback.status === 'paused') {
-    const { pausedBy } = view.playback;
-    if (!pausedBy) return { parts: ['Paused when everyone left'], tone: 'plain' };
-    return { parts: ['Paused by ', person(view, pausedBy, false), ' at ', time], tone: 'plain' };
+  const paused = view.playback.status === 'paused';
+  if (offlineFor !== null) return offlineLine(view, failed, offlineFor);
+  if (act) return { state: 'act', parts: [person(view, act.by, true), ` ${act.text}`, ...(act.fig ? [' ', { fig: act.fig }] : [])], tone: 'plain' };
+  // Who paused is for people watching. This viewer needs to know where the room is.
+  if (failed) return { state: 'failed', parts: [paused ? 'The room is paused at ' : 'The room is at ', time], tone: 'plain' };
+  if (paused) return pausedLine(view, time);
+  if (refused) return { state: 'refused', parts: ['Press play on the video to join in'], tone: 'warn' };
+  if (health === 'stalled') return { state: 'ad', parts: ['You’re at an ad'], tail: '. You’ll catch up after it.', tone: 'plain' };
+  if (health === 'correcting') return { state: 'behind', parts: ['You’re catching up'], tone: 'warn' };
+  const friend = laggingFriend(view);
+  if (friend) {
+    const doing = view.viewerStates[friend.userId] === 'stalled' ? ' is at an ad' : ' is catching up';
+    return { state: 'friend', parts: [person(view, friend.name, true), doing], tone: 'plain' };
   }
-  if (failed) return { parts: ['The room is at ', time], tone: 'plain' };
-  if (refused) return { parts: ['Press play on the video to join in'], tone: 'warn' };
-  const behind = view.members.find(({ userId }) => userId !== view.self?.userId && WAITING.has(view.viewerStates[userId] ?? ''));
-  if (health === 'correcting') return { parts: ['You’re catching up'], tone: 'warn' };
-  if (behind) return { parts: [person(view, behind.name, true), ' is catching up'], tone: 'plain' };
-  if (health !== 'synced') return { parts: ['Loading…'], tone: 'plain' };
-  if (live) return { parts: ['Live: everyone’s on the same channel'], tone: 'plain' };
-  return { parts: ['Playing at ', time, view.alone ? '' : ', everyone together'], tone: 'plain' };
+  if (health !== 'synced') return { state: 'loading', parts: ['Loading…'], tone: 'plain' };
+  const withThem = together(view);
+  if (live) return { state: 'playing', parts: ['Live'], tail: withThem ? ': everyone’s on the same channel' : undefined, tone: 'plain' };
+  return { state: 'playing', parts: ['Playing at ', time], tail: withThem ? ', everyone together' : undefined, tone: 'plain' };
 };

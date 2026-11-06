@@ -8,7 +8,7 @@ import { listNames, firstName } from './people';
 import { ReactionBar, ReactionTicker } from './Reactions';
 import { HostChip } from './RoomHeader';
 import { RoomStatus } from './RoomStatus';
-import { canControl, canQueue, failureNote, isLocked, isOffline, pillFor } from './rules';
+import { canControl, canQueue, failureNote, isLocked, isOffline } from './rules';
 import { Seats } from './Seats';
 import { failureReason, openLabel } from './sources';
 import type { Row } from './seatRow';
@@ -16,7 +16,7 @@ import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { UpNext } from './UpNext';
 import { useAdder, type Adder } from './useAdder';
-import { useSyncReport, type RoomPlayer } from './useRoomPlayer';
+import type { RoomPlayer } from './useRoomPlayer';
 import type { Act } from './status';
 import { useTrending, notInRoom } from './useTrending';
 
@@ -40,7 +40,9 @@ type StageProps = {
   /** Whoever has their hand on the player right now. */
   actor: string | null;
   queueOpen: boolean;
-  offlineNote: ReactNode;
+  /** How long the connection has been gone, or null while it's fine. */
+  offlineFor: number | null;
+  onRetryConnection: () => void;
   onToast: (text: string) => void;
   /** A labelled group of videos beside search and suggestions. */
   extra?: ReactNode;
@@ -101,6 +103,8 @@ export const FailurePanel = ({ item, error, view, onPickAnother, onRetry }: Fail
   const note = error.kind === 'ip_origin' ? '' : failureNote(view);
   const watching = view.members.filter(({ userId }) => userId !== view.self?.userId && view.viewerStates[userId] !== 'unavailable');
   const justYou = watching.length > 0;
+  // Nobody is watching a paused room, so all that can be said is that it works for them.
+  const others = view.playback.status === 'paused' ? 'can play it' : `${watching.length > 1 ? 'are' : 'is'} still watching`;
   return (
     <div className="absolute inset-0 overflow-hidden bg-stage">
       {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover opacity-25" />}
@@ -108,7 +112,7 @@ export const FailurePanel = ({ item, error, view, onPickAnother, onRetry }: Fail
         <div className="enter mx-auto w-full max-w-md">
           <h2 className="text-xl leading-7 font-semibold tracking-[-0.01em] phone:text-[17px] phone:leading-6">{justYou ? 'It’s just you.' : 'This video won’t play here.'}</h2>
           <p className="mt-1 text-text phone:text-[13px] phone:leading-[18px]">
-            {justYou ? `${listNames(watching.map(({ name }) => firstName(name)))} ${watching.length > 1 ? 'are' : 'is'} still watching. ${reason}` : `${reason} ${note}`}
+            {justYou ? `${listNames(watching.map(({ name }) => firstName(name)))} ${others}. ${reason}` : `${reason} ${note}`}
           </p>
           <div className="mt-4 flex flex-wrap gap-2 phone:mt-3">
             {!justYou && canQueue(view) && (
@@ -193,12 +197,6 @@ const Picks = ({ items, adder }: { items: Media[] | null; adder: Adder }) => {
   );
 };
 
-/** Sideways on a phone there's no bar, so the room's state sits in the top bar in a word. */
-export const SyncPill = ({ view, player }: { view: RoomView; player: RoomPlayer }) => {
-  const { health } = useSyncReport(player);
-  return <span className="max-w-40 truncate text-[13px] text-muted">{pillFor(view, health).text}</span>;
-};
-
 export const SkipButton = ({ session, view, onToast, className = '' }: { session: RoomSession; view: RoomView; onToast: (text: string) => void; className?: string }) => {
   const [busy, setBusy] = useState(false);
   const next = view.queue[1];
@@ -244,7 +242,7 @@ const ResumeButton = ({ session, view, onToast }: { session: RoomSession; view: 
 
 type BarProps = StageProps & { item: QueueItem };
 
-export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, offlineNote, act, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: BarProps) => {
+export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, offlineFor, onRetryConnection, act, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: BarProps) => {
   const failed = player.failure !== null;
   return (
     <section aria-label="Player controls" className="player-bar relative">
@@ -253,7 +251,7 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
           <h2 title={item.title} className="truncate text-lg leading-6 font-semibold tracking-[-0.01em] phone:text-[15px] phone:leading-5">
             {item.title}
           </h2>
-          {offlineNote ?? <RoomStatus view={view} player={player} act={act} />}
+          <RoomStatus view={view} player={player} act={act} offlineFor={offlineFor} onRetry={onRetryConnection} />
         </div>
 
         {railHidden && <ReactionTicker reactions={view.reactions} />}

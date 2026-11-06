@@ -125,6 +125,8 @@ type crewEvent struct {
 	Kick bool `json:"kick,omitempty"`
 	// MembersOnly closes the room to the guests already in it.
 	MembersOnly bool `json:"membersOnly,omitempty"`
+	// Host moves the host's role on sockets already open, after a handover.
+	Host string `json:"host,omitempty"`
 }
 
 // publishCrew tells the room. The change has already been made, so failing to say
@@ -246,7 +248,11 @@ func (s *Server) updateCrew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	locked := request.GuestAccess != nil && !*request.GuestAccess
-	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings", MembersOnly: locked})
+	host := ""
+	if request.OwnerID != nil && *request.OwnerID != crew.OwnerID {
+		host = *request.OwnerID
+	}
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings", MembersOnly: locked, Host: host})
 	writeJSON(w, http.StatusOK, map[string]bool{"saved": true})
 }
 

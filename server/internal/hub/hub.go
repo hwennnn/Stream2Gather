@@ -542,6 +542,12 @@ func (c *conn) rename(name string) {
 	c.person.Name = name
 }
 
+func (c *conn) setRole(role string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.person.Role = role
+}
+
 func (c *conn) setMember(member bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -697,6 +703,8 @@ func (r *liveRoom) deliver(payload []byte) {
 			Kick    bool   `json:"kick"`
 			// MembersOnly means the room has just closed to guests.
 			MembersOnly bool `json:"membersOnly"`
+			// Host is who a handover has just made the owner.
+			Host string `json:"host"`
 		} `json:"d"`
 	}
 	if err := json.Unmarshal(payload, &head); err == nil {
@@ -711,6 +719,9 @@ func (r *liveRoom) deliver(payload []byte) {
 		}
 		if head.Type == "crew" && head.Data.MembersOnly {
 			r.closeToGuests()
+		}
+		if head.Type == "crew" && head.Data.Host != "" {
+			r.hostChanged(head.Data.Host)
 		}
 	}
 	for c := range r.conns {
@@ -776,6 +787,26 @@ func (r *liveRoom) closeToGuests() {
 		c.shut(websocket.StatusPolicyViolation, "members only")
 		r.hub.owesCall(seat{r.id, person.UserID})
 	}
+}
+
+// hostChanged moves the host's role on open sockets, where it was fixed by the
+// ticket. Otherwise a handover gives the old owner control until they next
+// reconnect, and keeps it from the new one.
+func (r *liveRoom) hostChanged(host string) {
+	ctx, cancel := opContext()
+	defer cancel()
+	for c := range r.conns {
+		role := room.RoleMember
+		if c.who().UserID == host {
+			role = room.RoleHost
+		}
+		c.setRole(role)
+		if err := r.hub.live.Touch(ctx, r.id, c.id, c.who()); err != nil {
+			r.hub.log.Warn("presence write failed", "room", r.id, "error", err)
+		}
+	}
+	r.publishMembers(ctx)
+	r.settleHost(ctx)
 }
 
 // broadcastSnapshot repairs viewers after events were lost on the way here.

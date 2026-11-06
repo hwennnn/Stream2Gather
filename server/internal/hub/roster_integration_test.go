@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -84,5 +85,34 @@ func TestLockingARoomSendsGuestsHomeAndKeepsTheCrew(t *testing.T) {
 	case code := <-in.closed:
 		t.Fatalf("a member was sent home too: %d", code)
 	default:
+	}
+}
+
+func TestAHandoverMovesControlOnOpenSockets(t *testing.T) {
+	r := newRig(t, testRedis)
+	id, was, now := r.newRoom(t, room.New()), "u_"+ids.New(), "u_"+ids.New()
+	before := r.joined(t, id, was, room.RoleHost)
+	after := r.joined(t, id, now, room.RoleMember)
+
+	crewEvent(t, r, id, map[string]any{"changed": "settings", "host": now})
+	before.expect(t, "crew")
+	after.expect(t, "crew")
+
+	settings := map[string]any{"settings": room.Settings{ControlMode: room.ModeHosts, QueueMode: room.ModeHosts}}
+	before.sendWithID(t, "was", room.CmdSettings, settings)
+	if refused := before.expect(t, "error"); !strings.Contains(string(refused.D), "forbidden") {
+		t.Fatalf("the old owner got %s", refused.D)
+	}
+	after.sendWithID(t, "now", room.CmdSettings, settings)
+	after.expect(t, "ack")
+
+	people, err := r.live.People(context.Background(), id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, person := range people {
+		if wanted := person.UserID == now; wanted != (person.Role == room.RoleHost) {
+			t.Fatalf("%s is %s after the handover", person.UserID, person.Role)
+		}
 	}
 }

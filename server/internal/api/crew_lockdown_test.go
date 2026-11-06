@@ -89,3 +89,39 @@ func TestLockingARoomTellsItsSockets(t *testing.T) {
 		t.Fatalf("locking the room said %s", event)
 	}
 }
+
+func TestAHandoverTellsTheRoomWhoHostsNow(t *testing.T) {
+	s, _ := stackServer(t)
+	_, owner := signUp(t, s, "Hana")
+	heir, joining := signUp(t, s, "Ravi")
+	slug, token := newCrew(t, s, owner)
+	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, joining); response.Code != http.StatusOK {
+		t.Fatalf("join: %d", response.Code)
+	}
+	record, err := s.DB.RoomBySlug(context.Background(), slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	rdb := redis.NewClient(&redis.Options{Addr: testenv.RedisAddr()})
+	defer rdb.Close()
+	listening := rdb.Subscribe(ctx, store.Channel(record.ID))
+	defer listening.Close()
+	if _, err := listening.Receive(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	body := `{"ownerId":"` + heir.Subject + `"}`
+	if response, _ := serve(s, http.MethodPatch, "/v1/crews/"+slug, body, owner); response.Code != http.StatusOK {
+		t.Fatalf("handover: %d", response.Code)
+	}
+
+	message, err := listening.ReceiveMessage(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(message.Payload, `"host":"`+heir.Subject+`"`) {
+		t.Fatalf("the handover said %s", message.Payload)
+	}
+}

@@ -50,8 +50,15 @@ const STATE_NAMES: Record<number, PlayerState> = {
   5: 'ready',
 };
 
-const toError = (code: number): PlayerError => {
-  if (code === 101 || code === 150) return { kind: 'embed_blocked', code };
+const isIpAddress = (host: string) => host.startsWith('[') || /^\d+\.\d+\.\d+\.\d+$/.test(host);
+
+/**
+ * On a page whose address is an IP, YouTube refuses many videos with the same
+ * codes as an owner's embed block, so those codes only count on a named site.
+ */
+export const toError = (code: number, host: string): PlayerError => {
+  if (code === 101 || code === 150) return { kind: isIpAddress(host) ? 'ip_origin' : 'embed_blocked', code };
+  if (code === 153) return { kind: 'no_referrer', code };
   if (code === 2 || code === 100) return { kind: 'unavailable', code };
   return { kind: 'unknown', code };
 };
@@ -99,7 +106,9 @@ export const createYouTubePlayer = async (
         onError: (event) => {
           // Before onReady the promise must still settle, and the error waits
           // in the channel for the caller to subscribe.
-          errors.report(toError(Number(event.data)));
+          const error = toError(Number(event.data), window.location.hostname);
+          console.warn('YouTube player error', { ...error, videoId });
+          errors.report(error);
           resolve(instance);
         },
       },

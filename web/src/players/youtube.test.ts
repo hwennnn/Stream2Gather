@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createErrorChannel, type PlayerError } from './types';
-import { createYouTubePlayer, loadApi } from './youtube';
+import { createYouTubePlayer, loadApi, toError } from './youtube';
 
 type FakeScript = { src: string; onerror: (() => void) | null; remove: () => void };
 
@@ -47,6 +47,29 @@ describe('loadApi', () => {
   });
 });
 
+describe('toError', () => {
+  it('trusts a refusal on a named site', () => {
+    expect(toError(150, 'watch.example.com')).toEqual({ kind: 'embed_blocked', code: 150 });
+    expect(toError(101, 'localhost')).toEqual({ kind: 'embed_blocked', code: 101 });
+  });
+
+  // YouTube gives the same code for the page's address as for an owner's block.
+  it('blames the address when the page has no name', () => {
+    expect(toError(150, '192.168.1.20')).toEqual({ kind: 'ip_origin', code: 150 });
+    expect(toError(101, '[::1]')).toEqual({ kind: 'ip_origin', code: 101 });
+  });
+
+  it('keeps a missing referrer apart from a refusal', () => {
+    expect(toError(153, 'localhost')).toEqual({ kind: 'no_referrer', code: 153 });
+  });
+
+  it('says a removed video is gone, and leaves a player fault unknown', () => {
+    expect(toError(100, 'localhost').kind).toBe('unavailable');
+    expect(toError(2, 'localhost').kind).toBe('unavailable');
+    expect(toError(5, 'localhost').kind).toBe('unknown');
+  });
+});
+
 describe('an error raised before ready', () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -59,13 +82,16 @@ describe('an error raised before ready', () => {
     }
     const YT = { Player: FakePlayer };
     vi.stubGlobal('YT', YT);
-    vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
+    vi.stubGlobal('window', { YT, location: { origin: 'http://test', hostname: 'test' } });
     vi.stubGlobal('document', { createElement: () => ({}) });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0, true);
     const seen: PlayerError[] = [];
     player.onError((error) => seen.push(error));
     expect(seen).toEqual([{ kind: 'embed_blocked', code: 150 }]);
+    expect(warn).toHaveBeenCalledWith('YouTube player error', { code: 150, kind: 'embed_blocked', videoId: 'abc' });
+    warn.mockRestore();
   });
 });
 

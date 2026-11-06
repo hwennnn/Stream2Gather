@@ -188,6 +188,8 @@ export type RoomPlayer = {
   /** The room is paused and this player has not started, so it has no frame or controls yet. */
   cold: boolean;
   unmute: () => void;
+  /** Loads the same video again in place. The room carries on meanwhile. */
+  retry: () => void;
 };
 
 /** Keeps a player on the stage for whatever the room is watching. */
@@ -199,6 +201,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   const [muted, setMuted] = useState(false);
   const [refused, setRefused] = useState(false);
   const [cold, setCold] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const player = useRef<PlayerAdapter | null>(null);
 
   const current = view.queue[0];
@@ -221,9 +224,9 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
       onRefused: setRefused,
       onCold: setCold,
     });
-    // A new queue item is the only thing that replaces the player.
+    // Only a new queue item or a retry replaces the player.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId, session]);
+  }, [currentId, session, attempt]);
 
   return {
     stage,
@@ -237,6 +240,10 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     unmute: () => {
       player.current?.setMuted(false);
       setMuted(false);
+    },
+    retry: () => {
+      setFailed(null);
+      setAttempt((count) => count + 1);
     },
   };
 };

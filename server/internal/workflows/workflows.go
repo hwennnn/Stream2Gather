@@ -48,6 +48,7 @@ type Activities struct {
 	Rooms    RoomCloser
 	Media    MediaRefresher
 	Sessions SessionStore
+	Presence Presence
 	Metrics  Metrics
 }
 
@@ -58,6 +59,7 @@ type Summary struct {
 	MediaDeleted   int
 	Backlog        int64
 	SearchesPurged int64
+	Snapshots      int
 }
 
 // CloseRooms ends expired rooms.
@@ -116,7 +118,9 @@ func Maintenance(ctx workflow.Context) (Summary, error) {
 	backlogErr := workflow.ExecuteActivity(ctx, activities.MeasureBacklog).Get(ctx, &summary.Backlog)
 	purgeErr := workflow.ExecuteActivity(ctx, activities.PurgeSearches).Get(ctx, &summary.SearchesPurged)
 
-	return summary, errors.Join(closeErr, refreshErr, backlogErr, purgeErr)
+	snapshotErr := workflow.ExecuteActivity(ctx, activities.RefreshSnapshots).Get(ctx, &summary.Snapshots)
+
+	return summary, errors.Join(closeErr, refreshErr, backlogErr, purgeErr, snapshotErr)
 }
 
 // Register adds workflows, activities and schedules before a worker starts.

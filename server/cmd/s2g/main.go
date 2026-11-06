@@ -164,6 +164,9 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	catalog := catalogFor(cfg, db, log)
 
 	rooms := newHub(cfg, db, live, rdb, catalog, log)
+	rooms.Metric = func(name string, value float64) {
+		sink.Add(telemetry.Event{At: time.Now().UTC().Format("2006-01-02 15:04:05.000"), Name: name, Value: value})
+	}
 	go rooms.Run(ctx)
 
 	server := newHTTPServer(cfg.HTTPAddr, (&api.Server{

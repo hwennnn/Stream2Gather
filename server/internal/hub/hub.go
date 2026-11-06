@@ -77,6 +77,8 @@ type Hub struct {
 	pubsub  *redis.PubSub
 	// recorder hears about activity. It never blocks and may lose events.
 	recorder Recorder
+	// Metric reports a number to telemetry. It may be nil.
+	Metric func(name string, value float64)
 
 	// Timings are fields so tests need not wait them out.
 	idleTimeout     time.Duration

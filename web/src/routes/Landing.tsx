@@ -80,11 +80,11 @@ export const Landing = () => {
             <h1 id="landing-title" className="text-[44px] leading-[48px] font-semibold tracking-[-0.025em] text-balance phone:text-[32px] phone:leading-9">
               A room for watching YouTube with friends.
             </h1>
-            <p className="mt-4 max-w-md text-[15px] leading-6 text-muted">
+            <p className="mt-4 text-[15px] lg:max-w-md leading-6 text-muted">
               Paste a link and send the room to your friends. Everyone follows one player, so a pause, skip or seek happens for the whole room.
             </p>
 
-            <form onSubmit={submit} className="mt-7 flex max-w-md gap-2 phone:flex-col" noValidate>
+            <form onSubmit={submit} className="mt-7 flex gap-2 lg:max-w-md phone:flex-col" noValidate>
               <label htmlFor="link" className="sr-only">
                 YouTube link
               </label>
@@ -110,7 +110,7 @@ export const Landing = () => {
               </button>
             </form>
 
-            <div className="mt-2 max-w-md text-[13px]" id="link-note">
+            <div className="mt-2 text-[13px] lg:max-w-md" id="link-note">
               {error && (
                 <p role="alert" className="mb-2 text-bad">
                   {error.text}

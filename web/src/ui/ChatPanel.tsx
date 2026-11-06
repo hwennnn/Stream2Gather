@@ -18,6 +18,7 @@ type Props = {
   view: RoomView;
   active: boolean;
   inviteUrl: string;
+  inviteCopied: boolean;
   onCopyInvite: () => void;
   onInvite: () => void;
   onToast: (text: string) => void;
@@ -43,7 +44,7 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   return blocks;
 };
 
-export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onInvite, onToast }: Props) => {
+export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCopyInvite, onInvite, onToast }: Props) => {
   const [text, setText] = useState('');
   const [slow, setSlow] = useState(false);
   const [missed, setMissed] = useState(false);
@@ -121,7 +122,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
               ) : (
                 <div className="mt-auto">
                   <p className="mb-3 font-semibold">Only you so far.</p>
-                  <InviteSheet view={view} url={inviteUrl} onCopy={onCopyInvite} />
+                  <InviteSheet view={view} url={inviteUrl} copied={inviteCopied} onCopy={onCopyInvite} />
                 </div>
               )
             ) : (

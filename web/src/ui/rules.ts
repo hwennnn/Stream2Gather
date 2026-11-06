@@ -48,6 +48,12 @@ export const failureNote = (view: RoomView): string => {
 /** Chat keeps its box and People its host switch along the bottom of the rail, clear of toasts. */
 export const toastLift = (tab: string): string => (tab === 'queue' ? 'bottom-3' : 'bottom-[84px]');
 
+/** These are chat lines too. Over an open chat a toast only covers the same words. */
+const CHAT_NOTICES = new Set(['host', 'skipped']);
+
+export const noticesToShow = <T extends { kind?: string }>(notices: T[], tab: string, railHidden: boolean): T[] =>
+  tab === 'chat' && !railHidden ? notices.filter(({ kind }) => !CHAT_NOTICES.has(kind ?? '')) : notices;
+
 export type Pill = { text: string; tone: 'good' | 'paused' | 'warn' | 'bad' };
 
 /** What the sync pill says. Only the room's own words: no milliseconds, no jargon. */

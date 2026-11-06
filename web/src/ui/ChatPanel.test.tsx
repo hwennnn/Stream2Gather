@@ -25,6 +25,7 @@ const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
       session={session as unknown as RoomSession}
       view={view(messages, patch)}
       active
+      inviteCopied={false}
       inviteUrl="http://x/r/y"
       onCopyInvite={() => {}}
       onInvite={() => {}}

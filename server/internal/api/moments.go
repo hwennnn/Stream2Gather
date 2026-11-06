@@ -18,6 +18,7 @@ const (
 	// momentsPerMinute is a live room's reaction rate, for one person.
 	momentsPerMinute = 120
 	maxBodyRunes     = 500
+	missedShown      = 3
 	endOfTime        = int64(1) << 62
 )
 
@@ -51,6 +52,43 @@ func (s *Server) crewItem(w http.ResponseWriter, r *http.Request) {
 		reply["media"] = fresh[0]
 	}
 	writeJSON(w, http.StatusOK, reply)
+}
+
+// missed lists what this member could catch up on. A video that can't play isn't on it.
+func (s *Server) missed(w http.ResponseWriter, r *http.Request) {
+	claims, crew, ok := s.memberCrew(w, r)
+	if !ok {
+		return
+	}
+	items, err := s.DB.MissedItems(r.Context(), crew.ID, claims.Subject, missedShown)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	queue := make([]room.Item, len(items))
+	for i, item := range items {
+		queue[i] = room.Item{Media: room.Media{Source: item.Source, SourceID: item.SourceID}}
+	}
+	fresh, err := s.DB.FreshMedia(r.Context(), queue)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	byKey := make(map[string]room.Media, len(fresh))
+	for _, media := range fresh {
+		byKey[media.Source+"\x00"+media.SourceID] = media
+	}
+	type missedVideo struct {
+		store.MissedItem
+		Media room.Media `json:"media"`
+	}
+	out := []missedVideo{}
+	for _, item := range items {
+		if media, ok := byKey[item.Source+"\x00"+item.SourceID]; ok && !media.IsLive {
+			out = append(out, missedVideo{MissedItem: item, Media: media})
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": out})
 }
 
 func queryInt(r *http.Request, name string, fallback int64) (int64, bool) {

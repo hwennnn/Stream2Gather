@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+
+	"stream2gather/internal/store"
 )
 
 // catchupCrew is a crew that has watched a video, with Hana there and Mika not.
@@ -42,7 +45,6 @@ func TestMomentsAreForMembersAndComeInPositionOrder(t *testing.T) {
 	if response, _ := serve(s, http.MethodGet, path, "", stranger); response.Code != http.StatusForbidden {
 		t.Fatalf("stranger: %d", response.Code)
 	}
-
 	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+crew.slug+"/moments", crew.momentBody(1, `"emoji":"🔥"`), stranger); response.Code != http.StatusForbidden {
 		t.Fatalf("stranger writing: %d", response.Code)
 	}
@@ -86,30 +88,6 @@ func TestMomentsPageByPositionWithoutMissingTies(t *testing.T) {
 
 	if len(seen) != 1003 {
 		t.Fatalf("%d moments across pages", len(seen))
-	}
-}
-
-func TestAnItemThatCanNoLongerPlayHasNoMedia(t *testing.T) {
-	s, pool := stackServer(t)
-	ctx := context.Background()
-	crew := newCatchupCrew(t, s)
-	var itemID int64
-	if err := pool.QueryRow(ctx, `SELECT id FROM session_items WHERE session_id = $1`, crew.sessionID).Scan(&itemID); err != nil {
-		t.Fatal(err)
-	}
-	path := fmt.Sprintf("/v1/crews/%s/items/%d", crew.slug, itemID)
-
-	if _, body := serve(s, http.MethodGet, path, "", crew.mika); body["media"] == nil {
-		t.Fatalf("playable: %v", body)
-	}
-	if _, err := pool.Exec(ctx, `UPDATE media SET is_live = true WHERE source_id = $1`, crew.sourceID); err != nil {
-		t.Fatal(err)
-	}
-	if _, body := serve(s, http.MethodGet, path, "", crew.mika); body["media"] != nil {
-		t.Fatalf("live: %v", body)
-	}
-	if response, _ := serve(s, http.MethodGet, fmt.Sprintf("/v1/crews/%s/items/999999999", crew.slug), "", crew.mika); response.Code != http.StatusNotFound {
-		t.Fatalf("unknown: %d", response.Code)
 	}
 }
 
@@ -173,5 +151,79 @@ func TestMomentsAreRateLimitedLikeReactions(t *testing.T) {
 	}
 	if last != http.StatusTooManyRequests {
 		t.Fatalf("last answer: %d", last)
+	}
+}
+
+func TestAMemberIsToldWhatTheyMissedAndNotWhatTheySaw(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	crew := newCatchupCrew(t, s)
+	path := "/v1/crews/" + crew.slug + "/missed"
+
+	_, body := serve(s, http.MethodGet, path, "", crew.mika)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["media"].(map[string]any)["title"] != "Marker title" {
+		t.Fatalf("absent: %v", body)
+	}
+	if _, body := serve(s, http.MethodGet, path, "", crew.hana); len(body["items"].([]any)) != 0 {
+		t.Fatalf("Hana was there: %v", body)
+	}
+
+	if _, err := pool.Exec(ctx, `UPDATE media SET fetched_at = now() - interval '31 days' WHERE source_id = $1`, crew.sourceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, body := serve(s, http.MethodGet, path, "", crew.mika); len(body["items"].([]any)) != 0 {
+		t.Fatalf("a video that can't play has no catch-up: %v", body)
+	}
+}
+
+func TestAnItemThatCanNoLongerPlayHasNoMedia(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	crew := newCatchupCrew(t, s)
+	var itemID int64
+	if err := pool.QueryRow(ctx, `SELECT id FROM session_items WHERE session_id = $1`, crew.sessionID).Scan(&itemID); err != nil {
+		t.Fatal(err)
+	}
+	path := fmt.Sprintf("/v1/crews/%s/items/%d", crew.slug, itemID)
+
+	if _, body := serve(s, http.MethodGet, path, "", crew.mika); body["media"] == nil {
+		t.Fatalf("playable: %v", body)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE media SET is_live = true WHERE source_id = $1`, crew.sourceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, body := serve(s, http.MethodGet, path, "", crew.mika); body["media"] != nil {
+		t.Fatalf("live: %v", body)
+	}
+	if response, _ := serve(s, http.MethodGet, fmt.Sprintf("/v1/crews/%s/items/999999999", crew.slug), "", crew.mika); response.Code != http.StatusNotFound {
+		t.Fatalf("unknown: %d", response.Code)
+	}
+}
+
+func TestChatFromAMissedSessionIsMarkedForThoseWhoMissedIt(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	crew := newCatchupCrew(t, s)
+	_, err := pool.Exec(ctx, `
+		INSERT INTO messages (room_id, user_id, author_name, body, created_at)
+		SELECT $1, user_id, 'Hana', 'the butler did it', started_at + interval '1 millisecond'
+		FROM crew_sessions s, (SELECT owner_id AS user_id FROM rooms WHERE id = $1) r WHERE s.id = $2`, crew.roomID, crew.sessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE crew_sessions SET ended_at = $2 WHERE id = $1`, crew.sessionID, time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.DB.RecordCapture(ctx, store.Capture{CrewID: crew.crewID, At: time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	path := "/v1/rooms/" + crew.slug + "/messages"
+
+	if response, _ := serve(s, http.MethodGet, path, "", crew.mika); !strings.Contains(response.Body.String(), `"missed":true`) {
+		t.Fatalf("Mika missed it: %s", response.Body)
+	}
+	if response, _ := serve(s, http.MethodGet, path, "", crew.hana); strings.Contains(response.Body.String(), `"missed":true`) {
+		t.Fatalf("Hana was there: %s", response.Body)
 	}
 }

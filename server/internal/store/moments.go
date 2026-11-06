@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -106,4 +107,71 @@ func (p *Postgres) AddCatchupMoment(ctx context.Context, m CatchupMoment) (int64
 		return 0, err
 	}
 	return id, tx.Commit(ctx)
+}
+
+// MissedItem is something from a session this member wasn't at.
+type MissedItem struct {
+	ItemID    int64     `json:"itemId"`
+	Source    string    `json:"source"`
+	SourceID  string    `json:"sourceId"`
+	StartedAt time.Time `json:"startedAt"`
+	Moments   int       `json:"moments"`
+}
+
+// missedWindow is how long a missed session keeps asking for attention.
+const missedWindow = 14 * 24 * time.Hour
+
+// MissedItems finds, for each recent session this person missed, the video the
+// room reacted to most. Sessions nobody reacted in have nothing to catch up on.
+func (p *Postgres) MissedItems(ctx context.Context, crewID, userID string, limit int) ([]MissedItem, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT item_id, source, source_id, started_at, moments FROM (
+			SELECT DISTINCT ON (s.id) s.id, s.started_at, i.id AS item_id, i.source, i.source_id,
+				(SELECT count(*) FROM moments m WHERE m.session_id = s.id AND m.source = i.source AND m.source_id = i.source_id) AS moments
+			FROM crew_sessions s JOIN session_items i ON i.session_id = s.id
+			WHERE s.crew_id = $1 AND s.ended_at > $2 AND i.source_id IS NOT NULL
+				AND NOT EXISTS (SELECT 1 FROM session_people sp WHERE sp.session_id = s.id AND sp.user_id = $3)
+			ORDER BY s.id, moments DESC, i.id) best
+		WHERE moments > 0 ORDER BY started_at DESC LIMIT $4`,
+		crewID, time.Now().Add(-missedWindow), userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (MissedItem, error) {
+		var item MissedItem
+		return item, row.Scan(&item.ItemID, &item.Source, &item.SourceID, &item.StartedAt, &item.Moments)
+	})
+}
+
+// CatchupPerSession is how much people added afterwards, per session, over the window.
+func (p *Postgres) CatchupPerSession(ctx context.Context) (float64, error) {
+	var perSession *float64
+	err := p.pool.QueryRow(ctx, `
+		SELECT (SELECT count(*) FROM moments WHERE origin = 'catchup' AND at > $1)::float8
+			/ nullif((SELECT count(*) FROM crew_sessions WHERE ended_at > $1), 0)`,
+		time.Now().Add(-missedWindow)).Scan(&perSession)
+	if err != nil || perSession == nil {
+		return 0, err
+	}
+	return *perSession, nil
+}
+
+// MemberMessages is Messages for a crew member, marking what they weren't there for.
+func (p *Postgres) MemberMessages(ctx context.Context, roomID, userID string, before int64, limit int) ([]Message, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, user_id, author_name, body, created_at, COALESCE(client_id, ''), EXISTS (
+			SELECT 1 FROM crew_sessions s JOIN crews c ON c.id = s.crew_id
+			WHERE c.room_id = messages.room_id AND s.ended_at IS NOT NULL
+				AND messages.created_at BETWEEN s.started_at AND s.ended_at
+				AND NOT EXISTS (SELECT 1 FROM session_people sp WHERE sp.session_id = s.id AND sp.user_id = $2))
+		FROM messages
+		WHERE room_id = $1 AND ($3 = 0 OR id < $3) AND `+visibleInRoom+`
+		ORDER BY id DESC LIMIT $4`, roomID, userID, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Message, error) {
+		var m Message
+		return m, row.Scan(&m.ID, &m.UserID, &m.Author, &m.Body, &m.CreatedAt, &m.ClientID, &m.Missed)
+	})
 }

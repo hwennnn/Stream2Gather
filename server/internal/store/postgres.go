@@ -201,6 +201,8 @@ type Message struct {
 	CreatedAt time.Time `json:"createdAt"`
 	// ClientID is the sender's name for this line, the same on every retry.
 	ClientID string `json:"clientId,omitempty"`
+	// Missed marks chat from a session this reader wasn't at, which could spoil it.
+	Missed bool `json:"missed,omitempty"`
 }
 
 // InsertMessage stores a chat line.

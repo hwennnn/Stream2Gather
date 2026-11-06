@@ -259,7 +259,8 @@ export class RoomSession {
     } catch (error) {
       if (generation !== this.generation) return;
       // Too many at once is a wait, not a refusal: a whole party can hit it together.
-      if (error instanceof ApiError && error.status === 429) {
+      // The session limit is a refusal: it lasts too long to sit and wait out.
+      if (error instanceof ApiError && error.status === 429 && error.code !== 'session_limit') {
         this.handleClose(error.retryAfterMs);
         return;
       }

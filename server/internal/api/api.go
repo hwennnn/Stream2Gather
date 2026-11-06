@@ -730,6 +730,11 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims, err := s.ensureSession(w, r)
+	if errors.Is(err, errRateLimited) {
+		// Not the wait above: this limit outlasts anyone's patience, so the page says so.
+		writeProblem(w, http.StatusTooManyRequests, "session_limit", "Too many new sessions. Try again later.")
+		return
+	}
 	if err != nil {
 		s.sessionFailed(w, err)
 		return

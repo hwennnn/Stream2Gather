@@ -1,9 +1,11 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
@@ -29,6 +31,24 @@ func TestAnAddressIsLimitedInTicketsAndToldWhenToComeBack(t *testing.T) {
 	}
 	if response, _ := serve(s, http.MethodPost, path, `{}`, from("tickets-"+ids.New())); response.Code != http.StatusOK {
 		t.Fatal("another address was caught by the same limit")
+	}
+}
+
+func TestASessionLimitOnATicketIsARefusalNotAWait(t *testing.T) {
+	s, _ := stackServer(t)
+	path := "/v1/rooms/" + newRoom(t, s, room.New()).Slug + "/ticket"
+	address := "sessions-" + ids.New()
+	for range guestsPerHour {
+		if allowed, err := s.Live.Limit(context.Background(), "guest:"+address, guestsPerHour, time.Hour); err != nil || !allowed {
+			t.Fatal(allowed, err)
+		}
+	}
+	response, body := serve(s, http.MethodPost, path, `{}`, from(address))
+	if response.Code != http.StatusTooManyRequests || body["code"] != "session_limit" {
+		t.Fatalf("%d %v", response.Code, body)
+	}
+	if wait := response.Header().Get("Retry-After"); wait != "" {
+		t.Fatalf("Retry-After = %q", wait)
 	}
 }
 

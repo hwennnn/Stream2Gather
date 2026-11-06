@@ -1,7 +1,7 @@
 // Proves nothing is ever drawn over the player, as YouTube's terms require.
 // Drives the real web client against a scripted room, at every layout, through
 // the states most likely to break the rule: reactions, toasts, menus, search,
-// theatre, fullscreen, going offline.
+// theatre, fullscreen, going offline, all with voice open.
 // Run: BASE=http://127.0.0.1:18080 node web/scripts/player-overlap.mjs
 // Needs e2e/node_modules, and sample.mp4 in the web build.
 import { chromium } from '../../e2e/node_modules/playwright-core/index.mjs';
@@ -70,6 +70,12 @@ const mockRoom = async (page, current) => {
   await page.route(`**/v1/rooms/${SLUG}`, (route) => route.fulfill({ json: preview }));
   await page.route('**/v1/media/search*', (route) => route.fulfill({ json: { items: [video('dQw4w9WgXcQ', 'A result')] } }));
   await page.route('**/v1/telemetry', (route) => route.fulfill({ status: 204, body: '' }));
+  // A token that never comes keeps the voice panel open without a voice server.
+  await page.route(`**/v1/rooms/${SLUG}/voice-token`, () => {});
+  await page.route('**/v1/config', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), voice: true } });
+  });
 
   const room = { socket: null, send: (t, d) => room.socket?.send(JSON.stringify({ t, d })) };
   await page.routeWebSocket(/\/v1\/ws/, (socket) => {
@@ -79,7 +85,7 @@ const mockRoom = async (page, current) => {
     socket.send(JSON.stringify({ t: 'welcome', d: { self: people[1], room: { name: 'Room' }, state, members: people } }));
     socket.onMessage((raw) => {
       const message = JSON.parse(raw);
-      if (message.t === 'ping') socket.send(JSON.stringify({ t: 'pong', d: { t0: message.d.t0, ts: Date.now(), version: 5 } }));
+      if (message.t === 'ping') socket.send(JSON.stringify({ t: 'pong', d: { t0: message.d?.t0, ts: Date.now(), version: 5 } }));
       else if (message.id) socket.send(JSON.stringify({ t: 'ack', d: { id: message.id } }));
     });
   });
@@ -229,6 +235,12 @@ for (const [layout, options] of LAYOUTS) {
     if (!caught) failures.push(`${label}: the watcher missed a planted overlay`);
 
     await during(page, `${label} playing`, () => sleep(400));
+    // Everything after this runs with voice open.
+    await during(page, `${label} voice`, async () => {
+      await press(page.getByRole('button', { name: 'Join voice' }));
+      await page.getByRole('group', { name: 'Voice' }).waitFor();
+      await sleep(300);
+    });
     await during(page, `${label} reactions`, () => reactionBurst(room));
     await during(page, `${label} toasts`, async () => {
       noticeBurst(room);

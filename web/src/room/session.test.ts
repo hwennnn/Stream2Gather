@@ -195,7 +195,7 @@ describe('RoomSession', () => {
       socket.deliver('playback', { version: 6, playback: paused, cause: 'pause', by: 'Maya' });
       socket.deliver('playback', { version: 4, playback: idle, cause: 'pause', by: 'Maya' });
       expect(session.getView().version).toBe(6);
-      expect(lines(session)).toEqual(['Maya paused at 0:10']);
+      expect(session.getView().playback).toEqual(paused);
       expect(socket.ofType('sync')).toHaveLength(0);
     });
   });
@@ -518,193 +518,24 @@ describe('RoomSession', () => {
       return { session, socket };
     };
 
-    it('announces arrivals and departures, but not the first member list', async () => {
+    it('writes nothing of its own, so viewers can’t disagree', async () => {
       const { session, socket } = await live([ada, maya]);
-      expect(lines(session)).toEqual([]);
+      const zelda = { ...item('z'), title: 'Zelda trailer' };
+      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
       socket.deliver('members', { members: [ada, maya, sam] });
       socket.deliver('members', { members: [ada, sam] });
-      expect(lines(session)).toEqual(['Sam joined', 'Maya left']);
-    });
-
-    it('stays silent through a reload', async () => {
-      const { session, socket } = await live([ada, maya]);
-      socket.deliver('members', { members: [ada] });
-      expect(lines(session)).toEqual(['Maya left']);
-      vi.advanceTimersByTime(2000);
-      socket.deliver('members', { members: [ada, maya] });
-      expect(lines(session)).toEqual([]);
-    });
-
-    it('announces someone who comes back much later', async () => {
-      const { session, socket } = await live([ada, maya]);
-      socket.deliver('members', { members: [ada] });
-      vi.advanceTimersByTime(60_000);
-      socket.deliver('members', { members: [ada, maya] });
-      expect(lines(session)).toEqual(['Maya left', 'Maya joined']);
-    });
-
-    it('does not announce the people it finds on reconnecting', async () => {
-      const { session, socket } = await live([ada]);
-      socket.onclose?.();
-      await vi.advanceTimersByTimeAsync(6000);
-      FakeSocket.last.deliver('welcome', { ...welcome(1), members: [ada, maya] });
-      expect(lines(session)).toEqual([]);
-    });
-
-    it('says who paused and where', async () => {
-      const { session, socket } = await live();
-      socket.deliver('playback', { version: 2, playback: { ...idle, status: 'paused', pos: 192 }, cause: 'pause', by: 'Maya' });
-      expect(lines(session)).toEqual(['Maya paused at 3:12']);
-    });
-
-    it('tells a jump forward from a jump back', async () => {
-      const { session, socket } = await live();
-      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
-      socket.deliver('playback', { version: 2, playback: at(300), cause: 'pause', by: 'Sam' });
+      socket.deliver('playback', { version: 2, playback: at(192), cause: 'pause', by: 'Maya' });
       socket.deliver('playback', { version: 3, playback: at(760), cause: 'seek', by: 'Maya' });
-      vi.advanceTimersByTime(10_000);
-      socket.deliver('playback', { version: 4, playback: at(125), cause: 'seek', by: 'Maya' });
-      expect(lines(session).slice(1)).toEqual(['Maya jumped to 12:40', 'Maya went back to 2:05']);
+      socket.deliver('state', { version: 4, playback: at(760), queue: [zelda], cause: 'queue.add', by: 'Maya' });
+      socket.deliver('state', { version: 5, playback: { ...idle, item: 'z' }, queue: [zelda], cause: 'queue.play', by: 'Maya' });
+      expect(lines(session)).toEqual([]);
     });
 
-    it('collapses one person scrubbing into one line', async () => {
-      const { session, socket } = await live();
-      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
-      socket.deliver('playback', { version: 2, playback: at(600), cause: 'pause', by: 'Sam' });
-      [610, 620, 300].forEach((pos, i) => {
-        vi.advanceTimersByTime(500);
-        socket.deliver('playback', { version: 3 + i, playback: at(pos), cause: 'seek', by: 'Maya' });
-      });
-      expect(lines(session).slice(1)).toEqual(['Maya went back to 5:00']);
-    });
-
-    it('keeps two people scrubbing apart', async () => {
-      const { session, socket } = await live();
-      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
-      socket.deliver('playback', { version: 2, playback: at(100), cause: 'seek', by: 'Maya' });
-      socket.deliver('playback', { version: 3, playback: at(200), cause: 'seek', by: 'Sam' });
-      expect(lines(session)).toHaveLength(2);
-    });
-
-    it('names what was added and what comes up', async () => {
-      const { session, socket } = await live();
-      const zelda = { ...item('z'), title: 'Zelda trailer' };
-      const current = { ...idle, item: 'a', status: 'playing' };
-      socket.deliver('state', { version: 2, playback: current, queue: [item('a')], cause: 'queue.add', by: 'Sam' });
-      socket.deliver('state', { version: 3, playback: current, queue: [item('a'), zelda], cause: 'queue.add', by: 'Maya' });
-      socket.deliver('state', { version: 4, playback: { ...current, item: 'z' }, queue: [zelda], cause: 'ended' });
-      expect(lines(session)).toEqual(['Sam added Video a', 'Maya added Zelda trailer', 'Up next: Zelda trailer']);
-    });
-
-    const settings = (mode: string) => ({ controlMode: mode, queueMode: mode });
-    const locked = { version: 2, playback: idle, queue: [], settings: settings('hosts'), cause: 'settings', by: 'Maya' };
-
-    it('says who locked and unlocked the room', async () => {
-      const { session, socket } = await live();
-      socket.deliver('state', locked);
-      socket.deliver('state', { ...locked, version: 3, settings: settings('everyone') });
-      expect(lines(session)).toEqual(['Maya turned on host controls', 'Maya turned off host controls']);
-    });
-
-    it('leaves a handover to the server, in the toast’s own words', async () => {
-      const { session, socket } = await live();
-      socket.deliver('state', locked);
-      socket.deliver('state', { version: 3, playback: idle, queue: [], settings: settings('everyone'), cause: 'settings.release' });
-      socket.deliver('notice', { kind: 'host', text: 'Golden Otter left, so anyone can control playback.' });
-      socket.deliver('state', { version: 4, playback: idle, queue: [], settings: settings('hosts'), cause: 'settings.restore' });
-      socket.deliver('notice', { kind: 'host', text: 'Golden Otter is back, so they control playback again.' });
-      expect(lines(session)).toEqual([
-        'Maya turned on host controls',
-        'Golden Otter left, so anyone can control playback.',
-        'Golden Otter is back, so they control playback again.',
-      ]);
-      expect(session.getView().notices.map((notice) => notice.text)).toEqual([
-        'Golden Otter left, so anyone can control playback.',
-        'Golden Otter is back, so they control playback again.',
-      ]);
-    });
-
-    it('records a skip in the chat, but not every notice', async () => {
+    it('leaves a notice to the toast, because the server sends the line', async () => {
       const { session, socket } = await live();
       socket.deliver('notice', { kind: 'skipped', text: 'Skipped “Clip” because it wouldn’t load.' });
-      socket.deliver('notice', { text: 'That didn’t go through.' });
-      expect(lines(session)).toEqual(['Skipped “Clip” because it wouldn’t load.']);
-    });
-
-    describe('pauses that were not pauses', () => {
-      const playing = async (durationMs = 300_000) => {
-        const { session, socket } = await connected();
-        const video = { ...item('a'), durationMs };
-        const base = welcome(1);
-        const playback = { ...idle, item: 'a', status: 'playing', pos: 10, at: Date.now() };
-        socket.deliver('welcome', { ...base, state: { ...base.state, playback, queue: [video] }, members: [ada] });
-        await vi.advanceTimersByTimeAsync(0);
-        const at = (status: string, pos: number) => ({ ...idle, item: 'a', status, pos, at: Date.now() });
-        return { session, socket, at };
-      };
-
-      it('still says when someone really paused', async () => {
-        const { session, socket, at } = await playing();
-        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
-        await vi.advanceTimersByTimeAsync(5000);
-        socket.deliver('playback', { version: 3, playback: at('playing', 10), cause: 'play', by: 'Asha' });
-        expect(lines(session)).toEqual(['Asha paused at 0:10']);
-      });
-
-      it('writes nothing when the video ran out, for any number of viewers', async () => {
-        const { session, socket, at } = await playing(25_000);
-        socket.deliver('playback', { version: 2, playback: at('paused', 25), cause: 'pause', by: 'Asha' });
-        socket.deliver('playback', { version: 3, playback: at('paused', 25), cause: 'pause', by: 'Pia' });
-        expect(lines(session)).toEqual([]);
-      });
-
-      it('takes the line back when a video of unknown length ends', async () => {
-        const { session, socket, at } = await playing(0);
-        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
-        socket.deliver('playback', { version: 3, playback: at('paused', 10), cause: 'pause', by: 'Pia' });
-        socket.deliver('state', { version: 4, playback: idle, queue: [], cause: 'ended' });
-        expect(lines(session)).toEqual([]);
-      });
-
-      it('calls a pause away from the room’s position a jump', async () => {
-        const { session, socket, at } = await playing();
-        socket.deliver('playback', { version: 2, playback: at('paused', 25), cause: 'pause', by: 'Asha' });
-        socket.deliver('playback', { version: 3, playback: at('playing', 25), cause: 'play', by: 'Asha' });
-        expect(lines(session)).toEqual(['Asha jumped to 0:25']);
-      });
-
-      it('folds a pause and a play that moved the picture into one jump', async () => {
-        const { session, socket, at } = await playing();
-        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
-        socket.deliver('playback', { version: 3, playback: at('playing', 25), cause: 'play', by: 'Asha' });
-        expect(lines(session)).toEqual(['Asha jumped to 0:25']);
-      });
-
-      it('leaves no line for a pause undone at once', async () => {
-        const { session, socket, at } = await playing();
-        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
-        socket.deliver('playback', { version: 3, playback: at('playing', 10), cause: 'play', by: 'Asha' });
-        expect(lines(session)).toEqual([]);
-      });
-
-      it('keeps a pause that someone else resumed', async () => {
-        const { session, socket, at } = await playing();
-        socket.deliver('playback', { version: 2, playback: at('paused', 10), cause: 'pause', by: 'Asha' });
-        socket.deliver('playback', { version: 3, playback: at('playing', 10), cause: 'play', by: 'Pia' });
-        expect(lines(session)).toEqual(['Asha paused at 0:10']);
-      });
-    });
-
-    it('stays quiet when settings change nothing about control', async () => {
-      const { session, socket } = await live();
-      socket.deliver('state', { ...locked, settings: { controlMode: 'everyone', queueMode: 'hosts' } });
       expect(lines(session)).toEqual([]);
-    });
-
-    it('writes nothing for a snapshot', async () => {
-      const { session, socket } = await live();
-      socket.deliver('state', { version: 9, playback: { ...idle, item: 'a' }, queue: [item('a')], cause: 'sync', by: 'x' });
-      expect(lines(session)).toEqual([]);
+      expect(session.getView().notices.map((notice) => notice.text)).toEqual(['Skipped “Clip” because it wouldn’t load.']);
     });
   });
 
@@ -1090,13 +921,6 @@ describe('RoomSession', () => {
       const { session, socket } = await queued();
       socket.deliver('state', { version: 2, playback: { ...idle, item: 'b' }, queue: [item('b'), item('c')], cause: 'ended' });
       expect(session.getView().jump).toBeNull();
-    });
-
-    it('says what happened in the chat', async () => {
-      const { session, socket, moved } = await queued();
-      socket.deliver('state', moved);
-      socket.deliver('state', { version: 3, playback: { ...idle, item: 'a' }, queue: [item('a')], cause: 'queue.undo', by: 'Pia' });
-      expect(lines(session)).toEqual(['Asha jumped to Video c', 'Pia went back to Video a']);
     });
   });
 

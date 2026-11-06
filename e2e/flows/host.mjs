@@ -22,7 +22,7 @@ flow('host lock: only the host sees the switch, and turning it on reaches everyo
   await openTab(guest.page, 'People');
   t.eq('the guest has no switch', await ui.hostSwitch(guest.page).count(), 0);
   await t.see('the guest is told', ui.rail(guest.page).getByText(/host controls playback and the queue/i));
-  await t.see('the chip', guest.page.getByText('Host controls', { exact: true }));
+  await t.see('the chip', guest.page.getByText('Hana’s driving', { exact: true }));
   await openTab(guest.page, 'Chat');
   await t.see('the chat says who', ui.chatLog(guest.page).getByText('Hana turned on host controls'));
   await openTab(host.page, 'Chat');
@@ -31,7 +31,7 @@ flow('host lock: only the host sees the switch, and turning it on reaches everyo
 
 flow('host lock: a guest loses the controls but keeps the chat', async (t) => {
   const { guest, host } = await locked(t);
-  t.eq('no Skip', await ui.bar(guest.page).getByRole('button', { name: /^(skip|finish)$/i }).count(), 0);
+  t.eq('no Skip', await ui.bar(guest.page).getByRole('button', { name: /^(skip|finish video)$/i }).count(), 0);
   await openTab(guest.page, 'Queue');
   await t.see('the queue says why', ui.rail(guest.page).getByText(/only the host can change the queue/i));
   t.eq('no add box', await ui.addBox(guest.page).count(), 0);
@@ -87,7 +87,7 @@ flow('host lock: turning it off gives the controls back', async (t) => {
   const { guest, host } = await locked(t);
   await ui.hostSwitch(host.page).click();
   await t.see('Skip returns', ui.bar(guest.page).getByRole('button', { name: 'Skip' }));
-  await t.gone('the chip', guest.page.getByText('Host controls', { exact: true }));
+  await t.gone('the chip', guest.page.getByText('Hana’s driving', { exact: true }));
   await t.see('the chat says it', ui.chatLog(guest.page).getByText('Hana turned off host controls'));
 });
 
@@ -105,7 +105,7 @@ flow('host lock: a late joiner arrives locked out', async (t) => {
   const { room } = await locked(t);
   const late = await t.person('Late');
   await joinRoom(late, room.url);
-  await t.see('the chip', late.page.getByText('Host controls', { exact: true }));
+  await t.see('the chip', late.page.getByText('Hana’s driving', { exact: true }));
   t.eq('no Skip', await ui.bar(late.page).getByRole('button', { name: 'Skip' }).count(), 0);
 });
 
@@ -114,7 +114,7 @@ flow('handover: a locked room passes to the next person when the host goes, and 
   await host.page.goto('about:blank');
   await t.see('the room passes on', guest.page.getByText(/Hana left, so Gus is the host now/), 55_000);
   await t.see('Skip for the guest', ui.bar(guest.page).getByRole('button', { name: 'Skip' }));
-  await t.see('still locked, now in his hands', guest.page.getByText('Host controls', { exact: true }));
+  await t.see('still locked, now in his hands', guest.page.getByText('You’re driving', { exact: true }));
   await host.page.goto(room.url);
   await reenter(host.page);
   await t.see('it comes back', guest.page.getByText(/Hana is back, so they.re the host again/), 15_000);

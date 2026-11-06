@@ -115,7 +115,7 @@ flow('skip: moves everyone to the next video and says what it is', async (t) => 
 
 flow('skip: the last video ends the room, back to the stage', async (t) => {
   const { a, b } = await watching(t, golden.url);
-  await t.see('Finish, with nothing queued', ui.bar(a.page).getByRole('button', { name: 'Finish' }));
+  await t.see('Finish, with nothing queued', ui.bar(a.page).getByRole('button', { name: 'Finish video' }));
   await ui.skip(a.page).click();
   await t.see('Ana sees the stage', ui.stageHeading(a.page));
   await t.see('Ben sees the stage', ui.stageHeading(b.page));

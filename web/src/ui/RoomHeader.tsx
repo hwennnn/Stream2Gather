@@ -5,7 +5,7 @@ import { AccountMenu } from './AccountMenu';
 import { Icon } from './Icon';
 import { LeaveLink } from './LeaveLink';
 import { Mark } from './Mark';
-import { isLocked } from './rules';
+import { drivingLine, isLocked } from './rules';
 import { Seats } from './Seats';
 import type { Row } from './seatRow';
 import { Slot } from './Slot';
@@ -28,12 +28,7 @@ type RoomHeaderProps = {
   onPeople: () => void;
 };
 
-export const HostChip = ({ className = '' }: { className?: string }) => (
-  <span className={`chip ${className}`}>
-    <Icon name="lock" className="size-3" />
-    Host controls
-  </span>
-);
+export const DrivingChip = ({ view, className = '' }: { view: RoomView; className?: string }) => <span className={`chip max-w-48 truncate ${className}`}>{drivingLine(view)}</span>;
 
 export const RoomHeader = ({ session, view, adapter, row, actor, note, landscapeControls, onAccountOpen, onInvite, onPeople }: RoomHeaderProps) => (
   <header className="room-header flex h-12 shrink-0 items-center gap-3 border-b border-line px-4 phone:h-14 phone:gap-0 phone:px-1 land:h-10 land:gap-2 land:pr-[max(0.5rem,env(safe-area-inset-right))] land:pl-[max(0.25rem,env(safe-area-inset-left))]">
@@ -44,7 +39,7 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
       <Icon name="back" className="size-5" />
     </LeaveLink>
     <h1 className="min-w-0 truncate text-[15px] font-semibold phone:sr-only land:sr-only">{view.name}</h1>
-    {isLocked(view) && <HostChip className="phone:hidden" />}
+    {isLocked(view) && <DrivingChip view={view} className="phone:hidden" />}
     <div className="hidden min-w-0 phone:block land:block">
       <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} compact />
     </div>

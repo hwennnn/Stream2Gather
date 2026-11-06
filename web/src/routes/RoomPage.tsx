@@ -14,7 +14,7 @@ import { firstName } from '../ui/people';
 import { RoomStatus, useLatestAct } from '../ui/RoomStatus';
 import { useSeats } from '../ui/Seats';
 import { PeoplePanel } from '../ui/PeoplePanel';
-import { PlayerStage, SkipButton, UnmuteButton } from '../ui/PlayerStage';
+import { MainAction, PlayerStage, SkipButton } from '../ui/PlayerStage';
 import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
@@ -189,7 +189,6 @@ type ShellProps = { slug: string; session: RoomSession; view: RoomView };
 const RoomShell = ({ slug, session, view }: ShellProps) => {
   const [tab, setTab] = useState<Tab>('chat');
   const [theatre, setTheatre] = useState(false);
-  const [changing, setChanging] = useState(false);
   const [inviting, setInviting] = useState(false);
   const row = useSeats(view);
   const act = useLatestAct(view);
@@ -220,16 +219,6 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
 
   const back = useCallback(() => toast('You’re back'), [toast]);
   const offlineFor = useOfflineNotice(view, back);
-
-  // Remembers whether this visit has seen a video, and whether one just replaced another.
-  const seenItem = useRef<string | null>(null);
-  useEffect(() => {
-    const id = current?.id ?? null;
-    if (seenItem.current && id !== seenItem.current) {
-      setChanging(id !== null);
-    }
-    if (id) seenItem.current = id;
-  }, [current?.id]);
 
   const others = useMemo(() => view.members.filter(({ userId }) => userId !== view.self?.userId), [view.members, view.self?.userId]);
   useEffect(() => rememberRoom(slug, view.name, others), [slug, view.name, others]);
@@ -339,7 +328,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
             current && (
               <>
                 {roomStatus('max-w-40')}
-                <UnmuteButton player={player} />
+                <MainAction session={session} view={view} player={player} onToast={toast} />
                 {canControl(view) && <SkipButton session={session} view={view} onToast={toast} />}
               </>
             )
@@ -353,7 +342,6 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           session={session}
           view={view}
           player={player}
-          changing={changing}
           theatre={theatre}
           fullscreen={fullscreen.on}
           canFullscreen={canFullscreen()}

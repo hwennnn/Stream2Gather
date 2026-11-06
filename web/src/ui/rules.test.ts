@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatEntry, RoomView } from '../room/session';
-import { canControl, canQueue, chatOffersInvite, chatScroll, countUnread, failureNote, noticesToShow, toastLift } from './rules';
+import { canControl, canQueue, chatOffersInvite, chatScroll, countUnread, drivingLine, failureNote, noticesToShow, toastLift } from './rules';
 
 const view = (patch: Partial<RoomView>): RoomView =>
   ({
@@ -10,6 +10,19 @@ const view = (patch: Partial<RoomView>): RoomView =>
     playback: { item: 'x', status: 'playing', pos: 0, at: 0, rate: 1 },
     ...patch,
   }) as RoomView;
+
+describe('drivingLine', () => {
+  const room = (role: string, ...members: { name: string; role: string }[]) => view({ self: { userId: 'a', role }, members: members.map((person, index) => ({ userId: 'u' + index, ...person })) } as Partial<RoomView>);
+
+  it('names whoever has the controls', () => {
+    expect(drivingLine(room('member', { name: 'Maya Lin', role: 'host' }))).toBe('Maya’s driving');
+    expect(drivingLine(room('host', { name: 'Maya', role: 'member' }))).toBe('You’re driving');
+  });
+
+  it('still reads if the host has gone', () => {
+    expect(drivingLine(room('member', { name: 'Sam', role: 'member' }))).toBe('The host’s driving');
+  });
+});
 
 describe('failureNote', () => {
   const people = (...ids: string[]) => ids.map((userId) => ({ userId, name: userId, role: 'member' as const }));

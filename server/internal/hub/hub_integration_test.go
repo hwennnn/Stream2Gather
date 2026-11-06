@@ -1116,6 +1116,9 @@ func TestSomeoneArrivingLaterReadsTheSameHistory(t *testing.T) {
 	if len(welcome.Lines) != 2 || welcome.Lines[0].Text != "b joined" || welcome.Lines[1].Text != "c joined" {
 		t.Fatalf("lines = %+v", welcome.Lines)
 	}
+	if welcome.Lines[0].Arrived != "b" || welcome.Lines[1].Arrived != "c" {
+		t.Fatalf("a join should name who arrived, so they can skip it: %+v", welcome.Lines)
+	}
 }
 
 func TestAReloadSaysNothing(t *testing.T) {

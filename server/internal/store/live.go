@@ -196,9 +196,11 @@ func WithActingHost(people []Person, state room.State) []Person {
 // Line is something the room itself said. The server writes these, so everyone
 // reads the same history, whenever they arrive.
 type Line struct {
-	ID        string    `json:"id"`
-	Text      string    `json:"text"`
-	URL       string    `json:"url,omitempty"`
+	ID   string `json:"id"`
+	Text string `json:"text"`
+	URL  string `json:"url,omitempty"`
+	// Arrived is whose join this line announces. They are the one person it isn't news to.
+	Arrived   string    `json:"arrived,omitempty"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 

@@ -1146,7 +1146,11 @@ func (r *liveRoom) mutate(ctx context.Context, actor room.Actor, cmd room.Comman
 
 // say adds to what the room has said, for those here and those yet to arrive.
 func (r *liveRoom) say(ctx context.Context, text, url string) {
-	line := store.Line{ID: ids.New(), Text: text, URL: url, CreatedAt: time.Now().UTC()}
+	r.tell(ctx, store.Line{Text: text, URL: url})
+}
+
+func (r *liveRoom) tell(ctx context.Context, line store.Line) {
+	line.ID, line.CreatedAt = ids.New(), time.Now().UTC()
 	err := r.hub.live.AddLine(ctx, r.id, line)
 	if err == nil {
 		err = r.hub.live.Publish(ctx, r.id, encode("line", line))
@@ -1168,7 +1172,7 @@ func (r *liveRoom) arrived(ctx context.Context, person store.Person, tabs, other
 	}
 	reloaded := found && time.Now().UnixMilli()-gone.At < r.hub.rejoinQuiet.Milliseconds()
 	if !reloaded && others > 0 {
-		r.say(ctx, person.Name+" joined", "")
+		r.tell(ctx, store.Line{Text: person.Name + " joined", Arrived: person.UserID})
 	}
 }
 

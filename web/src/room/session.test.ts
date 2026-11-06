@@ -724,6 +724,20 @@ describe('RoomSession', () => {
       expect(lines(session)).toEqual(['Sam joined']);
     });
 
+    it('never tells someone of their own arrival', async () => {
+      const { session, socket } = await live({ lines: [{ ...line('l1', 'Ada joined'), arrived: 'g_1' }, { ...line('l2', 'Sam joined'), arrived: 'g_2' }] });
+      socket.deliver('line', { ...line('l3', 'Ada joined', 1_001_000), arrived: 'g_1' });
+      expect(lines(session)).toEqual(['Sam joined']);
+    });
+
+    it('drops their arrival when it beat the welcome here', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('line', { ...line('l1', 'Ada joined'), arrived: 'g_1' });
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(lines(session)).toEqual([]);
+    });
+
     it('reads what came before from the welcome, in order with the chat', async () => {
       vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ items: [chatLine(2)] })));
       const { session } = await live({ lines: [line('l1', 'Sam joined', 1_001_000), line('l2', 'Sam left', 1_003_000)] });

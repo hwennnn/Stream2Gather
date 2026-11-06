@@ -73,7 +73,8 @@ type Server struct {
 	Clerk               ClerkVerifier
 	ClerkPublishableKey string
 
-	assets sync.Map
+	assets   sync.Map
+	versions sessionVersions
 }
 
 // Handler returns the route table.
@@ -230,6 +231,9 @@ func (s *Server) session(r *http.Request) (auth.Claims, bool) {
 	if err != nil {
 		return auth.Claims{}, false
 	}
+	if claims.Account && !s.sessionLive(r.Context(), claims) {
+		return auth.Claims{}, false
+	}
 	// Cookies from before names were checked can hold what Postgres refuses.
 	if name, ok := room.CleanName(claims.Name); ok {
 		claims.Name = name
@@ -237,6 +241,21 @@ func (s *Server) session(r *http.Request) (auth.Claims, bool) {
 		claims.Name = ids.GuestName()
 	}
 	return claims, true
+}
+
+// sessionLive reports whether sign-out has left this signed-in cookie valid. A
+// lookup that fails leaves it valid: the route behind it needs the same database,
+// and dropping the session here would replace the cookie with a new guest's.
+func (s *Server) sessionLive(ctx context.Context, claims auth.Claims) bool {
+	version, err := s.versions.current(ctx, claims.Subject, s.DB.SessionVersion)
+	if errors.Is(err, store.ErrNotFound) {
+		return false
+	}
+	if err != nil {
+		s.Log.Warn("session check failed", "error", err)
+		return true
+	}
+	return version == claims.Version
 }
 
 func (s *Server) setSession(w http.ResponseWriter, claims auth.Claims) (auth.Claims, error) {
@@ -356,11 +375,20 @@ func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": publicUser(claims)})
 }
 
-// endSession signs the browser out. The next action starts a new guest.
-func (s *Server) endSession(w http.ResponseWriter, _ *http.Request) {
+// endSession signs the browser out, and every other copy of an account's cookie
+// with it. The next action starts a new guest.
+func (s *Server) endSession(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.session(r)
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Secure, SameSite: http.SameSiteLaxMode,
 	})
+	if ok && claims.Account {
+		if err := s.DB.BumpSessionVersion(r.Context(), claims.Subject); err != nil {
+			s.internal(w, err)
+			return
+		}
+		s.versions.forget(claims.Subject)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": nil})
 }
 

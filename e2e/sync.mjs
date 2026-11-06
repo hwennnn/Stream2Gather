@@ -210,6 +210,11 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   const injected = pairwiseDrift(await sampleAll([a, b, c]));
   check('measurement sees injected drift', injected > 0.4 && injected < 0.8, `before ${Math.round(clean * 1000)}ms, after ${Math.round(injected * 1000)}ms`);
 
+  // Nobody can feel 0.6s being corrected, but the pill may not call it in sync.
+  const bar = b.page.locator('section[aria-label="Player controls"]');
+  const honest = await bar.getByText('Catching up').waitFor({ timeout: 2500 }).then(() => true, () => false);
+  check('the pill does not say in sync while off the room', honest, '');
+
   const injectedAt = Date.now();
   let healed = null;
   while (Date.now() - injectedAt < 20000) {
@@ -265,6 +270,16 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   await pausesAndStays('an unlock', host, () => host.page.getByRole('switch').click());
   await pausesAndStays('a queue add', guest, () =>
     sendOnSocket(host, 'queue.add', { url: `${BASE}/sample.mp4?video=next`, mode: 'end' }));
+
+  // A locked guest is told why, and goes straight back to the room.
+  await host.page.getByRole('switch').click();
+  await sleep(1000);
+  await guest.page.evaluate(() => document.querySelector('video').pause());
+  const told = await guest.page.getByText('The host controls this room.').first().waitFor({ timeout: 2500 }).then(() => true, () => false);
+  const backAt = await waitFor(() => allInState([guest], 'playing'), 1500);
+  const [roomState] = (await sampleAll([host])).map((s) => s?.state);
+  check('locked guest: a pause is explained and undone', told && backAt && roomState === 'playing', `told ${told}, back ${backAt}, room ${roomState}`);
+  await host.page.getByRole('switch').click();
 
   report.pauseAfterEventErrors = [...new Set([...host.errors, ...guest.errors])].slice(0, 5);
   await Promise.all([host, guest].map((v) => v.context.close()));

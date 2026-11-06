@@ -314,6 +314,65 @@ describe('SyncController', () => {
     expect(commands).toEqual([]);
   });
 
+  describe('what the viewer is told', () => {
+    const lastHealth = () => reports.at(-1)?.health;
+
+    it('stays in sync through a correction nobody can see', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.current -= 0.3;
+      run(1);
+      expect(lastHealth()).toBe('synced');
+    });
+
+    it('does not say in sync during a nudge', () => {
+      player.rates = 'fine';
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.current -= 0.8;
+      for (let i = 0; i < 6; i += 1) {
+        run(1);
+        expect(lastHealth()).toBe('correcting');
+      }
+    });
+
+    it('does not wait to say it has fallen behind', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.current -= 2;
+      run(1);
+      expect(reports.at(-1)).toMatchObject({ health: 'correcting' });
+    });
+
+    it('does not call a stopped player in sync, however close it is', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.fire('paused');
+      expect(lastHealth()).toBe('correcting');
+      timers.advance(100);
+      sync.tick();
+      expect(lastHealth()).toBe('correcting');
+    });
+
+    it('stops saying in sync the moment the room moves it', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      expect(lastHealth()).toBe('synced');
+      player.seek = () => {}; // Accepted, not landed yet.
+      sync.apply(playing(90, timers.now));
+      expect(lastHealth()).toBe('correcting');
+    });
+
+    it('does not call a player the browser never started in sync', () => {
+      player.status = 'ready';
+      player.play = () => {};
+      sync.apply(playing(0, timers.now));
+      timers.advance(1000);
+      sync.tick();
+      expect(lastHealth()).toBe('correcting');
+    });
+  });
+
   describe('coming back from buffering', () => {
     const stall = (seconds: number) => {
       const room = playing(0, timers.now);

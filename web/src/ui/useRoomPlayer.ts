@@ -12,9 +12,6 @@ declare global {
   }
 }
 
-/** A sliver of drift is normal. Only this much, for this long, is worth a label. */
-const BEHIND_S = 1;
-const BEHIND_FOR_MS = 3000;
 const LOAD_TIMEOUT_MS = 20_000;
 /** Some browsers won't fetch a file until play is pressed, so the poster can't wait for it. */
 const POSTER_LIMIT_MS = 8000;
@@ -72,15 +69,8 @@ const exposeForTests = (session: RoomSession, player: PlayerAdapter, health: () 
   };
 };
 
-/** Small corrections happen all the time and don't need the viewer's attention. */
-const settle = (report: SyncReport, behindSince: number | null): SyncReport['health'] => {
-  if (report.health !== 'correcting') return report.health;
-  return behindSince !== null && Date.now() - behindSince >= BEHIND_FOR_MS ? 'correcting' : 'synced';
-};
-
 const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem, events: Events): Cleanup => {
   let health = 'waiting';
-  let behindSince: number | null = null;
 
   const sync = new SyncController(
     player,
@@ -90,10 +80,8 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
     (command) => session.send(command.type, { ...command, item: item.id }),
     (report) => {
       health = report.health;
-      behindSince = Math.abs(report.drift) > BEHIND_S ? (behindSince ?? Date.now()) : null;
-      const settled = settle(report, behindSince);
-      events.onReport({ ...report, health: settled });
-      session.reportStatus(settled, report.drift);
+      events.onReport(report);
+      session.reportStatus(report.health, report.drift);
     },
   );
 

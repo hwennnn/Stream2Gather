@@ -77,7 +77,7 @@ describe('CrewHome', () => {
     render(<CrewHome slug="movie-night" preview={{ ...preview(crew), members: [{ userId: 'u9', name: 'Maya Lin', role: 'host' }] }} onJoin={onJoin} />);
 
     expect(screen.getByRole('heading', { name: 'Maya saved you a seat' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Join' }).className).toContain('btn-primary');
+    expect(screen.getByRole('button', { name: 'Take your seat' }).className).toContain('btn-primary');
     expect(screen.getByRole('button', { name: 'Join the crew' }).className).not.toContain('btn');
     expect(screen.getByText(/You can watch, chat and react tonight/)).toBeTruthy();
     expect(window.document.body.textContent).not.toMatch(/guest/i);
@@ -111,19 +111,19 @@ describe('CrewHome', () => {
 
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This invite link has expired. Ask for a new one.');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Join the crew' })).toBeNull());
-    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Take your seat' })).toBeTruthy();
   });
 
   it('gives an invited friend one button when the crew is members only', () => {
     window.history.replaceState(null, '', '/r/movie-night?join=tok');
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: false })} onJoin={onJoin} />);
     expect(screen.getByRole('button', { name: 'Join the crew' }).className).toContain('btn-primary');
-    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Take your seat' })).toBeNull();
   });
 
   it('shuts a members-only room to anyone without an invite', () => {
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: false })} onJoin={onJoin} />);
-    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Take your seat' })).toBeNull();
     expect(screen.getByText('This room is for its crew. Ask them for an invite.')).toBeTruthy();
   });
 
@@ -219,7 +219,7 @@ describe('CrewHome', () => {
       ],
     });
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={vi.fn()} />);
-    await screen.findByRole('list', { name: 'Past sessions' });
+    await screen.findByRole('list', { name: 'Past nights' });
     const face = (name: string) => window.document.querySelector<HTMLElement>(`[title="${name}"]`);
     expect(face('Mika')?.style.backgroundColor).not.toBe('');
     expect(face('Former member')?.style.backgroundColor).toBe('');
@@ -229,7 +229,7 @@ describe('CrewHome', () => {
     signIntoAccount();
     vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana]));
     const empty = render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
-    expect(await screen.findByText('Your first watch party will show up here.')).toBeTruthy();
+    expect(await screen.findByText('Your first night together will show up here.')).toBeTruthy();
     empty.unmount();
 
     vi.spyOn(recapApi, 'read').mockRejectedValue(new Error('offline'));
@@ -245,8 +245,8 @@ describe('CrewHome', () => {
       ],
     });
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
-    expect((await screen.findByRole('list', { name: 'Past sessions' })).textContent).toContain('Video unavailable + 1 more');
-    expect(screen.getByRole('list', { name: 'Past sessions' }).textContent).toContain('1 h 30 min');
+    expect((await screen.findByRole('list', { name: 'Past nights' })).textContent).toContain('Video unavailable + 1 more');
+    expect(screen.getByRole('list', { name: 'Past nights' }).textContent).toContain('1 h 30 min');
     expect(screen.getByText('Reactions and watch stats come from Stream2Gather, not YouTube.')).toBeTruthy();
   });
 });

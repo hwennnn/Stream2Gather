@@ -1,6 +1,7 @@
 import { ClerkFailed, ClerkProvider, useAuth, useClerk } from '@clerk/react';
-import { useEffect } from 'react';
-import { account } from './account';
+import { useEffect, useMemo } from 'react';
+import { account, useAccount } from './account';
+import { clerkWords } from './words';
 
 // Matches the tokens in index.css.
 const appearance = {
@@ -13,9 +14,12 @@ const appearance = {
     colorInput: '#2a3241',
     colorInputForeground: '#eef1f6',
     colorNeutral: '#eef1f6',
-    fontFamily: "'Geist Variable', ui-sans-serif, system-ui, sans-serif",
-    borderRadius: '0.75rem',
+    fontFamily: 'Geist, ui-sans-serif, system-ui, sans-serif',
+    borderRadius: '0.5rem',
   },
+  // Clerk's button has a sheen of its own. Ours are flat.
+  // Clerk paints the button's sheen on ::after.
+  elements: { formButtonPrimary: { '&&::after': { display: 'none' } } },
 };
 
 const Sync = () => {
@@ -38,13 +42,17 @@ const Failed = () => {
 };
 
 /** Everything Clerk-specific lives here, so guests never download it. */
-const ClerkBridge = ({ publishableKey }: { publishableKey: string }) => (
-  <ClerkProvider publishableKey={publishableKey} appearance={appearance} telemetry={false}>
-    <Sync />
-    <ClerkFailed>
-      <Failed />
-    </ClerkFailed>
-  </ClerkProvider>
-);
+const ClerkBridge = ({ publishableKey }: { publishableKey: string }) => {
+  const { ask } = useAccount();
+  const localization = useMemo(() => clerkWords(ask), [ask]);
+  return (
+    <ClerkProvider publishableKey={publishableKey} appearance={appearance} localization={localization} telemetry={false}>
+      <Sync />
+      <ClerkFailed>
+        <Failed />
+      </ClerkFailed>
+    </ClerkProvider>
+  );
+};
 
 export default ClerkBridge;

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { api, ApiError, post, request, type Person } from '../api/http';
 import { account, useAccount } from '../auth/account';
+import { START_CREW } from '../auth/words';
 import { inThere, ReturnRow } from '../routes/landing/Sections';
 import { navigate } from '../routes/router';
 import type { CrewLine } from './api';
@@ -122,7 +123,7 @@ export default function CrewRail({ except }: { except?: string }) {
       return;
     }
     sessionStorage.setItem(WANTS_CREW, '1');
-    account.signIn();
+    account.signIn(START_CREW);
   };
 
   if (!signedIn && !publishableKey) return null;

@@ -5,7 +5,7 @@ import type { PlayerAdapter, PlayerError, PlayerState } from '../players/types';
 import { catchupApi, type CrewVideo, type Moment } from './api';
 import CatchupPage from './CatchupPage';
 
-vi.mock('../auth/account', () => ({ useAccount: () => ({ user: { name: 'Mika' } }) }));
+vi.mock('../auth/account', () => ({ useAccount: () => ({ user: { id: 'me', name: 'Mika' } }) }));
 
 const player = vi.hoisted(() => ({ time: 0, state: 'ready' as PlayerState, fail: null as null | ((error: PlayerError) => void), startAt: -1, autoplay: true }));
 vi.mock('../players/registry', () => ({
@@ -68,12 +68,36 @@ describe('CatchupPage', () => {
     await open([moment(1, 724_000)]);
     await advance(723.5);
     await advance(723.75);
-    expect(screen.queryByText(/Hana/)).toBeNull();
+    expect(screen.getByRole('list', { name: 'Reactions' }).textContent).toBe('');
 
     await advance(724);
 
     const line = screen.getByRole('list', { name: 'Reactions' }).textContent;
-    expect(line).toContain('Hana, 12:04, 🔥');
+    expect(line).toContain('12:04Hana🔥');
+  });
+
+  it('keeps their seat dim until the video reaches them, then lights it and lets it go', async () => {
+    await open([moment(1, 724_000)]);
+    const seat = () => screen.getByRole('list', { name: 'Who watched this' }).querySelector('.seat') as HTMLElement;
+    await advance(723.75);
+    expect(seat().dataset.away).toBe('true');
+    expect(seat().textContent).not.toContain('🔥');
+
+    await advance(724);
+    expect(seat().dataset.away).toBe('false');
+    expect(seat().textContent).toContain('🔥');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1700);
+    });
+    expect(seat().dataset.away).toBe('true');
+  });
+
+  it('seats nobody who is watching for themselves', async () => {
+    await open([{ ...moment(1, 724_000), userId: 'me' }, { ...moment(2, 725_000), userId: 'u2', author: 'Mika' }]);
+    const seats = screen.getByRole('list', { name: 'Who watched this' });
+    expect(seats.textContent).toContain('Mika');
+    expect(seats.textContent).not.toContain('Hana');
   });
 
   it('says what the empty rail is waiting for', async () => {

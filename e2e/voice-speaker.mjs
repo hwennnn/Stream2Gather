@@ -20,7 +20,7 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage();
 await page.goto(url);
-await page.getByRole('button', { name: 'Join' }).first().click();
+await page.getByRole('button', { name: 'Take your seat' }).first().click();
 await page.locator('header').getByRole('button', { name: /Join voice|is in voice/ }).click();
 await page.getByRole('button', { name: 'Unmute' }).click();
 await page.getByRole('button', { name: 'Mute' }).waitFor();

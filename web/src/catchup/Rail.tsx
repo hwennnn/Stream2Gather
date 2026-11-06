@@ -1,14 +1,17 @@
 import { useLayoutEffect, useRef } from 'react';
 import { formatTime } from '../ui/format';
-import { firstName } from '../ui/people';
+import { firstName, hueOf } from '../ui/people';
 import type { Moment } from './api';
 
 const Line = ({ moment, firedAt }: { moment: Moment; firedAt?: number }) => (
-  <li data-pos={moment.posMs} data-fired={firedAt} className={firedAt === undefined ? 'py-1 text-sm' : 'enter py-1 text-sm'}>
-    <span className="text-muted">
-      {firstName(moment.author)}, <span className="fig text-[13px]">{formatTime(moment.posMs / 1000)}</span>,
-    </span>{' '}
-    {moment.emoji ?? moment.body}
+  <li data-pos={moment.posMs} data-fired={firedAt} className={`grid grid-cols-[3rem_minmax(0,1fr)] py-1 text-sm ${firedAt === undefined ? '' : 'enter'}`}>
+    <span className="fig text-dim">{formatTime(moment.posMs / 1000)}</span>
+    <span className="[overflow-wrap:anywhere]">
+      <span style={{ color: moment.userId ? hueOf(moment.userId) : undefined }} className="mr-1.5 font-semibold">
+        {firstName(moment.author)}
+      </span>
+      {moment.emoji ?? moment.body}
+    </span>
   </li>
 );
 

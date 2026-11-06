@@ -99,7 +99,7 @@ const createRoom = async (host, url) => {
 
 const join = async (guest, url) => {
   await guest.page.goto(url);
-  await guest.page.getByRole('button', { name: 'Join' }).click();
+  await guest.page.getByRole('button', { name: 'Take your seat' }).click();
 };
 
 const seats = (v) => v.page.evaluate(() => Number(/People\s+(\d+)/.exec(document.body.innerText)?.[1] ?? 0));

@@ -1,6 +1,6 @@
 import { post, request, type Media } from '../api/http';
 
-export type Moment = { id: number; posMs: number; kind: 'reaction' | 'chat'; origin: 'live' | 'catchup'; author: string; emoji?: string; body?: string };
+export type Moment = { id: number; posMs: number; kind: 'reaction' | 'chat'; origin: 'live' | 'catchup'; author: string; userId?: string; emoji?: string; body?: string };
 
 export type CrewVideo = { source: string; sourceId: string; crewName: string; media: Media | null };
 

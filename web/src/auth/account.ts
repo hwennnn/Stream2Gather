@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { api, type Account, type SiteConfig } from '../api/http';
+import { SIGN_IN, type SignInAsk } from './words';
 
 /** The parts of Clerk's browser object this app calls. */
 export type ClerkControls = {
@@ -20,12 +21,14 @@ type AccountView = {
   othersMayRemain: boolean;
   /** The server couldn't say how to sign in. A failed `/v1/me` isn't this: sign-in still works. */
   startFailed: boolean;
+  /** Why the sign-in window is opening, in words it can show. */
+  ask: SignInAsk;
 };
 
 // Survives the redirect back from Google, which reloads the page.
 const SIGNING_IN = 's2g:signing-in';
 
-let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null, othersMayRemain: false, startFailed: false };
+let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null, othersMayRemain: false, startFailed: false, ask: SIGN_IN };
 let clerk: ClerkControls | null = null;
 let openWhenReady = false;
 /** The sign-in was opened by this page, so it may still be showing. */
@@ -89,14 +92,15 @@ export const account = {
     if (view.user) update({ user: { ...view.user, name } });
   },
 
-  signIn(): void {
+  signIn(ask: SignInAsk = SIGN_IN): void {
     sessionStorage.setItem(SIGNING_IN, '1');
     if (clerk) {
+      update({ ask });
       open();
       return;
     }
     openWhenReady = true;
-    update({ clerkWanted: true, problem: null });
+    update({ ask, clerkWanted: true, problem: null });
   },
 
   manage(): void {

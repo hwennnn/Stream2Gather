@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ErrorBoundary } from './ErrorBoundary';
+import { Page } from './Page';
 
 const failed = (props: ConstructorParameters<typeof ErrorBoundary>[0]) => {
   const boundary = new ErrorBoundary(props);
@@ -17,6 +18,6 @@ describe('ErrorBoundary', () => {
   });
 
   it('still shows the whole-page message without one', () => {
-    expect(failed({ children: 'app' })).toMatchObject({ type: 'main' });
+    expect(failed({ children: 'app' })).toMatchObject({ type: Page });
   });
 });

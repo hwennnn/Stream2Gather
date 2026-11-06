@@ -6,6 +6,8 @@ import { firstName, hueOf, listNames } from '../../ui/people';
 import { Thumb } from '../../ui/Thumb';
 
 const LISTED = 4;
+/** The first one is already on the screen above. */
+const SHOWN_ABOVE = 1;
 const REPO = 'https://github.com/hwennnn/Stream2Gather';
 
 type PopularProps = { items: Media[] | null; busy: string | null; disabled: boolean; onPick: (media: Media) => void };
@@ -14,13 +16,13 @@ type PopularProps = { items: Media[] | null; busy: string | null; disabled: bool
 export const Popular = ({ items, busy, disabled, onPick }: PopularProps) => {
   if (items?.length === 0) return null;
   return (
-    <section aria-labelledby="popular-title" className="order-2 mt-12 phone:mt-8">
+    <section aria-labelledby="popular-title" className="order-2 mt-10 phone:mt-8">
       <h2 id="popular-title" className="text-[15px] font-semibold">
         Popular on YouTube today
       </h2>
       <ol className="mt-3 grid grid-cols-4 gap-4 phone:grid-cols-2 phone:gap-3">
         {items
-          ? items.slice(0, LISTED).map((media) => (
+          ? items.slice(SHOWN_ABOVE, SHOWN_ABOVE + LISTED).map((media) => (
               <li key={media.sourceId} className="min-w-0">
                 <button type="button" disabled={disabled} onClick={() => onPick(media)} aria-label={`Start a room with ${media.title}`} className="group block w-full cursor-pointer text-left disabled:cursor-default">
                   <Thumb src={media.thumbnailUrl} className="w-full rounded-md" />
@@ -63,74 +65,83 @@ export const ReturnRow = ({ href, title, note, people }: { href: string; title: 
   </a>
 );
 
-const CAST = [
-  { userId: 'picture-maya', name: 'Maya', role: 'host' as const },
-  { userId: 'picture-sam', name: 'Sam', role: 'member' as const },
-  { userId: 'picture-priya', name: 'Priya', role: 'member' as const },
-  { userId: 'picture-you', name: 'You', role: 'member' as const },
-];
+type Line = { text: string; at: number; stays?: boolean };
+type Sitter = { userId: string; name: string; sat: number; lines?: Line[]; reacts?: { emoji: string; at: number }; pauses?: number };
 
-const LINES: [number, string][] = [
-  [1, 'is this the one with the dog'],
-  [2, 'yes. shh'],
-  [0, 'door, one sec'],
-  [3, 'what did i miss'],
-  [1, 'nothing, she paused it'],
-  [2, 'wait for this part'],
-  [1, 'no spoilers'],
-  [3, 'ok back, go'],
+/** Five seconds in a room, once through, and it stops on the seat nobody's in. Only the video is real. */
+const CAST: Sitter[] = [
+  { userId: 'picture-maya', name: 'Maya', sat: 120, pauses: 2800, lines: [{ text: 'door, one sec', at: 2800 }] },
+  { userId: 'picture-sam', name: 'Sam', sat: 240, lines: [{ text: 'is this the one with the dog', at: 600 }, { text: 'we’ll wait', at: 3900, stays: true }] },
+  { userId: 'picture-priya', name: 'Priya', sat: 360, lines: [{ text: 'yes. shh', at: 1700 }], reacts: { emoji: '😂', at: 1700 } },
+  { userId: 'picture-you', name: 'You', sat: 480 },
 ];
-/** A phone has room for the end of the conversation. */
-const PHONE_LINES = 3;
+const MISSING_AT = 4300;
+const PAUSED_AT = 2800;
 
-/** A picture of a room, not a live one: only the video in it is real. */
-export const RoomPicture = ({ media }: { media: Media | null }) => (
-  <figure className="min-w-0">
-    <div aria-hidden="true" className="flex overflow-hidden rounded-lg border border-line bg-ink phone:flex-col">
-      <div className="min-w-0 flex-1">
-        <div className="aspect-video bg-stage">
-          <img src={media?.thumbnailUrl ?? '/room-still.svg'} alt="" className="size-full object-cover" />
-        </div>
-        <ul data-picture={true} className="seats px-3 pt-3">
-          {CAST.map((person, index) => (
-            <li key={person.userId} data-acting={index === 0} style={{ '--hue': hueOf(person.userId) } as React.CSSProperties} className="seat">
-              <span className="seat-disc">
-                <Avatar person={person} labelled={false} className="size-full text-[13px]" />
-                {index === 1 && <span className="seat-reaction">😂</span>}
-              </span>
-              <span className="seat-name">{person.name}</span>
-            </li>
-          ))}
-          <li className="seat seat-spare">
-            <span className="seat-empty" />
-          </li>
-        </ul>
-        <p className="truncate px-4 pt-3 pb-3 text-[13px] text-muted">
-          Paused by{' '}
-          <span style={{ color: hueOf(CAST[0]?.userId ?? '') }} className="font-semibold">
-            Maya
-          </span>{' '}
-          at <span className="fig text-[13px]">3:20</span>
-        </p>
-      </div>
-      <div className="flex w-44 shrink-0 flex-col justify-end gap-2.5 overflow-hidden border-l border-line bg-panel p-3 text-[13px] leading-[18px] phone:w-full phone:border-t phone:border-l-0">
-        {LINES.map(([who, text], index) => {
-          const person = CAST[who];
-          return (
-            person && (
-              <p key={text} className={index < LINES.length - PHONE_LINES ? 'phone:hidden' : undefined}>
-                <span style={{ color: hueOf(person.userId) }} className="mr-1.5 font-semibold">
-                  {person.name}
-                </span>
-                {text}
-              </p>
-            )
-          );
-        })}
-      </div>
-    </div>
+const at = (name: string, ms: number) => ({ [name]: `${ms}ms` }) as React.CSSProperties;
+
+const Seat = ({ person }: { person: Sitter }) => (
+  <li style={{ '--hue': hueOf(person.userId), ...at('--sat', person.sat) } as React.CSSProperties} className="seat picture-seat">
+    {person.lines?.map((line) => (
+      <span key={line.text} data-stays={line.stays} style={at('--at', line.at)} className="picture-say">
+        {line.text}
+      </span>
+    ))}
+    <span className="seat-disc">
+      <Avatar person={person} labelled={false} className="size-full" />
+      {person.pauses !== undefined && <span style={at('--at', person.pauses)} className="picture-ring" />}
+      {person.reacts && (
+        <span style={at('--at', person.reacts.at)} className="seat-reaction picture-react">
+          {person.reacts.emoji}
+        </span>
+      )}
+    </span>
+    <span className="seat-name">{person.name}</span>
+  </li>
+);
+
+/** The screen in the picture. A pasted link puts its own video here before there's a room. */
+export const PictureScreen = ({ src, onBroken }: { src: string; onBroken: () => void }) => (
+  <figure aria-hidden="true" className="aspect-video overflow-hidden rounded-lg bg-stage">
+    <img key={src} src={src} alt="" onError={onBroken} className="enter size-full object-cover" />
   </figure>
 );
+
+/** Everyone in front of that screen, and a place for whoever you're about to send this to. */
+export const FrontRow = ({ ready }: { ready: boolean }) => {
+  const maya = CAST[0]?.userId;
+  return (
+    <div aria-hidden="true" data-ready={ready} className="picture-row">
+      <ul className="seats">
+        {CAST.map((person) => (
+          <Seat key={person.userId} person={person} />
+        ))}
+        <li className="seat picture-seat">
+          <span className="seat-empty picture-open" />
+          <span style={at('--at', MISSING_AT)} className="seat-name picture-missing">
+            Who’s missing?
+          </span>
+        </li>
+        <li className="seat picture-seat picture-spare">
+          <span className="seat-empty" />
+        </li>
+      </ul>
+      <p className="picture-status">
+        <span style={at('--at', PAUSED_AT)} className="picture-before">
+          Playing at <span className="tabular-nums">3:12</span>, everyone together
+        </span>
+        <span style={at('--at', PAUSED_AT)} className="picture-after">
+          Paused by{' '}
+          <span style={{ color: hueOf(maya) }} className="font-semibold">
+            Maya
+          </span>{' '}
+          at <span className="tabular-nums">3:20</span>
+        </span>
+        <span className="picture-ready">That’s your screen. Start the room, then send the link.</span>
+      </p>
+    </div>
+  );
+};
 
 export const Footer = () => (
   <footer className="border-t border-line">

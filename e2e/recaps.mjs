@@ -100,6 +100,9 @@ for (let i = 0; i < SWEEP_TRIES && !ended; i += 1) {
 }
 check('the sweep ended the session and built its recap', ended);
 
+// The server only knows a YouTube video's length, and the track needs one.
+await db.query(`UPDATE media SET duration_ms = 60000 WHERE url = $1`, [`${BASE}/sample.mp4`]);
+
 await hana.page.goto(home);
 const card = hana.page.getByRole('region', { name: 'Recap' });
 check('the recap is at the top of the home', await visible(card));
@@ -107,14 +110,27 @@ const text = await card.innerText();
 check('it says who came', text.includes('Hana') && text.includes('Mika'), text.split('\n')[0]);
 check('it counts the reactions', text.includes('6 reactions'), text);
 check('it names the video', text.includes('sample'));
-check('it finds the biggest moment', text.includes('Biggest moment'));
+check('it finds the biggest moment', /All of you reacted at \d+:\d\d in sample/.test(text), text);
+check('it names the night', /\w+day (night|morning|afternoon)/.test(text), text.split('\n')[0]);
+const dots = card.locator('.seat-track-dot');
+await dots.first().waitFor({ timeout: 5000 }).catch(() => {});
+check('each reaction sits on the track in its person\'s colour', (await dots.count()) > 0 && (await dots.evaluateAll((all) => all.map((dot) => dot.style.backgroundColor))).every(Boolean));
 check('it can be relived', (await card.getByRole('link', { name: 'Relive it' }).getAttribute('href'))?.includes('/catchup/'));
 check('the page says where the numbers come from', await visible(hana.page.getByText('come from Stream2Gather, not YouTube')));
-const faces = hana.page.getByRole('list', { name: 'Past sessions' }).locator('[title]');
+const faces = hana.page.getByRole('list', { name: 'Past nights' }).locator('[title]');
 check('past faces carry their person\'s colour', (await faces.evaluateAll((all) => all.map((face) => face.style.backgroundColor))).every(Boolean) && (await faces.count()) > 0);
 await hana.page.screenshot({ path: `${OUT}/recap-home.png`, fullPage: true });
 await hana.page.setViewportSize({ width: 390, height: 844 });
 await hana.page.screenshot({ path: `${OUT}/recap-home-phone.png` });
+// A title long enough to truncate is what shows a row letting its hidden names out.
+const setTitle = (title) => db.query(`UPDATE media SET title = $1 WHERE url = $2`, [title, `${BASE}/sample.mp4`]);
+await setTitle('서울의 밤 산책 라이브 함께 보기 — the very long version with every encore and the whole walk home');
+await hana.page.reload();
+await hana.page.getByRole('list', { name: 'Past nights' }).waitFor();
+check('nothing runs off a phone', (await hana.page.evaluate(() => document.documentElement.scrollWidth)) === 390);
+await setTitle('sample');
+await hana.page.reload();
+await hana.page.getByRole('list', { name: 'Past nights' }).waitFor();
 await hana.page.setViewportSize({ width: 1280, height: 800 });
 
 await button(hana, 'Share this recap').click();

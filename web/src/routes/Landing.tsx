@@ -5,9 +5,9 @@ import { looksLikeUrl, normalizeUrl } from '../ui/format';
 import { SiteHeader, WIDE_COLUMN } from '../ui/Page';
 import { Slot } from '../ui/Slot';
 import { useTrending } from '../ui/useTrending';
-import { badLink, emptyNote, failureFor, linkKinds, type Failure } from './landing/notes';
+import { badLink, emptyNote, failureFor, linkKinds, stillOf, youtubeId, type Failure } from './landing/notes';
 import { useRecentRoom } from './landing/recent';
-import { Footer, inThere, Popular, ReturnRow, RoomPicture } from './landing/Sections';
+import { Footer, FrontRow, inThere, PictureScreen, Popular, ReturnRow } from './landing/Sections';
 import { loadRoomPage, startRoom } from './router';
 
 const CrewRail = lazy(() => import('../crew/CrewRail'));
@@ -22,6 +22,9 @@ export const Landing = () => {
   const recent = useRecentRoom();
   const { config } = useAccount();
   const kinds = linkKinds(config?.sources);
+  const [noStill, setNoStill] = useState<string | null>(null);
+  const pasted = youtubeId(link);
+  const yours = pasted !== noStill ? pasted : null;
 
   useEffect(() => {
     if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) input.current?.focus();
@@ -80,7 +83,7 @@ export const Landing = () => {
           <CrewRail except={recent?.slug} />
         </Slot>
 
-        <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-end gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <section aria-labelledby="landing-title">
             <h1 id="landing-title" className="text-4xl leading-10 font-semibold tracking-[-0.02em] text-balance phone:text-[30px] phone:leading-9">
               Save your friends a seat.
@@ -133,8 +136,10 @@ export const Landing = () => {
 
           </section>
 
-          <RoomPicture media={trending?.[0] ?? null} />
+          <PictureScreen src={yours ? stillOf(yours) : (trending?.[0]?.thumbnailUrl ?? '/room-still.svg')} onBroken={() => setNoStill(pasted)} />
         </div>
+
+        <FrontRow ready={yours !== null} />
 
         <Popular items={trending} busy={busy} disabled={working} onPick={(media) => void start(media.sourceId, media.url)} />
       </main>

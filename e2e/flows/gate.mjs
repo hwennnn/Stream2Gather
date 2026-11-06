@@ -86,4 +86,48 @@ flow('gate: a returning guest keeps their name', async (t) => {
   }
 });
 
+flow('gate: your seat is outlined with your initials, and fills when you sit', async (t) => {
+  const host = await t.person('Mina');
+  const guest = await t.person('guest');
+  const room = await startRoom(t, host, { url: golden.url });
+  await guest.page.goto(room.url);
+  await t.see('the gate', ui.join(guest.page));
+  await ui.joinName(guest.page).fill('Ada Lovelace');
+  const seat = guest.page.getByRole('list', { name: 'In the room' }).locator('.seat-you');
+  await t.expect('your initials on your seat', seat.getByText('AL', { exact: true }));
+  await t.expect('your first name under it', seat.getByText('Ada', { exact: true }));
+  await ui.join(guest.page).click();
+  await t.see('the room', ui.rail(guest.page));
+});
+
+flow('gate: someone sitting down shows up at the door, and the clock keeps moving', async (t) => {
+  const host = await t.person('Mina');
+  const early = await t.person('guest');
+  const late = await t.person('Late');
+  const room = await startRoom(t, host, { url: golden.url });
+  await t.until('it plays', async () => (await host.sample())?.time > 1);
+  await late.page.goto(room.url);
+  await t.see('the gate', ui.join(late.page));
+  const clock = late.page.getByText(/^\d+:\d\d in$/);
+  const before = await clock.innerText();
+  await joinRoom(early, room.url, { name: 'Bo' });
+  await t.expect('Bo at the door', late.page.getByRole('list', { name: 'In the room' }).getByText('Bo'), 8000);
+  t.check('the clock moved', (await clock.innerText()) !== before, before);
+});
+
+flow('gate: looks like the room it opens into', async (t) => {
+  const host = await t.person('Mina');
+  const guest = await t.person('guest');
+  const room = await startRoom(t, host, { url: golden.url });
+  await guest.page.goto(room.url);
+  await t.see('the gate', ui.join(guest.page));
+  const geometry = await guest.page.evaluate(() => {
+    const screen = document.querySelector('.door-screen').getBoundingClientRect();
+    const row = document.querySelector('.door-row').getBoundingClientRect();
+    return { below: row.top >= screen.bottom - 1, picture: document.querySelector('.door-screen img')?.src ?? '' };
+  });
+  t.check('the seats are under the screen', geometry.below);
+  t.check('what is on is on the screen', geometry.picture.includes(golden.id), geometry.picture);
+});
+
 const openPeople = (client) => ui.tab(client.page, 'People').click();

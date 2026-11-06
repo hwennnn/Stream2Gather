@@ -15,6 +15,8 @@ type VideoMoment struct {
 	Kind   string `json:"kind"`
 	Origin string `json:"origin"`
 	Author string `json:"author"`
+	// UserID is empty once the account has gone. It picks their colour on the page.
+	UserID string `json:"userId,omitempty"`
 	Emoji  string `json:"emoji,omitempty"`
 	Body   string `json:"body,omitempty"`
 }
@@ -29,7 +31,7 @@ type MomentRange struct {
 // VideoMoments reads a video's moments across all of a crew's sessions, in order.
 func (p *Postgres) VideoMoments(ctx context.Context, crewID, source, sourceID string, span MomentRange) ([]VideoMoment, error) {
 	rows, err := p.pool.Query(ctx, `
-		SELECT m.id, m.pos_ms, m.kind, m.origin, m.author_name, coalesce(m.emoji, ''), coalesce(c.body, '')
+		SELECT m.id, m.pos_ms, m.kind, m.origin, m.author_name, coalesce(m.user_id, ''), coalesce(m.emoji, ''), coalesce(c.body, '')
 		FROM moments m LEFT JOIN messages c ON c.id = m.message_id
 		WHERE m.crew_id = $1 AND m.source = $2 AND m.source_id = $3
 			AND m.pos_ms >= $4 AND m.pos_ms < $5 AND (m.pos_ms, m.id) > ($6, $7)
@@ -40,7 +42,7 @@ func (p *Postgres) VideoMoments(ctx context.Context, crewID, source, sourceID st
 	}
 	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (VideoMoment, error) {
 		var m VideoMoment
-		return m, row.Scan(&m.ID, &m.PosMs, &m.Kind, &m.Origin, &m.Author, &m.Emoji, &m.Body)
+		return m, row.Scan(&m.ID, &m.PosMs, &m.Kind, &m.Origin, &m.Author, &m.UserID, &m.Emoji, &m.Body)
 	})
 }
 

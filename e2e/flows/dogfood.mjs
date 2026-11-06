@@ -147,14 +147,14 @@ for (const [label, source] of [['YouTube', () => golden.url], ['a file', (t) => 
 flow('dogfood: the landing picture centres each face and name in its seat', async (t) => {
   const a = await t.person('Ana', { viewport: LAPTOP });
   await a.page.goto(t.base);
-  const seats = a.page.locator('figure .seat');
+  const seats = a.page.locator('.picture-row .seat');
   await t.until('the picture has its seats', async () => (await seats.count()) >= 2);
   const offsets = await seats.evaluateAll((list) => list.flatMap((seat) => {
     const middle = (node) => {
       const { left, right } = node.getBoundingClientRect();
       return (left + right) / 2;
     };
-    return [...seat.children].filter((part) => part.getBoundingClientRect().width > 0).map((part) => Math.abs(middle(part) - middle(seat)));
+    return [...seat.children].filter((part) => part.getBoundingClientRect().width > 0 && !part.matches('.picture-say')).map((part) => Math.abs(middle(part) - middle(seat)));
   }));
   t.check('every part is centred', offsets.length > 2 && Math.max(...offsets) <= 1, JSON.stringify(offsets));
 });

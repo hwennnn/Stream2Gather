@@ -97,7 +97,7 @@ check('the session ended', ended);
 
 // From the home: one click to the page, one on Play.
 await mika.page.reload();
-const offer = mika.page.getByRole('link', { name: 'You missed this. Catch up.' });
+const offer = mika.page.getByRole('link', { name: /^Catch up on/ });
 check('the home offers what was missed', await visible(offer));
 check('the home keeps chat to itself', !(await mika.page.locator('body').innerText()).includes('the ending though'));
 await mika.page.goto(home); // A fresh load, so the socket count below starts at this page's own.
@@ -112,6 +112,9 @@ await mika.page.screenshot({ path: `${OUT}/catchup-before.png` });
 await video.evaluate((element) => element.play());
 const fired = mika.page.locator('[data-fired]');
 await fired.first().waitFor({ timeout: 15_000 });
+const company = mika.page.getByRole('list', { name: 'Who watched this' });
+check('her seat lights when the video reaches her', await visible(company.locator('.seat[data-away="false"] .seat-reaction')));
+await mika.page.screenshot({ path: `${OUT}/catchup-lit.png` });
 await sleep(1500 + (REACTIONS + 2) * REACT_GAP_MS);
 const seen = await mika.page.locator('[data-fired]').evaluateAll((lines) =>
   lines.map((line) => ({ pos: Number(line.dataset.pos), fired: Number(line.dataset.fired), text: line.textContent })),
@@ -119,7 +122,7 @@ const seen = await mika.page.locator('[data-fired]').evaluateAll((lines) =>
 check('every moment fired', seen.length === REACTIONS + 1, `${seen.length} of ${REACTIONS + 1}`);
 const worst = Math.max(...seen.map((moment) => Math.abs(moment.fired - moment.pos)));
 check('each fired on time', worst <= FIRE_BUDGET_MS, `worst ${worst} ms, budget ${FIRE_BUDGET_MS}`);
-check('it says who', seen[0]?.text.startsWith('Hana,'), seen[0]?.text);
+check('it says who', seen[0]?.text.includes('Hana'), seen[0]?.text);
 check('chat comes back too', seen.some((moment) => moment.text.includes('the ending though')));
 check('no socket opened', (await mika.page.evaluate(() => window.__sockets)) === 0);
 await mika.page.screenshot({ path: `${OUT}/catchup-rail.png` });
@@ -171,7 +174,7 @@ const phone = await person('Ren', { width: 390, height: 844 });
 await phone.page.goto(invite);
 await button(phone, 'Join the crew').click();
 await button(phone, /Join the room/).waitFor();
-await phone.page.getByRole('link', { name: 'You missed this. Catch up.' }).click();
+await phone.page.getByRole('link', { name: /^Catch up on/ }).click();
 const small = phone.page.locator('video');
 await small.waitFor();
 await small.evaluate((element) => element.play());

@@ -31,7 +31,7 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   let spoken: ChatLine | undefined;
   for (const entry of entries) {
     if (entry.kind === 'system') {
-      if (!entry.quiet) blocks.push({ kind: 'system', entry });
+      blocks.push({ kind: 'system', entry });
       continue;
     }
     const gap = spoken ? Date.parse(entry.createdAt) - Date.parse(spoken.createdAt) : Infinity;

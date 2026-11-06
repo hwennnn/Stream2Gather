@@ -1,7 +1,6 @@
 import { api, ApiError, type ChatMessage, type Media, type Person, type VoiceState } from '../api/http';
 import { ServerClock } from '../sync/clock';
 import type { Playback, SyncHealth } from '../sync/controller';
-import { Narrator } from './narrate';
 
 export type QueueItem = Media & { id: string; addedBy: string; addedByName: string };
 
@@ -19,7 +18,7 @@ export type ChatLine = Omit<ChatMessage, 'id'> & {
   serverId?: number;
 };
 
-export type ChatEntry = ChatLine | { kind: 'system'; id: string; text: string; createdAt: string; quiet?: boolean };
+export type ChatEntry = ChatLine | { kind: 'system'; id: string; text: string; createdAt: string };
 
 /** Limited means the server refused it for speed, so the text is still worth keeping. */
 export type ChatResult = { id: string; limited: boolean };
@@ -144,6 +143,9 @@ class Refused extends Error {
   }
 }
 
+const inTimeOrder = (entries: ChatEntry[]) =>
+  [...entries].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)).slice(-MAX_ENTRIES);
+
 const serverIdOf = (entry: ChatEntry) => (entry.kind === 'chat' ? (entry.serverId ?? entry.id) : entry.id);
 
 /** Settles the viewer's own waiting line with the message the server made of it. */
@@ -190,12 +192,6 @@ export class RoomSession {
   private voice: VoiceState | 'off' = 'off';
   private voiceTimer: number | null = null;
   private closing: () => void = () => {};
-  private narrator = new Narrator({
-    say: (text, quiet) => this.say(text, quiet),
-    rewrite: (lineId, text) => this.rewrite(lineId, text),
-    remove: (lineId) => this.update({ messages: this.view.messages.filter((entry) => entry.id !== lineId) }),
-    now: () => this.clock.now(),
-  });
   readonly marks: { joinMs?: number } = {};
 
   constructor(readonly slug: string) {}
@@ -443,7 +439,6 @@ export class RoomSession {
     this.attempts = 0;
     this.behindAt = null;
     this.resyncAt = null;
-    this.narrator.endSeekRun();
     this.lastStatus = '';
     this.marks.joinMs ??= performance.now() - this.joinStartedAt;
     this.update({
@@ -486,10 +481,7 @@ export class RoomSession {
       .filter((message) => !known.has(message.id))
       .map((message): ChatEntry => ({ ...message, kind: 'chat', ...history }));
     if (missing.length === 0 && lines === this.view.messages) return;
-    const merged = [...missing, ...lines].sort(
-      (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
-    );
-    this.update({ messages: merged.slice(-MAX_ENTRIES) });
+    this.update({ messages: inTimeOrder([...missing, ...lines]) });
   }
 
   private pong(data: { t0: number; ts: number; version?: number }): void {
@@ -530,10 +522,7 @@ export class RoomSession {
 
     const previous = this.view;
     const itemChanged = message.playback.item !== previous.playback.item;
-    if (itemChanged) {
-      this.lastStatus = '';
-      this.narrator.endSeekRun();
-    }
+    if (itemChanged) this.lastStatus = '';
     this.update({
       version: message.version,
       playback: message.playback,
@@ -544,7 +533,6 @@ export class RoomSession {
       lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
     });
     if (itemChanged) this.noteJump(message);
-    if (!snapshot) this.narrator.stateChanged(message, previous);
     this.playbackListener(message.playback, snapshot);
   }
 
@@ -561,35 +549,14 @@ export class RoomSession {
     return this.request('queue.undo', { target });
   }
 
-  private rewrite(lineId: string, text: string): boolean {
-    const found = this.view.messages.some((entry) => entry.id === lineId);
-    if (found) {
-      this.update({
-        messages: this.view.messages.map((entry) => (entry.id === lineId ? { ...entry, text } : entry)),
-      });
-    }
-    return found;
-  }
-
-  private say(text: string, quiet?: boolean): string {
-    const id = `s${this.nextId++}`;
-    const createdAt = new Date(this.clock.now()).toISOString();
-    this.append({ kind: 'system', id, text, createdAt, ...(quiet ? { quiet } : {}) });
-    return id;
-  }
-
   private append(entry: ChatEntry): void {
     this.update({ messages: [...this.view.messages, entry].slice(-MAX_ENTRIES) });
   }
 
   private membersChanged(members: Person[]): void {
-    const before = this.view.members;
     const { self } = this.view;
     const role = members.find((person) => person.userId === self?.userId)?.role;
     this.update({ members, self: self && role ? { ...self, role } : self });
-    if (this.view.connection !== 'live') return;
-
-    this.narrator.membersChanged(before, members, this.view.self?.userId);
   }
 
   private memberStatus(data: { userId: string; state: string; item?: string }): void {
@@ -668,8 +635,6 @@ export class RoomSession {
   }
 
   private notice(data: { kind?: string; text: string; url?: string }): void {
-    // These change the room, so the chat keeps the same words the toast shows.
-    if (data.kind === 'host' || data.kind === 'skipped') this.say(data.text);
     const id = this.nextId++;
     this.update({ notices: [...this.view.notices, { id, ...data }] });
     window.setTimeout(

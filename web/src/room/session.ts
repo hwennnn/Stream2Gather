@@ -34,7 +34,7 @@ export type CrewChange = 'settings' | 'members' | 'watchlist';
 
 type Reaction = { id: number; emoji: string; name: string };
 
-type Notice = { id: number; text: string; url?: string };
+type Notice = { id: number; kind?: string; text: string; url?: string };
 
 /** Someone replaced the current video, and the room can still go back. */
 type Jump = { id: string; by: string; title: string };

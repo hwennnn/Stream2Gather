@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatEntry, RoomView } from '../room/session';
-import { canControl, canQueue, chatScroll, countUnread, failureNote, pillFor, toastLift } from './rules';
+import { canControl, canQueue, chatScroll, countUnread, failureNote, noticesToShow, pillFor, toastLift } from './rules';
 
 const view = (patch: Partial<RoomView>): RoomView =>
   ({
@@ -134,5 +134,21 @@ describe('chatScroll', () => {
   it('says nothing when nothing is new', () => {
     expect(chatScroll(false, false, false)).toBe('stay');
     expect(chatScroll(false, false, true)).toBe('stay');
+  });
+});
+
+describe('noticesToShow', () => {
+  const skipped = { id: 'a', kind: 'skipped', text: 'Skipped it.' };
+  const host = { id: 'b', kind: 'host', text: 'Bea is the host now.' };
+  const other = { id: 'c', text: 'Something else.' };
+  const notices: { id: string; kind?: string; text: string }[] = [skipped, host, other];
+
+  it('leaves out what the open chat already says, or it covers the same words', () => {
+    expect(noticesToShow(notices, 'chat', false)).toEqual([other]);
+  });
+
+  it('shows everything when the chat is not on screen', () => {
+    expect(noticesToShow(notices, 'queue', false)).toEqual(notices);
+    expect(noticesToShow(notices, 'chat', true)).toEqual(notices);
   });
 });

@@ -3,10 +3,10 @@ import { Icon } from './Icon';
 import { firstName } from './people';
 import { Thumb } from './Thumb';
 
-type Props = { view: RoomView; url: string; onCopy: () => void; onClose?: () => void };
+type Props = { view: RoomView; url: string; copied: boolean; onCopy: () => void; onClose?: () => void };
 
 /** What the friend gets, so you can see it before you send it. Lives in the rail, off the player. */
-export const InviteSheet = ({ view, url, onCopy, onClose }: Props) => {
+export const InviteSheet = ({ view, url, copied, onCopy, onClose }: Props) => {
   const video = view.queue[0];
   return (
     <section aria-label="Invite" className={onClose ? 'enter rail-edge shrink-0 border-b border-line py-4' : 'enter'}>
@@ -25,7 +25,7 @@ export const InviteSheet = ({ view, url, onCopy, onClose }: Props) => {
       <div className="mt-3 flex items-center gap-3">
         <p className="fig min-w-0 flex-1 truncate text-muted">{url.replace(/^https?:\/\//, '')}</p>
         <button type="button" onClick={onCopy} className="btn btn-quiet btn-sm">
-          Copy link
+          {copied ? 'Copied' : 'Copy link'}
         </button>
       </div>
     </section>

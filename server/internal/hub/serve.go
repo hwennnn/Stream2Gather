@@ -34,13 +34,14 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	defer h.release(r)
 
 	c := &conn{
-		id:      ids.New(),
-		person:  ticket.Person,
-		out:     make(chan []byte, sendBuffer),
-		closed:  make(chan struct{}),
-		control: rate.NewLimiter(5, 10),
-		chat:    rate.NewLimiter(2, 5),
-		reports: rate.NewLimiter(rate.Every(5*time.Second), 3),
+		id:        ids.New(),
+		person:    ticket.Person,
+		out:       make(chan []byte, sendBuffer),
+		closed:    make(chan struct{}),
+		control:   rate.NewLimiter(5, 10),
+		chat:      rate.NewLimiter(2, 5),
+		reactions: rate.NewLimiter(2, 5),
+		reports:   rate.NewLimiter(rate.Every(5*time.Second), 3),
 	}
 	defer c.close()
 
@@ -316,7 +317,7 @@ func (r *liveRoom) react(c *conn, message Message) {
 	var request struct {
 		Emoji string `json:"emoji"`
 	}
-	if err := json.Unmarshal(message.Data, &request); err != nil || !reactions[request.Emoji] || !c.chat.Allow() {
+	if err := json.Unmarshal(message.Data, &request); err != nil || !reactions[request.Emoji] || !c.reactions.Allow() {
 		return
 	}
 	ctx, cancel := opContext()

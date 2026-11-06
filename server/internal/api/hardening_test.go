@@ -18,6 +18,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"stream2gather/internal/auth"
+	"stream2gather/internal/hub"
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
 	"stream2gather/internal/source"
@@ -304,6 +305,32 @@ func TestPreviewOfARoomRedisLostShowsWhereItWillResume(t *testing.T) {
 	}
 }
 
+func TestOnlyCreatedRoomsCountTowardsTheLimit(t *testing.T) {
+	s, _ := stackServer(t)
+	ip := "rooms-" + ids.New()
+	for range roomsPerHour - 1 {
+		if _, err := s.Live.Limit(context.Background(), "rooms:"+ip, roomsPerHour, time.Hour); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cookie := signedIn(t, s, auth.Claims{Subject: "g_" + ids.New(), Name: "Ada"})
+
+	for range 5 {
+		response, body := serve(s, http.MethodPost, "/v1/rooms", `{"url":"https://example.com/nope"}`, cookie, from(ip))
+		if response.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("rejected link: %d %v", response.Code, body)
+		}
+	}
+	if response, body := serve(s, http.MethodPost, "/v1/rooms", `{}`, cookie, from(ip)); response.Code != http.StatusCreated {
+		t.Fatalf("last room of the hour: %d %v", response.Code, body)
+	}
+	for range 3 {
+		if response, body := serve(s, http.MethodPost, "/v1/rooms", `{}`, cookie, from(ip)); response.Code != http.StatusTooManyRequests {
+			t.Fatalf("over the limit: %d %v", response.Code, body)
+		}
+	}
+}
+
 func TestTicketRefusesAnEleventhTab(t *testing.T) {
 	s, _ := stackServer(t)
 	ctx := context.Background()
@@ -312,7 +339,7 @@ func TestTicketRefusesAnEleventhTab(t *testing.T) {
 	person := store.Person{UserID: userID, Name: "Tabby", Role: room.RoleMember}
 	cookie := signedIn(t, s, auth.Claims{Subject: userID, Name: "Tabby"})
 
-	for i := range maxSocketsPerUser - 1 {
+	for i := range hub.MaxSocketsPerUser - 1 {
 		if err := s.Live.Touch(ctx, record.ID, fmt.Sprint(i), person); err != nil {
 			t.Fatal(err)
 		}

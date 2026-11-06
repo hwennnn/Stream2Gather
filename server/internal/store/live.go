@@ -367,6 +367,20 @@ func (l *Live) Limit(ctx context.Context, key string, limit int64, window time.D
 	return count.Val() <= limit, nil
 }
 
+// refundScript leaves an expired window alone: a count with no key behind it
+// would start the next window below zero.
+var refundScript = redis.NewScript(`
+if redis.call('EXISTS', KEYS[1]) == 1 then
+  redis.call('DECR', KEYS[1])
+end
+return 1
+`)
+
+// Refund hands back what Limit charged, for an attempt that came to nothing.
+func (l *Live) Refund(ctx context.Context, key string) error {
+	return refundScript.Run(ctx, l.rdb, []string{"limit:" + key}).Err()
+}
+
 // MarkEmpty records when the last viewer left.
 func (l *Live) MarkEmpty(ctx context.Context, roomID string, at int64) error {
 	return l.rdb.Set(ctx, "room:"+roomID+":empty", at, liveTTL).Err()

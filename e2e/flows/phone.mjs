@@ -112,12 +112,13 @@ flow('phone: chat works above the keyboard line, with reactions behind one butto
   await t.see('Ben gets it', ui.chatLog(b.page).getByText('from a phone'));
   await sendChat(b.page, 'to a phone');
   await t.see('Ana gets it', ui.chatLog(a.page).getByText('to a phone'));
+  await a.page.getByRole('button', { name: 'Send a reaction' }).filter({ visible: true }).tap();
   await a.page.getByRole('button', { name: 'React 👏' }).filter({ visible: true }).tap();
   await t.see('Ben sees it', ui.seats(b.page).getByText('👏'));
   await noSideScroll(t, a.page, 'the chat');
 });
 
-flow('phone: the room has its name, a labelled Leave, seats you can hit, and reactions on every tab', async (t) => {
+flow('phone: the room has its name, a labelled Leave, seats you can hit, and reactions in the message row', async (t) => {
   const a = await t.person('Ana', { viewport: { width: 390, height: 844 }, phone: true });
   const b = await t.person('Ben');
   const room = await startRoom(t, a, { url: golden.url, name: 'Ana' });
@@ -127,14 +128,45 @@ flow('phone: the room has its name, a labelled Leave, seats you can hit, and rea
   const seats = a.page.getByRole('list', { name: 'In the room' }).filter({ visible: true });
   const widths = await seats.locator('.seat-disc').evaluateAll((discs) => discs.map((disc) => disc.offsetWidth));
   t.check('every seat is at least 40px', widths.length > 0 && widths.every((width) => width >= 40), widths.join());
-  for (const tab of ['Queue', 'People', 'Chat']) {
-    await openTab(a.page, tab);
-    const row = a.page.getByRole('button', { name: /^React / }).filter({ visible: true });
-    t.eq(`all six reactions show on ${tab}`, await row.count(), 6);
-  }
+  const row = a.page.getByRole('button', { name: /^React / }).filter({ visible: true });
+  t.eq('no row of reactions takes up the room', await row.count(), 0);
+  await a.page.getByRole('button', { name: 'Send a reaction' }).filter({ visible: true }).tap();
+  t.eq('all six behind the button', await row.count(), 6);
   const rest = await a.page.getByRole('button', { name: 'React 🔥' }).filter({ visible: true }).evaluate((button) => getComputedStyle(button).filter);
   t.eq('in full colour at rest', rest, 'none');
   await noSideScroll(t, a.page, 'the room');
+});
+
+for (const [width, height] of [[390, 844], [390, 664], [320, 568]]) {
+  flow(`phone ${width}x${height}: the status has the line, and Skip waits in Queue`, async (t) => {
+    const a = await t.person('Ana', { viewport: { width, height }, phone: true });
+    const b = await t.person('Ben');
+    const room = await startRoom(t, a, { url: golden.url, name: 'Ana' });
+    await addByMessage(t, a.page, [train.url]);
+    await joinRoom(b, room.url);
+    const status = ui.bar(a.page).locator('[data-room-status] span').first();
+    await t.see('the sentence', ui.bar(a.page).getByText(/everyone together/));
+    t.check('whole, not cut off', await status.evaluate((el) => el.scrollWidth <= el.clientWidth));
+    t.eq('no Skip under the player', await ui.bar(a.page).getByRole('button', { name: 'Skip' }).count(), 0);
+    await openTab(a.page, 'Queue');
+    await ui.rail(a.page).getByRole('button', { name: 'Skip' }).tap();
+    await t.see('Skip still moves the room', ui.bar(b.page).getByRole('heading', { name: train.title }));
+    await noSideScroll(t, a.page, 'the room');
+  });
+}
+
+flow('phone: someone who can’t control the room sees who can, and no Skip anywhere', async (t) => {
+  const host = await t.person('Hana');
+  const guest = await phone(t, 'Gus');
+  const room = await startRoom(t, host, { url: golden.url, name: 'Hana' });
+  await addByMessage(t, host.page, [train.url]);
+  await joinRoom(guest, room.url);
+  await openTab(host.page, 'People');
+  await ui.hostSwitch(host.page).click();
+  await t.see('the chip', ui.bar(guest.page).getByText('Hana’s driving', { exact: true }));
+  await openTab(guest.page, 'Queue');
+  await t.see('the queue says so', ui.rail(guest.page).getByText('Only the host can change the queue.'));
+  t.eq('no Skip', await guest.page.getByRole('button', { name: 'Skip' }).count(), 0);
 });
 
 flow('phone: turning sideways keeps the room, the draft and the controls', async (t) => {

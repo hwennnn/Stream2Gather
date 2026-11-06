@@ -67,6 +67,8 @@ const WAITING = new Set(['buffering', 'correcting', 'stalled']);
 /** What to say about someone. Nobody is behind a room that isn't moving, so a pause leaves only not being able to play. */
 export const viewerState = (view: RoomView, userId: string): string | undefined => {
   const state = view.viewerStates[userId];
+  // There's nobody to be behind, either.
+  if (view.alone && WAITING.has(state ?? '')) return undefined;
   return view.playback.status === 'paused' && state !== 'unavailable' ? undefined : state;
 };
 
@@ -106,7 +108,8 @@ export const statusFor = ({ view, health, failed, act, position, started, slow, 
   if (refused) return { state: 'refused', parts: ['Press play on the video to join in'], tone: 'warn' };
   if (!started && slow) return { state: 'loading', parts: ['Loading…'], tone: 'plain' };
   if (started && health === 'stalled') return { state: 'ad', parts: ['You’re at an ad'], tail: '. You’ll catch up after it.', tone: 'plain' };
-  if (started && gap) return { state: 'behind', parts: ['You’re catching up'], tone: 'warn' };
+  // The player still corrects itself, but alone in a room there's nobody to have fallen behind.
+  if (started && gap && !view.alone) return { state: 'behind', parts: ['You’re catching up'], tone: 'warn' };
   const friend = laggingFriend(view);
   if (friend && friendGap) {
     const doing = view.viewerStates[friend.userId] === 'stalled' ? ' is at an ad' : ' is catching up';

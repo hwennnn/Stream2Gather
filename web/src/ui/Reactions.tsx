@@ -13,7 +13,7 @@ export const ReactionBar = ({ session, disabled, className }: { session: RoomSes
         aria-label={`React ${emoji}`}
         disabled={disabled}
         onClick={() => session.react(emoji)}
-        className="react flex size-9 cursor-pointer items-center justify-center rounded-md text-[20px] disabled:cursor-not-allowed phone:size-11"
+        className="react flex size-9 cursor-pointer items-center justify-center rounded-md text-[20px] disabled:cursor-not-allowed"
       >
         {emoji}
       </button>
@@ -21,7 +21,7 @@ export const ReactionBar = ({ session, disabled, className }: { session: RoomSes
   </div>
 );
 
-/** Where the bar is short of room but a phone's row won't fit either, reactions wait behind one button next to the chat box. */
+/** Wherever the row beside the seats won't fit, reactions wait behind one button next to the chat box. */
 export const ReactionPicker = ({ session, disabled }: { session: RoomSession; disabled: boolean }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -41,7 +41,7 @@ export const ReactionPicker = ({ session, disabled }: { session: RoomSession; di
   }, [open]);
 
   return (
-    <div ref={root} className="shrink-0 phone:hidden xl:hidden land:block short:block">
+    <div ref={root} className="shrink-0 xl:hidden land:block">
       {open && (
         <div className="enter float absolute inset-x-3 bottom-full z-30 mb-1 flex justify-between p-1">
           {EMOJI.map((emoji) => (

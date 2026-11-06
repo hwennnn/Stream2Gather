@@ -445,7 +445,6 @@ body {
   .stage-idle {
     width: min(100cqw, calc((100cqh - var(--bar)) * 16 / 9));
     aspect-ratio: 16 / 9;
-    background: var(--color-stage);
   }
 
   /* As wide as that screen, so the first seat lines up with the search box above it. */
@@ -486,16 +485,10 @@ body {
   }
 }
 
+/* Two lines of words, and nothing else: every pixel saved here is chat's. */
 @media (max-width: 639px) {
   :root {
-    --info: 60px;
-  }
-}
-
-/* The bar's 44px targets still fit, and the 8px goes to chat. */
-@media (max-width: 639px) and (max-height: 599px) {
-  :root {
-    --info: 52px;
+    --info: 48px;
   }
 }
 
@@ -767,8 +760,20 @@ body {
  * search docks to the screen's bottom edge, above them. The row starts where a playing room's does,
  * and takes its extra height from the strip below, so it sits under the screen and not on it.
  */
+/* No picture isn't a broken picture. The room's dark, and the screen is drawn like an empty seat: kept for what's coming. */
 .stage-dock {
-  justify-content: flex-end;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .stage-dock {
+    height: calc(100% - 1rem);
+    margin-top: 1rem;
+    margin-inline: 1rem;
+    width: calc(100% - 2rem);
+    border: 1px dashed var(--color-dim);
+    border-radius: 8px;
+  }
 }
 
 .stage-dock[data-searching='true'] {
@@ -777,12 +782,12 @@ body {
 
 .front-row[data-idle='true'] {
   position: relative;
-  align-items: flex-end;
-  height: calc(var(--seats) + 2.5rem);
+  height: calc(var(--seats) + 0.75rem);
+  padding-top: 0.75rem;
 }
 
 .front-row[data-idle='true'] .seat {
-  width: 6rem;
+  width: 5rem;
   font-size: 0.8125rem;
 }
 
@@ -791,13 +796,13 @@ body {
 .front-row[data-idle='true'] .seat-empty,
 .front-row[data-idle='true'] .seat-more {
   width: 100%;
-  max-width: 4.5rem;
+  max-width: 3.25rem;
   height: auto;
   aspect-ratio: 1;
 }
 
 .front-row[data-idle='true'] .seat-disc > span {
-  font-size: 1.375rem;
+  font-size: 1rem;
 }
 
 /* Where everyone's playhead is, on a hairline, beside the room's clock. */

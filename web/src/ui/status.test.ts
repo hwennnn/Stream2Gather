@@ -21,6 +21,22 @@ const line = (patch: Partial<Parameters<typeof statusFor>[0]>) => {
 
 const paused = (pausedBy?: string, pausedById?: string) => ({ status: 'paused', pausedBy, pausedById }) as RoomView['playback'];
 
+describe('alone in a room', () => {
+  const alone = view({ alone: true, members: [me], viewerStates: { me: 'correcting' } });
+
+  it('doesn’t call you behind, because there’s nobody to be behind', () => {
+    expect(status({ view: alone, health: 'correcting', gap: true })).toMatchObject({ state: 'playing', tone: 'plain' });
+  });
+
+  it('doesn’t mark your own seat either', () => {
+    expect(viewerState(alone, 'me')).toBeUndefined();
+  });
+
+  it('still says when you can’t play at all', () => {
+    expect(viewerState(view({ alone: true, members: [me], viewerStates: { me: 'unavailable' } }), 'me')).toBe('unavailable');
+  });
+});
+
 describe('viewerState', () => {
   it('passes on what someone reports while the room plays', () => {
     expect(viewerState(view({ viewerStates: { m: 'correcting' } }), 'm')).toBe('correcting');

@@ -19,6 +19,7 @@ import (
 const (
 	// A person lining up a whole evening is well inside this.
 	watchlistAddsPerHour = 120
+	sessionsPerPage      = 20
 	// mediaFreshFor is the 30-day limit on keeping a source's data.
 	mediaFreshFor = 30 * 24 * time.Hour
 )
@@ -32,6 +33,7 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews/{slug}/join", s.joinCrew)
 	mux.HandleFunc("POST /v1/crews/{slug}/invite", s.rotateInvite)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/members/{userId}", s.removeMember)
+	mux.HandleFunc("GET /v1/crews/{slug}/sessions", s.crewSessions)
 	mux.HandleFunc("GET /v1/crews/{slug}/watchlist", s.watchlist)
 	mux.HandleFunc("POST /v1/crews/{slug}/watchlist", s.addWatch)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/watchlist/{id}", s.removeWatch)
@@ -401,6 +403,33 @@ func (s *Server) watchlist(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+// crewSessions pages back through the crew's watch parties, newest first.
+func (s *Server) crewSessions(w http.ResponseWriter, r *http.Request) {
+	_, crew, ok := s.memberCrew(w, r)
+	if !ok {
+		return
+	}
+	before := time.Now()
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		parsed, err := time.Parse(time.RFC3339Nano, raw)
+		if err != nil {
+			writeProblem(w, http.StatusBadRequest, "bad_request", "That page marker isn't valid.")
+			return
+		}
+		before = parsed
+	}
+	items, err := s.DB.CrewSessions(r.Context(), crew.ID, before, sessionsPerPage)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	reply := map[string]any{"items": items}
+	if len(items) == sessionsPerPage {
+		reply["next"] = items[len(items)-1].StartedAt.Format(time.RFC3339Nano)
+	}
+	writeJSON(w, http.StatusOK, reply)
 }
 
 // addWatch goes through the catalog like queue.add, so clients only ever name a

@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"stream2gather/internal/ids"
+	"stream2gather/internal/room"
 )
 
 // CapturedMoment is a reaction or chat line, placed in the video it happened in.
@@ -333,6 +334,101 @@ func (p *Postgres) OpenSessionStart(ctx context.Context, roomID string) (time.Ti
 		return time.Time{}, false, nil
 	}
 	return at, err == nil, err
+}
+
+// SessionPerson is someone at a watch party.
+type SessionPerson struct {
+	Name    string `json:"name"`
+	IsGuest bool   `json:"isGuest"`
+}
+
+// SessionVideo is one thing a session watched. Media is joined fresh and is nil
+// once the source's data has gone or aged out.
+type SessionVideo struct {
+	Source   string      `json:"source"`
+	SourceID string      `json:"sourceId,omitempty"`
+	Media    *room.Media `json:"media"`
+}
+
+// PastSession is one finished watch party.
+type PastSession struct {
+	ID        string          `json:"id"`
+	StartedAt time.Time       `json:"startedAt"`
+	EndedAt   time.Time       `json:"endedAt"`
+	People    []SessionPerson `json:"people"`
+	Videos    []SessionVideo  `json:"videos"`
+}
+
+// CrewSessions returns finished sessions started before a moment, newest first.
+func (p *Postgres) CrewSessions(ctx context.Context, crewID string, before time.Time, limit int) ([]PastSession, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, started_at, ended_at FROM crew_sessions
+		WHERE crew_id = $1 AND ended_at IS NOT NULL AND started_at < $2
+		ORDER BY started_at DESC LIMIT $3`, crewID, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	sessions, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (PastSession, error) {
+		s := PastSession{People: []SessionPerson{}, Videos: []SessionVideo{}}
+		return s, row.Scan(&s.ID, &s.StartedAt, &s.EndedAt)
+	})
+	if err != nil || len(sessions) == 0 {
+		return sessions, err
+	}
+	byID := make(map[string]*PastSession, len(sessions))
+	sessionIDs := make([]string, len(sessions))
+	for i := range sessions {
+		byID[sessions[i].ID] = &sessions[i]
+		sessionIDs[i] = sessions[i].ID
+	}
+	if err := p.sessionPeople(ctx, sessionIDs, byID); err != nil {
+		return nil, err
+	}
+	return sessions, p.sessionVideos(ctx, sessionIDs, byID)
+}
+
+func (p *Postgres) sessionPeople(ctx context.Context, sessionIDs []string, byID map[string]*PastSession) error {
+	rows, err := p.pool.Query(ctx, `
+		SELECT session_id, display_name, is_guest FROM session_people
+		WHERE session_id = ANY($1) ORDER BY joined_at, user_id`, sessionIDs)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sessionID string
+		var person SessionPerson
+		if err := rows.Scan(&sessionID, &person.Name, &person.IsGuest); err != nil {
+			return err
+		}
+		byID[sessionID].People = append(byID[sessionID].People, person)
+	}
+	return rows.Err()
+}
+
+func (p *Postgres) sessionVideos(ctx context.Context, sessionIDs []string, byID map[string]*PastSession) error {
+	rows, err := p.pool.Query(ctx, `
+		SELECT i.session_id, i.source, coalesce(i.source_id, ''),
+		       m.url, m.title, m.author, m.thumbnail_url, m.duration_ms, m.is_live
+		FROM session_items i
+		LEFT JOIN media m ON m.source = i.source AND m.source_id = i.source_id
+		                 AND m.fetched_at > now() - interval '30 days'
+		WHERE i.session_id = ANY($1) ORDER BY i.id`, sessionIDs)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var sessionID string
+		var video SessionVideo
+		var fresh freshMedia
+		if err := rows.Scan(&sessionID, &video.Source, &video.SourceID, &fresh.url, &fresh.title, &fresh.author, &fresh.thumbnail, &fresh.duration, &fresh.live); err != nil {
+			return err
+		}
+		video.Media = fresh.media(video.Source, video.SourceID)
+		byID[sessionID].Videos = append(byID[sessionID].Videos, video)
+	}
+	return rows.Err()
 }
 
 // SecondSessions counts crews whose first session is at least 14 days old, and

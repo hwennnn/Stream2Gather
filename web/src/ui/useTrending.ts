@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type Media } from '../api/http';
+import { viewerRegion } from './region';
 
 const STORE_KEY = 's2g:trending';
 const STORE_LIFE_MS = 30 * 60_000;
@@ -16,7 +17,7 @@ const remembered = (): Media[] | null => {
 let loading: Promise<Media[]> | null = null;
 
 const load = (): Promise<Media[]> => {
-  loading ??= api.trending().then(
+  loading ??= api.trending(viewerRegion(navigator.language)).then(
     ({ items }) => {
       try {
         sessionStorage.setItem(STORE_KEY, JSON.stringify({ at: Date.now(), items }));

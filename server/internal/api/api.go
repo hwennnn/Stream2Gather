@@ -868,7 +868,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 		s.mediaFailed(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": source.ForViewer(items, r.URL.Query().Get("viewer"))})
 }
 
 func (s *Server) trending(w http.ResponseWriter, r *http.Request) {
@@ -877,7 +877,7 @@ func (s *Server) trending(w http.ResponseWriter, r *http.Request) {
 		s.mediaFailed(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+	writeJSON(w, http.StatusOK, map[string]any{"items": source.ForViewer(items, r.URL.Query().Get("viewer"))})
 }
 
 func (s *Server) telemetry(w http.ResponseWriter, r *http.Request) {

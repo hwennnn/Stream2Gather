@@ -68,6 +68,19 @@ type Media struct {
 	IsLive       bool   `json:"isLive"`
 	// Refused marks a search result that viewers' players have recently refused.
 	Refused bool `json:"refused,omitempty"`
+	// RegionBlocked marks a search result the viewer's region probably can't watch.
+	RegionBlocked bool `json:"regionBlocked,omitempty"`
+	// Where the owner limits the video, as space-separated region codes. They can
+	// be long, so they stay out of room state, and strings keep Media comparable.
+	AllowedRegions string `json:"-"`
+	BlockedRegions string `json:"-"`
+}
+
+// Queued is this media as a queue keeps it, without what only a search needs.
+func (m Media) Queued() Media {
+	m.Refused, m.RegionBlocked = false, false
+	m.AllowedRegions, m.BlockedRegions = "", ""
+	return m
 }
 
 // Item is one entry in a room's queue.

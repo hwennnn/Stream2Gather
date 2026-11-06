@@ -81,7 +81,11 @@ type youtubeVideo struct {
 		} `json:"thumbnails"`
 	} `json:"snippet"`
 	ContentDetails struct {
-		Duration string `json:"duration"`
+		Duration          string `json:"duration"`
+		RegionRestriction struct {
+			Allowed []string `json:"allowed"`
+			Blocked []string `json:"blocked"`
+		} `json:"regionRestriction"`
 	} `json:"contentDetails"`
 	Status struct {
 		Embeddable    bool   `json:"embeddable"`
@@ -106,6 +110,9 @@ func (v youtubeVideo) media() room.Media {
 		ThumbnailURL: thumbnail,
 		DurationMS:   parseDuration(v.ContentDetails.Duration),
 		IsLive:       v.live(),
+
+		AllowedRegions: strings.Join(v.ContentDetails.RegionRestriction.Allowed, " "),
+		BlockedRegions: strings.Join(v.ContentDetails.RegionRestriction.Blocked, " "),
 	}
 }
 

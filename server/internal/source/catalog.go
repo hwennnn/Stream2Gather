@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -41,6 +42,8 @@ func LookupCharge(limit func(context.Context, string, int64, time.Duration) (boo
 		return nil
 	}
 }
+
+var viewerRegion = regexp.MustCompile(`^[A-Z]{2}$`)
 
 // Catalog resolves links and searches through caches and the quota budget.
 type Catalog struct {
@@ -231,16 +234,36 @@ func (c *Catalog) remember(ctx context.Context, sourceName, query, region string
 			kept = append(kept, item)
 		}
 	}
-	slices.SortStableFunc(kept, func(a, b room.Media) int {
+	sinkTroubled(kept)
+	return kept, nil
+}
+
+func sinkTroubled(items []room.Media) {
+	rank := func(m room.Media) int {
 		switch {
-		case a.Refused == b.Refused:
-			return 0
-		case a.Refused:
+		case m.Refused:
+			return 2
+		case m.RegionBlocked:
 			return 1
 		}
-		return -1
-	})
-	return kept, nil
+		return 0
+	}
+	slices.SortStableFunc(items, func(a, b room.Media) int { return rank(a) - rank(b) })
+}
+
+// ForViewer marks and sinks what the owner keeps from the viewer's region, which
+// is a two-letter code or unknown. Results are cached for everyone, so this runs
+// per request and never costs a search.
+func ForViewer(items []room.Media, region string) []room.Media {
+	if !viewerRegion.MatchString(region) {
+		return items
+	}
+	for i := range items {
+		allowed, blocked := strings.Fields(items[i].AllowedRegions), strings.Fields(items[i].BlockedRegions)
+		items[i].RegionBlocked = slices.Contains(blocked, region) || (len(allowed) > 0 && !slices.Contains(allowed, region))
+	}
+	sinkTroubled(items)
+	return items
 }
 
 // RefreshStale renews metadata nearing YouTube's 30-day limit, and deletes what

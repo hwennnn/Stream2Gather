@@ -9,6 +9,8 @@ export type Media = {
   isLive: boolean;
   /** Viewers' players have recently refused it. Only search results say so. */
   refused?: boolean;
+  /** The owner keeps it from the viewer's region. Only search results say so. */
+  regionBlocked?: boolean;
 };
 
 export type VoiceState = 'listening' | 'muted' | 'live';
@@ -101,9 +103,9 @@ export const api = {
   ticket: (slug: string) => post<{ ticket: string }>(`/v1/rooms/${encodeURIComponent(slug)}/ticket`),
   messages: (slug: string) =>
     request<{ items: ChatMessage[] }>(`/v1/rooms/${encodeURIComponent(slug)}/messages`),
-  search: (query: string) =>
-    request<{ items: Media[] }>(`/v1/media/search?q=${encodeURIComponent(query)}`),
-  trending: () => request<{ items: Media[] }>('/v1/media/trending'),
+  search: (query: string, viewer: string) =>
+    request<{ items: Media[] }>(`/v1/media/search?q=${encodeURIComponent(query)}&viewer=${viewer}`),
+  trending: (viewer = '') => request<{ items: Media[] }>(`/v1/media/trending?viewer=${viewer}`),
   rename: (name: string) => request<Session>('/v1/me', { method: 'PATCH', body: JSON.stringify({ name }) }),
   config: () => request<SiteConfig>('/v1/config'),
   me: () => request<Session>('/v1/me'),

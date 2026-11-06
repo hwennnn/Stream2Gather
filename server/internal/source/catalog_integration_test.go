@@ -214,3 +214,24 @@ func TestRefusedVideosSinkInFreshAndCachedSearch(t *testing.T) {
 	}
 	check("cached", cached)
 }
+
+func TestRegionLimitsSurviveTheCache(t *testing.T) {
+	db := catalogDB(t)
+	ctx := context.Background()
+	id := ids.New()
+	media := room.Media{Source: "fake", SourceID: id, BlockedRegions: "RU", AllowedRegions: "KR"}
+	if err := db.PutMedia(ctx, []room.Media{media}); err != nil {
+		t.Fatal(err)
+	}
+	query := "q" + ids.New()
+	if err := db.PutSearch(ctx, "fake", query, "", []string{id}); err != nil {
+		t.Fatal(err)
+	}
+	items, found, err := db.CachedSearch(ctx, "fake", query, "", time.Hour)
+	if err != nil || !found || len(items) != 1 {
+		t.Fatal(items, found, err)
+	}
+	if items[0].BlockedRegions == "" || items[0].AllowedRegions == "" {
+		t.Fatalf("limits lost: %+v", items[0])
+	}
+}

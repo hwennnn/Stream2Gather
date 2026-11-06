@@ -270,13 +270,16 @@ func (p *Postgres) PutMedia(ctx context.Context, items []room.Media) error {
 	batch := &pgx.Batch{}
 	for _, m := range items {
 		batch.Queue(`
-			INSERT INTO media (source, source_id, url, title, author, thumbnail_url, duration_ms, is_live)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			INSERT INTO media (source, source_id, url, title, author, thumbnail_url, duration_ms, is_live,
+			                   allowed_regions, blocked_regions)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			ON CONFLICT (source, source_id) DO UPDATE SET
 			  url = EXCLUDED.url, title = EXCLUDED.title, author = EXCLUDED.author,
 			  thumbnail_url = EXCLUDED.thumbnail_url, duration_ms = EXCLUDED.duration_ms,
-			  is_live = EXCLUDED.is_live, fetched_at = now()`,
-			m.Source, m.SourceID, m.URL, m.Title, m.Author, m.ThumbnailURL, m.DurationMS, m.IsLive)
+			  is_live = EXCLUDED.is_live, allowed_regions = EXCLUDED.allowed_regions,
+			  blocked_regions = EXCLUDED.blocked_regions, fetched_at = now()`,
+			m.Source, m.SourceID, m.URL, m.Title, m.Author, m.ThumbnailURL, m.DurationMS, m.IsLive,
+			m.AllowedRegions, m.BlockedRegions)
 	}
 	return p.pool.SendBatch(ctx, batch).Close()
 }
@@ -333,7 +336,8 @@ func (p *Postgres) CachedSearch(ctx context.Context, source, query, region strin
 
 	rows, err := p.pool.Query(ctx, `
 		SELECT source, m.source_id, url, title, author, thumbnail_url, duration_ms, is_live,
-		       COALESCE(m.embed_blocked_at > now() - make_interval(days => $3), false) AS refused
+		       COALESCE(m.embed_blocked_at > now() - make_interval(days => $3), false) AS refused,
+		       allowed_regions, blocked_regions
 		FROM unnest($2::text[]) WITH ORDINALITY AS wanted (source_id, position)
 		JOIN media m ON m.source = $1 AND m.source_id = wanted.source_id
 		WHERE NOT m.is_live
@@ -343,7 +347,8 @@ func (p *Postgres) CachedSearch(ctx context.Context, source, query, region strin
 	}
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (room.Media, error) {
 		var m room.Media
-		return m, row.Scan(&m.Source, &m.SourceID, &m.URL, &m.Title, &m.Author, &m.ThumbnailURL, &m.DurationMS, &m.IsLive, &m.Refused)
+		return m, row.Scan(&m.Source, &m.SourceID, &m.URL, &m.Title, &m.Author, &m.ThumbnailURL, &m.DurationMS, &m.IsLive, &m.Refused,
+			&m.AllowedRegions, &m.BlockedRegions)
 	})
 	return items, err == nil, err
 }

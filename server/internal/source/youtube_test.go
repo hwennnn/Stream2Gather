@@ -6,8 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
+
+	"stream2gather/internal/room"
 )
 
 func TestYouTubeMatch(t *testing.T) {
@@ -157,6 +160,54 @@ func TestDirectLinksNeedHTTPSOutsideDev(t *testing.T) {
 		}
 		if _, ok := test.direct.Match(link); ok != test.want {
 			t.Errorf("%+v %s = %v", test.direct, test.link, ok)
+		}
+	}
+}
+
+func TestRegionRestrictionIsRead(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"items":[{"id":"abc","status":{"embeddable":true,"privacyStatus":"public"},
+			"contentDetails":{"duration":"PT1M","regionRestriction":{"blocked":["RU","BY"]}}},
+			{"id":"def","status":{"embeddable":true,"privacyStatus":"public"},
+			"contentDetails":{"duration":"PT1M","regionRestriction":{"allowed":["KR"]}}}]}`))
+	}))
+	defer server.Close()
+
+	items, err := NewYouTube("key", server.URL).ResolveMany(context.Background(), []string{"abc", "def"})
+	if err != nil || len(items) != 2 {
+		t.Fatal(items, err)
+	}
+	if items[0].BlockedRegions != "RU BY" || items[1].AllowedRegions != "KR" {
+		t.Fatalf("items = %+v", items)
+	}
+}
+
+func TestForViewerSinksWhatTheirRegionCannotWatch(t *testing.T) {
+	blocked := room.Media{SourceID: "blocked", BlockedRegions: "SG"}
+	notAllowed := room.Media{SourceID: "not-allowed", AllowedRegions: "KR"}
+	allowed := room.Media{SourceID: "allowed", AllowedRegions: "SG"}
+	free := room.Media{SourceID: "free"}
+	refused := room.Media{SourceID: "refused", Refused: true}
+
+	items := ForViewer([]room.Media{blocked, notAllowed, allowed, free, refused}, "SG")
+	got := make([]string, len(items))
+	for i, item := range items {
+		got[i] = item.SourceID
+	}
+	if !slices.Equal(got, []string{"allowed", "free", "blocked", "not-allowed", "refused"}) {
+		t.Fatalf("order = %v", got)
+	}
+	if !items[2].RegionBlocked || !items[3].RegionBlocked || items[0].RegionBlocked || items[1].RegionBlocked {
+		t.Fatalf("marks = %+v", items)
+	}
+}
+
+// An unknown or malformed region must not claim anything about anyone.
+func TestForViewerWithoutARegionMarksNothing(t *testing.T) {
+	for _, region := range []string{"", "sg", "SGP", "S1"} {
+		items := ForViewer([]room.Media{{SourceID: "a", AllowedRegions: "KR"}}, region)
+		if items[0].RegionBlocked {
+			t.Errorf("%q marked it", region)
 		}
 	}
 }

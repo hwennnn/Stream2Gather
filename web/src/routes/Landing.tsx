@@ -1,12 +1,13 @@
 import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { looksLikeUrl, normalizeUrl } from '../ui/format';
 import { Slot } from '../ui/Slot';
 import { useTrending } from '../ui/useTrending';
 import { Wordmark } from '../ui/Wordmark';
-import { BAD_LINK, EMPTY, failureFor, type Failure } from './landing/notes';
+import { badLink, emptyNote, failureFor, linkKinds, type Failure } from './landing/notes';
 import { useRecentRoom } from './landing/recent';
-import { Footer, Popular, RecentRoomRow, RoomPicture } from './landing/Sections';
+import { Footer, inThere, Popular, ReturnRow, RoomPicture } from './landing/Sections';
 import { loadRoomPage, startRoom } from './router';
 
 const CrewRail = lazy(() => import('../crew/CrewRail'));
@@ -19,6 +20,8 @@ export const Landing = () => {
   const input = useRef<HTMLInputElement>(null);
   const trending = useTrending();
   const recent = useRecentRoom();
+  const { config } = useAccount();
+  const kinds = linkKinds(config?.sources);
 
   useEffect(() => {
     if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) input.current?.focus();
@@ -34,7 +37,7 @@ export const Landing = () => {
     try {
       await startRoom(url);
     } catch (failure) {
-      setError(failureFor(failure));
+      setError(failureFor(failure, kinds));
       setBusy(null);
       // The note sits by the field, and on a phone a trending pick can fail from below it.
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -52,7 +55,7 @@ export const Landing = () => {
     }
     if (!looksLikeUrl(text)) {
       setPrompt(false);
-      setError({ text: BAD_LINK, canStartRoom: true });
+      setError({ text: badLink(kinds), canStartRoom: true });
       return;
     }
     void start('link', normalizeUrl(text));
@@ -72,19 +75,28 @@ export const Landing = () => {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1160px] flex-1 px-6 pt-14 pb-12 phone:px-4 phone:pt-6 land:pt-6">
+      <main className="mx-auto flex w-full max-w-[1160px] flex-1 flex-col px-6 pt-10 pb-12 phone:px-4 phone:pt-6 land:pt-6">
+        {recent && (
+          <section aria-label="Your last room" className="mb-10 border-y border-line phone:mb-8">
+            <ReturnRow href={`/r/${recent.slug}`} title={`Back to ${recent.name}`} note={inThere(recent.members)} people={recent.members} />
+          </section>
+        )}
+        <Slot>
+          <CrewRail except={recent?.slug} />
+        </Slot>
+
         <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <section aria-labelledby="landing-title">
-            <h1 id="landing-title" className="text-[44px] leading-[48px] font-semibold tracking-[-0.025em] text-balance phone:text-[32px] phone:leading-9">
-              A room for watching YouTube with friends.
+            <h1 id="landing-title" className="text-4xl leading-10 font-semibold tracking-[-0.02em] text-balance phone:text-[30px] phone:leading-9">
+              Save your friends a seat.
             </h1>
-            <p className="mt-4 text-[15px] lg:max-w-md leading-6 text-muted">
-              Paste a link and send the room to your friends. Everyone follows one player, so a pause, skip or seek happens for the whole room.
+            <p className="mt-3 text-[15px] leading-6 text-muted lg:max-w-md">
+              Paste a {kinds} link and send the room round. When one of you pauses, everyone waits. No account, nothing to install.
             </p>
 
             <form onSubmit={submit} className="mt-7 flex gap-2 lg:max-w-md phone:flex-col" noValidate>
               <label htmlFor="link" className="sr-only">
-                YouTube link
+                Paste a video link
               </label>
               <input
                 ref={input}
@@ -95,7 +107,7 @@ export const Landing = () => {
                   setError(null);
                   setPrompt(false);
                 }}
-                placeholder="youtube.com/watch?v=…"
+                placeholder={`Paste a ${kinds} link`}
                 autoComplete="off"
                 spellCheck={false}
                 enterKeyHint="go"
@@ -116,7 +128,7 @@ export const Landing = () => {
               )}
               {prompt && (
                 <p role="status" className="mb-2">
-                  {EMPTY}
+                  {emptyNote(kinds)}
                 </p>
               )}
               <button type="button" hidden={!canStartRoom} disabled={working} onClick={() => void start('empty')} className="btn btn-quiet phone:w-full">
@@ -124,15 +136,11 @@ export const Landing = () => {
               </button>
             </div>
 
-            {recent && <RecentRoomRow room={recent} />}
           </section>
 
           <RoomPicture media={trending?.[0] ?? null} />
         </div>
 
-        <Slot>
-          <CrewRail />
-        </Slot>
         <Popular items={trending} busy={busy} disabled={working} onPick={(media) => void start(media.sourceId, media.url)} />
       </main>
 

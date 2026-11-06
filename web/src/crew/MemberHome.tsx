@@ -7,11 +7,13 @@ import { firstName, seatHues } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
+import { Watchlist } from './Watchlist';
 
 type Props = {
   slug: string;
   home: CrewDocument;
   problem: string | null;
+  refresh: () => void;
   onJoin: (name: string, changed: boolean) => Promise<void>;
 };
 
@@ -63,7 +65,7 @@ const Frame = ({ children }: { children: ReactNode }) => (
 );
 
 /** The crew's page: who's here, what's on, and the one button that goes in. */
-export const MemberHome = ({ slug, home, problem, onJoin }: Props) => {
+export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
   const { user } = useAccount();
   const [joining, setJoining] = useState(false);
   const here = home.members.length;
@@ -113,6 +115,8 @@ export const MemberHome = ({ slug, home, problem, onJoin }: Props) => {
       </section>
 
       <Invite slug={slug} home={home} />
+
+      <Watchlist slug={slug} items={home.watchlist} onChange={refresh} />
 
       <section aria-label="Members" className="mt-8">
         <h2 className="text-sm font-semibold">Members</h2>

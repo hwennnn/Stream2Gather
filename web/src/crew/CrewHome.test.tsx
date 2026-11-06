@@ -115,4 +115,14 @@ describe('CrewHome', () => {
     expect(screen.queryByRole('button', { name: 'Continue as guest' })).toBeNull();
     expect(screen.getByText('This room is for its crew. Ask them for an invite.')).toBeTruthy();
   });
+
+  it('says a video is unavailable when its details are gone, and never guesses a title', async () => {
+    signIntoAccount();
+    const watchlist = [{ id: 7, source: 'youtube', sourceId: 'abc', addedAt: '2026-11-06T00:00:00Z', media: null }];
+    vi.spyOn(crewApi, 'home').mockResolvedValue({ ...document([hana]), watchlist });
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    expect(await screen.findByText('Video unavailable')).toBeTruthy();
+    expect(screen.queryByText('abc')).toBeNull();
+    expect(screen.queryByText('Add something for next time.')).toBeNull();
+  });
 });

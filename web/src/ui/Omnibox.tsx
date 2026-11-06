@@ -146,7 +146,12 @@ export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
   );
 };
 
-type ResultsProps = { search: Search; adder: Adder };
+type ResultsProps = {
+  search: Search;
+  adder: Adder;
+  /** Replaces the ways to play, where results go somewhere other than the queue. */
+  action?: string;
+};
 
 /** Extra is a labelled group of its own beside the results, which YouTube's rules keep unmixed. */
 export const SearchResults = ({ extra, ...props }: ResultsProps & { extra?: ReactNode }) => (
@@ -156,7 +161,7 @@ export const SearchResults = ({ extra, ...props }: ResultsProps & { extra?: Reac
   </>
 );
 
-const Results = ({ search, adder }: ResultsProps) => {
+const Results = ({ search, adder, action }: ResultsProps) => {
   if (search.query === null) return null;
   return (
     <section aria-label="Search results" className="enter">
@@ -169,7 +174,7 @@ const Results = ({ search, adder }: ResultsProps) => {
       {search.results && search.results.length > 0 && (
         <ul>
           {search.results.map((media) => (
-            <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={(mode) => void adder.addMedia(media, mode)} />
+            <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} action={action} onAdd={(mode) => void adder.addMedia(media, mode)} />
           ))}
         </ul>
       )}
@@ -207,10 +212,11 @@ const ACTIONS: { mode: QueueMode; label: string; icon: IconName }[] = [
   { mode: 'end', label: 'Queue', icon: 'plus' },
 ];
 
-type RowProps = { media: Media; status: AddStatus; onAdd: (mode: QueueMode) => void };
+type RowProps = { media: Media; status: AddStatus; action?: string; onAdd: (mode: QueueMode) => void };
 
 /** One video you could add. Hover shows the actions; touch taps to queue, ⋯ for the rest. */
-export const MediaRow = ({ media, status, onAdd }: RowProps) => {
+export const MediaRow = ({ media, status, action, onAdd }: RowProps) => {
+  const actions = action ? ACTIONS.filter(({ mode }) => mode === 'end').map((one) => ({ ...one, label: action })) : ACTIONS;
   const [tray, setTray] = useState(false);
   const label = STATUS_TEXT.get(status);
   const duration = media.durationMs > 0 && <span className="fig shrink-0 text-dim">{formatTime(media.durationMs / 1000)}</span>;
@@ -218,13 +224,13 @@ export const MediaRow = ({ media, status, onAdd }: RowProps) => {
   return (
     <li className="row relative py-2">
       {!label && (
-        <button type="button" aria-label={`Queue ${media.title}`} onClick={() => onAdd('end')} className="row-tap absolute inset-0" />
+        <button type="button" aria-label={`${action ?? 'Queue'} ${media.title}`} onClick={() => onAdd('end')} className="row-tap absolute inset-0" />
       )}
       <div className="flex items-center gap-3">
         <Thumb src={media.thumbnailUrl} className="w-20 rounded-md" />
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-[13px] leading-[18px] font-medium">{media.title}</p>
-          <div style={actionRoom(ACTIONS.length)} className="relative min-h-[26px]">
+          <div style={actionRoom(actions.length)} className="relative min-h-[26px]">
             {label ? (
               <p className="flex justify-between gap-2 text-xs leading-[26px] text-muted">
                 <span className="flex min-w-0 gap-2">
@@ -241,7 +247,7 @@ export const MediaRow = ({ media, status, onAdd }: RowProps) => {
             )}
             {!label && (
               <div className="row-actions">
-                {ACTIONS.map(({ mode, label: text, icon }) => (
+                {actions.map(({ mode, label: text, icon }) => (
                   <button
                     key={mode}
                     type="button"
@@ -257,7 +263,7 @@ export const MediaRow = ({ media, status, onAdd }: RowProps) => {
             )}
           </div>
         </div>
-        {!label && (
+        {!label && !action && (
           <button
             type="button"
             aria-label={`More for ${media.title}`}

@@ -76,6 +76,8 @@ body {
   margin: 0;
   background: var(--color-ink);
   color: var(--color-text);
+  /* Korean breaks between words, as Latin does. A word too long for its line still breaks, by overflow-wrap. */
+  word-break: keep-all;
   font-family: var(--font-sans);
   font-size: 0.875rem;
   line-height: 1.25rem;

@@ -250,7 +250,7 @@ const Message = memo(({ session, canAdd, offline, message, name, onToast }: Mess
     <div title={formatClock(message.createdAt)}>
       <p data-delivery={message.delivery} className={`leading-5 transition-opacity [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}>
         {name && (
-          <span style={{ color: hueOf(message.userId) }} className="mr-1.5 font-semibold">
+          <span style={{ color: hueOf(message.userId) }} className="mr-1.5 inline-block max-w-[90%] truncate align-bottom font-semibold">
             {name}
           </span>
         )}

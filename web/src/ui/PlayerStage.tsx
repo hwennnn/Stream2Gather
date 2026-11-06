@@ -9,7 +9,7 @@ import { ReactionBar, ReactionTicker } from './Reactions';
 import { HostChip } from './RoomHeader';
 import { RoomStatus } from './RoomStatus';
 import { canControl, canQueue, failureNote, isLocked, isOffline, pillFor } from './rules';
-import { Seats, useSeats } from './Seats';
+import { Seats } from './Seats';
 import type { Row } from './seatRow';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
@@ -33,15 +33,15 @@ type StageProps = {
   onTheatre: () => void;
   onFullscreen: () => void;
   onPickAnother: () => void;
-  onPeople?: () => void;
-  onInvite?: () => void;
+  onPeople: () => void;
+  onInvite: () => void;
   onShowQueue: () => void;
-  row?: Row;
-  act?: Act | null;
+  row: Row;
+  act: Act | null;
   /** Whoever has their hand on the player right now. */
-  actor?: string | null;
-  queueOpen?: boolean;
-  offlineNote?: ReactNode;
+  actor: string | null;
+  queueOpen: boolean;
+  offlineNote: ReactNode;
   onToast: (text: string) => void;
   /** Theatre mode has hidden the rail, so what lives there has to show here. */
   railHidden: boolean;
@@ -49,11 +49,8 @@ type StageProps = {
   toastSlot: ReactNode;
 };
 
-const noop = () => {};
-
 export const PlayerStage = (props: StageProps) => {
-  const seats = useSeats(props.view);
-  const { session, view, player, finished, changing, row = seats, actor = null, queueOpen = false, railHidden, onInvite = noop, onPeople = noop, onPickAnother, onShowQueue, onToast } = props;
+  const { session, view, player, finished, changing, row, actor, queueOpen, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
   const current = view.queue[0];
 
   return (
@@ -255,7 +252,7 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
           <h2 title={item.title} className="truncate text-lg leading-6 font-semibold tracking-[-0.01em] phone:text-[15px] phone:leading-5">
             {item.title}
           </h2>
-          {offlineNote ?? <RoomStatus view={view} player={player} act={act ?? null} />}
+          {offlineNote ?? <RoomStatus view={view} player={player} act={act} />}
         </div>
 
         {railHidden && <ReactionTicker reactions={view.reactions} />}

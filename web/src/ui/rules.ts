@@ -39,14 +39,15 @@ export const failureNote = (view: RoomView): string => {
   return view.alone ? '' : 'Others are still watching.';
 };
 
-export type Pill = { text: string; tone: 'good' | 'calm' | 'warn' | 'bad' };
+export type Pill = { text: string; tone: 'good' | 'paused' | 'warn' | 'bad' };
 
 /** What the sync pill says. Only the room's own words: no milliseconds, no jargon. */
-export const pillFor = (view: RoomView, health: SyncHealth, pausedBy: string | null): Pill => {
+export const pillFor = (view: RoomView, health: SyncHealth): Pill => {
   if (isOffline(view)) return { text: 'Offline', tone: 'bad' };
-  if (view.playback.status === 'paused') {
-    if (!pausedBy) return { text: 'Paused', tone: 'calm' };
-    return { text: `Paused by ${pausedBy === view.self?.name ? 'you' : pausedBy}`, tone: 'calm' };
+  const { status, pausedBy, pausedById } = view.playback;
+  if (status === 'paused') {
+    if (!pausedBy) return { text: 'Paused when everyone left', tone: 'paused' };
+    return { text: `Paused by ${pausedById === view.self?.userId ? 'you' : pausedBy}`, tone: 'paused' };
   }
   if (health === 'synced') return { text: 'In sync', tone: 'good' };
   if (health === 'correcting') return { text: 'Catching up', tone: 'warn' };

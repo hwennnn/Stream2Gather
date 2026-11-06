@@ -143,8 +143,10 @@ func applyTransport(s *State, actor Actor, cmd Command, now int64) error {
 	switch cmd.Type {
 	case CmdPlay:
 		s.Playback.Status = StatusPlaying
+		s.Playback.PausedBy, s.Playback.PausedByID = "", ""
 	case CmdPause:
 		s.Playback.Status = StatusPaused
+		s.Playback.PausedBy, s.Playback.PausedByID = actor.Name, actor.ID
 	}
 
 	if cmd.Pos < 0 {

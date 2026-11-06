@@ -81,6 +81,10 @@ type Playback struct {
 	Pos    float64 `json:"pos"`
 	At     int64   `json:"at"`
 	Rate   float64 `json:"rate"`
+	// PausedBy and PausedByID say who paused, so a viewer arriving later can be
+	// told. Both are empty when nobody did: see Rested.
+	PausedBy   string `json:"pausedBy,omitempty"`
+	PausedByID string `json:"pausedById,omitempty"`
 }
 
 // Settings are the room's permissions.

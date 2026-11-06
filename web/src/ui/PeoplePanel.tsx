@@ -38,9 +38,9 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
           return (
             <li key={person.userId} className="flex min-h-12 items-center gap-3 rounded-lg px-2 py-1.5">
               <Avatar person={person} status={status} className={`size-8 text-xs ${status ? '' : 'ring-panel!'}`} />
-              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                {person.name}
-                {own && <span className="font-normal text-muted"> (you)</span>}
+              <span className="flex min-w-0 flex-1 items-baseline gap-1 text-sm font-medium">
+                <span className="min-w-0 truncate">{person.name}</span>
+                {own && <span className="shrink-0 font-normal text-muted">(you)</span>}
               </span>
               {detail && <span className="shrink-0 text-xs text-muted">{detail}</span>}
               {own && (

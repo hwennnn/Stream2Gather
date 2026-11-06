@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Media } from '../api/http';
 import type { PlayerError } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
@@ -163,28 +163,22 @@ const Picks = ({ items, adder }: { items: Media[] | null; adder: Adder }) => {
   );
 };
 
-/** Remembers who paused, since later actions in the room replace `lastAction`. */
-const usePausedBy = (view: RoomView): string | null => {
-  const by = useRef<string | null>(null);
-  if (view.lastAction?.cause === 'pause') by.current = view.lastAction.by;
-  if (view.playback.status === 'playing') by.current = null;
-  return by.current;
-};
-
 const DOTS = new Map([
   ['good', 'bg-good'],
-  ['calm', 'bg-muted'],
   ['warn', 'bg-warn'],
   ['bad', 'bg-accent'],
 ]);
 
 export const SyncPill = ({ view, player }: { view: RoomView; player: RoomPlayer }) => {
-  const pausedBy = usePausedBy(view);
-  const pill = pillFor(view, player.report.health, pausedBy);
+  const pill = pillFor(view, player.report.health);
   const live = pill.tone === 'good' || pill.text === 'Catching up';
+  const paused = pill.tone === 'paused';
   return (
-    <span title={live ? `${Math.round(Math.abs(player.report.drift) * 1000)} ms from the room` : undefined} className="chip max-w-48 min-w-0 shrink">
-      <span className={`size-1.5 shrink-0 rounded-full ${DOTS.get(pill.tone)}`} />
+    <span
+      title={live ? `${Math.round(Math.abs(player.report.drift) * 1000)} ms from the room` : paused ? pill.text : undefined}
+      className={`chip max-w-56 min-w-0 shrink ${paused ? 'chip-paused' : ''}`}
+    >
+      {paused ? <Icon name="pause" className="size-3 shrink-0" /> : <span className={`size-1.5 shrink-0 rounded-full ${DOTS.get(pill.tone)}`} />}
       <span className="truncate">{pill.text}</span>
     </span>
   );
@@ -223,14 +217,14 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
   const sideways = useMediaQuery(PHONE_LANDSCAPE); // The chat box hosts reactions then.
   return (
   <section aria-label="Player controls" className="player-bar relative flex items-center gap-4 px-4 phone:flex-col phone:items-stretch phone:gap-1 phone:py-2 sm:max-lg:py-2.5">
-    <div className="min-w-0 flex-1">
+    <div className="min-w-28 flex-1">
       <h2 title={item.title} className="truncate text-[15px] leading-tight font-semibold">
         {item.title}
       </h2>
       {item.author && <p className="mt-0.5 truncate text-[13px] text-muted phone:hidden">{item.author}</p>}
     </div>
 
-    <div className="flex min-w-0 shrink-0 items-center gap-2">
+    <div className="flex min-w-0 items-center gap-2">
       {!player.failure && <SyncPill view={view} player={player} />}
       {isLocked(view) && <HostChip className="hidden phone:inline-flex" />}
       <UnmuteButton player={player} />

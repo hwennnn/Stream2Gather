@@ -1,4 +1,4 @@
-.PHONY: up down voice voice-keys push-keys web serve worker notifier temporal test sample e2e e2e-voice e2e-push flows
+.PHONY: up down voice voice-keys push-keys web serve worker notifier temporal test sample e2e e2e-voice e2e-push flows perf
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
@@ -62,3 +62,7 @@ e2e-push:
 # Every user flow against a real server, Postgres and Redis. GREP narrows it.
 flows:
 	cd e2e && npm ci --silent && node flows.mjs $(if $(GREP),--grep '$(GREP)')
+
+# Needs `make up` and Google Chrome. Measures a busy room in throttled Chrome and fails over e2e/perf-budgets.json.
+perf:
+	cd e2e && npm ci --silent && DATABASE_URL=$${DATABASE_URL:-postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable} node perf.mjs

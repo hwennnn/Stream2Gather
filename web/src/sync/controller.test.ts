@@ -1187,6 +1187,34 @@ describe('SyncController', () => {
       expect(commands).toEqual([]);
     });
 
+    it('does not hand a room seek back after buffering its way there', () => {
+      sync.apply(playing(60, timers.now));
+      run(3);
+      commands.length = 0;
+      sync.apply(playing(480, timers.now));
+      player.fire('buffering');
+      timers.advance(1000);
+      sync.tick(); // The seek lands here, while the player is still buffering.
+      timers.advance(2000);
+      sync.tick();
+      player.fire('playing');
+      expect(commands).toEqual([]);
+    });
+
+    it('still hears a seek made after its own one landed', () => {
+      sync.apply(playing(60, timers.now));
+      run(3);
+      sync.apply(playing(480, timers.now));
+      run(3);
+      commands.length = 0;
+      player.fire('buffering');
+      player.current = 100;
+      timers.advance(1000);
+      sync.tick();
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 100 })]);
+    });
+
     it('does not take its own jump to the room for a viewer seek', () => {
       restAt50();
       sync.apply(playing(120, timers.now)); // Someone moved it as it resumed.

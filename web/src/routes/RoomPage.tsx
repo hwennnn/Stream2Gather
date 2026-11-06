@@ -12,7 +12,10 @@ import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
 import { canControl } from '../ui/rules';
 import { ToastStack, useToasts } from '../ui/Toasts';
+import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
 import { useMediaQuery } from '../ui/useMediaQuery';
+import { useOfflineNotice } from '../ui/useOfflineNotice';
+import { usePageVisible } from '../ui/usePageVisible';
 import { useRoomPlayer } from '../ui/useRoomPlayer';
 
 type Tab = 'chat' | 'queue' | 'people';
@@ -24,7 +27,6 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const CONNECT_PATIENCE_MS = 15_000;
-const OFFLINE_BAR_DELAY_MS = 1000;
 const STILL_TRYING_MS = 30_000;
 
 const arrival = () => (window.history.state ?? {}) as { joined?: boolean; copied?: boolean };
@@ -156,37 +158,6 @@ const Waiting = ({ session, view }: { session: RoomSession; view: RoomView }) =>
   );
 };
 
-const canFullscreen = () => document.fullscreenEnabled && !/iPhone|iPod/.test(navigator.userAgent);
-
-const useFullscreen = () => {
-  const [on, setOn] = useState(false);
-
-  useEffect(() => {
-    // YouTube's own fullscreen is the iframe's business, not this layout's.
-    const update = () => setOn(document.fullscreenElement === document.documentElement);
-    document.addEventListener('fullscreenchange', update);
-    return () => document.removeEventListener('fullscreenchange', update);
-  }, []);
-
-  const toggle = useCallback(() => {
-    const change = document.fullscreenElement
-      ? document.exitFullscreen()
-      : document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-    void change.catch(() => {});
-  }, []);
-
-  return { on, toggle };
-};
-
-const usePageVisible = (): boolean =>
-  useSyncExternalStore(
-    (listener) => {
-      document.addEventListener('visibilitychange', listener);
-      return () => document.removeEventListener('visibilitychange', listener);
-    },
-    () => document.visibilityState === 'visible',
-  );
-
 /** The session narrates what it hears, but not this, so the room says it here. */
 const useLockLines = (session: RoomSession, view: RoomView): ChatEntry[] => {
   const [lines, setLines] = useState<ChatEntry[]>([]);
@@ -209,31 +180,6 @@ const useLockLines = (session: RoomSession, view: RoomView): ChatEntry[] => {
         : [...view.messages, ...lines].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
     [lines, view.messages],
   );
-};
-
-const useOfflineNotice = (view: RoomView, onBack: () => void) => {
-  const [elapsed, setElapsed] = useState(0);
-  const shown = useRef(false);
-  const since = view.offlineSince;
-
-  useEffect(() => {
-    if (since === null) {
-      setElapsed(0);
-      if (shown.current) onBack();
-      shown.current = false;
-      return undefined;
-    }
-    const tick = () => {
-      const passed = Date.now() - since;
-      setElapsed(passed);
-      if (passed >= OFFLINE_BAR_DELAY_MS) shown.current = true;
-    };
-    tick();
-    const timer = window.setInterval(tick, 500);
-    return () => window.clearInterval(timer);
-  }, [since, onBack]);
-
-  return since !== null && elapsed >= OFFLINE_BAR_DELAY_MS ? elapsed : null;
 };
 
 const OfflineBar = ({ elapsed, onRetry }: { elapsed: number; onRetry: () => void }) => {

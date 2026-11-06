@@ -154,6 +154,7 @@ func (h *Hub) acquire(ctx context.Context, roomID string) (*liveRoom, error) {
 		in:     make(chan func(), 256),
 		events: make(chan []byte, eventBuffer),
 		resync: make(chan struct{}, 1),
+		saves:  make(chan struct{}, 1),
 		done:   make(chan struct{}),
 		conns:  make(map[*conn]struct{}),
 	}
@@ -164,8 +165,9 @@ func (h *Hub) acquire(ctx context.Context, roomID string) (*liveRoom, error) {
 		return nil, err
 	}
 	h.rooms[roomID] = r
-	h.serving.Add(1)
+	h.serving.Add(2)
 	go r.run()
+	go r.saver()
 	return r, nil
 }
 
@@ -361,8 +363,10 @@ type liveRoom struct {
 	resync chan struct{}
 	done   chan struct{}
 	conns  map[*conn]struct{}
-	dirty  bool
-	// savedAt is when this server last saved the room. Zero means not yet.
+	// dirty means Redis holds something Postgres does not.
+	dirty atomic.Bool
+	saves chan struct{}
+	// savedAt is when this server last asked for a save. Zero means not yet.
 	savedAt time.Time
 	// subscribed turns true on Redis's first confirmation. Any later one means
 	// the subscription was lost and restored.
@@ -426,7 +430,7 @@ func (r *liveRoom) run() {
 			r.touchAll()
 		case <-snapshot.C:
 			if len(r.conns) > 0 && time.Since(r.savedAt) >= r.hub.keepAlive {
-				r.dirty = true
+				r.dirty.Store(true)
 			}
 			r.saveSnapshot()
 		}
@@ -448,7 +452,7 @@ func (r *liveRoom) deliver(payload []byte) {
 	}
 	if err := json.Unmarshal(payload, &head); err == nil {
 		if head.Data.Version > 0 {
-			r.dirty = true
+			r.dirty.Store(true)
 		}
 		if head.Type == "member.rename" {
 			r.renamed(head.Data.UserID, head.Data.Name)
@@ -563,17 +567,45 @@ func (r *liveRoom) publishNotice(ctx context.Context, notice map[string]string) 
 // shutDown saves the room and starts closing its sockets. Each one's leave then
 // runs as its connection unwinds.
 func (r *liveRoom) shutDown() {
-	r.dirty = true
+	r.dirty.Store(true)
 	r.saveSnapshot()
 	for c := range r.conns {
 		c.shut(websocket.StatusGoingAway, "server restarting")
 	}
 }
 
+// saveSnapshot asks for a save. The room's goroutine delivers every event, so it
+// must never wait on Postgres: a slow database would stop playback for everyone.
 func (r *liveRoom) saveSnapshot() {
-	if !r.dirty {
+	if !r.dirty.Swap(false) {
 		return
 	}
+	r.savedAt = time.Now()
+	select {
+	case r.saves <- struct{}{}:
+	default: // One is already waiting, and it will read the latest state.
+	}
+}
+
+// saver does the saving. The room can finish first, so it takes one last look.
+func (r *liveRoom) saver() {
+	defer r.hub.serving.Done()
+	for {
+		select {
+		case <-r.saves:
+			r.save()
+		case <-r.done:
+			select {
+			case <-r.saves:
+				r.save()
+			default:
+			}
+			return
+		}
+	}
+}
+
+func (r *liveRoom) save() {
 	ctx, cancel := opContext()
 	defer cancel()
 	state, found, err := r.hub.live.Load(ctx, r.id)
@@ -582,10 +614,8 @@ func (r *liveRoom) saveSnapshot() {
 	}
 	if err != nil {
 		r.hub.log.Warn("snapshot failed", "room", r.id, "error", err)
-		return
+		r.dirty.Store(true)
 	}
-	r.dirty = false
-	r.savedAt = time.Now()
 }
 
 func (r *liveRoom) publishMembers(ctx context.Context) {
@@ -777,7 +807,7 @@ func (r *liveRoom) leave(c *conn) {
 		if err := r.hub.live.MarkEmpty(ctx, r.id, time.Now().UnixMilli()); err != nil {
 			r.hub.log.Warn("empty mark failed", "room", r.id, "error", err)
 		}
-		r.dirty = true
+		r.dirty.Store(true)
 		r.saveSnapshot()
 	}
 }

@@ -35,7 +35,7 @@ const shutdownTimeout = 10 * time.Second
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: s2g serve | worker | migrate")
+		fmt.Fprintln(os.Stderr, "usage: s2g serve | worker | notifier | migrate")
 		os.Exit(2)
 	}
 
@@ -51,6 +51,8 @@ func main() {
 			err = migrate(cfg)
 		case "worker":
 			err = worker(ctx, cfg, log)
+		case "notifier":
+			err = notifier(ctx, cfg, log)
 		default:
 			err = fmt.Errorf("unknown command %q", os.Args[1])
 		}
@@ -91,8 +93,9 @@ func worker(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	defer pool.Close()
 	db := store.NewPostgres(pool)
 	return workflows.Run(ctx, cfg.TemporalAddr, cfg.TemporalNamespace, log, &workflows.Activities{
-		Rooms: db,
-		Media: catalogFor(cfg, db, log),
+		Rooms:    db,
+		Media:    catalogFor(cfg, db, log),
+		Sessions: db,
 	})
 }
 

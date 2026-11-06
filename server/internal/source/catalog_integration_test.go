@@ -14,6 +14,7 @@ import (
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
 	"stream2gather/internal/store"
+	"stream2gather/internal/testenv"
 )
 
 type fakeSource struct {
@@ -35,7 +36,7 @@ func catalogDB(t *testing.T) *store.Postgres {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	pool, err := pgxpool.New(context.Background(), "postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable")
+	pool, err := pgxpool.New(context.Background(), testenv.PostgresURL())
 	if err != nil {
 		t.Skip(err)
 	}

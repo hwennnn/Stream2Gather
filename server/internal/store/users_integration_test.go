@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"stream2gather/internal/ids"
+	"stream2gather/internal/testenv"
 )
 
 // These tests need the Postgres from deploy/compose.yaml and skip without it.
@@ -17,7 +18,7 @@ func testPostgres(t *testing.T) *Postgres {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	pool, err := pgxpool.New(context.Background(), "postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable")
+	pool, err := pgxpool.New(context.Background(), testenv.PostgresURL())
 	if err != nil {
 		t.Skip("postgres not configured:", err)
 	}

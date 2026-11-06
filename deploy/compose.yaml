@@ -64,6 +64,20 @@ services:
       clickhouse:
         condition: service_healthy
 
+  # Off for `make up`: it won't start without keys, and rooms run without it.
+  livekit:
+    profiles: [voice]
+    image: livekit/livekit-server:v1.13.11
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: ${LIVEKIT_KEYS:-}
+    ports:
+      - 127.0.0.1:17880:17880
+      - 127.0.0.1:17881:17881
+      - 127.0.0.1:17882:17882/udp
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+
 volumes:
   postgres:
   clickhouse:

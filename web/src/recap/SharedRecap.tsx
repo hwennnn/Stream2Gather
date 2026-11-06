@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Page, SiteHeader } from '../ui/Page';
-import { firstName, listNames, seatHue } from '../ui/people';
+import { AVATAR_COLORS, firstName, listNames } from '../ui/people';
 import { recapApi, type PublicRecap } from './api';
 import { Track } from './Track';
 import { DISCLOSURE, EmojiCounts, nightOf, plural, position, together, totalOf, whoReacted } from './words';
@@ -12,6 +12,9 @@ const SEATS = 15;
 
 type Video = PublicRecap['videos'][number];
 type Biggest = NonNullable<PublicRecap['biggest']>;
+
+/** Someone there, in a colour that isn't theirs. Steps round the wheel so neighbours differ. */
+const seatHue = (seat: number) => (seat < 0 ? 'var(--color-dim)' : (AVATAR_COLORS[(seat * 5) % AVATAR_COLORS.length] ?? 'var(--color-dim)'));
 
 const topEmoji = (emojis: Record<string, number>) => Object.entries(emojis).sort(([, a], [, b]) => b - a)[0]?.[0];
 

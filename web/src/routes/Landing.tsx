@@ -136,13 +136,12 @@ export const Landing = () => {
                 </button>
               </p>
             </div>
-
           </section>
 
-          <div className="min-w-0">
+          <div>
             <PictureScreen src={yours ? stillOf(yours) : (trending?.[0]?.thumbnailUrl ?? '/room-still.svg')} onBroken={() => setNoStill(pasted)} />
             <FrontRow ready={yours !== null} />
-            <p className="mt-1 text-[13px] text-dim">Your room looks like this: one screen, and a seat for each friend you send it to.</p>
+            <p className="mt-1 text-[13px] text-dim">Your room: a seat for each friend.</p>
           </div>
         </div>
 

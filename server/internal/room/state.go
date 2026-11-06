@@ -113,8 +113,8 @@ type State struct {
 	Playback Playback `json:"playback"`
 	Queue    []Item   `json:"queue"`
 	Settings Settings `json:"settings"`
-	// Held keeps the host's lock while it is released for an absent host.
-	Held *Settings `json:"held,omitempty"`
+	// ActingHost is who holds the host's rights while the host is away.
+	ActingHost string `json:"actingHost,omitempty"`
 	// Jump is set while the latest video change can still be undone.
 	Jump *Jump `json:"jump,omitempty"`
 }
@@ -155,6 +155,14 @@ func (s State) Rested(savedAt, now int64) State {
 		s.Playback.Status = StatusPaused
 	}
 	return s
+}
+
+// RoleOf is the role someone holds right now, given the one their ticket gave them.
+func (s State) RoleOf(id, role string) string {
+	if id != "" && id == s.ActingHost {
+		return RoleHost
+	}
+	return role
 }
 
 // CleanName returns a display name fit to store, or false if it is not one.

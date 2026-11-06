@@ -181,6 +181,16 @@ type Person struct {
 	Member bool `json:"member,omitempty"`
 	// Voice is empty, or listening, muted or live.
 	Voice string `json:"voice,omitempty"`
+	// Since is when they arrived, which decides who is next in line to host.
+	Since int64 `json:"since,omitempty"`
+}
+
+// WithActingHost shows a stand-in as the host. Presence keeps the role a ticket gave.
+func WithActingHost(people []Person, state room.State) []Person {
+	for i := range people {
+		people[i].Role = state.RoleOf(people[i].UserID, people[i].Role)
+	}
+	return people
 }
 
 // Touch records that a connection is alive.
@@ -297,6 +307,7 @@ func mergeTabs(connected []Person) []Person {
 			people[at].Voice = person.Voice
 		}
 		people[at].Member = people[at].Member || person.Member
+		people[at].Since = min(people[at].Since, person.Since)
 	}
 	return people
 }

@@ -713,7 +713,7 @@ func fastHost(h *Hub) {
 	h.touchEvery = 50 * time.Millisecond
 }
 
-func TestOrphanedRoomUnlocksOnceAcrossServersAndRelocks(t *testing.T) {
+func TestADroppedHostIsReplacedOnceAcrossServersAndComesBack(t *testing.T) {
 	one, two := newRig(t, testRedis, fastHost), newRig(t, testRedis, fastHost)
 	ctx := context.Background()
 	state := directVideo(t)
@@ -723,38 +723,119 @@ func TestOrphanedRoomUnlocksOnceAcrossServersAndRelocks(t *testing.T) {
 	host := one.joined(t, id, "Maya", room.RoleHost)
 	viewers := []*client{one.joined(t, id, "a", room.RoleMember), two.joined(t, id, "b", room.RoleMember)}
 	if message, ok := viewers[0].next("notice", 500*time.Millisecond); ok {
-		t.Fatalf("a present host lost the lock: %s", message.D)
+		t.Fatalf("a present host was replaced: %s", message.D)
 	}
 
 	_ = host.ws.CloseNow()
 	started := time.Now()
 	for _, viewer := range viewers {
-		if got := noticeOf(t, viewer.expect(t, "notice"))["text"]; got != "Maya left, so anyone can control playback." {
+		viewer.expectWhere(t, "members", func(raw json.RawMessage) bool { return roleIn(t, raw, "a") == room.RoleHost })
+		if got := noticeOf(t, viewer.expect(t, "notice"))["text"]; got != "Maya left, so a is the host now." {
 			t.Fatalf("notice = %q", got)
 		}
 	}
 	if elapsed := time.Since(started); elapsed < 250*time.Millisecond {
-		t.Fatalf("released after %v, before the grace period", elapsed)
+		t.Fatalf("replaced after %v, before the grace period", elapsed)
 	}
 	if message, ok := viewers[1].next("notice", 300*time.Millisecond); ok {
 		t.Fatalf("second server announced it too: %s", message.D)
 	}
-	released, _, _ := one.live.Load(ctx, id)
-	if released.Settings.Locked() {
-		t.Fatalf("settings = %+v", released.Settings)
+	passed, _, _ := one.live.Load(ctx, id)
+	if passed.ActingHost != "a" || !passed.Settings.Locked() {
+		t.Fatalf("state = %+v", passed)
 	}
 
 	one.joined(t, id, "Maya", room.RoleHost)
-	viewers[1].expectWhere(t, "state", func(raw json.RawMessage) bool {
-		return strings.Contains(string(raw), `"controlMode":"hosts"`)
-	})
-	restored, _, _ := one.live.Load(ctx, id)
-	if restored.Settings != state.Settings || restored.Held != nil {
-		t.Fatalf("restored = %+v", restored)
+	viewers[1].expectWhere(t, "members", func(raw json.RawMessage) bool { return roleIn(t, raw, "a") == room.RoleMember })
+	if got := noticeOf(t, viewers[1].expect(t, "notice"))["text"]; got != "Maya is back, so they’re the host again." {
+		t.Fatalf("notice = %q", got)
 	}
 }
 
-func TestTwoServersReleasingAtOnceAnnounceOnce(t *testing.T) {
+func roleIn(t *testing.T, raw json.RawMessage, userID string) string {
+	t.Helper()
+	var out struct {
+		Members []store.Person `json:"members"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, person := range out.Members {
+		if person.UserID == userID {
+			return person.Role
+		}
+	}
+	return ""
+}
+
+func TestLeavingTakesTheSeatAndTheHostAtOnce(t *testing.T) {
+	r := newRig(t, testRedis, func(h *Hub) { h.touchEvery = 50 * time.Millisecond }) // The real 30s grace.
+	id := r.newRoom(t, directVideo(t))
+	host := r.joined(t, id, "Maya", room.RoleHost)
+	first := r.joined(t, id, "a", room.RoleMember)
+	time.Sleep(5 * time.Millisecond)
+	second := r.joined(t, id, "b", room.RoleMember)
+
+	host.send(t, "leave", nil)
+	for _, viewer := range []*client{first, second} {
+		if got := noticeOf(t, viewer.expect(t, "notice"))["text"]; got != "Maya left, so a is the host now." {
+			t.Fatalf("notice = %q", got)
+		}
+	}
+	eventually(t, "the seat outlived the Leave", func() bool {
+		people, err := r.live.People(context.Background(), id)
+		return err == nil && len(people) == 2
+	})
+}
+
+func TestAStandInWhoReloadsStaysTheHost(t *testing.T) {
+	r := newRig(t, testRedis, fastHost)
+	ctx := context.Background()
+	id := r.newRoom(t, directVideo(t))
+	host := r.joined(t, id, "Maya", room.RoleHost)
+	standIn := r.joined(t, id, "a", room.RoleMember)
+	time.Sleep(5 * time.Millisecond)
+	viewer := r.joined(t, id, "b", room.RoleMember)
+	host.send(t, "leave", nil)
+	viewer.expect(t, "notice")
+
+	_ = standIn.ws.CloseNow()
+	time.Sleep(100 * time.Millisecond)
+	back := r.dial(t, id, "a", room.RoleMember)
+	var welcome struct {
+		Self store.Person `json:"self"`
+	}
+	if err := json.Unmarshal(back.expect(t, "welcome").D, &welcome); err != nil {
+		t.Fatal(err)
+	}
+	if welcome.Self.Role != room.RoleHost {
+		t.Fatalf("self = %+v", welcome.Self)
+	}
+	if message, ok := viewer.next("notice", 600*time.Millisecond); ok {
+		t.Fatalf("a reload cost the stand-in the room: %s", message.D)
+	}
+	if state, _, _ := r.live.Load(ctx, id); state.ActingHost != "a" {
+		t.Fatalf("acting host = %q", state.ActingHost)
+	}
+}
+
+func TestAStandInWhoLeavesPassesItOn(t *testing.T) {
+	r := newRig(t, testRedis, fastHost)
+	id := r.newRoom(t, directVideo(t))
+	host := r.joined(t, id, "Maya", room.RoleHost)
+	standIn := r.joined(t, id, "a", room.RoleMember)
+	time.Sleep(5 * time.Millisecond)
+	viewer := r.joined(t, id, "b", room.RoleMember)
+	host.send(t, "leave", nil)
+	viewer.expect(t, "notice")
+
+	standIn.send(t, "leave", nil)
+	if got := noticeOf(t, viewer.expect(t, "notice"))["text"]; got != "a left, so b is the host now." {
+		t.Fatalf("notice = %q", got)
+	}
+}
+
+func TestTwoServersPassingTheHostAtOnceAnnounceOnce(t *testing.T) {
 	one, two := newRig(t, testRedis), newRig(t, testRedis)
 	ctx := context.Background()
 	id := one.newRoom(t, directVideo(t))
@@ -768,10 +849,8 @@ func TestTwoServersReleasingAtOnceAnnounceOnce(t *testing.T) {
 	}
 	first, second := roomOf(one), roomOf(two)
 	longAgo := time.Now().Add(-time.Hour).UnixMilli()
-	locked := room.Settings{ControlMode: room.ModeHosts, QueueMode: room.ModeHosts}
 
 	for round := range 30 {
-		one.apply(t, id, room.Command{Type: room.CmdSettings, Settings: &locked})
 		if err := one.live.HostSeen(ctx, id, "Maya", longAgo); err != nil {
 			t.Fatal(err)
 		}
@@ -788,10 +867,11 @@ func TestTwoServersReleasingAtOnceAnnounceOnce(t *testing.T) {
 		if message, ok := viewer.next("notice", 30*time.Millisecond); ok {
 			t.Fatalf("round %d: announced twice: %s", round, message.D)
 		}
+		first.wait(func() { first.applySystem(ctx, room.Command{Type: room.CmdHostPass}) })
 	}
 }
 
-func TestHostReloadKeepsTheLock(t *testing.T) {
+func TestHostReloadKeepsTheRoom(t *testing.T) {
 	r := newRig(t, testRedis, fastHost)
 	state := directVideo(t)
 	state.Settings = room.Settings{ControlMode: room.ModeHosts, QueueMode: room.ModeHosts}
@@ -802,7 +882,7 @@ func TestHostReloadKeepsTheLock(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	r.joined(t, id, "Maya", room.RoleHost)
 	if message, ok := viewer.next("notice", 600*time.Millisecond); ok {
-		t.Fatalf("a reload released the lock: %s", message.D)
+		t.Fatalf("a reload cost the host the room: %s", message.D)
 	}
 }
 

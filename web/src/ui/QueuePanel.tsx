@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { formatTime, plural } from './format';
-import { Icon } from './Icon';
+import { Icon, type IconName } from './Icon';
 import { AddBox, MediaRow, MediaSkeleton, SearchResults, useSearch } from './Omnibox';
+import { followPointer } from './pointerDrag';
 import { canControl, canQueue, isOffline } from './rules';
 import { Thumb } from './Thumb';
+import { toastError } from './Toasts';
 import { useAdder } from './useAdder';
 import { useTrending } from './useTrending';
 
 type Props = { session: RoomSession; view: RoomView; onToast: (text: string) => void };
-
-const failed = (onToast: Props['onToast']) => (error: unknown) => {
-  if (error instanceof Error) onToast(error.message);
-};
 
 const summary = (items: QueueItem[]): string => {
   const parts = [plural(items.length, 'video')];
@@ -108,9 +106,22 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
   const [drag, setDrag] = useState<Drag | null>(null);
   const [order, setOrder] = useState<string[] | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const stopDrag = useRef<(() => void) | null>(null);
+  const editable = canQueue(view);
 
   // The server's answer always wins over the order shown while waiting for it.
   useEffect(() => setOrder(null), [view.queue]);
+
+  // Someone else can take the row away, or the host the right to move it.
+  const dragGone = drag !== null && (!editable || !items.some((item) => item.id === drag.id));
+  useEffect(() => {
+    if (!dragGone) return;
+    stopDrag.current?.();
+    stopDrag.current = null;
+    setDrag(null);
+  }, [dragGone]);
+
+  useEffect(() => () => stopDrag.current?.(), []);
 
   const shown = order
     ? [...items].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
@@ -124,7 +135,7 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
     // The server counts the current video as index 0.
     session.queueMove(item.id, to + 1).catch((error: unknown) => {
       setOrder(null);
-      failed(onToast)(error);
+      toastError(onToast)(error);
     });
   };
 
@@ -133,29 +144,25 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
     const own = rows[from];
     if (!own) return;
     event.preventDefault();
-    const handle = event.currentTarget;
-    handle.setPointerCapture(event.pointerId);
+    event.currentTarget.setPointerCapture(event.pointerId);
     const startY = event.clientY;
     let latest: Drag = { id: item.id, from, to: from, dy: 0, height: own.height };
     setDrag(latest);
 
-    const onMove = (next: PointerEvent) => {
-      const dy = next.clientY - startY;
-      const center = own.top + own.height / 2 + dy;
-      const passed = rows.filter((row, index) => index !== from && row.top + row.height / 2 < center).length;
-      latest = { ...latest, dy, to: passed };
-      setDrag(latest);
-    };
-    const onEnd = () => {
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onEnd);
-      handle.removeEventListener('pointercancel', onEnd);
-      setDrag(null);
-      if (latest.to !== from) move(item, latest.to);
-    };
-    handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onEnd);
-    handle.addEventListener('pointercancel', onEnd);
+    stopDrag.current = followPointer(event.pointerId, {
+      onMove: (next) => {
+        const dy = next.clientY - startY;
+        const center = own.top + own.height / 2 + dy;
+        const passed = rows.filter((row, index) => index !== from && row.top + row.height / 2 < center).length;
+        latest = { ...latest, dy, to: passed };
+        setDrag(latest);
+      },
+      onEnd: (commit) => {
+        stopDrag.current = null;
+        setDrag(null);
+        if (commit && latest.to !== from) move(item, latest.to);
+      },
+    });
   };
 
   const offsetOf = (index: number): number => {
@@ -179,12 +186,12 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
             dragging={drag?.id === item.id}
             settling={drag !== null}
             canPlay={canControl(view)}
-            editable={canQueue(view)}
+            editable={editable}
             offline={isOffline(view)}
             onDragStart={(event) => startDrag(event, item, index)}
             onMove={(to) => move(item, to)}
-            onPlay={() => void session.request('queue.play', { target: item.id }).catch(failed(onToast))}
-            onRemove={() => void session.queueRemove(item.id).catch(failed(onToast))}
+            onPlay={() => void session.request('queue.play', { target: item.id }).catch(toastError(onToast))}
+            onRemove={() => void session.queueRemove(item.id).catch(toastError(onToast))}
           />
         ))}
       </ol>
@@ -193,6 +200,17 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
       </p>
     </>
   );
+};
+
+type RowAction = {
+  label: string;
+  /** Icon-only on the row itself. Without one it shows its label. */
+  icon?: IconName;
+  primary?: boolean;
+  /** Too rarely wanted to earn room on the row. */
+  trayOnly?: boolean;
+  disabled: boolean;
+  run: () => void;
 };
 
 type RowProps = {
@@ -216,6 +234,17 @@ const QueueRow = (props: RowProps) => {
   const { onDragStart, onMove, onPlay, onRemove } = props;
   const [tray, setTray] = useState(false);
   const meta = [`Added by ${item.addedByName}`, item.durationMs > 0 ? formatTime(item.durationMs / 1000) : ''].filter(Boolean).join(' · ');
+  const actions: RowAction[] = [
+    ...(canPlay ? [{ label: 'Play now', primary: true, disabled: offline, run: onPlay }] : []),
+    ...(editable
+      ? [
+          { label: 'Play next', trayOnly: true, disabled: index === 0 || offline, run: () => onMove(0) },
+          { label: 'Move up', icon: 'up' as const, disabled: index === 0 || offline, run: () => onMove(index - 1) },
+          { label: 'Move down', icon: 'down' as const, disabled: last || offline, run: () => onMove(index + 1) },
+          { label: 'Remove', icon: 'close' as const, disabled: offline, run: onRemove },
+        ]
+      : []),
+  ];
 
   return (
     <li
@@ -247,24 +276,20 @@ const QueueRow = (props: RowProps) => {
           <div className="relative mt-0.5 min-h-[26px]">
             <p className="row-meta truncate text-xs leading-[26px] text-muted transition-opacity">{meta}</p>
             <div className="row-actions absolute inset-0 flex items-center gap-1 transition-opacity">
-              {canPlay && (
-                <button type="button" aria-label={`Play now: ${item.title}`} disabled={offline} onClick={onPlay} className="btn btn-sm btn-primary">
-                  Play now
-                </button>
-              )}
-              {editable && (
-                <>
-                  <button type="button" aria-label={`Move up: ${item.title}`} disabled={index === 0 || offline} onClick={() => onMove(index - 1)} className="btn btn-sm btn-quiet btn-icon">
-                    <Icon name="up" className="size-3.5" />
+              {actions
+                .filter((action) => !action.trayOnly)
+                .map(({ label, icon, primary, disabled, run }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    aria-label={`${label}: ${item.title}`}
+                    disabled={disabled}
+                    onClick={run}
+                    className={`btn btn-sm ${primary ? 'btn-primary' : 'btn-quiet'} ${icon ? 'btn-icon' : ''}`}
+                  >
+                    {icon ? <Icon name={icon} className="size-3.5" /> : label}
                   </button>
-                  <button type="button" aria-label={`Move down: ${item.title}`} disabled={last || offline} onClick={() => onMove(index + 1)} className="btn btn-sm btn-quiet btn-icon">
-                    <Icon name="down" className="size-3.5" />
-                  </button>
-                  <button type="button" aria-label={`Remove: ${item.title}`} disabled={offline} onClick={onRemove} className="btn btn-sm btn-quiet btn-icon">
-                    <Icon name="close" className="size-3.5" />
-                  </button>
-                </>
-              )}
+                ))}
             </div>
           </div>
         </div>
@@ -276,27 +301,11 @@ const QueueRow = (props: RowProps) => {
       </div>
       {tray && (
         <div className="relative mt-2 grid grid-cols-2 gap-2 pl-2">
-          {canPlay && (
-            <button type="button" disabled={offline} onClick={onPlay} className="btn btn-primary">
-              Play now
+          {actions.map(({ label, primary, disabled, run }) => (
+            <button key={label} type="button" disabled={disabled} onClick={run} className={`btn ${primary ? 'btn-primary' : 'btn-quiet'}`}>
+              {label}
             </button>
-          )}
-          {editable && (
-            <>
-              <button type="button" disabled={index === 0 || offline} onClick={() => onMove(0)} className="btn btn-quiet">
-                Play next
-              </button>
-              <button type="button" disabled={index === 0 || offline} onClick={() => onMove(index - 1)} className="btn btn-quiet">
-                Move up
-              </button>
-              <button type="button" disabled={last || offline} onClick={() => onMove(index + 1)} className="btn btn-quiet">
-                Move down
-              </button>
-              <button type="button" disabled={offline} onClick={onRemove} className="btn btn-quiet">
-                Remove
-              </button>
-            </>
-          )}
+          ))}
         </div>
       )}
     </li>

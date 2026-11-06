@@ -1103,6 +1103,28 @@ func (r *liveRoom) settleEmptyRoom(ctx context.Context) {
 	})
 }
 
+// pickUpOnReturn restarts a room that stopped only because everyone left, from
+// where they left it, so the first person back isn't met by a paused video.
+func (r *liveRoom) pickUpOnReturn(ctx context.Context) {
+	if len(r.conns) > 0 {
+		return
+	}
+	here, err := r.hub.live.People(ctx, r.id)
+	if err != nil || len(here) > 0 {
+		return
+	}
+	state, found, err := r.hub.live.Load(ctx, r.id)
+	if err != nil || !found || !state.PickUpOnReturn() {
+		return
+	}
+	r.applySystem(ctx, room.Command{
+		Type: room.CmdPlay,
+		Item: state.Playback.ItemID,
+		Pos:  state.Playback.Pos,
+		CT:   time.Now().UnixMilli(),
+	})
+}
+
 // applySystem reports whether the command took effect, so that of several
 // servers deciding the same thing only the winner announces it.
 func (r *liveRoom) applySystem(ctx context.Context, cmd room.Command) bool {
@@ -1242,6 +1264,7 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 		return
 	}
 	r.settleEmptyRoom(ctx)
+	r.pickUpOnReturn(ctx)
 	r.renewMedia(ctx, state)
 	if latest, found, err := r.hub.live.Load(ctx, r.id); err == nil && found {
 		state = latest

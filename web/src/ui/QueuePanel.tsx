@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { memo, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { formatTime, plural } from './format';
 import { Icon, type IconName } from './Icon';
@@ -10,6 +10,7 @@ import { sourceName } from './sources';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { useAdder } from './useAdder';
+import { useLatest } from './useLatest';
 import { notInRoom, useTrending } from './useTrending';
 
 type Props = {
@@ -83,7 +84,7 @@ export const QueuePanel = ({ session, view, onToast, extra }: Props) => {
                 {suggestions ? (
                   <ul>
                     {suggestions.map((media) => (
-                      <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={(mode) => void adder.addMedia(media, mode)} />
+                      <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={adder.addMedia} />
                     ))}
                   </ul>
                 ) : (
@@ -140,7 +141,7 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
     });
   };
 
-  const startDrag = (event: ReactPointerEvent<HTMLButtonElement>, item: QueueItem, from: number) => {
+  const startDrag = useLatest((event: ReactPointerEvent<HTMLButtonElement>, item: QueueItem, from: number) => {
     const rows = [...(list.current?.children ?? [])].map((row) => row.getBoundingClientRect());
     const own = rows[from];
     if (!own) return;
@@ -164,7 +165,11 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
         if (commit && latest.to !== from) move(item, latest.to);
       },
     });
-  };
+  });
+
+  const onMove = useLatest(move);
+  const onPlay = useLatest((item: QueueItem) => void session.request('queue.play', { target: item.id }).catch(toastError(onToast)));
+  const onRemove = useLatest((item: QueueItem) => void session.queueRemove(item.id).catch(toastError(onToast)));
 
   const offsetOf = (index: number): number => {
     if (!drag) return 0;
@@ -189,10 +194,10 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
             canPlay={canControl(view)}
             editable={editable}
             offline={isOffline(view)}
-            onDragStart={(event) => startDrag(event, item, index)}
-            onMove={(to) => move(item, to)}
-            onPlay={() => void session.request('queue.play', { target: item.id }).catch(toastError(onToast))}
-            onRemove={() => void session.queueRemove(item.id).catch(toastError(onToast))}
+            onDragStart={startDrag}
+            onMove={onMove}
+            onPlay={onPlay}
+            onRemove={onRemove}
           />
         ))}
       </ol>
@@ -224,24 +229,24 @@ type RowProps = {
   canPlay: boolean;
   editable: boolean;
   offline: boolean;
-  onDragStart: (event: ReactPointerEvent<HTMLButtonElement>) => void;
-  onMove: (to: number) => void;
-  onPlay: () => void;
-  onRemove: () => void;
+  onDragStart: (event: ReactPointerEvent<HTMLButtonElement>, item: QueueItem, from: number) => void;
+  onMove: (item: QueueItem, to: number) => void;
+  onPlay: (item: QueueItem) => void;
+  onRemove: (item: QueueItem) => void;
 };
 
-const QueueRow = (props: RowProps) => {
+const QueueRow = memo((props: RowProps) => {
   const { item, index, last, offset, dragging, settling, canPlay, editable, offline } = props;
   const { onDragStart, onMove, onPlay, onRemove } = props;
   const [tray, setTray] = useState(false);
   const actions: RowAction[] = [
-    ...(canPlay ? [{ label: 'Play now', icon: 'play' as const, primary: true, disabled: offline, run: onPlay }] : []),
+    ...(canPlay ? [{ label: 'Play now', icon: 'play' as const, primary: true, disabled: offline, run: () => onPlay(item) }] : []),
     ...(editable
       ? [
-          { label: 'Play next', trayOnly: true, disabled: index === 0 || offline, run: () => onMove(0) },
-          { label: 'Move up', icon: 'up' as const, disabled: index === 0 || offline, run: () => onMove(index - 1) },
-          { label: 'Move down', icon: 'down' as const, disabled: last || offline, run: () => onMove(index + 1) },
-          { label: 'Remove', icon: 'close' as const, disabled: offline, run: onRemove },
+          { label: 'Play next', trayOnly: true, disabled: index === 0 || offline, run: () => onMove(item, 0) },
+          { label: 'Move up', icon: 'up' as const, disabled: index === 0 || offline, run: () => onMove(item, index - 1) },
+          { label: 'Move down', icon: 'down' as const, disabled: last || offline, run: () => onMove(item, index + 1) },
+          { label: 'Remove', icon: 'close' as const, disabled: offline, run: () => onRemove(item) },
         ]
       : []),
   ];
@@ -261,7 +266,7 @@ const QueueRow = (props: RowProps) => {
             type="button"
             tabIndex={-1}
             aria-hidden="true"
-            onPointerDown={onDragStart}
+            onPointerDown={(event) => onDragStart(event, item, index)}
             className="row-grip absolute top-0 -left-4 flex h-full w-4 cursor-grab touch-none items-center justify-center text-dim hover:text-text active:cursor-grabbing"
           >
             <Icon name="grip" />
@@ -314,4 +319,4 @@ const QueueRow = (props: RowProps) => {
       )}
     </li>
   );
-};
+});

@@ -1,4 +1,4 @@
-import { lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
+import { lazy, memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { api, ApiError, type RoomPreview } from '../api/http';
 import { account, useAccount } from '../auth/account';
 import { useInviteUrl } from '../crew/useInviteUrl';
@@ -26,10 +26,15 @@ import { useMediaQuery } from '../ui/useMediaQuery';
 import { useOfflineNotice } from '../ui/useOfflineNotice';
 import { usePageVisible } from '../ui/usePageVisible';
 import { useRoomPlayer } from '../ui/useRoomPlayer';
+import { useShownView } from '../ui/useShownView';
 
 const CrewHome = lazy(() => import('./CrewHome'));
 const VoiceButton = lazy(() => import('../voice/VoiceButton'));
 const RoomWatchlist = lazy(() => import('../crew/RoomWatchlist'));
+
+// Both stay mounted behind their tabs, so they have to be able to sit still there.
+const QueueTab = memo(QueuePanel);
+const PeopleTab = memo(PeoplePanel);
 
 type Tab = 'chat' | 'queue' | 'people';
 
@@ -198,11 +203,18 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const current = view.queue[0];
   const railHidden = theatre && wide && !fullscreen.on && current !== undefined;
   const inviteUrl = useInviteUrl(session, view);
-  const watchlist = onCrew(view) ? (
-    <Slot>
-      <RoomWatchlist session={session} view={view} />
-    </Slot>
-  ) : undefined;
+
+  const queueView = useShownView(view, tab === 'queue' && !railHidden);
+  const peopleView = useShownView(view, tab === 'people' && !railHidden);
+  const watchlist = useMemo(
+    () =>
+      onCrew(queueView) ? (
+        <Slot>
+          <RoomWatchlist session={session} view={queueView} />
+        </Slot>
+      ) : undefined,
+    [session, queueView],
+  );
 
   const unread = useUnread(view.messages, view.self?.userId, tab === 'chat' && !railHidden && visible);
 
@@ -409,10 +421,10 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
             />
           </div>
           <div id="panel-queue" role="tabpanel" aria-labelledby="tab-queue" hidden={tab !== 'queue'} className="min-h-0 flex-1">
-            <QueuePanel session={session} view={view} onToast={toast} extra={watchlist} />
+            <QueueTab session={session} view={queueView} onToast={toast} extra={watchlist} />
           </div>
           <div id="panel-people" role="tabpanel" aria-labelledby="tab-people" hidden={tab !== 'people'} className="min-h-0 flex-1">
-            <PeoplePanel session={session} view={view} onToast={toast} />
+            <PeopleTab session={session} view={peopleView} onToast={toast} />
           </div>
 
           <ReactionLane reactions={view.reactions} />

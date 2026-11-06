@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { api, ApiError, type Media } from '../api/http';
 import { useAccount } from '../auth/account';
 import type { QueueMode } from '../room/session';
@@ -174,7 +174,7 @@ const Results = ({ search, adder, action }: ResultsProps) => {
       {search.results && search.results.length > 0 && (
         <ul>
           {search.results.map((media) => (
-            <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} action={action} onAdd={(mode) => void adder.addMedia(media, mode)} />
+            <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} action={action} onAdd={adder.addMedia} />
           ))}
         </ul>
       )}
@@ -212,10 +212,10 @@ const ACTIONS: { mode: QueueMode; label: string; icon: IconName }[] = [
   { mode: 'end', label: 'Queue', icon: 'plus' },
 ];
 
-type RowProps = { media: Media; status: AddStatus; action?: string; onAdd: (mode: QueueMode) => void };
+type RowProps = { media: Media; status: AddStatus; action?: string; onAdd: (media: Media, mode: QueueMode) => unknown };
 
 /** One video you could add. Hover shows the actions; touch taps to queue, ⋯ for the rest. */
-export const MediaRow = ({ media, status, action, onAdd }: RowProps) => {
+export const MediaRow = memo(({ media, status, action, onAdd }: RowProps) => {
   const actions = action ? ACTIONS.filter(({ mode }) => mode === 'end').map((one) => ({ ...one, label: action })) : ACTIONS;
   const [tray, setTray] = useState(false);
   const label = STATUS_TEXT.get(status);
@@ -224,7 +224,7 @@ export const MediaRow = ({ media, status, action, onAdd }: RowProps) => {
   return (
     <li className="row relative py-2">
       {!label && (
-        <button type="button" aria-label={`${action ?? 'Queue'} ${media.title}`} onClick={() => onAdd('end')} className="row-tap absolute inset-0" />
+        <button type="button" aria-label={`${action ?? 'Queue'} ${media.title}`} onClick={() => void onAdd(media, 'end')} className="row-tap absolute inset-0" />
       )}
       <div className="flex items-center gap-3">
         <Thumb src={media.thumbnailUrl} className="w-20 rounded-md" />
@@ -253,7 +253,7 @@ export const MediaRow = ({ media, status, action, onAdd }: RowProps) => {
                     type="button"
                     aria-label={`${text}: ${media.title}`}
                     title={text}
-                    onClick={() => onAdd(mode)}
+                    onClick={() => void onAdd(media, mode)}
                     className={`btn btn-sm btn-icon ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}
                   >
                     <Icon name={icon} className="size-3.5" />
@@ -280,7 +280,7 @@ export const MediaRow = ({ media, status, action, onAdd }: RowProps) => {
       {tray && !label && (
         <div className="row-tray">
           {ACTIONS.map(({ mode, label: text }) => (
-            <button key={mode} type="button" onClick={() => onAdd(mode)} className={`btn ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}>
+            <button key={mode} type="button" onClick={() => void onAdd(media, mode)} className={`btn ${mode === 'now' ? 'btn-primary' : 'btn-quiet'}`}>
               {text}
             </button>
           ))}
@@ -288,4 +288,4 @@ export const MediaRow = ({ media, status, action, onAdd }: RowProps) => {
       )}
     </li>
   );
-};
+});

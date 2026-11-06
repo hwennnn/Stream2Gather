@@ -3,6 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { QueuePanel } from './QueuePanel';
+import { Thumb } from './Thumb';
+
+vi.mock('./Thumb', () => ({ Thumb: vi.fn(() => null) }));
 
 const item = (id: string) =>
   ({ id, title: `Video ${id}`, addedByName: 'Maya', durationMs: 0, source: 'direct', sourceId: id }) as unknown as QueueItem;
@@ -81,5 +84,54 @@ describe('tapping a queue row', () => {
   it('gives a guest in a locked room nothing to tap', () => {
     const { rowTap } = setup({ settings: { controlMode: 'hosts', queueMode: 'hosts' } });
     expect(rowTap()).toBeNull();
+  });
+});
+
+describe('a long queue', () => {
+  const queue = Array.from({ length: 12 }, (_, n) => item(`v${n}`));
+  const session = { request: vi.fn(async () => {}), queueMove: vi.fn(async () => {}), queueRemove: vi.fn(async () => {}) } as unknown as RoomSession;
+  const onToast = () => {};
+  const panel = (patch?: Partial<RoomView>) => <QueuePanel session={session} view={view({ queue, ...patch })} onToast={onToast} />;
+  const drawn = () => vi.mocked(Thumb).mock.calls.length;
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ items: [] })));
+    vi.mocked(Thumb).mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves its rows alone while someone types in the box', () => {
+    render(panel());
+    const before = drawn();
+    fireEvent.change(screen.getByLabelText('Add a video'), { target: { value: 'l' } });
+    fireEvent.change(screen.getByLabelText('Add a video'), { target: { value: 'lo' } });
+    // Now playing isn't a row, and it isn't worth a memo.
+    expect(drawn() - before).toBeLessThanOrEqual(2);
+  });
+
+  it('leaves its rows alone when the room changes around them', () => {
+    const { rerender } = render(panel());
+    const before = drawn();
+    rerender(panel({ viewerStates: { other: 'buffering' } }));
+    expect(drawn() - before).toBeLessThanOrEqual(1);
+  });
+
+  it('still takes the row actions away when the room goes offline', () => {
+    const { rerender } = render(panel());
+    const remove = () => screen.getByRole<HTMLButtonElement>('button', { name: 'Remove: Video v3' });
+    expect(remove().disabled).toBe(false);
+    rerender(panel({ offlineSince: 1 }));
+    expect(remove().disabled).toBe(true);
+  });
+
+  it('acts on the row that was clicked, after the list has changed', () => {
+    const { rerender } = render(panel());
+    rerender(panel({ queue: [queue[0] as QueueItem, ...queue.slice(2)] }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove: Video v3' }));
+    expect(session.queueRemove).toHaveBeenCalledWith('v3');
   });
 });

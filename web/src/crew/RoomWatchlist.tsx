@@ -34,7 +34,7 @@ export default function RoomWatchlist({ session, view }: Props) {
       <h3 className="py-1.5 text-[13px] font-semibold">Your watchlist</h3>
       <ul>
         {videos.map((media) => (
-          <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={(mode) => void adder.addMedia(media, mode)} />
+          <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={adder.addMedia} />
         ))}
       </ul>
     </section>

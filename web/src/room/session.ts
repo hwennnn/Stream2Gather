@@ -40,7 +40,7 @@ type Notice = { id: number; kind?: string; text: string; url?: string };
 
 /** Someone replaced the current video, and the room can still go back. */
 /** Moving to the video that was next is a skip, and can be undone just the same. */
-type Jump = { id: string; by: string; title: string; skip?: boolean };
+type Jump = { id: string; by: string; skip?: boolean };
 
 export type RoomView = {
   connection: 'connecting' | 'live' | 'reconnecting' | 'failed';
@@ -621,7 +621,7 @@ export class RoomSession {
     if (this.jumpTimer !== null) clearTimeout(this.jumpTimer);
     const item = queue?.[0];
     const skip = item && before[1]?.id === item.id ? { skip: true } : {};
-    const jump = cause === 'queue.play' && by && item ? { id: item.id, by, title: item.title, ...skip } : null;
+    const jump = cause === 'queue.play' && by && item ? { id: item.id, by, ...skip } : null;
     this.update({ jump });
     if (jump) this.jumpTimer = window.setTimeout(() => this.update({ jump: null }), UNDO_LIFE_MS);
   }

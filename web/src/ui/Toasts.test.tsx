@@ -6,7 +6,7 @@ import { JumpToast } from './Toasts';
 
 const view = (patch: Partial<RoomView> = {}) =>
   ({
-    jump: { id: 'c', by: 'Asha', title: 'Video c' },
+    jump: { id: 'c', by: 'Asha' },
     self: { userId: 'me', name: 'Ada', role: 'member' },
     settings: { controlMode: 'everyone', queueMode: 'everyone' },
     offlineSince: null,
@@ -22,19 +22,19 @@ const setup = (patch?: Partial<RoomView>, undoJump = vi.fn(async () => {})) => {
 describe('JumpToast', () => {
   afterEach(cleanup);
 
-  it('names who jumped and to what', () => {
+  it('names who jumped, and leaves the title to the line under the player', () => {
     setup();
-    expect(screen.getByText(/jumped to/).textContent).toBe('Asha jumped to Video c');
+    expect(screen.getByText(/jumped to/).textContent).toBe('Asha jumped to another video');
   });
 
   it('calls a skip a skip', () => {
-    setup({ jump: { id: 'c', by: 'Ada', title: 'Video c', skip: true } });
-    expect(screen.getByText(/skipped to/).textContent).toBe('You skipped to Video c');
+    setup({ jump: { id: 'c', by: 'Ada', skip: true } });
+    expect(screen.getByText(/skipped ahead/).textContent).toBe('You skipped ahead');
   });
 
   it('says you when it was you', () => {
-    setup({ jump: { id: 'c', by: 'Ada', title: 'Video c' } });
-    expect(screen.getByText(/jumped to/).textContent).toBe('You jumped to Video c');
+    setup({ jump: { id: 'c', by: 'Ada' } });
+    expect(screen.getByText(/jumped to/).textContent).toBe('You jumped to another video');
   });
 
   it('undoes the jump it is showing', () => {

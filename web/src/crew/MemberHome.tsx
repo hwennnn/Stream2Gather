@@ -7,6 +7,7 @@ import { firstName, seatHues } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
+import { CrewSettings, MemberRow } from './CrewSettings';
 import { Watchlist } from './Watchlist';
 
 type Props = {
@@ -122,14 +123,12 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
         <h2 className="text-sm font-semibold">Members</h2>
         <ul className="mt-2 divide-y divide-line border-y border-line">
           {home.roster.map((person) => (
-            <li key={person.userId} className="flex h-11 items-center gap-3 text-sm">
-              <Avatar person={person} />
-              <span className="min-w-0 truncate">{person.name}</span>
-              {person.userId === home.ownerId && <span className="ml-auto text-muted">Owner</span>}
-            </li>
+            <MemberRow key={person.userId} slug={slug} home={home} person={person} onChange={refresh} />
           ))}
         </ul>
       </section>
+
+      <CrewSettings slug={slug} home={home} onChange={refresh} />
     </Frame>
   );
 };

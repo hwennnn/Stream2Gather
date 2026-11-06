@@ -125,4 +125,22 @@ describe('CrewHome', () => {
     expect(screen.queryByText('abc')).toBeNull();
     expect(screen.queryByText('Add something for next time.')).toBeNull();
   });
+
+  it('gives the owner settings and asks before closing, and gives a member only Leave', async () => {
+    signIntoAccount();
+    vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana, mika]));
+    const close = vi.spyOn(crewApi, 'close').mockResolvedValue({});
+    const owner = render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Close' }));
+    expect(close).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close it for everyone?' }));
+    await waitFor(() => expect(close).toHaveBeenCalledWith('movie-night'));
+    owner.unmount();
+
+    accountState.view = { ...accountState.view, user: { id: 'u2', name: 'Mika', avatarUrl: '', signedIn: true } };
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
+    expect(await screen.findByRole('button', { name: 'Leave' })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Settings' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
+  });
 });

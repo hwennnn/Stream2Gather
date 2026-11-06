@@ -1295,6 +1295,16 @@ describe('RoomSession', () => {
   });
 
   describe('viewer health', () => {
+    it('keeps where a viewer said they were, until the video changes', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('member.status', { userId: 'g_2', state: 'correcting', drift: -4.2 });
+      expect(session.getView().viewerDrift.g_2?.drift).toBe(-4.2);
+
+      socket.deliver('state', { version: 2, playback: { ...idle, item: 'b' }, queue: [item('b')], cause: 'skip' });
+      expect(session.getView().viewerDrift).toEqual({});
+    });
+
     it('starts over when the video changes', async () => {
       const { session, socket } = await connected();
       socket.deliver('welcome', welcome(1));

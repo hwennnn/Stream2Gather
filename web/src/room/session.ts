@@ -65,6 +65,8 @@ export type RoomView = {
   /** Who has really left, not just reloaded, so their seat can go. */
   vacated: string[];
   viewerStates: Record<string, string>;
+  /** What each viewer last reported, and when it got here. They only report a change of state. */
+  viewerDrift: Record<string, { drift: number; at: number }>;
   messages: ChatEntry[];
   reactions: Reaction[];
   notices: Notice[];
@@ -103,6 +105,7 @@ const initialView: RoomView = {
   alone: false,
   vacated: [],
   viewerStates: {},
+  viewerDrift: {},
   messages: [],
   reactions: [],
   notices: [],
@@ -518,6 +521,7 @@ export class RoomSession {
       viewerStates: {},
       // The server can announce a join before it has told this page who it is.
       messages: this.view.messages.filter((entry) => entry.kind !== 'system' || entry.arrived !== data.self.userId),
+      viewerDrift: {},
     });
     this.addLines(data.lines ?? []);
     this.playbackListener(data.state.playback, true);
@@ -609,6 +613,7 @@ export class RoomSession {
       queue: message.queue ?? previous.queue,
       settings: message.settings ?? previous.settings,
       viewerStates: itemChanged ? {} : previous.viewerStates,
+      viewerDrift: itemChanged ? {} : previous.viewerDrift,
       ranOut: ranOut(message, previous.ranOut),
       lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
     });
@@ -641,12 +646,13 @@ export class RoomSession {
     this.update({ members, vacated, self: self && role ? { ...self, role } : self });
   }
 
-  private memberStatus(data: { userId: string; state: string; item?: string }): void {
+  private memberStatus(data: { userId: string; state: string; drift?: number; item?: string }): void {
     if (data.item && data.item !== this.view.playback.item) return;
     // A viewer who cannot play this video keeps reporting health from a player
     // that is not showing anything.
     if (this.view.viewerStates[data.userId] === 'unavailable') return;
-    this.update({ viewerStates: { ...this.view.viewerStates, [data.userId]: data.state } });
+    const viewerDrift = data.drift === undefined ? this.view.viewerDrift : { ...this.view.viewerDrift, [data.userId]: { drift: data.drift, at: Date.now() } };
+    this.update({ viewerStates: { ...this.view.viewerStates, [data.userId]: data.state }, viewerDrift });
   }
 
   /** Another tab of this person changed their name. */

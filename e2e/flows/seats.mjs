@@ -1,5 +1,5 @@
 // The seats, the way out and the way back.
-import { joinRoom, openTab, reenter, startRoom, ui } from '../lib/app.mjs';
+import { addByMessage, joinRoom, openTab, reenter, startRoom, ui } from '../lib/app.mjs';
 import { crowd } from '../lib/bots.mjs';
 import { video } from '../lib/fixtures.mjs';
 import { flow } from '../lib/runner.mjs';
@@ -46,6 +46,30 @@ flow('seats: a full row says how many more, and that opens People', async (t) =>
     return button.getBoundingClientRect().right <= seats.right + 0.5;
   }));
   bots.forEach((bot) => bot.close());
+});
+
+flow('track: one dot each, a friend behind sits behind, and the player does not move', async (t) => {
+  const a = await t.person('Ana');
+  const b = await t.person('Ben');
+  const room = await startRoom(t, a);
+  await addByMessage(t, a.page, [golden.url]);
+  await joinRoom(b, room.url);
+  const dots = a.page.locator('.seat-track-dot');
+  await t.until('a dot each', async () => (await dots.count()) === 2);
+  await t.see('the room clock', a.page.locator('.seat-track').getByText(/^\d+:\d\d$/));
+  const box = () => a.page.locator('[data-player]').evaluate((node) => JSON.stringify(node.getBoundingClientRect()));
+  const before = await box();
+  const lefts = () => dots.evaluateAll((list) => list.map((dot) => dot.getBoundingClientRect().left).sort((x, y) => x - y));
+  const together = await lefts();
+  t.check('together, side by side', together[1] - together[0] < 24, together.join());
+  await b.page.evaluate(() => window.__net.send('status', { state: 'correcting', drift: -12 }));
+  await t.until('Ben falls behind on the track', async () => {
+    const [behind = 0, here = 0] = await lefts();
+    return here - behind > 100;
+  });
+  t.eq('the player did not move', await box(), before);
+  const clear = await a.page.evaluate(() => document.querySelector('.seat-track').getBoundingClientRect().top >= document.querySelector('[data-player]').getBoundingClientRect().bottom);
+  t.check('the track is off the player', clear);
 });
 
 flow('leave: Leave goes home, the room hears, and the landing offers the way back', async (t) => {

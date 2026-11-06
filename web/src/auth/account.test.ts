@@ -30,12 +30,14 @@ const load = async (me: Account | null = guest) => {
 let storage: Map<string, string>;
 const responses: { me: Account | null; session: Account | null; meDown?: boolean; configDown?: boolean; signOutDown?: boolean } = { me: null, session: null };
 const signedOutCalls = vi.fn();
+const browserOnlyCalls = vi.fn();
 const exchanges = vi.fn();
 
 describe('account sign-in', () => {
   beforeEach(() => {
     storage = new Map();
     signedOutCalls.mockReset();
+    browserOnlyCalls.mockReset();
     stopPings.mockClear();
     exchanges.mockReset();
     responses.session = ada;
@@ -57,6 +59,10 @@ describe('account sign-in', () => {
       if (path === '/v1/session/clerk') {
         exchanges();
         return body({ user: responses.session });
+      }
+      if (path === '/v1/session?scope=browser' && init?.method === 'DELETE') {
+        browserOnlyCalls();
+        return body({ user: null });
       }
       if (path === '/v1/session' && init?.method === 'DELETE') {
         signedOutCalls();
@@ -257,10 +263,38 @@ describe('account sign-in', () => {
     expect(signedOutCalls).toHaveBeenCalledOnce();
   });
 
-  it('signs out of this app when Clerk no longer knows the viewer', async () => {
+  // The bridge clears this browser's cookie the moment Clerk reports signed out, and
+  // the server needs that cookie to know whose other devices to end.
+  it('tells the server before Clerk, so a sign-out still reaches every device', async () => {
+    const { account, controls, clerkReports } = await load(ada);
+    await clerkReports(true);
+    let serverToldFirst = false;
+    controls.signOut.mockImplementation(async () => {
+      serverToldFirst = signedOutCalls.mock.calls.length === 1;
+      await clerkReports(false);
+    });
+
+    await account.signOut();
+
+    expect(serverToldFirst).toBe(true);
+    expect(browserOnlyCalls).toHaveBeenCalledTimes(0);
+  });
+
+  it('finishes signing out when Clerk has already been told by the server', async () => {
+    const { account, controls, clerkReports } = await load(ada);
+    await clerkReports(true);
+    controls.signOut.mockRejectedValue(new Error('session gone'));
+
+    await expect(account.signOut()).resolves.toBeUndefined();
+
+    expect(account.current().user).toBeNull();
+  });
+
+  it('signs only this browser out when Clerk no longer knows the viewer', async () => {
     const { identityChanges, clerkReports } = await load(ada);
     await clerkReports(false);
-    expect(signedOutCalls).toHaveBeenCalledTimes(1);
+    expect(browserOnlyCalls).toHaveBeenCalledTimes(1);
+    expect(signedOutCalls).toHaveBeenCalledTimes(0);
     expect(identityChanges).toHaveBeenCalledTimes(1);
   });
 

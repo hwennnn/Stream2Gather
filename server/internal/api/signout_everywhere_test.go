@@ -73,6 +73,28 @@ func TestSignOutSaysSoWhenClerkKeptTheOtherDevices(t *testing.T) {
 	}
 }
 
+// A phone left idle past Clerk's session comes back with a good cookie and Clerk
+// saying signed out. That's one browser's news, and no reason to end the others.
+func TestABrowserWhoseClerkLapsedLeavesOnItsOwn(t *testing.T) {
+	test, server := sessionStack(t)
+	clerk := &clerkOnTwoDevices{fakeClerk: server.Clerk.(fakeClerk)}
+	server.Clerk = clerk
+	laptop := signInAs(t, test, "good", nil)
+	phone := signInAs(t, test, "good", nil)
+
+	response, _ := call(t, http.MethodDelete, test.URL+"/v1/session?scope=browser", "", phone)
+
+	if cleared := response.Cookies(); len(cleared) != 1 || cleared[0].MaxAge >= 0 {
+		t.Fatalf("the phone kept its cookie: %v", cleared)
+	}
+	if user := meOf(t, test, laptop); user == nil {
+		t.Fatal("one idle phone signed the laptop out")
+	}
+	if len(clerk.ended) != 0 {
+		t.Fatalf("ended %v, and with them every other device's Clerk session", clerk.ended)
+	}
+}
+
 func TestAGuestSigningOutAsksNothingOfClerk(t *testing.T) {
 	test, server := sessionStack(t)
 	clerk := &clerkOnTwoDevices{fakeClerk: server.Clerk.(fakeClerk)}

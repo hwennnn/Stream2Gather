@@ -65,7 +65,7 @@ export const RoomStatus = ({ view, player, act }: Props) => {
   const playing = view.playback.status === 'playing';
   useTick(playing);
   const position = playing ? expectedPosition(view.playback, Date.now()) : view.playback.pos;
-  const { parts, tone } = statusFor({ view, health: player.report.health, failed: player.failure !== null, act, position });
+  const { parts, tone } = statusFor({ view, health: player.report.health, failed: player.failure !== null, act, position, refused: player.refused, live: view.queue[0]?.isLive });
   return (
     <p className={`truncate text-[13px] leading-5 ${tone === 'warn' ? 'text-warn' : 'text-muted'}`}>
       {parts.map((part, index) => (

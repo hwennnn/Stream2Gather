@@ -50,6 +50,39 @@ describe('watchAutoplay', () => {
     expect(fake.setMuted).not.toHaveBeenCalled();
   });
 
+  it('asks the viewer only once starting muted has been refused too', () => {
+    const fake = fakePlayer('ready');
+    const onRefused = vi.fn();
+    watchAutoplay(() => true, () => false, fake.player, vi.fn(), onRefused);
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(onRefused).not.toHaveBeenCalledWith(true);
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(onRefused).toHaveBeenCalledWith(true);
+    expect(fake.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops asking once the viewer has pressed play, even in a paused room', () => {
+    const fake = fakePlayer('ready');
+    const onRefused = vi.fn();
+    let playing = true;
+    watchAutoplay(() => playing, () => false, fake.player, vi.fn(), onRefused);
+    vi.advanceTimersByTime(CHECK_MS * 2);
+    playing = false;
+    vi.advanceTimersByTime(CHECK_MS);
+    fake.setState('playing');
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(onRefused).toHaveBeenLastCalledWith(false);
+  });
+
+  it('never asks while the room is paused, or after a stop someone meant', () => {
+    const fake = fakePlayer('ready');
+    const onRefused = vi.fn();
+    watchAutoplay(() => false, () => false, fake.player, vi.fn(), onRefused);
+    watchAutoplay(() => true, () => true, fake.player, vi.fn(), onRefused);
+    vi.advanceTimersByTime(CHECK_MS * 3);
+    expect(onRefused).not.toHaveBeenCalledWith(true);
+  });
+
   it('leaves a slow load alone once it plays', () => {
     const fake = fakePlayer('loading');
     watchAutoplay(() => true, () => false, fake.player, vi.fn());

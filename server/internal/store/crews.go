@@ -2,17 +2,27 @@ package store
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// MaxOwnedCrews is how many crews one person can own.
-const MaxOwnedCrews = 10
+const (
+	// MaxCrewMembers is the roster's size. The room's own cap counts who is here.
+	MaxCrewMembers = 50
+	// MaxOwnedCrews is how many crews one person can own.
+	MaxOwnedCrews = 10
+)
 
-// ErrCrewLimit means this person owns all the crews they can.
-var ErrCrewLimit = errors.New("too many crews")
+// Reasons a crew change is refused.
+var (
+	ErrCrewLimit     = errors.New("too many crews")
+	ErrCrewFull      = errors.New("crew is full")
+	ErrInvalidInvite = errors.New("invalid invite")
+)
 
 // Crew is a group's permanent home. Its room holds the name and the owner.
 type Crew struct {
@@ -31,6 +41,14 @@ type CrewAccess struct {
 	Member      bool
 	GuestAccess bool
 	MemberCount int
+}
+
+// CrewMember is one name on a roster.
+type CrewMember struct {
+	UserID    string    `json:"userId"`
+	Name      string    `json:"name"`
+	AvatarURL string    `json:"avatarUrl,omitempty"`
+	JoinedAt  time.Time `json:"joinedAt"`
 }
 
 // reserveCrew turns away an owner who has no crews left. The row lock makes two
@@ -86,6 +104,18 @@ func (p *Postgres) CreateCrew(ctx context.Context, r Room, crew Crew) error {
 	return tx.Commit(ctx)
 }
 
+// CrewOfRoom returns a room's crew, or ErrNotFound for a room without one.
+func (p *Postgres) CrewOfRoom(ctx context.Context, r Room) (Crew, error) {
+	crew := Crew{RoomID: r.ID, Slug: r.Slug, Name: r.Name, OwnerID: r.OwnerID}
+	err := p.pool.QueryRow(ctx, `
+		SELECT id, invite_token, guest_access FROM crews WHERE room_id = $1`, r.ID,
+	).Scan(&crew.ID, &crew.InviteToken, &crew.GuestAccess)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Crew{}, ErrNotFound
+	}
+	return crew, err
+}
+
 // CrewAccessOf answers in one read, because every ticket asks.
 func (p *Postgres) CrewAccessOf(ctx context.Context, roomID, userID string) (CrewAccess, error) {
 	var access CrewAccess
@@ -100,4 +130,55 @@ func (p *Postgres) CrewAccessOf(ctx context.Context, roomID, userID string) (Cre
 	}
 	access.Exists = err == nil
 	return access, err
+}
+
+// JoinCrew adds someone holding the current invite. The crew's row lock stops two
+// joins taking the last place. A member's old link still works: they are in.
+func (p *Postgres) JoinCrew(ctx context.Context, crewID, userID, token string) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	var current string
+	err = tx.QueryRow(ctx, `SELECT invite_token FROM crews WHERE id = $1 FOR UPDATE`, crewID).Scan(&current)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	var members int
+	var member bool
+	err = tx.QueryRow(ctx, `
+		SELECT count(*), coalesce(bool_or(user_id = $2), false) FROM crew_members WHERE crew_id = $1`, crewID, userID,
+	).Scan(&members, &member)
+	if err != nil || member {
+		return err
+	}
+	if subtle.ConstantTimeCompare([]byte(current), []byte(token)) != 1 {
+		return ErrInvalidInvite
+	}
+	if members >= MaxCrewMembers {
+		return ErrCrewFull
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO crew_members (crew_id, user_id) VALUES ($1, $2)`, crewID, userID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// CrewRoster lists members, longest-standing first.
+func (p *Postgres) CrewRoster(ctx context.Context, crewID string) ([]CrewMember, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT m.user_id, u.display_name, coalesce(u.avatar_url, ''), m.joined_at
+		FROM crew_members m JOIN users u ON u.id = m.user_id
+		WHERE m.crew_id = $1 ORDER BY m.joined_at, m.user_id`, crewID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (CrewMember, error) {
+		var m CrewMember
+		return m, row.Scan(&m.UserID, &m.Name, &m.AvatarURL, &m.JoinedAt)
+	})
 }

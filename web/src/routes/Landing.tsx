@@ -1,5 +1,4 @@
 import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
-import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { looksLikeUrl, normalizeUrl } from '../ui/format';
 import { Slot } from '../ui/Slot';
@@ -13,7 +12,6 @@ import { loadRoomPage, startRoom } from './router';
 const CrewRail = lazy(() => import('../crew/CrewRail'));
 
 export const Landing = () => {
-  const { user } = useAccount();
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<Failure | null>(null);
@@ -132,11 +130,9 @@ export const Landing = () => {
           <RoomPicture media={trending?.[0] ?? null} />
         </div>
 
-        {user?.signedIn && (
-          <Slot>
-            <CrewRail />
-          </Slot>
-        )}
+        <Slot>
+          <CrewRail />
+        </Slot>
         <Popular items={trending} busy={busy} disabled={working} onPick={(media) => void start(media.sourceId, media.url)} />
       </main>
 

@@ -259,7 +259,7 @@ func (s *Server) closeCrew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings"})
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]bool{"done": true})
 }
 
 func (s *Server) rotateInvite(w http.ResponseWriter, r *http.Request) {
@@ -340,7 +340,7 @@ func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "members", UserID: target, Kick: !crew.GuestAccess})
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]bool{"done": true})
 }
 
 // memberCrew is findCrew for routes only people on the roster may use. Guests in
@@ -423,7 +423,7 @@ func (s *Server) addWatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "watchlist"})
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]bool{"done": true})
 }
 
 func (s *Server) removeWatch(w http.ResponseWriter, r *http.Request) {
@@ -442,7 +442,7 @@ func (s *Server) removeWatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "watchlist"})
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, map[string]bool{"done": true})
 }
 
 // myCrews feeds the rail. Who is here comes live from each room, so one room's

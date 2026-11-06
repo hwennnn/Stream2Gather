@@ -92,7 +92,7 @@ func TestClosingACrewClosesTheRoomAndClearsWhatItKept(t *testing.T) {
 	if _, err := s.DB.InsertMessage(ctx, record.ID, store.Message{UserID: friendID, Author: "Mika", Body: "hello"}); err != nil {
 		t.Fatal(err)
 	}
-	if response, _ := serve(s, http.MethodDelete, "/v1/crews/"+slug, "", owner); response.Code != http.StatusNoContent {
+	if response, _ := serve(s, http.MethodDelete, "/v1/crews/"+slug, "", owner); response.Code != http.StatusOK {
 		t.Fatalf("delete: %d %s", response.Code, response.Body)
 	}
 	if response, _ := serve(s, http.MethodGet, "/v1/rooms/"+slug, "", friend); response.Code != http.StatusGone {
@@ -144,7 +144,7 @@ func TestLeavingAndRemoval(t *testing.T) {
 	if response, _ := serve(s, http.MethodDelete, members+ownerID, "", friend); response.Code != http.StatusForbidden {
 		t.Fatalf("member removing the owner: %d", response.Code)
 	}
-	if response, _ := serve(s, http.MethodDelete, members+friendID, "", friend); response.Code != http.StatusNoContent {
+	if response, _ := serve(s, http.MethodDelete, members+friendID, "", friend); response.Code != http.StatusOK {
 		t.Fatalf("leaving: %d %s", response.Code, response.Body)
 	}
 	if response, _ := serve(s, http.MethodDelete, members+friendID, "", friend); response.Code != http.StatusConflict {
@@ -155,7 +155,7 @@ func TestLeavingAndRemoval(t *testing.T) {
 		t.Fatalf("rejoin: %d %s", response.Code, response.Body)
 	}
 
-	if response, _ := serve(s, http.MethodDelete, members+friendID, "", owner); response.Code != http.StatusNoContent {
+	if response, _ := serve(s, http.MethodDelete, members+friendID, "", owner); response.Code != http.StatusOK {
 		t.Fatalf("removal: %d %s", response.Code, response.Body)
 	}
 	response, body := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, friend)
@@ -169,7 +169,7 @@ func TestRailListsOnlyMyOpenCrews(t *testing.T) {
 	_, as := signUp(t, s, "Hana")
 	kept, _ := newCrew(t, s, as)
 	closed, _ := newCrew(t, s, as)
-	if response, _ := serve(s, http.MethodDelete, "/v1/crews/"+closed, "", as); response.Code != http.StatusNoContent {
+	if response, _ := serve(s, http.MethodDelete, "/v1/crews/"+closed, "", as); response.Code != http.StatusOK {
 		t.Fatalf("delete: %d", response.Code)
 	}
 	response, body := serve(s, http.MethodGet, "/v1/me/crews", "", as)

@@ -105,6 +105,9 @@ describe('SyncController', () => {
 
   const drift = (playback: Playback) => player.time() - expectedPosition(playback, timers.now);
 
+  /** A viewer's pause waits this long for a double-click to cancel it. */
+  const pauseHeld = () => timers.advance(300);
+
   beforeEach(() => {
     player = new FakePlayer();
     timers = new FakeTimers();
@@ -228,6 +231,7 @@ describe('SyncController', () => {
     sync.apply(playing(0, timers.now));
     run(3);
     player.fire('paused');
+    pauseHeld();
     expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
   });
 
@@ -320,6 +324,7 @@ describe('SyncController', () => {
       lockToggle(playback);
       timers.advance(delay);
       viewerPauses();
+      pauseHeld();
       expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
     });
 
@@ -410,6 +415,7 @@ describe('SyncController', () => {
     it('hears a pause', () => {
       nudged();
       player.fire('paused');
+      pauseHeld();
       expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
     });
 
@@ -527,6 +533,7 @@ describe('SyncController', () => {
       sync.apply(playing(0, timers.now));
       run(1);
       player.fire('paused');
+      pauseHeld();
       expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
     });
 
@@ -539,6 +546,7 @@ describe('SyncController', () => {
       sync.apply(room);
       run(3);
       player.fire('paused');
+      pauseHeld();
       expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
     });
 
@@ -548,6 +556,7 @@ describe('SyncController', () => {
       player.status = 'paused';
       player.fire('buffering');
       player.fire('paused');
+      pauseHeld();
       expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
     });
 
@@ -571,6 +580,7 @@ describe('SyncController', () => {
       run(5);
       commands.length = 0;
       player.fire('paused');
+      pauseHeld();
       timers.advance(100);
       player.fire('playing');
       expect(commands.map((c) => c.type)).toEqual(['pause', 'play']);
@@ -583,6 +593,7 @@ describe('SyncController', () => {
       player.fire('playing');
       timers.advance(100);
       player.fire('paused');
+      pauseHeld();
       expect(commands.map((c) => c.type)).toEqual(['play', 'pause']);
     });
 
@@ -591,6 +602,7 @@ describe('SyncController', () => {
       run(5);
       commands.length = 0;
       player.fire('paused');
+      pauseHeld();
       timers.advance(100);
       player.fire('playing');
       const pos = player.time();
@@ -611,6 +623,7 @@ describe('SyncController', () => {
       run(3);
       expect(player.state()).toBe('playing');
       player.fire('paused');
+      pauseHeld();
       expect(commands.map((c) => c.type)).toEqual(['pause', 'pause']);
     });
 
@@ -619,6 +632,7 @@ describe('SyncController', () => {
       run(5);
       commands.length = 0;
       player.fire('paused');
+      pauseHeld();
       sync.apply({ item: 'a', status: 'idle', pos: 0, at: timers.now, rate: 1 });
       player.fire('playing');
       expect(commands.map((c) => c.type)).toEqual(['pause']);
@@ -629,8 +643,112 @@ describe('SyncController', () => {
       run(5);
       commands.length = 0;
       player.fire('paused');
+      pauseHeld();
       player.fire('paused');
+      pauseHeld();
       expect(commands.map((c) => c.type)).toEqual(['pause']);
+    });
+  });
+
+  describe('a pause that is not one', () => {
+    const playingAt = (time: number) => {
+      sync.apply(playing(time, timers.now));
+      player.current = time;
+      run(3);
+      commands.length = 0;
+      player.seeks = [];
+    };
+
+    it('tells the room nothing about a double-click', () => {
+      playingAt(30);
+      player.fire('paused');
+      timers.advance(150);
+      player.fire('playing');
+      run(3);
+      expect(commands).toEqual([]);
+      expect(player.state()).toBe('playing');
+    });
+
+    it('tells the room nothing when a double-click passes through buffering', () => {
+      playingAt(30);
+      player.fire('paused');
+      player.fire('buffering');
+      timers.advance(260);
+      player.fire('playing');
+      run(3);
+      expect(commands).toEqual([]);
+    });
+
+    it('takes a click on the timeline for a seek', () => {
+      playingAt(30);
+      player.current = 165;
+      player.fire('paused');
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 165 })]);
+    });
+
+    it('takes a drag along the timeline for one seek', () => {
+      playingAt(30);
+      player.current = 87;
+      player.fire('paused');
+      for (const time of [118, 150, 181, 212]) {
+        timers.advance(500);
+        player.current = time;
+        timers.advance(500);
+        sync.tick();
+      }
+      expect(commands).toEqual([]);
+      expect(player.seeks).toEqual([]);
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 212 })]);
+    });
+
+    it('pauses the room where a viewer lets go of a paused drag', () => {
+      playingAt(30);
+      player.current = 87;
+      player.fire('paused');
+      timers.advance(500);
+      player.current = 118;
+      timers.advance(500); // It moved, so it looks again.
+      timers.advance(1000);
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause', pos: 118 })]);
+    });
+
+    it('does not resume a pause it is holding', () => {
+      playingAt(30);
+      player.current = 87;
+      player.fire('paused');
+      timers.advance(900);
+      sync.tick();
+      expect(player.state()).toBe('paused');
+    });
+
+    it('keeps the pause when someone else moves the room first', () => {
+      playingAt(30);
+      player.fire('paused');
+      timers.advance(100);
+      sync.apply(playing(90, timers.now));
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+      expect(player.state()).toBe('paused');
+    });
+
+    it('still follows the room when the player was only buffering', () => {
+      playingAt(30);
+      player.fire('paused');
+      player.fire('buffering');
+      timers.advance(100);
+      sync.apply(playing(90, timers.now));
+      expect(commands).toEqual([]);
+      expect(player.seeks.at(-1)).toBeGreaterThan(89);
+    });
+
+    it('forgets the pause when the room pauses first', () => {
+      playingAt(30);
+      player.fire('paused');
+      timers.advance(100);
+      sync.apply({ item: 'a', status: 'paused', pos: 30, at: timers.now, rate: 1 });
+      run(1);
+      expect(commands).toEqual([]);
     });
   });
 
@@ -646,6 +764,16 @@ describe('SyncController', () => {
       run(1);
       expect(player.status).toBe('playing');
       expect(commands.length).toBe(1);
+    });
+
+    it('resumes a refused pause as soon as the room says no', () => {
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(3);
+      player.fire('paused');
+      pauseHeld();
+      sync.apply({ ...room }, true); // The snapshot sent with the refusal.
+      expect(player.status).toBe('playing');
     });
 
     it('puts a refused seek back', () => {

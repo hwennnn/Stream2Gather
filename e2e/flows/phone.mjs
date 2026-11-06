@@ -1,4 +1,5 @@
 import { addByMessage, joinRoom, openTab, search, sendChat, startRoom, ui } from '../lib/app.mjs';
+import { crowd } from '../lib/bots.mjs';
 import { LANDSCAPE, PHONE } from '../lib/client.mjs';
 import { video } from '../lib/fixtures.mjs';
 import { insets } from '../lib/layout.mjs';
@@ -135,6 +136,43 @@ flow('phone: the room has its name, a labelled Leave, seats you can hit, and rea
   const rest = await a.page.getByRole('button', { name: 'React 🔥' }).filter({ visible: true }).evaluate((button) => getComputedStyle(button).filter);
   t.eq('in full colour at rest', rest, 'none');
   await noSideScroll(t, a.page, 'the room');
+});
+
+flow('phone: the light stays in the top bar, and a full row still only slides sideways', async (t) => {
+  const a = await phone(t, 'Ana');
+  const room = await startRoom(t, a, { url: golden.url, name: 'Ana' });
+  const bots = await crowd(t, room.slug, 9);
+  const read = () => a.page.evaluate(() => {
+    const row = [...document.querySelectorAll('.room-header .seats')].find((node) => node.getClientRects().length);
+    const seat = row.querySelector('.seat[data-away]');
+    const pool = getComputedStyle(seat, '::before');
+    const top = seat.getBoundingClientRect().top + parseFloat(pool.top);
+    const clock = [...document.querySelectorAll('.seat-track-slot *')].filter((node) => /^\d+:\d\d$/.test(node.textContent) && node.getClientRects().length).at(-1);
+    const box = clock?.getBoundingClientRect();
+    return {
+      full: row.scrollWidth > row.clientWidth,
+      lit: pool.backgroundImage.startsWith('radial-gradient'),
+      // A row that holds its light clips it, so that's where the light can end. One that doesn't has only the pool's own box.
+      end: getComputedStyle(row).overflowY === 'visible' ? top + parseFloat(pool.height) : row.getBoundingClientRect().bottom,
+      sliding: getComputedStyle(row).overflowY,
+      header: document.querySelector('.room-header').getBoundingClientRect().bottom,
+      player: document.querySelector('[data-player]').getBoundingClientRect().top,
+      clockOnTop: box ? clock.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)) : null,
+    };
+  });
+  await t.until('a full row', async () => (await read()).full, 8000);
+  const upright = await read();
+  t.check('everyone casts a little light', upright.lit);
+  t.check('it ends in the bar, above the player', upright.end <= upright.header && upright.header <= upright.player, JSON.stringify(upright));
+  t.eq('the row can’t scroll up and down', upright.sliding, 'hidden');
+  t.check('the clock is on top of it', upright.clockOnTop === true);
+  for (const [name, viewport] of [['a short phone', { width: 320, height: 568 }], ['sideways', LANDSCAPE]]) {
+    await a.page.setViewportSize(viewport);
+    await t.sleep(200);
+    const now = await read();
+    t.check(`${name}: still in the bar, above the player`, now.end <= now.header + 2 && now.end <= now.player, JSON.stringify(now));
+  }
+  bots.forEach((bot) => bot.close());
 });
 
 for (const [width, height] of [[390, 844], [390, 664], [320, 568]]) {

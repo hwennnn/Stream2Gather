@@ -195,3 +195,38 @@ func TestAFourPersonTwoHourSessionBuildsInUnderASecond(t *testing.T) {
 		t.Fatalf("took %s", took)
 	}
 }
+
+func TestPastSessionsKnowTheirPeopleUntilAnAccountGoes(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	crewID, owner := testCrew(t, db)
+	mika := aGuest(t, db, "Mika")
+	endedSession(t, db, crewID, nil, Person{UserID: owner, Name: "Hana", Member: true}, Person{UserID: mika, Name: "Mika"})
+
+	person := func(name string) SessionPerson {
+		t.Helper()
+		sessions, err := db.CrewSessions(ctx, crewID, time.Now(), 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, candidate := range sessions[0].People {
+			if candidate.Name == name {
+				return candidate
+			}
+		}
+		t.Fatalf("no %s in %+v", name, sessions[0].People)
+		return SessionPerson{}
+	}
+
+	if got := person("Mika").UserID; got != mika {
+		t.Fatalf("id %q, want %q", got, mika)
+	}
+	if _, err := db.DeleteAccount(ctx, mika); err != nil {
+		t.Fatal(err)
+	}
+	if got := person("Former member").UserID; got != "" {
+		t.Fatalf("a deleted account still has id %q", got)
+	}
+	if got := person("Hana").UserID; got != owner {
+		t.Fatalf("id %q, want %q", got, owner)
+	}
+}

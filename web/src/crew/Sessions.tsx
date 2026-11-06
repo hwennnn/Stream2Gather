@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RecapCard } from '../recap/RecapCard';
 import { DISCLOSURE, together } from '../recap/words';
+import { Avatar } from '../ui/Avatar';
 import { initials } from '../ui/format';
 import { crewApi, type PastSession, type SessionPage } from './api';
 
@@ -19,18 +20,22 @@ const watched = ({ videos }: PastSession): string => {
   return videos.length > 1 ? `${title} + ${videos.length - 1} more` : title;
 };
 
-/** Discs stay neutral: a session carries names, not ids, and a person's hue comes from their id. */
+/** Each face in its person's hue. A former member has no id, so theirs stays neutral. */
 const SessionRow = ({ slug, session, hasRecap }: { slug: string; session: PastSession; hasRecap: boolean }) => {
   const [open, setOpen] = useState(false);
   return (
     <li className="py-1 text-sm">
       <div className="flex min-h-11 items-center gap-3">
         <span aria-hidden="true" className="flex w-[60px] shrink-0 -space-x-1.5">
-          {session.people.slice(0, FACES).map((person, index) => (
-            <span key={index} title={person.name} className="inline-flex size-7 items-center justify-center rounded-full bg-raised text-[11px] font-semibold text-muted ring-2 ring-ink">
-              {initials(person.name)}
-            </span>
-          ))}
+          {session.people.slice(0, FACES).map((person, index) =>
+            person.userId ? (
+              <Avatar key={index} person={{ userId: person.userId, name: person.name }} className="size-7 text-[11px] ring-2 ring-ink" />
+            ) : (
+              <span key={index} title={person.name} className="inline-flex size-7 items-center justify-center rounded-full bg-raised text-[11px] font-semibold text-muted ring-2 ring-ink">
+                {initials(person.name)}
+              </span>
+            ),
+          )}
         </span>
         <span className="relative min-w-0 flex-1 truncate">
           {watched(session)}

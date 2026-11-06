@@ -144,7 +144,7 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
         <PushCard />
       </Suspense>
 
-      <Watchlist slug={slug} items={home.watchlist} onChange={refresh} />
+      <Watchlist slug={slug} items={home.watchlist} selfId={user?.id} onChange={refresh} />
 
       <Sessions slug={slug} page={sessions} setPage={setSessions} />
 

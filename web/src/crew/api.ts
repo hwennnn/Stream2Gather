@@ -2,7 +2,15 @@ import { post, request, type Media, type RoomPreview } from '../api/http';
 
 export type CrewLine = { slug: string; name: string; here: number };
 
-export type WatchItem = { id: number; source: string; sourceId: string; addedAt: string; media: Media | null };
+export type WatchItem = {
+  id: number;
+  source: string;
+  sourceId: string;
+  addedAt: string;
+  /** Null once the account that added it has gone. */
+  addedBy: { userId: string; name: string } | null;
+  media: Media | null;
+};
 
 export type RosterEntry = { userId: string; name: string; avatarUrl?: string; joinedAt: string };
 
@@ -18,7 +26,8 @@ export type PastSession = {
   id: string;
   startedAt: string;
   endedAt: string;
-  people: { name: string; isGuest: boolean }[];
+  /** A person has no id once their account has gone. */
+  people: { userId?: string; name: string; isGuest: boolean }[];
   videos: { source: string; sourceId?: string; media: Media | null }[];
 };
 

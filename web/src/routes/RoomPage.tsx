@@ -17,7 +17,7 @@ import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerSta
 import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
-import { canControl, noticesToShow, toastLift } from '../ui/rules';
+import { canControl, chatOffersInvite, noticesToShow, toastLift } from '../ui/rules';
 import { Slot } from '../ui/Slot';
 import { JumpToast, ToastStack, useToasts } from '../ui/Toasts';
 import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
@@ -355,7 +355,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
 
         {/* Hidden rather than removed, so a chat draft survives theatre mode. */}
         <aside aria-label="Room" hidden={railHidden} className="room-rail">
-          {inviting && !view.alone && <InviteSheet view={view} url={inviteUrl} copied={copied} onCopy={() => void copyInvite()} onClose={() => setInviting(false)} />}
+          {inviting && !chatOffersInvite(view, tab) && <InviteSheet view={view} url={inviteUrl} copied={copied} onCopy={() => void copyInvite()} onClose={() => setInviting(false)} />}
           <div role="tablist" aria-label="Room panels" onKeyDown={moveTab} className="rail-edge flex shrink-0 gap-5 border-b border-line">
             {TABS.map(({ id, label }) => {
               const count = id === 'queue' ? Math.max(view.queue.length - 1, 0) : id === 'people' ? view.members.length : 0;

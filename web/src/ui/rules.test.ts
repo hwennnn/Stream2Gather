@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatEntry, RoomView } from '../room/session';
-import { canControl, canQueue, chatScroll, countUnread, failureNote, noticesToShow, pillFor, toastLift } from './rules';
+import { canControl, canQueue, chatOffersInvite, chatScroll, countUnread, failureNote, noticesToShow, pillFor, toastLift } from './rules';
 
 const view = (patch: Partial<RoomView>): RoomView =>
   ({
@@ -155,5 +155,21 @@ describe('noticesToShow', () => {
   it('shows everything when the chat is not on screen', () => {
     expect(noticesToShow(notices, 'queue', false)).toEqual(notices);
     expect(noticesToShow(notices, 'chat', true)).toEqual(notices);
+  });
+});
+
+describe('chatOffersInvite', () => {
+  const queue = [{ id: 'q' }] as RoomView['queue'];
+  const line = { kind: 'chat' } as ChatEntry;
+
+  it('is true only when the card is on screen, alone with a video and no chat yet', () => {
+    expect(chatOffersInvite(view({ alone: true, queue, messages: [] }), 'chat')).toBe(true);
+  });
+
+  it('is false otherwise, so Invite has to answer some other way', () => {
+    expect(chatOffersInvite(view({ alone: true, queue: [], messages: [] }), 'chat')).toBe(false);
+    expect(chatOffersInvite(view({ alone: true, queue, messages: [line] }), 'chat')).toBe(false);
+    expect(chatOffersInvite(view({ alone: true, queue, messages: [] }), 'queue')).toBe(false);
+    expect(chatOffersInvite(view({ alone: false, queue, messages: [] }), 'chat')).toBe(false);
   });
 });

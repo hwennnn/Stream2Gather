@@ -911,6 +911,17 @@ body {
   .row-more {
     display: inline-flex;
   }
+
+  /* Always showing here, so it is a column of the row, inside the rail's gutter. Positioned to stay above the tap target. */
+  .row-grip {
+    position: relative;
+    left: 0;
+    flex: none;
+    align-self: stretch;
+    width: 1.25rem;
+    height: auto;
+    margin-right: -0.25rem;
+  }
 }
 
 /* ---- Reactions ------------------------------------------------------------

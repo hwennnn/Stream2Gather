@@ -4,9 +4,8 @@ import { AccountMenu } from '../ui/AccountMenu';
 import { looksLikeUrl, normalizeUrl } from '../ui/format';
 import { Slot } from '../ui/Slot';
 import { useTrending } from '../ui/useTrending';
-import { HeroPreview } from './landing/HeroPreview';
 import { BAD_LINK, EMPTY, failureFor, type Failure } from './landing/notes';
-import { Footer, HowItWorks, InsideARoom, Trending } from './landing/Sections';
+import { Footer, Trending } from './landing/Sections';
 import { loadRoomPage, startRoom } from './router';
 
 const CrewRail = lazy(() => import('../crew/CrewRail'));
@@ -56,11 +55,6 @@ export const Landing = () => {
       return;
     }
     void start('link', normalizeUrl(text));
-  };
-
-  const focusInput = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    input.current?.focus({ preventScroll: true });
   };
 
   const working = busy !== null;
@@ -151,7 +145,6 @@ export const Landing = () => {
             </div>
           </div>
 
-          <HeroPreview thumbnail={trending?.[0]?.thumbnailUrl ?? ''} title={trending?.[0]?.title ?? 'Tonight’s movie'} />
         </section>
 
         {user?.signedIn && (
@@ -160,8 +153,6 @@ export const Landing = () => {
           </Slot>
         )}
         <Trending items={trending} busy={busy} disabled={working} onPick={(media) => void start(media.sourceId, media.url)} />
-        <InsideARoom items={trending} />
-        <HowItWorks disabled={working} onStart={focusInput} />
       </main>
 
       <Footer />

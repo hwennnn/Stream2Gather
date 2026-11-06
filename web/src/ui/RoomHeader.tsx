@@ -7,6 +7,7 @@ import { LeaveLink } from './LeaveLink';
 import { Mark } from './Mark';
 import { drivingLine, isLocked } from './rules';
 import { Seats } from './Seats';
+import { SeatTrack } from './SeatTrack';
 import type { Row } from './seatRow';
 import { Slot } from './Slot';
 
@@ -43,6 +44,7 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
     {isLocked(view) && <DrivingChip view={view} className="phone:hidden" />}
     <div className="hidden min-w-0 phone:order-last phone:block phone:w-full phone:px-3 phone:pb-1 land:order-none land:block land:w-auto land:p-0">
       <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} compact />
+      <div className="seat-track-slot">{view.queue[0] && <SeatTrack view={view} />}</div>
     </div>
 
     <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 phone:gap-1 land:gap-1.5">

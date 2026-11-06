@@ -54,9 +54,9 @@ flow('track: one dot each, a friend behind sits behind, and the player does not 
   const room = await startRoom(t, a);
   await addByMessage(t, a.page, [golden.url]);
   await joinRoom(b, room.url);
-  const dots = a.page.locator('.seat-track-dot');
+  const dots = a.page.locator('.front-row .seat-track-dot');
   await t.until('a dot each', async () => (await dots.count()) === 2);
-  await t.see('the room clock', a.page.locator('.seat-track').getByText(/^\d+:\d\d$/));
+  await t.see('the room clock', a.page.locator('.front-row .seat-track').getByText(/^\d+:\d\d$/));
   const box = () => a.page.locator('[data-player]').evaluate((node) => JSON.stringify(node.getBoundingClientRect()));
   const before = await box();
   const lefts = () => dots.evaluateAll((list) => list.map((dot) => dot.getBoundingClientRect().left).sort((x, y) => x - y));
@@ -68,7 +68,7 @@ flow('track: one dot each, a friend behind sits behind, and the player does not 
     return here - behind > 100;
   });
   t.eq('the player did not move', await box(), before);
-  const clear = await a.page.evaluate(() => document.querySelector('.seat-track').getBoundingClientRect().top >= document.querySelector('[data-player]').getBoundingClientRect().bottom);
+  const clear = await a.page.evaluate(() => document.querySelector('.front-row .seat-track').getBoundingClientRect().top >= document.querySelector('[data-player]').getBoundingClientRect().bottom);
   t.check('the track is off the player', clear);
 });
 

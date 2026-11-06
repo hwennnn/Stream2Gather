@@ -654,6 +654,17 @@ func (s *Server) mediaFailed(w http.ResponseWriter, err error) {
 	s.internal(w, err)
 }
 
+// searchFailed is for lookups that lean on the source being up. When it isn't,
+// that isn't this server breaking, and a person still has something to do instead.
+func (s *Server) searchFailed(w http.ResponseWriter, err error) {
+	if source.IsUserError(err) {
+		s.mediaFailed(w, err)
+		return
+	}
+	s.Log.Warn("search failed", "error", err)
+	writeProblem(w, http.StatusServiceUnavailable, "search_unavailable", "Search isn’t working right now. Paste a link instead.")
+}
+
 func (s *Server) findRoom(w http.ResponseWriter, r *http.Request) (store.Room, bool) {
 	record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug"))
 	if errors.Is(err, store.ErrNotFound) {
@@ -890,7 +901,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 	// the day's search quota.
 	items, err := s.Catalog.Search(r.Context(), "youtube", query, "")
 	if err != nil {
-		s.mediaFailed(w, err)
+		s.searchFailed(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": source.ForViewer(items, r.URL.Query().Get("viewer"))})
@@ -899,7 +910,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 func (s *Server) trending(w http.ResponseWriter, r *http.Request) {
 	items, err := s.Catalog.Trending(r.Context(), "youtube")
 	if err != nil {
-		s.mediaFailed(w, err)
+		s.searchFailed(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": source.ForViewer(items, r.URL.Query().Get("viewer"))})

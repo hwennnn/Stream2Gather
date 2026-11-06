@@ -1,12 +1,36 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/geist';
 
 /* Narrow screens, and phones held sideways. */
 @custom-variant phone (@media (max-width: 639px));
 @custom-variant land (@media (orientation: landscape) and (max-height: 500px));
 
+@font-face {
+  font-family: Geist;
+  src: url('./fonts/geist-latin.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+0192, U+02C6, U+02DA, U+02DC, U+2013-2014, U+2018-201E, U+2022, U+2026, U+2030, U+2039-203A, U+20AC, U+2122, U+2190-2193, U+2212, U+2318;
+}
+
+/* Only a name with letters beyond Western Europe downloads this one. */
+@font-face {
+  font-family: Geist;
+  src: url('./fonts/geist-latin-ext.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0100-0130, U+0132-0151, U+0154-017F;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('./fonts/geist-mono-latin.woff2') format('woff2');
+  font-weight: 400 500;
+  font-display: swap;
+}
+
 @theme {
-  --font-sans: 'Geist Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --color-ink: #0b0f1e;
   --color-panel: #121730;
   --color-raised: #1b2240;

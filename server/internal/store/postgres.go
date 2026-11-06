@@ -28,6 +28,8 @@ const embedBlockDays = 7
 
 const uniqueViolation = "23505"
 
+const foreignKeyViolation = "23503"
+
 // Postgres runs durable queries.
 type Postgres struct {
 	pool *pgxpool.Pool

@@ -277,7 +277,7 @@ for (const [path, hlsJs] of [['native', false], ['hls.js', true]]) {
 // Only hls.js can be refused: it fetches, and a plain video doesn't need the host's leave.
 {
   const refused = await viewer('refused', { hlsJs: true });
-  await createRoom(refused, `${BASE.replace('127.0.0.1', 'localhost')}/hls/index.m3u8`);
+  await createRoom(refused, `${BASE.replace('localhost', '127.0.0.1')}/hls/index.m3u8`);
   const said = await refused.page
     .getByText('doesn’t allow playback here')
     .first()

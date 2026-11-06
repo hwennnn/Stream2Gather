@@ -1,7 +1,7 @@
 // Puts real browsers in a room's call against a real LiveKit, and proves they hear
 // each other: each sends its own tone, and each must hear the other's. A real click
 // starts the audio, so there's no autoplay flag here.
-// `make e2e-voice` builds what this needs. By hand: BASE=http://127.0.0.1:18082 node voice.mjs
+// `make e2e-voice` builds what this needs. By hand: BASE=http://localhost:18082 node voice.mjs [shots-dir]
 //   E2E_LIVEKIT_CONTAINER  stops this container to check the room survives it
 //   E2E_SOAK_MS            how long to stay in a call past token expiry at the end.
 //                          E2E_SAMPLE must run longer, or the room has no video left to check
@@ -13,9 +13,10 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
 import { instrument } from './voice-page.mjs';
 
-const BASE = process.env.BASE ?? 'http://127.0.0.1:18082';
+const BASE = process.env.BASE ?? 'http://localhost:18082';
 const CONTAINER = process.env.E2E_LIVEKIT_CONTAINER ?? '';
 const SOAK_MS = Number(process.env.E2E_SOAK_MS ?? 0);
+const SHOTS = process.argv[2];
 const ROUNDS = 10;
 const ALICE_HZ = 440;
 const BOB_HZ = 880;
@@ -109,6 +110,16 @@ const spread = async (people, seconds) => {
   return { n: drifts.length, p95: Math.round(p95(drifts)), max: Math.round(Math.max(...drifts)) };
 };
 
+/** What someone in the call sees, at desktop and phone sizes, for a person to look at. */
+const shots = async (who, name) => {
+  if (!SHOTS) return;
+  await who.page.screenshot({ path: joinPath(SHOTS, `${name}-desktop.png`) });
+  await who.page.setViewportSize({ width: 390, height: 844 });
+  await sleep(500);
+  await who.page.screenshot({ path: joinPath(SHOTS, `${name}-phone.png`) });
+  await who.page.setViewportSize({ width: 1280, height: 800 });
+};
+
 const run = async () => {
   const aliceBrowser = await launch(toneFile(ALICE_HZ));
   const bobBrowser = await launch(toneFile(BOB_HZ));
@@ -191,6 +202,9 @@ const run = async () => {
   const panel = bob.page.locator('#panel-people');
   await panel.getByText('Speaking').first().waitFor();
   check('talking shows on the person, in words', true);
+  await bob.page.locator(".seat[data-speaking='true']:visible").first().waitFor();
+  check('and on their seat', true);
+  await shots(bob, 'voice-talking');
   await button(bob, 'Mute').click();
 
   // Ducking, on a file: Alice talks and Bob's video comes down, then back.

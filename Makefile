@@ -1,4 +1,4 @@
-.PHONY: up down voice web serve worker notifier temporal test sample e2e
+.PHONY: up down voice voice-keys web serve worker notifier temporal test sample e2e
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
@@ -6,9 +6,15 @@ up:
 down:
 	docker compose -f deploy/compose.yaml down
 
-# Needs LIVEKIT_KEYS="key: secret" in the environment, matching server/.env.local.
-voice:
-	docker compose -f deploy/compose.yaml --profile voice up -d livekit
+# Writes local LiveKit keys into server/.env.local once. `make voice` reads them from there.
+voice-keys:
+	@umask 077; grep -q '^LIVEKIT_API_SECRET=' server/.env.local 2>/dev/null || \
+		printf 'LIVEKIT_URL=ws://127.0.0.1:17880\nLIVEKIT_API_KEY=dev%s\nLIVEKIT_API_SECRET=%s\n' \
+		"$$(openssl rand -hex 6)" "$$(openssl rand -hex 24)" >> server/.env.local
+
+voice: voice-keys
+	. server/.env.local && LIVEKIT_KEYS="$$LIVEKIT_API_KEY: $$LIVEKIT_API_SECRET" \
+		docker compose -f deploy/compose.yaml --profile voice up -d livekit
 
 web:
 	cd web && npm ci && npm run build

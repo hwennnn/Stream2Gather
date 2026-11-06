@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Runs sync.mjs against a private server and a fresh web build, so it never
+# Runs an e2e script, sync.mjs unless told otherwise, against a private server and a fresh web build, so it never
 # touches a server in use or tests stale code. Needs `make up` and Google Chrome.
 #   E2E_PORT    port for the private server (18082)
 #   E2E_SAMPLE  the test video, made here if missing (.data/sample.mp4)
 #   E2E_OUT     where sync.mjs leaves its screenshots (a temporary folder)
+#   E2E_SCRIPT  which script to run (sync.mjs)
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
@@ -43,4 +44,4 @@ for _ in $(seq 1 100); do
 done
 
 cd "$root/e2e"
-BASE=$base node sync.mjs "$out"
+BASE=$base node "${E2E_SCRIPT:-sync.mjs}" "$out"

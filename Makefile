@@ -1,4 +1,4 @@
-.PHONY: up down voice voice-keys web serve worker notifier temporal test sample e2e
+.PHONY: up down voice voice-keys web serve worker notifier temporal test sample e2e e2e-voice
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
@@ -47,3 +47,6 @@ sample:
 # Starts its own server. All it needs running first is `make up`.
 e2e:
 	./e2e/run.sh
+
+e2e-voice:
+	E2E_SCRIPT=voice.mjs ./e2e/run.sh

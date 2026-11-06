@@ -5,10 +5,10 @@ import { useInviteUrl } from '../crew/useInviteUrl';
 import { RoomSession, type RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { ChatPanel, useUnread } from '../ui/ChatPanel';
-import { DeadEnd, ENDINGS, fullRoom, type Ending } from '../ui/DeadEnd';
+import { closedRoom, DeadEnd, ENDINGS, fullRoom, type Ending } from '../ui/DeadEnd';
 import { JoinGate } from '../ui/JoinGate';
 import { InviteSheet } from '../ui/InviteSheet';
-import { rememberRoom } from './landing/recent';
+import { peopleLastIn, rememberRoom } from './landing/recent';
 import { Page } from '../ui/Page';
 import { firstName } from '../ui/people';
 import { RoomStatus, useLatestAct } from '../ui/RoomStatus';
@@ -50,10 +50,10 @@ const COPIED_MS = 2000;
 
 const arrival = () => (window.history.state ?? {}) as { joined?: boolean };
 
-const endingFor = (error: unknown): Ending => {
+const endingFor = (error: unknown, slug: string): Ending => {
   if (error instanceof ApiError) {
     if (error.status === 404) return ENDINGS.missing;
-    if (error.status === 410) return ENDINGS.closed;
+    if (error.status === 410) return closedRoom(peopleLastIn(slug));
   }
   return ENDINGS.unreachable;
 };
@@ -74,7 +74,7 @@ export const RoomPage = ({ slug }: { slug: string }) => {
     setEnding(null);
     api.preview(slug).then(
       (next) => live && setPreview(next),
-      (error: unknown) => live && setEnding(endingFor(error)),
+      (error: unknown) => live && setEnding(endingFor(error, slug)),
     );
     return () => {
       live = false;
@@ -92,7 +92,7 @@ export const RoomPage = ({ slug }: { slug: string }) => {
 
   if (!joined) {
     if (ending) return <DeadEnd {...ending} onRetry={ending === ENDINGS.unreachable ? () => setAttempt(attempt + 1) : undefined} />;
-    if (preview && isFull(preview, user?.id)) return <DeadEnd {...fullRoom(preview.members.length, preview.maxMembers)} />;
+    if (preview && isFull(preview, user?.id)) return <DeadEnd {...fullRoom(preview.members)} />;
     const gate = <JoinGate preview={preview} onJoin={join} />;
     if (!preview?.crew) return gate;
     return (
@@ -141,9 +141,9 @@ const RoomFailure = ({ slug, failure }: { slug: string; failure: string | null }
       (preview) => {
         if (!live) return;
         const full = preview.members.length >= preview.maxMembers;
-        setEnding(full ? fullRoom(preview.members.length, preview.maxMembers) : { title: 'We couldn’t open this room', body: failure ?? 'Try the link again in a moment.' });
+        setEnding(full ? fullRoom(preview.members) : { title: 'We couldn’t open this room', body: failure ?? 'Try the link again in a moment.' });
       },
-      (error: unknown) => live && setEnding(endingFor(error)),
+      (error: unknown) => live && setEnding(endingFor(error, slug)),
     );
     return () => {
       live = false;
@@ -231,7 +231,8 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
     if (id) seenItem.current = id;
   }, [current?.id]);
 
-  useEffect(() => rememberRoom(slug, view.name), [slug, view.name]);
+  const others = useMemo(() => view.members.filter(({ userId }) => userId !== view.self?.userId), [view.members, view.self?.userId]);
+  useEffect(() => rememberRoom(slug, view.name, others), [slug, view.name, others]);
 
   useEffect(() => {
     document.title = unread > 0 ? `(${unread}) ${view.name}` : view.name;

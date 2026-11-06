@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAccount } from '../auth/account';
+import { Missed } from '../catchup/Missed';
 import { RecapCard } from '../recap/RecapCard';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
@@ -106,6 +107,8 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
       )}
 
       {latest && <RecapCard key={latest.id} slug={slug} sessionId={latest.id} />}
+
+      <Missed slug={slug} />
 
       <section aria-label="Now" className="mt-6">
         {home.nowPlaying && (

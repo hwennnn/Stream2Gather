@@ -115,8 +115,8 @@ func Load() (Config, error) {
 		EnableTwitch: os.Getenv("ENABLE_TWITCH") == "true",
 		TwitchParent: env("TWITCH_PARENT", "localhost"),
 	}
-	if cfg.Env != "dev" && cfg.SessionKey == "" {
-		return Config{}, fmt.Errorf("SESSION_KEY is required outside dev")
+	if err := cfg.check(os.Getenv("TRUSTED_PROXY")); err != nil {
+		return Config{}, err
 	}
 	return cfg, nil
 }
@@ -146,6 +146,48 @@ func namedOrigin(origin string) string {
 func IPOrigin(origin string) bool {
 	link, err := url.Parse(origin)
 	return err == nil && net.ParseIP(link.Hostname()) != nil
+}
+
+// check refuses to start a server whose settings would quietly be unsafe. dev
+// means cookies without Secure and a key on disk, so it stays on this machine.
+// Anywhere else a wrong guess about the proxy puts every viewer on one address,
+// sharing one set of limits, so it has to be stated.
+func (c Config) check(trustedProxy string) error {
+	if trustedProxy != "" && trustedProxy != "true" && trustedProxy != "false" {
+		return fmt.Errorf("TRUSTED_PROXY must be true or false, not %q", trustedProxy)
+	}
+	origin, err := url.Parse(c.PublicOrigin)
+	if err != nil {
+		return fmt.Errorf("PUBLIC_ORIGIN is not a URL: %w", err)
+	}
+	if c.Env == "dev" {
+		if !localHost(origin.Hostname()) {
+			return fmt.Errorf("APP_ENV is dev but PUBLIC_ORIGIN %s is not local: set APP_ENV=production", c.PublicOrigin)
+		}
+		if host, _, err := net.SplitHostPort(c.HTTPAddr); err != nil || !localHost(host) {
+			return fmt.Errorf("APP_ENV is dev but HTTP_ADDR %s is not loopback: set APP_ENV=production", c.HTTPAddr)
+		}
+		return nil
+	}
+	if c.SessionKey == "" {
+		return fmt.Errorf("SESSION_KEY is required outside dev")
+	}
+	if origin.Scheme != "https" {
+		return fmt.Errorf("PUBLIC_ORIGIN must be https outside dev, or Secure cookies never come back: %s", c.PublicOrigin)
+	}
+	if trustedProxy == "" {
+		return fmt.Errorf("TRUSTED_PROXY must be set outside dev: true behind exactly one proxy, otherwise false")
+	}
+	return nil
+}
+
+// localHost reports whether a name can only mean this machine or a test domain.
+func localHost(host string) bool {
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".test") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func env(key, fallback string) string {

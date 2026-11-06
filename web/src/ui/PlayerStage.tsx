@@ -23,8 +23,6 @@ type StageProps = {
   session: RoomSession;
   view: RoomView;
   player: RoomPlayer;
-  /** A video has finished in this visit, so an empty room means the queue ran out. */
-  finished: boolean;
   /** Set while the video after this one is loading. */
   changing: boolean;
   theatre: boolean;
@@ -50,14 +48,14 @@ type StageProps = {
 };
 
 export const PlayerStage = (props: StageProps) => {
-  const { session, view, player, finished, changing, row, actor, queueOpen, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
+  const { session, view, player, changing, row, actor, queueOpen, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
   const current = view.queue[0];
 
   return (
     <main className="room-main">
       <div className={current ? 'stage aspect-video' : 'stage stage-idle'}>
         <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
-        {!current && <IdleStage session={session} view={view} finished={finished} />}
+        {!current && <IdleStage session={session} view={view} />}
         {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} />}
         {current && !player.failure && !player.ready && <Poster item={current} changing={changing} />}
       </div>
@@ -136,7 +134,8 @@ const FailurePanel = ({ item, error, view, onPickAnother }: { item: QueueItem; e
 
 const PICKS = 4;
 
-const IdleStage = ({ session, view, finished }: { session: RoomSession; view: RoomView; finished: boolean }) => {
+const IdleStage = ({ session, view }: { session: RoomSession; view: RoomView }) => {
+  const finished = view.ranOut;
   const adder = useAdder(session, view);
   const search = useSearch(adder);
   const trending = useTrending();
@@ -242,9 +241,8 @@ const ResumeButton = ({ session, view, onToast }: { session: RoomSession; view: 
 
 type BarProps = StageProps & { item: QueueItem };
 
-const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, offlineNote, act, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: BarProps) => {
+export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, offlineNote, act, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: BarProps) => {
   const failed = player.failure !== null;
-  const othersFine = view.members.some(({ userId }) => userId !== view.self?.userId && view.viewerStates[userId] !== 'unavailable');
   return (
     <section aria-label="Player controls" className="player-bar relative">
       <div className="flex h-[var(--info)] items-center gap-4 px-4 phone:gap-3">
@@ -261,7 +259,7 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
           {isLocked(view) && <HostChip className="hidden phone:inline-flex" />}
           <UnmuteButton player={player} />
           {player.cold && !failed && canControl(view) && <ResumeButton session={session} view={view} onToast={onToast} />}
-          {canControl(view) && !(failed && othersFine) && <SkipButton session={session} view={view} onToast={onToast} className="btn-quiet" />}
+          {canControl(view) && <SkipButton session={session} view={view} onToast={onToast} className="btn-quiet" />}
           {!failed && (
             <div className="hidden items-center lg:flex">
               {!fullscreen && (

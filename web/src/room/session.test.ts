@@ -871,6 +871,53 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('the queue running out', () => {
+    const state = (version: number, cause: string, by: string, queue: unknown[]) => ({
+      version,
+      cause,
+      by,
+      queue,
+      playback: { item: '', status: 'idle', pos: 0, at: 0, rate: 1 },
+    });
+
+    const watching = async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', playingWelcome('a'));
+      return { session, socket };
+    };
+
+    it('says so when the last video ended', async () => {
+      const { session, socket } = await watching();
+      socket.deliver('state', state(2, 'ended', '', []));
+      expect(session.getView().ranOut).toBe(true);
+    });
+
+    it('says so when someone skipped the last video', async () => {
+      const { session, socket } = await watching();
+      socket.deliver('state', state(2, 'skip', 'Maya', []));
+      expect(session.getView().ranOut).toBe(true);
+    });
+
+    it('does not when the room gave up on a video nobody could play', async () => {
+      const { session, socket } = await watching();
+      socket.deliver('state', state(2, 'skip', '', []));
+      expect(session.getView().ranOut).toBe(false);
+    });
+
+    it('does not when someone removed the video', async () => {
+      const { session, socket } = await watching();
+      socket.deliver('state', state(2, 'queue.remove', 'Maya', []));
+      expect(session.getView().ranOut).toBe(false);
+    });
+
+    it('forgets once there is something to watch again', async () => {
+      const { session, socket } = await watching();
+      socket.deliver('state', state(2, 'ended', '', []));
+      socket.deliver('state', state(3, 'queue.add', 'Maya', [item('b')]));
+      expect(session.getView().ranOut).toBe(false);
+    });
+  });
+
   describe('host handover', () => {
     it('makes a viewer the host when the roster says so', async () => {
       const { session, socket } = await connected();

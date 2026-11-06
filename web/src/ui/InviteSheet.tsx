@@ -10,8 +10,8 @@ export const InviteSheet = ({ view, url, copied, onCopy, onClose }: Props) => {
   const video = view.queue[0];
   return (
     <section aria-label="Invite" className="enter rail-edge shrink-0 border-b border-line py-4">
-      <p className="mb-2 text-xs text-dim">What friends will see</p>
-      <div className="flex items-center gap-3">
+      <p className="invite-preview mb-2 text-xs text-dim">What friends will see</p>
+      <div className={`flex items-center gap-3 ${onClose ? '' : 'invite-preview'}`}>
         {video && <Thumb src={video.thumbnailUrl} className="w-20 rounded-md" />}
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{firstName(view.self?.name ?? 'A friend')} saved you a seat</p>

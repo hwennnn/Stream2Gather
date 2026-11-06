@@ -226,11 +226,6 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   const injected = pairwiseDrift(await sampleAll([a, b, c]));
   check('measurement sees injected drift', injected > 0.4 && injected < 0.8, `before ${Math.round(clean * 1000)}ms, after ${Math.round(injected * 1000)}ms`);
 
-  // Nobody can feel 0.6s being corrected, but the pill may not call it in sync.
-  const bar = b.page.locator('section[aria-label="Player controls"]');
-  const honest = await bar.getByText('Catching up').waitFor({ timeout: 2500 }).then(() => true, () => false);
-  check('the pill does not say in sync while off the room', honest, honest ? '' : await bar.innerText());
-
   const injectedAt = Date.now();
   let healed = null;
   while (Date.now() - injectedAt < 20000) {
@@ -242,6 +237,16 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   }
   report.driftHealMs = healed;
   check('injected drift corrects itself', healed !== null, String(healed));
+
+  // 0.6s is back inside the in-sync line about when the pill's two-second hold ends, so it may stay quiet. 1s can't.
+  await b.page.evaluate(() => { document.querySelector('video').currentTime += 1; });
+  const bar = b.page.locator('section[aria-label="Player controls"]');
+  const honest = await bar.getByText('Catching up').waitFor({ timeout: 4000 }).then(() => true, () => false);
+  check('the pill does not say in sync while off the room', honest, honest ? '' : await bar.innerText());
+  for (const end = Date.now() + 20000; Date.now() < end;) {
+    await sleep(250);
+    if (pairwiseDrift(await sampleAll([a, b, c])) < 0.15) break;
+  }
 
   // A dropped connection must come back on the timeline.
   const cutAt = Date.now();

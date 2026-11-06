@@ -3,7 +3,7 @@ import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
 import { WhereItIs } from '../ui/JoinGate';
-import { firstName, seatHues } from '../ui/people';
+import { firstName } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
@@ -78,7 +78,6 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
   const [joining, setJoining] = useState(false);
   const [admin, setAdmin] = useState(false);
   const here = home.members.length;
-  seatHues(home.members.map((person) => person.userId));
 
   const enter = () => {
     setJoining(true);

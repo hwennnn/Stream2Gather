@@ -1,25 +1,15 @@
-import { AVATAR_COLORS, avatarColor } from './format';
+/**
+ * One muted hue per person, light enough to read as a name and to carry dark initials.
+ * No error red and no link blue: a colour here means a person and nothing else.
+ */
+export const AVATAR_COLORS = ['#e0a884', '#d8bb6c', '#c8c864', '#a9c47c', '#8fce8f', '#79c4a6', '#7bcbc0', '#72bdd0', '#c0a6e2', '#d6a2dc', '#e3a3d2', '#e2a2bb'];
 
-const seated = new Map<string, string>();
-
-/** Everyone in the room gets a hue nobody else there has, and keeps it for as long as this page is open. */
-export const seatHues = (userIds: readonly string[]): void => {
-  const taken = new Set<string>();
-  const unseated = userIds.filter((id) => {
-    const hue = seated.get(id);
-    if (!hue || taken.has(hue)) return true;
-    taken.add(hue);
-    return false;
-  });
-  for (const id of unseated) {
-    const first = AVATAR_COLORS.indexOf(avatarColor(id));
-    const hue = AVATAR_COLORS.map((_, step) => AVATAR_COLORS[(first + step) % AVATAR_COLORS.length]).find((next) => next && !taken.has(next));
-    seated.set(id, hue ?? avatarColor(id));
-    if (hue) taken.add(hue);
-  }
+/** A person's hue comes from their id alone, so they look the same on every page and in every room. */
+export const hueOf = (userId = ''): string => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < userId.length; index += 1) hash = Math.imul(hash ^ userId.charCodeAt(index), 0x01000193) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? '#e0a884';
 };
-
-export const hueOf = (userId = ''): string => seated.get(userId) ?? avatarColor(userId);
 
 export const firstName = (name: string): string => name.trim().split(/\s+/)[0] ?? name;
 

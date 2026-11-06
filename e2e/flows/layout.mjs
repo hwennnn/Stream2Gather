@@ -4,7 +4,7 @@ import { byId, video, youtube } from '../lib/fixtures.mjs';
 import { blockedControls, gutters, insets, playerCover, sideScroll, spills } from '../lib/layout.mjs';
 import { flow } from '../lib/runner.mjs';
 
-const train = video('Night Train');
+const rain = video('Rainy Window'); // Not the flows' next video, or the strip has two of one title.
 
 const WIDTHS = [
   { width: 390, height: 844, phone: true },
@@ -180,7 +180,7 @@ for (const size of WIDTHS) {
       await checkPlayer(t, `${width} with the invite card`, host.page);
       await checkPage(t, `${width} with the invite card`, host.page);
       await host.page.getByRole('button', { name: 'Close' }).click();
-      await sendChat(guest.page, train.url);
+      await sendChat(guest.page, rain.url);
       await ui.chatLog(host.page).getByRole('button', { name: 'Add to queue' }).click();
       await t.see('a toast', host.page.getByText('Added to the queue'));
       await checkPlayer(t, `${width} with a toast`, host.page);

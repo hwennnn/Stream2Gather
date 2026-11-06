@@ -22,20 +22,9 @@
 
 :root {
   color-scheme: dark;
-  --rail: 340px;
+  /* Wide enough for chat, then whatever hands the player the height "Up next" doesn't need. */
+  --rail: clamp(320px, calc(100vw - (100dvh - 52px - var(--bar) - 104px) * 16 / 9), 420px);
   --bar: 68px;
-}
-
-@media (min-width: 1280px) {
-  :root {
-    --rail: 380px;
-  }
-}
-
-@media (min-width: 1800px) {
-  :root {
-    --rail: 420px;
-  }
 }
 
 html,
@@ -393,27 +382,29 @@ body {
   }
 }
 
-/* With height to spare the cards can grow. */
+/* With height to spare the thumbnails can grow. */
 @container up-next (min-height: 150px) {
-  .up-next-cards {
-    --card: 17rem;
-  }
-
   .up-next-thumb {
     width: 9rem;
   }
 }
 
-/* Extra cards wrap onto rows with no height, so a card is never cut in half. */
+/* UpNext works out how many cards fit, so a card is never cut in half. */
 .up-next-cards {
   display: grid;
   flex: 1;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card, 13.5rem), 1fr));
-  grid-template-rows: auto;
-  grid-auto-rows: 0;
   column-gap: 0.5rem;
   min-width: 0;
-  overflow: hidden;
+}
+
+/* A lot of height left: the card stands up, and the thumbnail takes the space. */
+.up-next-cards[data-stacked='true'] .up-next-card {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.up-next-cards[data-stacked='true'] .up-next-thumb {
+  width: 100%;
 }
 
 /* ---- Rows ---------------------------------------------------------------- */

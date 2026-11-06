@@ -322,6 +322,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           onTheatre={() => setTheatre(!theatre)}
           onFullscreen={fullscreen.toggle}
           onPickAnother={openQueue}
+          onShowQueue={() => setTab('queue')}
           onToast={toast}
           toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink/90 px-4 empty:hidden', 1)}
         />

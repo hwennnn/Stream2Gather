@@ -413,13 +413,11 @@ func (r *liveRoom) chat(c *conn, message Message) {
 	c.ack(message.ID)
 }
 
-var reactions = map[string]bool{"😂": true, "❤️": true, "🔥": true, "😮": true, "👏": true, "😭": true}
-
 func (r *liveRoom) react(c *conn, message Message) {
 	var request struct {
 		Emoji string `json:"emoji"`
 	}
-	if err := json.Unmarshal(message.Data, &request); err != nil || !reactions[request.Emoji] || !c.reactions.Allow() {
+	if err := json.Unmarshal(message.Data, &request); err != nil || !room.Reactions[request.Emoji] || !c.reactions.Allow() {
 		return
 	}
 	ctx, cancel := opContext()

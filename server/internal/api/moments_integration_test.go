@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,10 @@ func newCatchupCrew(t *testing.T, s *Server) catchupCrew {
 	return catchupCrew{slug: slug, crewID: crewID, sourceID: media.SourceID, sessionID: sessionID, roomID: record.ID, hana: as, mika: mikaAs}
 }
 
+func (c catchupCrew) momentBody(pos int64, extra string) string {
+	return fmt.Sprintf(`{"source":"test","id":"%s","posMs":%d,%s}`, c.sourceID, pos, extra)
+}
+
 func TestMomentsAreForMembersAndComeInPositionOrder(t *testing.T) {
 	s, _ := stackServer(t)
 	crew := newCatchupCrew(t, s)
@@ -36,6 +41,10 @@ func TestMomentsAreForMembersAndComeInPositionOrder(t *testing.T) {
 
 	if response, _ := serve(s, http.MethodGet, path, "", stranger); response.Code != http.StatusForbidden {
 		t.Fatalf("stranger: %d", response.Code)
+	}
+
+	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+crew.slug+"/moments", crew.momentBody(1, `"emoji":"🔥"`), stranger); response.Code != http.StatusForbidden {
+		t.Fatalf("stranger writing: %d", response.Code)
 	}
 
 	response, body := serve(s, http.MethodGet, path+"&from=1500&to=2500", "", crew.mika)
@@ -101,5 +110,68 @@ func TestAnItemThatCanNoLongerPlayHasNoMedia(t *testing.T) {
 	}
 	if response, _ := serve(s, http.MethodGet, fmt.Sprintf("/v1/crews/%s/items/999999999", crew.slug), "", crew.mika); response.Code != http.StatusNotFound {
 		t.Fatalf("unknown: %d", response.Code)
+	}
+}
+
+func TestACatchupMomentIsThereForTheNextPersonAndNotForTheRecap(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	crew := newCatchupCrew(t, s)
+	add := "/v1/crews/" + crew.slug + "/moments"
+
+	for _, bad := range []string{
+		crew.momentBody(5, `"emoji":"💩"`),
+		crew.momentBody(5, `"emoji":"🔥","body":"both"`),
+		crew.momentBody(5, `"body":"   "`),
+		crew.momentBody(5, `"body":"`+strings.Repeat("x", 501)+`"`),
+		crew.momentBody(-1, `"emoji":"🔥"`),
+		`{"source":"test","id":"never-watched","posMs":1,"emoji":"🔥"}`,
+	} {
+		if response, _ := serve(s, http.MethodPost, add, bad, crew.mika); response.Code < 400 {
+			t.Fatalf("accepted %s: %d", bad, response.Code)
+		}
+	}
+
+	if response, _ := serve(s, http.MethodPost, add, crew.momentBody(9000, `"emoji":"😂"`), crew.mika); response.Code != http.StatusCreated {
+		t.Fatalf("react: %d %s", response.Code, response.Body)
+	}
+	if response, _ := serve(s, http.MethodPost, add, crew.momentBody(9500, `"body":"caught up"`), crew.mika); response.Code != http.StatusCreated {
+		t.Fatalf("chat: %d %s", response.Code, response.Body)
+	}
+
+	response, _ := serve(s, http.MethodGet, "/v1/crews/"+crew.slug+"/moments?source=test&id="+crew.sourceID, "", crew.hana)
+	for _, want := range []string{`"origin":"catchup"`, `"😂"`, `"body":"caught up"`, `"author":"Mika"`} {
+		if !strings.Contains(response.Body.String(), want) {
+			t.Fatalf("missing %s in %s", want, response.Body)
+		}
+	}
+
+	if err := s.DB.BuildRecap(ctx, crew.sessionID); err != nil {
+		t.Fatal(err)
+	}
+	var doc string
+	if err := pool.QueryRow(ctx, `SELECT doc::text FROM session_recaps WHERE session_id = $1`, crew.sessionID).Scan(&doc); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(doc, "😂") {
+		t.Fatalf("a recap is of the evening itself: %s", doc)
+	}
+
+	response, _ = serve(s, http.MethodGet, "/v1/rooms/"+crew.slug+"/messages", "", crew.hana)
+	if strings.Contains(response.Body.String(), "caught up") {
+		t.Fatalf("catch-up chat reached the room: %s", response.Body)
+	}
+}
+
+func TestMomentsAreRateLimitedLikeReactions(t *testing.T) {
+	s, _ := stackServer(t)
+	crew := newCatchupCrew(t, s)
+	last := http.StatusCreated
+	for i := 0; i <= momentsPerMinute && last == http.StatusCreated; i++ {
+		response, _ := serve(s, http.MethodPost, "/v1/crews/"+crew.slug+"/moments", crew.momentBody(int64(i), `"emoji":"🔥"`), crew.mika)
+		last = response.Code
+	}
+	if last != http.StatusTooManyRequests {
+		t.Fatalf("last answer: %d", last)
 	}
 }

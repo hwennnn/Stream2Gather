@@ -391,6 +391,273 @@ describe('SyncController', () => {
     });
   });
 
+  describe('during a nudge', () => {
+    const nudged = () => {
+      player.rates = 'fine';
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(2);
+      player.current -= 1; // Twenty seconds of nudging at 1.05.
+      run(1);
+      expect(player.rate).toBeCloseTo(1.05);
+      run(5);
+      expect(player.rate).toBeCloseTo(1.05);
+      return playback;
+    };
+
+    it('hears a pause', () => {
+      nudged();
+      player.fire('paused');
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('hears a seek', () => {
+      nudged();
+      player.current += 60;
+      run(1);
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek' })]);
+    });
+
+    it('does not take the nudge itself for a seek', () => {
+      nudged();
+      run(20);
+      expect(commands).toEqual([]);
+    });
+
+    it('stops once the pause lands', () => {
+      const playback = nudged();
+      player.fire('paused');
+      sync.apply({ ...playback, status: 'paused', pos: player.time(), at: timers.now });
+      expect(player.rate).toBe(1);
+      run(3);
+      expect(player.status).toBe('paused');
+    });
+
+    it('does not resume a player it paused to fall back', () => {
+      sync.apply(playing(0, timers.now));
+      run(2);
+      // Comes out of buffering 1.9s ahead, which holds it for longer than settling.
+      player.status = 'buffering';
+      timers.advance(1000);
+      sync.tick();
+      player.current += 3.9; // Two seconds passed, so this is 1.9s ahead.
+      player.status = 'playing';
+      timers.advance(1000);
+      sync.tick();
+      expect(player.status).toBe('paused');
+      timers.advance(1600);
+      sync.tick();
+      expect(player.status).toBe('paused');
+      timers.advance(400);
+      expect(player.status).toBe('playing');
+    });
+  });
+
+  describe('expected echoes', () => {
+    /** Reports changes late, the way a real player does. */
+    class EchoingPlayer extends FakePlayer {
+      latency = 120;
+      override play() { this.change('playing'); }
+      override pause() { this.change('paused'); }
+      private change(state: PlayerState) {
+        if (this.status === state) return; // A real player says nothing then.
+        timers.setTimeout(() => this.fire(state), this.latency);
+      }
+    }
+
+    const useEchoes = (start: PlayerState = 'paused') => {
+      const echoing = new EchoingPlayer();
+      echoing.status = start;
+      player = echoing;
+      sync = new SyncController(player, { now: () => timers.now }, (command) => commands.push(command), (report) => reports.push(report), timers);
+      return echoing;
+    };
+
+    it('recognises its own pause however late the echo', () => {
+      const echoing = useEchoes();
+      sync.apply(playing(0, timers.now));
+      run(3);
+      echoing.latency = 4000;
+      sync.apply({ item: 'a', status: 'paused', pos: 3, at: timers.now, rate: 1 });
+      run(6);
+      expect(player.status).toBe('paused');
+      expect(commands).toEqual([]);
+    });
+
+    it('recognises its own play when the room pauses again straight away', () => {
+      sync.apply({ item: 'a', status: 'paused', pos: 3, at: timers.now, rate: 1 });
+      run(2);
+      const resumed = playing(3, timers.now);
+      sync.apply(resumed);
+      sync.apply({ ...resumed, status: 'paused' });
+      player.fire('playing');
+      player.fire('paused');
+      expect(commands).toEqual([]);
+    });
+
+    it('takes a pause landing behind its own play for an echo', () => {
+      useEchoes('playing');
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(2);
+      sync.apply({ ...room, status: 'paused', pos: 2, at: timers.now });
+      sync.apply({ ...room, pos: 2, at: timers.now });
+      run(3);
+      expect(commands).toEqual([]);
+    });
+
+    it('does not take a player already starting for the viewer', () => {
+      useEchoes('buffering');
+      sync.apply({ item: 'a', status: 'paused', pos: 3, at: timers.now, rate: 1 });
+      player.fire('playing'); // Queued before the pause reached the player.
+      expect(commands).toEqual([]);
+    });
+
+    it('expects nothing from a player already where it was sent', () => {
+      useEchoes('paused');
+      sync.apply({ item: 'a', status: 'paused', pos: 3, at: timers.now, rate: 1 });
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'play' })]);
+    });
+
+    it('hears the viewer once its own echo has come', () => {
+      useEchoes();
+      sync.apply(playing(0, timers.now));
+      run(1);
+      player.fire('paused');
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('stops waiting for a command that changed nothing it could report', () => {
+      // A file told to pause before it ever played fires no pause event.
+      player.status = 'loading';
+      sync.apply({ item: 'a', status: 'paused', pos: 0, at: timers.now, rate: 1 });
+      run(1);
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(3);
+      player.fire('paused');
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('hears a pause while a play is still buffering', () => {
+      player.status = 'paused';
+      sync.apply(playing(0, timers.now));
+      player.status = 'paused';
+      player.fire('buffering');
+      player.fire('paused');
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('still ignores its own corrective pause', () => {
+      useEchoes('playing');
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(2);
+      player.current += 0.8;
+      run(4);
+      expect(commands).toEqual([]);
+      expect(player.status).toBe('playing');
+    });
+  });
+
+  describe('before the room has answered', () => {
+    const paused = (pos: number, at: number): Playback => ({ item: 'a', status: 'paused', pos, at, rate: 1 });
+
+    it('hears a play right after this viewer paused', () => {
+      sync.apply(playing(0, timers.now));
+      run(5);
+      commands.length = 0;
+      player.fire('paused');
+      timers.advance(100);
+      player.fire('playing');
+      expect(commands.map((c) => c.type)).toEqual(['pause', 'play']);
+    });
+
+    it('hears a pause right after this viewer played', () => {
+      sync.apply(paused(5, timers.now));
+      run(5);
+      commands.length = 0;
+      player.fire('playing');
+      timers.advance(100);
+      player.fire('paused');
+      expect(commands.map((c) => c.type)).toEqual(['play', 'pause']);
+    });
+
+    it('ends up where the viewer did once both answers come', () => {
+      sync.apply(playing(0, timers.now));
+      run(5);
+      commands.length = 0;
+      player.fire('paused');
+      timers.advance(100);
+      player.fire('playing');
+      const pos = player.time();
+      sync.apply(paused(pos, timers.now));
+      player.fire('paused');
+      sync.apply(playing(pos, timers.now));
+      player.fire('playing');
+      run(3);
+      expect(player.state()).toBe('playing');
+      expect(commands.map((c) => c.type)).toEqual(['pause', 'play']);
+    });
+
+    it('goes back to the room once the viewer has been waiting too long', () => {
+      sync.apply(playing(0, timers.now));
+      run(5);
+      commands.length = 0;
+      player.fire('paused'); // The room never answers.
+      run(3);
+      expect(player.state()).toBe('playing');
+      player.fire('paused');
+      expect(commands.map((c) => c.type)).toEqual(['pause', 'pause']);
+    });
+
+    it('forgets the command when the room moves on without it', () => {
+      sync.apply(playing(0, timers.now));
+      run(5);
+      commands.length = 0;
+      player.fire('paused');
+      sync.apply({ item: 'a', status: 'idle', pos: 0, at: timers.now, rate: 1 });
+      player.fire('playing');
+      expect(commands.map((c) => c.type)).toEqual(['pause']);
+    });
+
+    it('does not repeat a command the room has yet to answer', () => {
+      sync.apply(playing(0, timers.now));
+      run(5);
+      commands.length = 0;
+      player.fire('paused');
+      player.fire('paused');
+      expect(commands.map((c) => c.type)).toEqual(['pause']);
+    });
+  });
+
+  describe('a viewer the room said no to', () => {
+    it('resumes a refused pause once the room has had time to answer', () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.status = 'paused';
+      player.fire('paused');
+      expect(player.status).toBe('paused');
+      run(1);
+      expect(player.status).toBe('paused');
+      run(1);
+      expect(player.status).toBe('playing');
+      expect(commands.length).toBe(1);
+    });
+
+    it('puts a refused seek back', () => {
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(3);
+      player.current = 60;
+      run(1);
+      sync.apply({ ...room }, true); // The snapshot sent with the refusal.
+      run(1);
+      expect(Math.abs(drift(room))).toBeLessThan(0.5);
+    });
+  });
+
   describe('telling a viewer from a hiccup', () => {
     const roomAt = (at: number): Playback => ({ item: 'a', status: 'playing', pos: 0, at, rate: 1 });
 

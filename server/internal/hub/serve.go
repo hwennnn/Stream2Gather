@@ -22,6 +22,10 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	ws.SetReadLimit(maxMessageBytes)
 
 	r, err := h.acquire(ctx, ticket.RoomID)
+	if errors.Is(err, errClosing) {
+		_ = ws.Close(websocket.StatusGoingAway, "server restarting")
+		return
+	}
 	if err != nil {
 		h.log.Error("room subscribe failed", "room", ticket.RoomID, "error", err)
 		_ = ws.Close(websocket.StatusInternalError, "unavailable")
@@ -36,6 +40,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 		closed:  make(chan struct{}),
 		control: rate.NewLimiter(5, 10),
 		chat:    rate.NewLimiter(2, 5),
+		reports: rate.NewLimiter(rate.Every(5*time.Second), 3),
 	}
 	defer c.close()
 
@@ -43,11 +48,15 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	defer cancel()
 	go writeLoop(ctx, ws, c, cancel)
 
-	r.do(func() { r.join(c, ticket) })
-	defer r.do(func() { r.leave(c) })
+	// Reading starts only after the welcome is queued. A pong that overtakes it
+	// tells the client it is behind a room it has not been shown yet.
+	r.wait(func() { r.join(c, ticket) })
+	// This has to finish before release can close the room, or the last viewer's
+	// presence and empty mark are lost with it.
+	defer r.wait(func() { r.leave(c) })
 
 	for {
-		_, payload, err := ws.Read(ctx)
+		payload, err := readMessage(ctx, ws, h.idleTimeout)
 		if err != nil {
 			return
 		}
@@ -60,6 +69,15 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	}
 }
 
+// readMessage gives up on a peer that has gone silent. Clients ping every ten
+// seconds, so this only fires on a connection that died without saying so.
+func readMessage(ctx context.Context, ws *websocket.Conn, idle time.Duration) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, idle)
+	defer cancel()
+	_, payload, err := ws.Read(ctx)
+	return payload, err
+}
+
 func writeLoop(ctx context.Context, ws *websocket.Conn, c *conn, cancel context.CancelFunc) {
 	defer cancel()
 	for {
@@ -67,7 +85,7 @@ func writeLoop(ctx context.Context, ws *websocket.Conn, c *conn, cancel context.
 		case <-ctx.Done():
 			return
 		case <-c.closed:
-			_ = ws.Close(websocket.StatusPolicyViolation, "too slow")
+			_ = ws.Close(c.code, c.reason)
 			return
 		case message := <-c.out:
 			writeCtx, done := context.WithTimeout(ctx, writeTimeout)
@@ -85,7 +103,11 @@ func writeLoop(ctx context.Context, ws *websocket.Conn, c *conn, cancel context.
 func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 	switch message.Type {
 	case "ping":
-		r.pong(c, message)
+		r.pong(ctx, c, message)
+	case "sync":
+		r.syncClient(c)
+	case "rename":
+		r.rename(c, message)
 	case "queue.add":
 		r.queueAdd(ctx, c, message)
 	case "chat.send":
@@ -96,28 +118,77 @@ func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 		r.status(c, message)
 	case "media_error":
 		r.mediaError(c, message)
-	case room.CmdPlay, room.CmdPause, room.CmdSeek, room.CmdRate, room.CmdEnded, room.CmdSkip,
-		room.CmdQueueRemove, room.CmdQueueMove, room.CmdQueuePlay, room.CmdQueueClear, room.CmdSettings:
+	case room.CmdPlay, room.CmdPause, room.CmdSeek, room.CmdEnded, room.CmdSkip,
+		room.CmdQueueRemove, room.CmdQueueMove, room.CmdQueuePlay, room.CmdSettings:
 		r.command(c, message)
 	default:
 		c.fail(message.ID, "unknown", "Unknown message.")
 	}
 }
 
-func (r *liveRoom) pong(c *conn, message Message) {
+// pong reports the version in Redis, not the last one seen here. Comparing the
+// room with itself could never reveal that this server missed an event.
+func (r *liveRoom) pong(ctx context.Context, c *conn, message Message) {
 	var ping struct {
 		T0 float64 `json:"t0"`
 	}
 	_ = json.Unmarshal(message.Data, &ping)
-	c.send(encode("pong", map[string]any{
-		"t0":      ping.T0,
-		"ts":      time.Now().UnixMilli(),
-		"version": r.version.Load(),
+	reply := map[string]any{"t0": ping.T0, "ts": time.Now().UnixMilli()}
+
+	ctx, cancel := context.WithTimeout(ctx, versionTimeout)
+	defer cancel()
+	if version, found, err := r.hub.live.Version(ctx, r.id); err == nil && found {
+		reply["version"] = version
+	}
+	c.send(encode("pong", reply))
+}
+
+// syncClient answers a client that noticed a gap in the versions it was sent.
+func (r *liveRoom) syncClient(c *conn) {
+	if !c.control.Allow() {
+		return
+	}
+	r.do(func() {
+		ctx, cancel := opContext()
+		defer cancel()
+		r.sendSnapshot(ctx, c)
+	})
+}
+
+func (r *liveRoom) rename(c *conn, message Message) {
+	if !c.control.Allow() {
+		c.fail(message.ID, "rate_limited", "Slow down a little.")
+		return
+	}
+	var request struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(message.Data, &request); err != nil {
+		c.fail(message.ID, "bad_message", "That message could not be read.")
+		return
+	}
+	name, ok := room.CleanName(request.Name)
+	if !ok {
+		c.fail(message.ID, "invalid", "Names can be up to 32 characters.")
+		return
+	}
+	ctx, cancel := opContext()
+	defer cancel()
+	// Going through Redis reaches this person's tabs on other servers too.
+	err := r.hub.live.Publish(ctx, r.id, encode("member.rename", map[string]string{
+		"userId": c.who().UserID, "name": name,
 	}))
+	if err != nil {
+		r.hub.log.Error("rename failed", "room", r.id, "error", err)
+		c.fail(message.ID, "unavailable", "That did not go through. Try again.")
+		return
+	}
+	c.ack(message.ID)
 }
 
 func actorOf(c *conn) room.Actor {
-	return room.Actor{ID: c.person.UserID, Name: c.person.Name, Role: c.person.Role}
+	person := c.who()
+	return room.Actor{ID: person.UserID, Name: person.Name, Role: person.Role}
 }
 
 func (r *liveRoom) command(c *conn, message Message) {
@@ -143,12 +214,16 @@ func (r *liveRoom) applyFor(c *conn, id string, cmd room.Command) {
 	_, err := r.mutate(ctx, actorOf(c), cmd)
 	switch {
 	case err == nil:
-		if id != "" {
-			c.send(encode("ack", map[string]string{"id": id}))
-		}
+		c.ack(id)
 	case errors.Is(err, room.ErrStale):
-		// The sender acted on an old view. A snapshot corrects it quietly.
+		// The sender acted on an old view. A snapshot corrects it quietly, but
+		// someone waiting on an answer still has to get one.
+		if id != "" {
+			c.fail(id, "stale", "That changed before it went through. Try again.")
+		}
 		r.sendSnapshot(ctx, c)
+	case errors.Is(err, room.ErrForbidden) && cmd.Type == room.CmdEnded:
+		// Every viewer's player reports the end. Nobody asked to do anything.
 	case errors.Is(err, room.ErrForbidden):
 		c.fail(id, "forbidden", "The host controls this room.")
 		r.sendSnapshot(ctx, c)
@@ -167,7 +242,7 @@ func (r *liveRoom) sendSnapshot(ctx context.Context, c *conn) {
 	if err != nil || !found {
 		return
 	}
-	c.send(encodeChange(state, room.Change{Cause: "sync", Queue: true, Settings: true}))
+	c.send(encodeSnapshot(state))
 }
 
 func (r *liveRoom) queueAdd(ctx context.Context, c *conn, message Message) {
@@ -176,8 +251,8 @@ func (r *liveRoom) queueAdd(ctx context.Context, c *conn, message Message) {
 		return
 	}
 	var request struct {
-		URL     string `json:"url"`
-		PlayNow bool   `json:"playNow"`
+		URL  string `json:"url"`
+		Mode string `json:"mode"`
 	}
 	if err := json.Unmarshal(message.Data, &request); err != nil {
 		c.fail(message.ID, "bad_message", "That message could not be read.")
@@ -196,7 +271,7 @@ func (r *liveRoom) queueAdd(ctx context.Context, c *conn, message Message) {
 		return
 	}
 
-	cmd := room.Command{Type: room.CmdQueueAdd, PlayNow: request.PlayNow, Media: &media, NewItemID: ids.New()}
+	cmd := room.Command{Type: room.CmdQueueAdd, Mode: request.Mode, Media: &media, NewItemID: ids.New()}
 	r.do(func() { r.applyFor(c, message.ID, cmd) })
 }
 
@@ -206,8 +281,7 @@ func (r *liveRoom) chat(c *conn, message Message) {
 		return
 	}
 	var request struct {
-		Text  string `json:"text"`
-		Nonce string `json:"nonce"`
+		Text string `json:"text"`
 	}
 	if err := json.Unmarshal(message.Data, &request); err != nil {
 		c.fail(message.ID, "bad_message", "That message could not be read.")
@@ -221,18 +295,19 @@ func (r *liveRoom) chat(c *conn, message Message) {
 
 	ctx, cancel := opContext()
 	defer cancel()
+	person := c.who()
 	stored, err := r.hub.db.InsertMessage(ctx, r.id, store.Message{
-		UserID: c.person.UserID, Author: c.person.Name, Body: text,
+		UserID: person.UserID, Author: person.Name, Body: text,
 	})
 	if err == nil {
-		err = r.hub.live.Publish(ctx, r.id, encode("chat", map[string]any{
-			"message": stored, "nonce": request.Nonce,
-		}))
+		err = r.hub.live.Publish(ctx, r.id, encode("chat", map[string]any{"message": stored}))
 	}
 	if err != nil {
 		r.hub.log.Error("chat failed", "room", r.id, "error", err)
 		c.fail(message.ID, "unavailable", "Your message did not send.")
+		return
 	}
+	c.ack(message.ID)
 }
 
 var reactions = map[string]bool{"😂": true, "❤️": true, "🔥": true, "😮": true, "👏": true, "😭": true}
@@ -247,8 +322,13 @@ func (r *liveRoom) react(c *conn, message Message) {
 	ctx, cancel := opContext()
 	defer cancel()
 	_ = r.hub.live.Publish(ctx, r.id, encode("react", map[string]string{
-		"emoji": request.Emoji, "name": c.person.Name,
+		"emoji": request.Emoji, "name": c.who().Name,
 	}))
+}
+
+// viewerStates are the only states relayed. Other clients use them as keys.
+var viewerStates = map[string]bool{
+	"waiting": true, "synced": true, "correcting": true, "buffering": true, "stalled": true,
 }
 
 // status shares a viewer's sync health. Clients send it when it changes.
@@ -257,13 +337,13 @@ func (r *liveRoom) status(c *conn, message Message) {
 		State string  `json:"state"`
 		Drift float64 `json:"drift"`
 	}
-	if err := json.Unmarshal(message.Data, &request); err != nil || !c.control.Allow() {
+	if err := json.Unmarshal(message.Data, &request); err != nil || !viewerStates[request.State] || !c.control.Allow() {
 		return
 	}
 	ctx, cancel := opContext()
 	defer cancel()
 	_ = r.hub.live.Publish(ctx, r.id, encode("member.status", map[string]any{
-		"userId": c.person.UserID, "state": request.State, "drift": request.Drift,
+		"userId": c.who().UserID, "state": request.State, "drift": request.Drift,
 	}))
 }
 
@@ -271,13 +351,14 @@ func (r *liveRoom) status(c *conn, message Message) {
 var embedRefused = map[int]bool{101: true, 150: true}
 
 // mediaError keeps a video one viewer cannot play from breaking the room. Once
-// most viewers fail, the room moves on and the video is remembered as blocked.
+// most viewers fail, the room moves on. A report costs nothing to send, so one
+// never decides anything for other rooms: see noteEmbedBlock.
 func (r *liveRoom) mediaError(c *conn, message Message) {
 	var report struct {
 		Item string `json:"item"`
 		Code int    `json:"code"`
 	}
-	if err := json.Unmarshal(message.Data, &report); err != nil {
+	if err := json.Unmarshal(message.Data, &report); err != nil || !c.reports.Allow() {
 		return
 	}
 
@@ -287,7 +368,14 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 	if err != nil || !found || state.Playback.ItemID != report.Item || len(state.Queue) == 0 {
 		return
 	}
-	failures, err := r.hub.live.CountFailure(ctx, r.id, report.Item, c.person.UserID)
+	item := state.Queue[0]
+	userID := c.who().UserID
+	refused := item.Source == "youtube" && embedRefused[report.Code]
+	if refused {
+		r.noteEmbedBlock(ctx, item, userID)
+	}
+
+	failures, err := r.hub.live.CountFailure(ctx, r.id, report.Item, userID)
 	if err != nil {
 		return
 	}
@@ -296,26 +384,45 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 		return
 	}
 	_ = r.hub.live.Publish(ctx, r.id, encode("member.status", map[string]any{
-		"userId": c.person.UserID, "state": "unavailable",
+		"userId": userID, "state": "unavailable", "item": report.Item,
 	}))
 	if failures*2 <= int64(len(people)) {
 		return
 	}
 
-	item := state.Queue[0]
-	if embedRefused[report.Code] {
-		if err := r.hub.db.MarkEmbedBlocked(ctx, item.Source, item.SourceID); err != nil {
-			r.hub.log.Warn("embed block not saved", "error", err)
-		}
+	notice := map[string]string{"kind": "skipped", "text": skipNotice(item, refused)}
+	if item.Source == "youtube" {
+		notice["url"] = item.URL
 	}
 	r.do(func() {
 		skipCtx, done := opContext()
 		defer done()
-		r.applySystem(skipCtx, room.Command{Type: room.CmdSkip, Item: report.Item})
-		_ = r.hub.live.Publish(skipCtx, r.id, encode("notice", map[string]string{
-			"kind": "skipped",
-			"text": "Skipped “" + item.Title + "”. Its owner doesn’t allow it to play outside YouTube.",
-			"url":  item.URL,
-		}))
+		// Everyone's player fails together, and only one skip wins.
+		if r.applySystem(skipCtx, room.Command{Type: room.CmdSkip, Item: report.Item}) {
+			r.publishNotice(skipCtx, notice)
+		}
 	})
+}
+
+func skipNotice(item room.Item, refused bool) string {
+	if refused {
+		return "Skipped “" + item.Title + "” because YouTube won’t let it play here."
+	}
+	return "Skipped “" + item.Title + "” because it wouldn’t load."
+}
+
+// noteEmbedBlock hides a video from everyone's search only once more than one
+// person has seen it refused. Any guest could otherwise blacklist it site-wide.
+func (r *liveRoom) noteEmbedBlock(ctx context.Context, item room.Item, userID string) {
+	reports, err := r.hub.live.ReportEmbedBlocked(ctx, item.Source, item.SourceID, userID)
+	if err != nil {
+		r.hub.log.Warn("embed report not saved", "error", err)
+		return
+	}
+	if reports < embedBlockReports {
+		return
+	}
+	if err := r.hub.db.MarkEmbedBlocked(ctx, item.Source, item.SourceID); err != nil {
+		r.hub.log.Warn("embed block not saved", "error", err)
+	}
 }

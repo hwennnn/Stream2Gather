@@ -1,4 +1,4 @@
-import type { PlayerAdapter, PlayerError, PlayerRates, PlayerState } from './types';
+import { createErrorChannel, type PlayerAdapter, type PlayerError, type PlayerState } from './types';
 
 declare global {
   interface Window {
@@ -6,18 +6,37 @@ declare global {
   }
 }
 
+const API_TIMEOUT_MS = 15_000;
+
 let apiReady: Promise<void> | null = null;
 
-const loadApi = (): Promise<void> => {
-  apiReady ??= new Promise((resolve) => {
+const requestApi = (): Promise<void> =>
+  new Promise((resolve, reject) => {
     if (window.YT?.Player) {
       resolve();
       return;
     }
-    window.onYouTubeIframeAPIReady = () => resolve();
     const script = document.createElement('script');
+    const giveUp = (message: string) => {
+      window.clearTimeout(timer);
+      script.remove();
+      reject(new Error(message));
+    };
+    const timer = window.setTimeout(() => giveUp('The YouTube player took too long to load.'), API_TIMEOUT_MS);
+    window.onYouTubeIframeAPIReady = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    script.onerror = () => giveUp('The YouTube player could not be loaded.');
     script.src = 'https://www.youtube.com/iframe_api';
     document.head.append(script);
+  });
+
+/** A failure is not kept, so the next video gets a fresh attempt. */
+export const loadApi = (): Promise<void> => {
+  apiReady ??= requestApi().catch((error: unknown) => {
+    apiReady = null;
+    throw error;
   });
   return apiReady;
 };
@@ -50,7 +69,7 @@ export const createYouTubePlayer = async (
 
   let state: PlayerState = 'loading';
   let stateListener: (state: PlayerState) => void = () => {};
-  let errorListener: (error: PlayerError) => void = () => {};
+  const errors = createErrorChannel();
 
   const target = document.createElement('div');
   element.replaceChildren(target);
@@ -75,18 +94,17 @@ export const createYouTubePlayer = async (
           stateListener(state);
         },
         onError: (event) => {
-          // Before onReady the promise must still settle for callers to see it.
+          // Before onReady the promise must still settle, and the error waits
+          // in the channel for the caller to subscribe.
+          errors.report(toError(Number(event.data)));
           resolve(instance);
-          errorListener(toError(Number(event.data)));
         },
       },
     } as YT.PlayerOptions);
   });
 
-  const rates: PlayerRates = { kind: 'discrete', values: [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2] };
-
   return {
-    rates,
+    rates: 'discrete',
     play: () => player.playVideo?.(),
     pause: () => player.pauseVideo?.(),
     seek: (seconds) => player.seekTo?.(seconds, true),
@@ -98,9 +116,7 @@ export const createYouTubePlayer = async (
     onState: (listener) => {
       stateListener = listener;
     },
-    onError: (listener) => {
-      errorListener = listener;
-    },
+    onError: errors.listen,
     destroy: () => {
       player.destroy?.();
       element.replaceChildren();

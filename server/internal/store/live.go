@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,8 +14,12 @@ import (
 	"stream2gather/internal/room"
 )
 
-// ErrConflict means concurrent writers kept winning past the retry limit.
-var ErrConflict = errors.New("room state conflict")
+var (
+	// ErrConflict means concurrent writers kept winning past the retry limit.
+	ErrConflict = errors.New("room state conflict")
+	// ErrNoState means Redis has forgotten the room.
+	ErrNoState = errors.New("room has no live state")
+)
 
 const (
 	mutateAttempts = 60
@@ -22,6 +27,8 @@ const (
 	liveTTL        = 7 * 24 * time.Hour
 	ticketTTL      = 30 * time.Second
 	presenceTTL    = 30 * time.Second
+	// A video's embed reports must agree within this long.
+	embedReportTTL = 7 * 24 * time.Hour
 )
 
 // casScript writes the state only if nobody else has since it was read, and
@@ -34,6 +41,16 @@ end
 redis.call('HSET', KEYS[1], 'version', ARGV[2], 'doc', ARGV[3])
 redis.call('EXPIRE', KEYS[1], ARGV[4])
 redis.call('PUBLISH', KEYS[2], ARGV[5])
+return 1
+`)
+
+// seedScript writes both fields or neither, so two servers rehydrating the same
+// room cannot leave one's version beside the other's document.
+var seedScript = redis.NewScript(`
+if redis.call('EXISTS', KEYS[1]) == 0 then
+  redis.call('HSET', KEYS[1], 'version', ARGV[1], 'doc', ARGV[2])
+end
+redis.call('EXPIRE', KEYS[1], ARGV[3])
 return 1
 `)
 
@@ -51,6 +68,7 @@ func Channel(roomID string) string { return "room:" + roomID + ":events" }
 func stateKey(roomID string) string    { return "room:" + roomID + ":state" }
 func presenceKey(roomID string) string { return "room:" + roomID + ":presence" }
 func peopleKey(roomID string) string   { return "room:" + roomID + ":people" }
+func hostKey(roomID string) string     { return "room:" + roomID + ":host" }
 
 // Load returns the live state, or false if Redis has none.
 func (l *Live) Load(ctx context.Context, roomID string) (room.State, bool, error) {
@@ -74,13 +92,23 @@ func (l *Live) Seed(ctx context.Context, roomID string, state room.State) error 
 	if err != nil {
 		return err
 	}
-	if err := l.rdb.HSetNX(ctx, stateKey(roomID), "doc", doc).Err(); err != nil {
+	err = seedScript.Run(ctx, l.rdb, []string{stateKey(roomID)}, state.Version, doc, int(liveTTL.Seconds())).Err()
+	if err != nil {
 		return fmt.Errorf("seed room: %w", err)
 	}
-	if err := l.rdb.HSetNX(ctx, stateKey(roomID), "version", state.Version).Err(); err != nil {
-		return fmt.Errorf("seed room: %w", err)
+	return nil
+}
+
+// Version returns the room's current version, or false if Redis has none.
+func (l *Live) Version(ctx context.Context, roomID string) (int64, bool, error) {
+	version, err := l.rdb.HGet(ctx, stateKey(roomID), "version").Int64()
+	if errors.Is(err, redis.Nil) {
+		return 0, false, nil
 	}
-	return l.rdb.Expire(ctx, stateKey(roomID), liveTTL).Err()
+	if err != nil {
+		return 0, false, fmt.Errorf("read version: %w", err)
+	}
+	return version, true, nil
 }
 
 // Mutate applies a change with compare-and-set, retrying when another server
@@ -108,7 +136,7 @@ func (l *Live) Mutate(
 			return room.State{}, err
 		}
 		if !found {
-			return room.State{}, fmt.Errorf("room %s has no live state", roomID)
+			return room.State{}, ErrNoState
 		}
 
 		next, err := change(current)
@@ -145,9 +173,10 @@ func (l *Live) Publish(ctx context.Context, roomID string, event []byte) error {
 
 // Person is one connection's identity in a room.
 type Person struct {
-	UserID string `json:"userId"`
-	Name   string `json:"name"`
-	Role   string `json:"role"`
+	UserID    string `json:"userId"`
+	Name      string `json:"name"`
+	Role      string `json:"role"`
+	AvatarURL string `json:"avatarUrl,omitempty"`
 }
 
 // Touch records that a connection is alive.
@@ -197,19 +226,44 @@ func toAny(values []string) []any {
 	return out
 }
 
-// People returns everyone present, once each however many tabs they have open.
-func (l *Live) People(ctx context.Context, roomID string) ([]Person, error) {
+// Sockets counts one person's open connections to a room, on every server.
+func (l *Live) Sockets(ctx context.Context, roomID, userID string) (int, error) {
+	people, err := l.connections(ctx, roomID)
+	if err != nil {
+		return 0, err
+	}
+	count := 0
+	for _, person := range people {
+		if person.UserID == userID {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (l *Live) connections(ctx context.Context, roomID string) ([]Person, error) {
 	docs, err := l.rdb.HVals(ctx, peopleKey(roomID)).Result()
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]bool, len(docs))
-	people := make([]Person, 0, len(docs))
-	for _, doc := range docs {
-		var person Person
-		if err := json.Unmarshal([]byte(doc), &person); err != nil {
+	people := make([]Person, len(docs))
+	for i, doc := range docs {
+		if err := json.Unmarshal([]byte(doc), &people[i]); err != nil {
 			return nil, err
 		}
+	}
+	return people, nil
+}
+
+// People returns everyone present, once each however many tabs they have open.
+func (l *Live) People(ctx context.Context, roomID string) ([]Person, error) {
+	connected, err := l.connections(ctx, roomID)
+	if err != nil {
+		return nil, err
+	}
+	seen := make(map[string]bool, len(connected))
+	people := make([]Person, 0, len(connected))
+	for _, person := range connected {
 		if !seen[person.UserID] {
 			seen[person.UserID] = true
 			people = append(people, person)
@@ -260,6 +314,46 @@ func (l *Live) CountFailure(ctx context.Context, roomID, itemID, userID string) 
 		return 0, err
 	}
 	return count.Val(), nil
+}
+
+// ReportEmbedBlocked records that a person's player refused a video, wherever
+// they saw it, and returns how many distinct people have said so. The window is
+// fixed from the first report, so a trickle cannot keep it open forever.
+func (l *Live) ReportEmbedBlocked(ctx context.Context, source, sourceID, userID string) (int64, error) {
+	key := "embed:reports:" + source + ":" + sourceID
+	pipe := l.rdb.TxPipeline()
+	pipe.SAdd(ctx, key, userID)
+	count := pipe.SCard(ctx, key)
+	pipe.ExpireNX(ctx, key, embedReportTTL)
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, err
+	}
+	return count.Val(), nil
+}
+
+// HostSeen records that the host is here, or was until this moment.
+func (l *Live) HostSeen(ctx context.Context, roomID, name string, at int64) error {
+	key := hostKey(roomID)
+	pipe := l.rdb.TxPipeline()
+	pipe.HSet(ctx, key, "name", name, "seen", at)
+	pipe.Expire(ctx, key, liveTTL)
+	_, err := pipe.Exec(ctx)
+	return err
+}
+
+// HostLastSeen returns the host's name and when they were last here. A room with
+// no record, because Redis lost it, starts counting from now.
+func (l *Live) HostLastSeen(ctx context.Context, roomID string, now int64) (string, int64, error) {
+	key := hostKey(roomID)
+	if err := l.rdb.HSetNX(ctx, key, "seen", now).Err(); err != nil {
+		return "", 0, err
+	}
+	fields, err := l.rdb.HGetAll(ctx, key).Result()
+	if err != nil {
+		return "", 0, err
+	}
+	seen, err := strconv.ParseInt(fields["seen"], 10, 64)
+	return fields["name"], seen, err
 }
 
 // Limit reports whether a fixed-window limit still has room.

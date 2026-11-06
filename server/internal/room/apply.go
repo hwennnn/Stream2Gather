@@ -1,21 +1,33 @@
 package room
 
-import "slices"
+import (
+	"encoding/json"
+	"math"
+	"slices"
+)
 
 // Command types.
 const (
 	CmdPlay        = "play"
 	CmdPause       = "pause"
 	CmdSeek        = "seek"
-	CmdRate        = "rate"
 	CmdEnded       = "ended"
 	CmdSkip        = "skip"
 	CmdQueueAdd    = "queue.add"
 	CmdQueueRemove = "queue.remove"
 	CmdQueueMove   = "queue.move"
 	CmdQueuePlay   = "queue.play"
-	CmdQueueClear  = "queue.clear"
 	CmdSettings    = "settings"
+	// Issued only by the server, when the host goes away and comes back.
+	CmdRelease = "settings.release"
+	CmdRestore = "settings.restore"
+)
+
+// Where queue.add puts a video.
+const (
+	AddEnd  = "end"
+	AddNext = "next"
+	AddNow  = "now"
 )
 
 // Command is a request to change the room.
@@ -25,26 +37,39 @@ type Command struct {
 	Item string  `json:"item,omitempty"`
 	Pos  float64 `json:"pos,omitempty"`
 	// CT is the client's estimate of server time when it sampled Pos.
-	CT   int64   `json:"ct,omitempty"`
-	Rate float64 `json:"rate,omitempty"`
+	CT int64 `json:"ct,omitempty"`
 	// Target is the queue item a queue command acts on.
 	Target string `json:"target,omitempty"`
 	Index  int    `json:"index,omitempty"`
 
-	PlayNow  bool      `json:"playNow,omitempty"`
 	Settings *Settings `json:"settings,omitempty"`
 
 	// Set by the server, never read from clients.
+	Mode      string `json:"-"`
 	Media     *Media `json:"-"`
 	NewItemID string `json:"-"`
+}
+
+// UnmarshalJSON accepts a fractional CT. Browsers compute it from a clock
+// offset, and half a millisecond must not lose a viewer's pause.
+func (c *Command) UnmarshalJSON(data []byte) error {
+	type fields Command
+	wire := struct {
+		*fields
+		CT float64 `json:"ct"`
+	}{fields: (*fields)(c)}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	c.CT = int64(math.Round(wire.CT))
+	return nil
 }
 
 // Change describes what a command did, for attribution in the UI.
 type Change struct {
 	Cause string `json:"cause"`
 	By    string `json:"by,omitempty"`
-	// Playback and Queue say which parts of the state changed.
-	Playback bool `json:"-"`
+	// Queue and Settings say the event must carry those parts of the state.
 	Queue    bool `json:"-"`
 	Settings bool `json:"-"`
 }
@@ -57,34 +82,36 @@ func Apply(s State, actor Actor, cmd Command, now int64) (State, Change, error) 
 	change := Change{Cause: cmd.Type, By: actor.Name}
 	var err error
 	switch cmd.Type {
-	case CmdPlay, CmdPause, CmdSeek, CmdRate:
-		change.Playback = true
+	case CmdPlay, CmdPause, CmdSeek:
 		err = applyTransport(&s, actor, cmd, now)
 	case CmdEnded:
-		change.Playback, change.Queue = true, true
+		change.Queue = true
 		change.By = ""
-		err = applyEnded(&s, cmd, now)
+		err = applyEnded(&s, actor, cmd, now)
 	case CmdSkip:
-		change.Playback, change.Queue = true, true
+		change.Queue = true
 		err = applySkip(&s, actor, cmd, now)
 	case CmdQueueAdd:
 		change.Queue = true
-		change.Playback, err = applyAdd(&s, actor, cmd, now)
+		err = applyAdd(&s, actor, cmd, now)
 	case CmdQueueRemove:
 		change.Queue = true
-		change.Playback, err = applyRemove(&s, actor, cmd, now)
+		err = applyRemove(&s, actor, cmd, now)
 	case CmdQueueMove:
 		change.Queue = true
 		err = applyMove(&s, actor, cmd)
 	case CmdQueuePlay:
-		change.Playback, change.Queue = true, true
-		err = applyQueuePlay(&s, actor, cmd, now)
-	case CmdQueueClear:
 		change.Queue = true
-		err = applyClear(&s, actor)
+		err = applyQueuePlay(&s, actor, cmd, now)
 	case CmdSettings:
 		change.Settings = true
 		err = applySettings(&s, actor, cmd)
+	case CmdRelease:
+		change.Settings = true
+		err = applyRelease(&s, actor)
+	case CmdRestore:
+		change.Settings = true
+		err = applyRestore(&s, actor)
 	default:
 		err = ErrInvalid
 	}
@@ -114,14 +141,6 @@ func applyTransport(s *State, actor Actor, cmd Command, now int64) error {
 		s.Playback.Status = StatusPlaying
 	case CmdPause:
 		s.Playback.Status = StatusPaused
-	case CmdRate:
-		if cmd.Rate < 0.25 || cmd.Rate > 2 {
-			return ErrInvalid
-		}
-		s.Playback.Pos = s.Playback.Position(at)
-		s.Playback.At = at
-		s.Playback.Rate = cmd.Rate
-		return nil
 	}
 
 	if cmd.Pos < 0 {
@@ -133,15 +152,18 @@ func applyTransport(s *State, actor Actor, cmd Command, now int64) error {
 }
 
 // applyEnded trusts a viewer's report only near the known end, so one client's
-// glitch cannot skip the video for everyone. Duplicates fail the item check.
-func applyEnded(s *State, cmd Command, now int64) error {
+// glitch cannot skip the video for everyone. With no known end the report is
+// really a skip, so it needs the same permission. Duplicates fail the item check.
+func applyEnded(s *State, actor Actor, cmd Command, now int64) error {
 	if s.Playback.ItemID == "" || cmd.Item != s.Playback.ItemID {
 		return ErrStale
 	}
-	if duration := s.Queue[0].DurationMS; duration > 0 {
-		if s.Playback.Position(now)*1000 < float64(duration-endToleranceMS) {
-			return ErrStale
-		}
+	duration := s.Queue[0].DurationMS
+	if duration <= 0 && !allowed(s.Settings.ControlMode, actor) {
+		return ErrForbidden
+	}
+	if duration > 0 && s.Playback.Position(now)*1000 < float64(duration-endToleranceMS) {
+		return ErrStale
 	}
 	advance(s, now)
 	return nil
@@ -158,41 +180,57 @@ func applySkip(s *State, actor Actor, cmd Command, now int64) error {
 	return nil
 }
 
-func applyAdd(s *State, actor Actor, cmd Command, now int64) (bool, error) {
+func applyAdd(s *State, actor Actor, cmd Command, now int64) error {
 	if !allowed(s.Settings.QueueMode, actor) {
-		return false, ErrForbidden
+		return ErrForbidden
 	}
 	if cmd.Media == nil || cmd.NewItemID == "" {
-		return false, ErrInvalid
+		return ErrInvalid
 	}
 	if len(s.Queue) >= maxQueue {
-		return false, ErrQueueFull
+		return ErrQueueFull
 	}
 
 	item := Item{ID: cmd.NewItemID, Media: *cmd.Media, AddedBy: actor.ID, AddedByName: actor.Name}
-	if cmd.PlayNow || len(s.Queue) == 0 {
+	switch {
+	case len(s.Queue) == 0:
+		s.Queue = append(s.Queue, item)
+		start(s, now)
+	case cmd.Mode == AddNow:
+		// This changes what everyone is watching, not just what comes later.
+		if !allowed(s.Settings.ControlMode, actor) {
+			return ErrForbidden
+		}
 		s.Queue = slices.Insert(s.Queue, 0, item)
 		start(s, now)
-		return true, nil
+	case cmd.Mode == AddNext:
+		s.Queue = slices.Insert(s.Queue, 1, item)
+	case cmd.Mode == AddEnd || cmd.Mode == "":
+		s.Queue = append(s.Queue, item)
+	default:
+		return ErrInvalid
 	}
-	s.Queue = append(s.Queue, item)
-	return false, nil
+	return nil
 }
 
-func applyRemove(s *State, actor Actor, cmd Command, now int64) (bool, error) {
+func applyRemove(s *State, actor Actor, cmd Command, now int64) error {
 	if !allowed(s.Settings.QueueMode, actor) {
-		return false, ErrForbidden
+		return ErrForbidden
 	}
 	index := indexOf(s.Queue, cmd.Target)
 	if index < 0 {
-		return false, ErrStale
+		return ErrStale
 	}
 	if index == 0 {
+		// Removing the current video is a skip by another name.
+		if !allowed(s.Settings.ControlMode, actor) {
+			return ErrForbidden
+		}
 		advance(s, now)
-		return true, nil
+		return nil
 	}
 	s.Queue = slices.Delete(s.Queue, index, index+1)
-	return false, nil
+	return nil
 }
 
 // applyMove reorders the upcoming videos. The current video stays first.
@@ -231,16 +269,6 @@ func applyQueuePlay(s *State, actor Actor, cmd Command, now int64) error {
 	return nil
 }
 
-func applyClear(s *State, actor Actor) error {
-	if !allowed(s.Settings.QueueMode, actor) {
-		return ErrForbidden
-	}
-	if len(s.Queue) > 1 {
-		s.Queue = s.Queue[:1]
-	}
-	return nil
-}
-
 func applySettings(s *State, actor Actor, cmd Command) error {
 	if actor.Role != RoleHost {
 		return ErrForbidden
@@ -249,6 +277,34 @@ func applySettings(s *State, actor Actor, cmd Command) error {
 		return ErrInvalid
 	}
 	s.Settings = *cmd.Settings
+	s.Held = nil
+	return nil
+}
+
+// applyRelease opens a locked room whose host has gone, keeping the lock to
+// restore. A second server arriving at the same decision finds nothing to do.
+func applyRelease(s *State, actor Actor) error {
+	if !actor.System {
+		return ErrForbidden
+	}
+	if s.Held != nil || !s.Settings.Locked() {
+		return ErrStale
+	}
+	held := s.Settings
+	s.Held = &held
+	s.Settings = Settings{ControlMode: ModeEveryone, QueueMode: ModeEveryone}
+	return nil
+}
+
+func applyRestore(s *State, actor Actor) error {
+	if !actor.System {
+		return ErrForbidden
+	}
+	if s.Held == nil {
+		return ErrStale
+	}
+	s.Settings = *s.Held
+	s.Held = nil
 	return nil
 }
 

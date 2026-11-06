@@ -22,7 +22,7 @@ func issuer(t *testing.T, seedByte byte) *Issuer {
 
 func TestRoundTrip(t *testing.T) {
 	i := issuer(t, 1)
-	token, err := i.Issue("g_1", "Sam", time.Hour)
+	token, err := i.Issue(Claims{Subject: "g_1", Name: "Sam"}, time.Hour)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,9 +37,9 @@ func TestRoundTrip(t *testing.T) {
 
 func TestRejectsBadTokens(t *testing.T) {
 	i := issuer(t, 1)
-	token, _ := i.Issue("g_1", "Sam", time.Hour)
-	foreign, _ := issuer(t, 2).Issue("g_1", "Sam", time.Hour)
-	expired, _ := i.Issue("g_1", "Sam", -time.Second)
+	token, _ := i.Issue(Claims{Subject: "g_1", Name: "Sam"}, time.Hour)
+	foreign, _ := issuer(t, 2).Issue(Claims{Subject: "g_1", Name: "Sam"}, time.Hour)
+	expired, _ := i.Issue(Claims{Subject: "g_1", Name: "Sam"}, -time.Second)
 	payload, signature, _ := strings.Cut(token, ".")
 	otherPayload, _, _ := strings.Cut(foreign, ".")
 

@@ -59,7 +59,8 @@ func (c *Catalog) Resolve(ctx context.Context, raw string) (room.Media, error) {
 		if err != nil {
 			return room.Media{}, err
 		}
-		if found {
+		// A cached live flag can be stale: the stream may have finished.
+		if found && !cached.IsLive {
 			return cached, nil
 		}
 
@@ -119,12 +120,12 @@ func (c *Catalog) Search(ctx context.Context, sourceName, query, region string) 
 }
 
 // Trending is cached for an hour, under a query name no user search can produce.
-func (c *Catalog) Trending(ctx context.Context, sourceName, region string) ([]room.Media, error) {
+func (c *Catalog) Trending(ctx context.Context, sourceName string) ([]room.Media, error) {
 	s, err := c.source(sourceName)
 	if err != nil {
 		return nil, err
 	}
-	const key = "\x01trending"
+	const key, region = "\x01trending", ""
 
 	cached, found, err := c.db.CachedSearch(ctx, sourceName, key, region, trendingMaxAge)
 	if err != nil {
@@ -134,14 +135,15 @@ func (c *Catalog) Trending(ctx context.Context, sourceName, region string) ([]ro
 		return cached, nil
 	}
 
-	items, err := s.Trending(ctx, region)
+	items, err := s.Trending(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return c.remember(ctx, sourceName, key, region, items)
 }
 
-// remember stores results and leaves out videos known to refuse embedding.
+// remember stores results and leaves out what cannot be played: videos known to
+// refuse embedding, and live streams.
 func (c *Catalog) remember(ctx context.Context, sourceName, query, region string, items []room.Media) ([]room.Media, error) {
 	if len(items) == 0 {
 		return items, nil
@@ -163,7 +165,7 @@ func (c *Catalog) remember(ctx context.Context, sourceName, query, region string
 	}
 	kept := items[:0]
 	for _, item := range items {
-		if !blocked[item.SourceID] {
+		if !blocked[item.SourceID] && !item.IsLive {
 			kept = append(kept, item)
 		}
 	}
@@ -218,5 +220,5 @@ func (c *Catalog) RefreshStale(ctx context.Context, limit int) (refreshed, delet
 // IsUserError reports whether an error's text is safe and useful to show.
 func IsUserError(err error) bool {
 	return errors.Is(err, ErrUnsupportedURL) || errors.Is(err, ErrUnavailable) ||
-		errors.Is(err, ErrOverBudget) || errors.Is(err, ErrNoSearch)
+		errors.Is(err, ErrOverBudget) || errors.Is(err, ErrNoSearch) || errors.Is(err, ErrLive)
 }

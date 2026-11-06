@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -102,5 +103,47 @@ func TestPeopleAreDedupedAcrossTabs(t *testing.T) {
 	}
 	if len(people) != 1 {
 		t.Fatalf("people = %+v", people)
+	}
+}
+
+func TestSeedNeverOverwrites(t *testing.T) {
+	live := NewLive(liveStore(t))
+	ctx := context.Background()
+	roomID := ids.New()
+	first, second := room.New(), room.New()
+	first.Version, second.Version = 5, 9
+	for _, state := range []room.State{first, second} {
+		if err := live.Seed(ctx, roomID, state); err != nil {
+			t.Fatal(err)
+		}
+	}
+	state, found, err := live.Load(ctx, roomID)
+	if err != nil || !found || state.Version != 5 {
+		t.Fatalf("state %+v, found %v, err %v", state, found, err)
+	}
+	if version, found, err := live.Version(ctx, roomID); err != nil || !found || version != 5 {
+		t.Fatalf("version %d, found %v, err %v", version, found, err)
+	}
+}
+
+func TestMutateNamesAMissingRoom(t *testing.T) {
+	live := NewLive(liveStore(t))
+	_, err := live.Mutate(context.Background(), ids.New(), apply(room.Actor{}, room.Command{}), noEvent)
+	if !errors.Is(err, ErrNoState) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestSocketsCountsEveryTab(t *testing.T) {
+	live := NewLive(liveStore(t))
+	ctx := context.Background()
+	roomID := ids.New()
+	for connID, userID := range map[string]string{"a": "u", "b": "u", "c": "v"} {
+		if err := live.Touch(ctx, roomID, connID, Person{UserID: userID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if count, err := live.Sockets(ctx, roomID, "u"); err != nil || count != 2 {
+		t.Fatalf("count %d, err %v", count, err)
 	}
 }

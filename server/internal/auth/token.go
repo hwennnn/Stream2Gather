@@ -21,7 +21,10 @@ var ErrInvalidToken = errors.New("invalid token")
 type Claims struct {
 	Subject string `json:"sub"`
 	Name    string `json:"name"`
-	Expires int64  `json:"exp"`
+	Avatar  string `json:"avatar,omitempty"`
+	// Account is true once the person has signed in, rather than being a guest.
+	Account bool  `json:"acct,omitempty"`
+	Expires int64 `json:"exp"`
 }
 
 // Issuer signs and verifies session tokens.
@@ -63,9 +66,10 @@ func loadSeed(encoded string) ([]byte, error) {
 	return seed, os.WriteFile(path, seed, 0o600)
 }
 
-// Issue returns a token valid for ttl.
-func (i *Issuer) Issue(subject, name string, ttl time.Duration) (string, error) {
-	payload, err := json.Marshal(Claims{Subject: subject, Name: name, Expires: i.now().Add(ttl).Unix()})
+// Issue returns a token for claims, valid for ttl.
+func (i *Issuer) Issue(claims Claims, ttl time.Duration) (string, error) {
+	claims.Expires = i.now().Add(ttl).Unix()
+	payload, err := json.Marshal(claims)
 	if err != nil {
 		return "", err
 	}

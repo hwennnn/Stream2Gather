@@ -29,6 +29,9 @@ import (
 	"stream2gather/migrations"
 )
 
+// A closing socket waits up to five seconds for a dead peer's reply.
+const shutdownTimeout = 10 * time.Second
+
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if len(os.Args) < 2 {
@@ -74,7 +77,7 @@ func migrate(cfg config.Config) error {
 func catalogFor(cfg config.Config, db *store.Postgres, log *slog.Logger) *source.Catalog {
 	sources := []source.Source{source.NewYouTube(cfg.YouTubeAPIKey, cfg.YouTubeBaseURL)}
 	if cfg.AllowDirectMedia {
-		sources = append(sources, source.Direct{})
+		sources = append(sources, source.Direct{HTTPSOnly: cfg.Env != "dev"})
 	}
 	return source.NewCatalog(db, cfg.SearchDailyBudget, log, sources...)
 }
@@ -131,20 +134,38 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 			DB: db, Live: live, Pool: pool, Redis: rdb, Hub: rooms, Catalog: catalog,
 			Issuer: issuer, Sink: sink, Log: log,
 			PublicOrigin: cfg.PublicOrigin, WebDir: cfg.WebDir, Secure: cfg.Env != "dev",
+			DirectMedia: cfg.AllowDirectMedia, TrustedProxy: cfg.TrustedProxy,
+			Clerk: clerkVerifier(cfg), ClerkPublishableKey: cfg.ClerkPublishable,
 		}).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
+	stopped := make(chan struct{})
 	go func() {
+		defer close(stopped)
 		<-ctx.Done()
-		shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		shutdown, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
-		_ = server.Shutdown(shutdown)
+		// Sockets are hijacked, so Shutdown only stops the listener for them.
+		// Rooms need both Redis and Postgres, which close when serve returns.
+		go func() { _ = server.Shutdown(shutdown) }()
+		if err := rooms.Close(shutdown); err != nil {
+			log.Warn("rooms did not close in time", "error", err)
+		}
 	}()
 
 	log.Info("listening", "addr", cfg.HTTPAddr)
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
+	<-stopped
 	return nil
+}
+
+// clerkVerifier returns nil, not a typed nil, so guests keep working without keys.
+func clerkVerifier(cfg config.Config) api.ClerkVerifier {
+	if cfg.ClerkSecret == "" || cfg.ClerkPublishable == "" {
+		return nil
+	}
+	return auth.NewClerk(cfg.ClerkSecret, cfg.PublicOrigin)
 }

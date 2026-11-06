@@ -102,8 +102,13 @@ func (v youtubeVideo) media() room.Media {
 		Author:       html.UnescapeString(v.Snippet.ChannelTitle),
 		ThumbnailURL: thumbnail,
 		DurationMS:   parseDuration(v.ContentDetails.Duration),
-		IsLive:       v.Snippet.LiveBroadcastContent == "live",
+		IsLive:       v.live(),
 	}
+}
+
+// live covers a stream that has been announced, since it cannot play yet either.
+func (v youtubeVideo) live() bool {
+	return v.Snippet.LiveBroadcastContent == "live" || v.Snippet.LiveBroadcastContent == "upcoming"
 }
 
 func (v youtubeVideo) playable() bool {
@@ -133,6 +138,9 @@ func (y *YouTube) Resolve(ctx context.Context, ref Ref) (room.Media, error) {
 	}
 	if len(videos) == 0 || !videos[0].playable() {
 		return room.Media{}, ErrUnavailable
+	}
+	if videos[0].live() {
+		return room.Media{}, ErrLive
 	}
 	return videos[0].media(), nil
 }
@@ -195,12 +203,9 @@ func (y *YouTube) Search(ctx context.Context, query, region string) ([]room.Medi
 }
 
 // Trending costs one quota unit.
-func (y *YouTube) Trending(ctx context.Context, region string) ([]room.Media, error) {
-	if region == "" {
-		region = "US"
-	}
+func (y *YouTube) Trending(ctx context.Context) ([]room.Media, error) {
 	videos, err := y.videos(ctx, url.Values{
-		"chart": {"mostPopular"}, "regionCode": {region}, "maxResults": {"50"},
+		"chart": {"mostPopular"}, "regionCode": {"US"}, "maxResults": {"50"},
 	})
 	if err != nil {
 		return nil, err

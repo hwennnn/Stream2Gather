@@ -9,13 +9,18 @@ export type Media = {
   isLive: boolean;
 };
 
-export type Person = { userId: string; name: string; role: 'host' | 'member' };
+export type Person = { userId: string; name: string; role: 'host' | 'member'; avatarUrl?: string };
+
+export type Account = { id: string; name: string; avatarUrl: string; signedIn: boolean };
 
 export type RoomPreview = {
   slug: string;
   name: string;
   nowPlaying: Media | null;
+  /** Where the room is right now, or null when nothing is playing. */
+  playback: { status: string; pos: number } | null;
   members: Person[];
+  maxMembers: number;
 };
 
 export type ChatMessage = {
@@ -36,17 +41,27 @@ export class ApiError extends Error {
   }
 }
 
+const reach = async (path: string, init?: RequestInit): Promise<Response> => {
+  try {
+    return await fetch(path, {
+      ...init,
+      headers: { ...(init?.body ? { 'content-type': 'application/json' } : {}), ...init?.headers },
+    });
+  } catch {
+    throw new ApiError(0, 'network', 'Could not reach the server. Try again.');
+  }
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
-  const response = await fetch(path, {
-    ...init,
-    headers: init?.body ? { 'content-type': 'application/json' } : undefined,
-  });
+  const response = await reach(path, init);
   if (!response.ok) {
     const problem = (await response.json().catch(() => null)) as { code?: string; message?: string } | null;
     throw new ApiError(response.status, problem?.code ?? 'unknown', problem?.message ?? 'Something went wrong. Try again.');
   }
   return (await response.json()) as T;
 };
+
+type Session = { user: Account | null };
 
 const post = <T>(path: string, body: unknown = {}) =>
   request<T>(path, { method: 'POST', body: JSON.stringify(body) });
@@ -60,6 +75,10 @@ export const api = {
   search: (query: string) =>
     request<{ items: Media[] }>(`/v1/media/search?q=${encodeURIComponent(query)}`),
   trending: () => request<{ items: Media[] }>('/v1/media/trending'),
-  rename: (name: string) =>
-    request<{ user: { id: string; name: string } }>('/v1/me', { method: 'PATCH', body: JSON.stringify({ name }) }),
+  rename: (name: string) => request<Session>('/v1/me', { method: 'PATCH', body: JSON.stringify({ name }) }),
+  config: () => request<{ clerkPublishableKey: string }>('/v1/config'),
+  me: () => request<Session>('/v1/me'),
+  clerkSession: (token: string) =>
+    request<Session>('/v1/session/clerk', { method: 'POST', headers: { authorization: `Bearer ${token}` } }),
+  signOut: () => request<Session>('/v1/session', { method: 'DELETE' }),
 };

@@ -15,15 +15,18 @@ const directName = "direct"
 
 // Direct plays a media file by URL in the browser. The server never fetches the
 // URL. It stays off unless ALLOW_DIRECT_MEDIA is set.
-type Direct struct{}
+type Direct struct {
+	// HTTPSOnly refuses plain http even on this machine, for anywhere but dev.
+	HTTPSOnly bool
+}
 
 // Name returns the source identifier.
 func (Direct) Name() string { return directName }
 
 // Match accepts media file links.
-func (Direct) Match(link *url.URL) (Ref, bool) {
-	local := link.Hostname() == "127.0.0.1" || link.Hostname() == "localhost"
-	if link.Scheme != "https" && !local {
+func (d Direct) Match(link *url.URL) (Ref, bool) {
+	local := link.Scheme == "http" && (link.Hostname() == "127.0.0.1" || link.Hostname() == "localhost")
+	if link.Scheme != "https" && (d.HTTPSOnly || !local) {
 		return Ref{}, false
 	}
 	switch strings.ToLower(path.Ext(link.Path)) {
@@ -55,6 +58,6 @@ func (Direct) Search(context.Context, string, string) ([]room.Media, error) {
 }
 
 // Trending is not available for direct links.
-func (Direct) Trending(context.Context, string) ([]room.Media, error) {
+func (Direct) Trending(context.Context) ([]room.Media, error) {
 	return nil, ErrNoSearch
 }

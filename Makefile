@@ -24,10 +24,13 @@ test:
 	cd web && npm test
 
 # The browser test needs a local video in the web build.
+SAMPLE ?= web/dist/sample.mp4
+
 sample:
 	ffmpeg -loglevel error -y -f lavfi -i testsrc2=size=640x360:rate=30:duration=300 \
 		-f lavfi -i sine=frequency=330:duration=300 -c:v libx264 -preset veryfast -g 30 \
-		-pix_fmt yuv420p -c:a aac -b:a 48k -shortest -movflags +faststart web/dist/sample.mp4
+		-pix_fmt yuv420p -c:a aac -b:a 48k -shortest -movflags +faststart $(SAMPLE)
 
+# Starts its own server. All it needs running first is `make up`.
 e2e:
-	cd e2e && npm ci && node sync.mjs
+	./e2e/run.sh

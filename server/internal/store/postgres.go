@@ -9,13 +9,24 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"stream2gather/internal/room"
 )
 
-// ErrNotFound means the row does not exist.
-var ErrNotFound = errors.New("not found")
+var (
+	// ErrNotFound means the row does not exist.
+	ErrNotFound = errors.New("not found")
+	// ErrSlugTaken means another room already has this address.
+	ErrSlugTaken = errors.New("slug taken")
+)
+
+// embedBlockDays is how long a reported embed block is believed. Owners change
+// their minds, and a mistaken report must not last forever.
+const embedBlockDays = 7
+
+const uniqueViolation = "23505"
 
 // Postgres runs durable queries.
 type Postgres struct {
@@ -44,12 +55,53 @@ func (p *Postgres) EnsureUser(ctx context.Context, id, name string) error {
 	return err
 }
 
+// LinkClerkUser returns the user behind a Clerk account and their display name.
+// A guest signing in for the first time keeps their id, so rooms they host stay
+// theirs. If the account already exists, it takes over the guest's rooms instead.
+func (p *Postgres) LinkClerkUser(ctx context.Context, clerkID, guestID, newID, name, avatar string) (string, string, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	defer tx.Rollback(ctx)
+
+	var id, displayName string
+	err = tx.QueryRow(ctx, `
+		UPDATE users SET avatar_url = $2, last_seen_at = now() WHERE clerk_id = $1
+		RETURNING id, display_name`, clerkID, avatar).Scan(&id, &displayName)
+	switch {
+	case err == nil:
+		_, err = tx.Exec(ctx, `
+			UPDATE rooms SET owner_id = $1
+			WHERE owner_id = $2 AND EXISTS (SELECT 1 FROM users WHERE id = $2 AND kind = 'guest')`, id, guestID)
+	case errors.Is(err, pgx.ErrNoRows):
+		err = tx.QueryRow(ctx, `
+			UPDATE users SET kind = 'clerk', clerk_id = $2, display_name = $3, avatar_url = $4, last_seen_at = now()
+			WHERE id = $1 AND kind = 'guest'
+			RETURNING id, display_name`, guestID, clerkID, name, avatar).Scan(&id, &displayName)
+		if errors.Is(err, pgx.ErrNoRows) {
+			err = tx.QueryRow(ctx, `
+				INSERT INTO users (id, kind, clerk_id, display_name, avatar_url) VALUES ($1, 'clerk', $2, $3, $4)
+				ON CONFLICT (clerk_id) DO UPDATE SET avatar_url = EXCLUDED.avatar_url, last_seen_at = now()
+				RETURNING id, display_name`, newID, clerkID, name, avatar).Scan(&id, &displayName)
+		}
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return id, displayName, tx.Commit(ctx)
+}
+
 // CreateRoom inserts a room that expires after a day without use.
 func (p *Postgres) CreateRoom(ctx context.Context, r Room) error {
 	_, err := p.pool.Exec(ctx, `
 		INSERT INTO rooms (id, slug, name, owner_id, expires_at)
 		VALUES ($1, $2, $3, $4, now() + interval '24 hours')`,
 		r.ID, r.Slug, r.Name, r.OwnerID)
+	var failure *pgconn.PgError
+	if errors.As(err, &failure) && failure.Code == uniqueViolation && failure.ConstraintName == "rooms_slug_key" {
+		return ErrSlugTaken
+	}
 	return err
 }
 
@@ -166,7 +218,8 @@ func (p *Postgres) MarkEmbedBlocked(ctx context.Context, source, sourceID string
 func (p *Postgres) EmbedBlocked(ctx context.Context, source string, sourceIDs []string) (map[string]bool, error) {
 	rows, err := p.pool.Query(ctx, `
 		SELECT source_id FROM media
-		WHERE source = $1 AND source_id = ANY($2) AND embed_blocked_at IS NOT NULL`, source, sourceIDs)
+		WHERE source = $1 AND source_id = ANY($2)
+		  AND embed_blocked_at > now() - make_interval(days => $3)`, source, sourceIDs, embedBlockDays)
 	if err != nil {
 		return nil, err
 	}
@@ -200,8 +253,9 @@ func (p *Postgres) CachedSearch(ctx context.Context, source, query, region strin
 		SELECT source, m.source_id, url, title, author, thumbnail_url, duration_ms, is_live
 		FROM unnest($2::text[]) WITH ORDINALITY AS wanted (source_id, position)
 		JOIN media m ON m.source = $1 AND m.source_id = wanted.source_id
-		WHERE m.embed_blocked_at IS NULL
-		ORDER BY wanted.position`, source, ids)
+		WHERE NOT m.is_live
+		  AND (m.embed_blocked_at IS NULL OR m.embed_blocked_at <= now() - make_interval(days => $3))
+		ORDER BY wanted.position`, source, ids, embedBlockDays)
 	if err != nil {
 		return nil, false, err
 	}

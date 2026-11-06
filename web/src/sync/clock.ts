@@ -15,6 +15,8 @@ export class ServerClock {
   /** Records a ping sent at t0 and answered with server time ts, received at t1. */
   addSample(t0: number, ts: number, t1: number): void {
     const rtt = t1 - t0;
+    // The wall clock stepped back mid-ping. It would otherwise win as the fastest.
+    if (rtt < 0) return;
     this.samples.push({ offset: ts + rtt / 2 - t1, rtt });
     if (this.samples.length > KEPT_SAMPLES) this.samples.shift();
   }
@@ -31,7 +33,8 @@ export class ServerClock {
     return Math.min(...this.samples.map((sample) => sample.rtt), Infinity);
   }
 
+  /** Whole milliseconds, because an odd round trip puts the offset on a half. */
   now(): number {
-    return this.localNow() + this.offset;
+    return Math.round(this.localNow() + this.offset);
   }
 }

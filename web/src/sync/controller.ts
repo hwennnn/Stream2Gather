@@ -44,6 +44,10 @@ const ECHO_WINDOW_MS = 1500;
  */
 const RESUME_ECHO_WINDOW_MS = 300;
 const USER_SEEK_THRESHOLD_S = 1;
+/** A jump to within this of where we last sent the player is that seek landing. */
+const OWN_SEEK_WINDOW_S = 2;
+/** Beyond this, a throttled tab makes the time between ticks meaningless. */
+const MAX_TICK_GAP_MS = 2500;
 const STALL_TICKS = 3;
 
 export const expectedPosition = (playback: Playback, serverNow: number): number => {
@@ -62,7 +66,12 @@ export class SyncController {
   private lastSeekAt = -Infinity;
   private lastTime = 0;
   private lastTickAt = 0;
+  private lastState: PlayerState | null = null;
+  /** Where we sent the player, until it is seen arriving. Seeks can land late. */
+  private pendingSeek: number | null = null;
   private stalledTicks = 0;
+  /** The player has been seen resting on the room's paused position. */
+  private settled = false;
   private startTimer: number | null = null;
   private nudgeTimer: number | null = null;
   private nudging = false;
@@ -81,6 +90,8 @@ export class SyncController {
   apply(playback: Playback): void {
     const previous = this.playback;
     this.playback = playback;
+    this.settled &&= previous?.item === playback.item && previous.pos === playback.pos;
+    this.pendingSeek = null;
     this.cancelNudge();
     this.clearStart();
 
@@ -89,6 +100,7 @@ export class SyncController {
         this.player.pause();
         if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.player.seek(playback.pos);
       });
+      this.noteSettled(playback);
       return;
     }
     if (playback.status !== 'playing') return;
@@ -132,20 +144,22 @@ export class SyncController {
     if (!playback) return;
     const now = this.clock.now();
 
+    const state = this.player.state();
+    const time = this.player.time();
+
     if (playback.status === 'paused') {
-      this.detectPausedSeek(playback, now);
+      this.detectPausedSeek(playback, state, time, now);
+      this.remember(time, now, state);
       return;
     }
     if (playback.status !== 'playing' || now < playback.at) return;
 
-    const state = this.player.state();
-    const time = this.player.time();
     const expected = expectedPosition(playback, now);
     const drift = time - expected;
 
     if (state === 'buffering' || state === 'loading') {
       this.report({ health: 'buffering', drift });
-      this.remember(time, now);
+      this.remember(time, now, state);
       return;
     }
 
@@ -153,7 +167,7 @@ export class SyncController {
       // Most likely an ad. It is never skipped; the room carries on and this
       // viewer catches up afterwards.
       this.report({ health: 'stalled', drift });
-      this.remember(time, now);
+      this.remember(time, now, state);
       return;
     }
 
@@ -161,9 +175,9 @@ export class SyncController {
       this.act(() => this.player.play());
     }
 
-    this.detectUserSeek(playback, time, now, expected);
+    this.detectUserSeek(playback, state, time, now, expected);
     this.correct(drift, expected, now);
-    this.remember(time, now);
+    this.remember(time, now, state);
   }
 
   private isStalled(state: PlayerState, time: number): boolean {
@@ -175,14 +189,34 @@ export class SyncController {
     return this.stalledTicks >= STALL_TICKS;
   }
 
-  private remember(time: number, now: number): void {
+  private remember(time: number, now: number, state: PlayerState): void {
     this.lastTime = time;
     this.lastTickAt = now;
+    this.lastState = state;
   }
 
-  /** The native player controls stay on, so a viewer's seek shows as a jump. */
-  private detectUserSeek(playback: Playback, time: number, now: number, expected: number): void {
-    if (this.recentlyActed(now) || this.nudging || this.lastTickAt === 0) return;
+  /**
+   * The native player controls stay on, so a viewer's seek shows as a jump. It
+   * moves the whole room, so anything else must not pass for one: a player that
+   * was not running across both ticks, one that froze (its time did not move, it
+   * only fell behind the clock), or a tab the browser put to sleep between ticks.
+   */
+  private detectUserSeek(
+    playback: Playback,
+    state: PlayerState,
+    time: number,
+    now: number,
+    expected: number,
+  ): void {
+    if (this.recentlyActed(now) || this.nudging) return;
+    if (state !== 'playing' || this.lastState !== 'playing') return;
+    if (now - this.lastTickAt > MAX_TICK_GAP_MS) return;
+    if (Math.abs(time - this.lastTime) <= USER_SEEK_THRESHOLD_S) return;
+    if (this.pendingSeek !== null && Math.abs(time - this.pendingSeek) <= OWN_SEEK_WINDOW_S) {
+      this.pendingSeek = null;
+      return;
+    }
+
     const elapsed = ((now - this.lastTickAt) / 1000) * playback.rate;
     const jump = time - (this.lastTime + elapsed);
     if (Math.abs(jump) > USER_SEEK_THRESHOLD_S && Math.abs(time - expected) > USER_SEEK_THRESHOLD_S) {
@@ -191,12 +225,29 @@ export class SyncController {
     }
   }
 
-  private detectPausedSeek(playback: Playback, now: number): void {
-    const time = this.player.time();
-    if (!this.recentlyActed(now) && Math.abs(time - playback.pos) > USER_SEEK_THRESHOLD_S) {
+  /**
+   * A paused player only counts once it has been seen on the room's position.
+   * Until then, being elsewhere means it has not arrived, like a joiner's player
+   * still reporting 0, and that must not drag the room back with it.
+   */
+  private detectPausedSeek(playback: Playback, state: PlayerState, time: number, now: number): void {
+    if (state !== 'paused' || this.noteSettled(playback)) return;
+    if (this.recentlyActed(now)) return;
+    if (this.settled) {
       this.lastActionAt = now;
       this.emit({ type: 'seek', pos: time, ct: now });
+    } else {
+      this.act(() => this.player.seek(playback.pos));
     }
+  }
+
+  /** Reports whether the player is resting on the room's paused position. */
+  private noteSettled(playback: Playback): boolean {
+    const resting =
+      this.player.state() === 'paused' &&
+      Math.abs(this.player.time() - playback.pos) <= USER_SEEK_THRESHOLD_S;
+    this.settled ||= resting;
+    return resting;
   }
 
   private correct(drift: number, expected: number, now: number): void {
@@ -214,7 +265,7 @@ export class SyncController {
       return;
     }
 
-    if (this.player.rates.kind === 'fine') {
+    if (this.player.rates === 'fine') {
       const rate = this.playback?.rate ?? 1;
       this.nudgeRate(rate + (ahead ? -FINE_RATE_DELTA : FINE_RATE_DELTA), size / FINE_RATE_DELTA);
     } else if (ahead) {
@@ -257,7 +308,8 @@ export class SyncController {
 
   private seekTo(expected: number): void {
     this.lastSeekAt = this.clock.now();
-    this.player.seek(expected + SEEK_SETTLE_S);
+    this.pendingSeek = expected + SEEK_SETTLE_S;
+    this.player.seek(this.pendingSeek);
   }
 
   private act(work: () => void): void {

@@ -117,3 +117,43 @@ func TestQuotaErrorIsRecognised(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestLiveAndUpcomingStreamsAreRejected(t *testing.T) {
+	for _, state := range []string{"live", "upcoming"} {
+		t.Run(state, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(`{"items":[{"id":"x","snippet":{"liveBroadcastContent":"` + state + `"},
+					"status":{"embeddable":true,"privacyStatus":"public"}}]}`))
+			}))
+			defer server.Close()
+			_, err := NewYouTube("k", server.URL).Resolve(context.Background(), Ref{ID: "x"})
+			if !errors.Is(err, ErrLive) || !IsUserError(err) || err.Error() != "Live streams aren’t supported yet." {
+				t.Fatalf("err = %v", err)
+			}
+		})
+	}
+}
+
+func TestDirectLinksNeedHTTPSOutsideDev(t *testing.T) {
+	tests := []struct {
+		link   string
+		direct Direct
+		want   bool
+	}{
+		{"https://cdn.test/a.mp4", Direct{HTTPSOnly: true}, true},
+		{"http://127.0.0.1:18082/a.mp4", Direct{HTTPSOnly: true}, false},
+		{"http://cdn.test/a.mp4", Direct{HTTPSOnly: true}, false},
+		{"http://127.0.0.1:18082/a.mp4", Direct{}, true},
+		{"http://cdn.test/a.mp4", Direct{}, false},
+		{"ftp://127.0.0.1/a.mp4", Direct{}, false},
+	}
+	for _, test := range tests {
+		link, err := url.Parse(test.link)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := test.direct.Match(link); ok != test.want {
+			t.Errorf("%+v %s = %v", test.direct, test.link, ok)
+		}
+	}
+}

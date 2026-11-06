@@ -15,6 +15,7 @@ var (
 	ErrUnavailable    = errors.New("this video cannot be played here")
 	ErrNoSearch       = errors.New("this source has no search")
 	ErrOverBudget     = errors.New("search is resting until tomorrow")
+	ErrLive           = errors.New("Live streams aren’t supported yet.")
 )
 
 // Ref points at one video on a source.
@@ -32,7 +33,7 @@ type Source interface {
 	// Resolve fetches metadata, or fails if the video cannot be embedded.
 	Resolve(ctx context.Context, ref Ref) (room.Media, error)
 	Search(ctx context.Context, query, region string) ([]room.Media, error)
-	Trending(ctx context.Context, region string) ([]room.Media, error)
+	Trending(ctx context.Context) ([]room.Media, error)
 }
 
 // Batcher is a source that can renew many videos at once.

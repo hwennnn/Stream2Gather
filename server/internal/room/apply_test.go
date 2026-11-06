@@ -1,8 +1,10 @@
 package room
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -150,14 +152,6 @@ func TestQueueOperationsUseItemIDs(t *testing.T) {
 	if got := ids(played); got != "c d" || played.Playback.ItemID != "c" {
 		t.Fatalf("after play = %s, current %s", got, played.Playback.ItemID)
 	}
-
-	cleared, _, err := Apply(played, member, Command{Type: CmdQueueClear}, now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := ids(cleared); got != "c" {
-		t.Fatalf("after clear = %s", got)
-	}
 }
 
 func TestRemovingCurrentVideoAdvances(t *testing.T) {
@@ -166,8 +160,8 @@ func TestRemovingCurrentVideoAdvances(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if next.Playback.ItemID != "b" || !change.Playback {
-		t.Fatalf("current = %q, playback changed = %v", next.Playback.ItemID, change.Playback)
+	if next.Playback.ItemID != "b" || !change.Queue {
+		t.Fatalf("current = %q, queue changed = %v", next.Playback.ItemID, change.Queue)
 	}
 }
 
@@ -184,7 +178,6 @@ func TestHostOnlyModes(t *testing.T) {
 	blocked := []Command{
 		{Type: CmdPause, Item: "a", CT: now},
 		{Type: CmdSkip, Item: "a"},
-		{Type: CmdQueueClear},
 		{Type: CmdQueueAdd, NewItemID: "x", Media: &Media{}},
 	}
 	for _, cmd := range blocked {
@@ -250,4 +243,152 @@ func ids(s State) string {
 		out += item.ID
 	}
 	return out
+}
+
+// A real browser's ct is often fractional, and rejecting it lost the command.
+func TestFractionalClientTimeDecodes(t *testing.T) {
+	var cmd Command
+	body := `{"item":"a","pos":3.2,"ct":1793000000000.5}`
+	if err := json.Unmarshal([]byte(body), &cmd); err != nil {
+		t.Fatal(err)
+	}
+	if cmd.CT != 1793000000001 || cmd.Item != "a" || cmd.Pos != 3.2 {
+		t.Fatalf("decoded %+v", cmd)
+	}
+}
+
+func locked(s State) State {
+	s.Settings = Settings{ControlMode: ModeHosts, QueueMode: ModeHosts}
+	return s
+}
+
+func controlLocked(s State) State {
+	s.Settings = Settings{ControlMode: ModeHosts, QueueMode: ModeEveryone}
+	return s
+}
+
+func TestHostOnlyModeCannotBeWalkedAround(t *testing.T) {
+	media := &Media{Source: "youtube", SourceID: "n"}
+	cases := []struct {
+		name  string
+		state State
+		cmd   Command
+	}{
+		{"ended with no known duration", controlLocked(add(t, New(), "a", 0)), Command{Type: CmdEnded, Item: "a"}},
+		{"playing something now", controlLocked(add(t, New(), "a", 0)), Command{Type: CmdQueueAdd, Mode: AddNow, Media: media, NewItemID: "n"}},
+		{"removing the current video", controlLocked(add(t, add(t, New(), "a", 0), "b", 0)), Command{Type: CmdQueueRemove, Target: "a"}},
+		{"adding at all", locked(add(t, New(), "a", 0)), Command{Type: CmdQueueAdd, Media: media, NewItemID: "n"}},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			if _, _, err := Apply(test.state, member, test.cmd, now); !errors.Is(err, ErrForbidden) {
+				t.Fatalf("member got %v", err)
+			}
+			if _, _, err := Apply(test.state, host, test.cmd, now); err != nil && test.name != "adding at all" {
+				t.Fatalf("host got %v", err)
+			}
+		})
+	}
+}
+
+func TestQueuePermissionAloneStillCoversTheQueue(t *testing.T) {
+	s := controlLocked(add(t, add(t, New(), "a", 0), "b", 0))
+	if _, _, err := Apply(s, member, Command{Type: CmdQueueRemove, Target: "b"}, now); err != nil {
+		t.Fatalf("removing an upcoming video: %v", err)
+	}
+	media := &Media{Source: "youtube", SourceID: "n"}
+	if _, _, err := Apply(s, member, Command{Type: CmdQueueAdd, Mode: AddNext, Media: media, NewItemID: "n"}, now); err != nil {
+		t.Fatalf("adding next: %v", err)
+	}
+	empty := controlLocked(New())
+	if _, _, err := Apply(empty, member, Command{Type: CmdQueueAdd, Mode: AddNow, Media: media, NewItemID: "n"}, now); err != nil {
+		t.Fatalf("nothing is displaced in an empty room: %v", err)
+	}
+}
+
+func TestEndedNearAKnownEndNeedsNoPermission(t *testing.T) {
+	s := controlLocked(add(t, New(), "a", 60_000))
+	if _, _, err := Apply(s, member, Command{Type: CmdEnded, Item: "a"}, now+StartLeadMS+59_000); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestQueueAddModes(t *testing.T) {
+	media := &Media{Source: "youtube", SourceID: "n"}
+	s := add(t, add(t, New(), "a", 0), "b", 0)
+	cases := []struct {
+		mode, want, current string
+	}{
+		{AddEnd, "a b n", "a"},
+		{"", "a b n", "a"},
+		{AddNext, "a n b", "a"},
+		{AddNow, "n a b", "n"},
+	}
+	for _, test := range cases {
+		next, _, err := Apply(s, member, Command{Type: CmdQueueAdd, Mode: test.mode, Media: media, NewItemID: "n"}, now)
+		if err != nil {
+			t.Fatalf("mode %q: %v", test.mode, err)
+		}
+		if got := ids(next); got != test.want || next.Playback.ItemID != test.current {
+			t.Fatalf("mode %q: queue %s, current %s", test.mode, got, next.Playback.ItemID)
+		}
+	}
+	if _, _, err := Apply(s, member, Command{Type: CmdQueueAdd, Mode: "sideways", Media: media, NewItemID: "n"}, now); !errors.Is(err, ErrInvalid) {
+		t.Fatalf("unknown mode: %v", err)
+	}
+}
+
+func TestLockReleaseAndRestore(t *testing.T) {
+	system := Actor{System: true}
+	s := controlLocked(add(t, New(), "a", 0))
+
+	released, change, err := Apply(s, system, Command{Type: CmdRelease}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if released.Settings.Locked() || released.Held == nil || !change.Settings {
+		t.Fatalf("released = %+v", released)
+	}
+	if _, _, err := Apply(released, member, Command{Type: CmdSkip, Item: "a"}, now); err != nil {
+		t.Fatalf("anyone can control a released room: %v", err)
+	}
+	if _, _, err := Apply(released, system, Command{Type: CmdRelease}, now); !errors.Is(err, ErrStale) {
+		t.Fatalf("second server releasing: %v", err)
+	}
+
+	restored, _, err := Apply(released, system, Command{Type: CmdRestore}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restored.Settings != s.Settings || restored.Held != nil {
+		t.Fatalf("restored = %+v", restored)
+	}
+	if _, _, err := Apply(restored, system, Command{Type: CmdRestore}, now); !errors.Is(err, ErrStale) {
+		t.Fatalf("second server restoring: %v", err)
+	}
+
+	for _, kind := range []string{CmdRelease, CmdRestore} {
+		if _, _, err := Apply(s, host, Command{Type: kind}, now); !errors.Is(err, ErrForbidden) {
+			t.Fatalf("%s from a person: %v", kind, err)
+		}
+	}
+}
+
+func TestReleaseLeavesAnOpenRoomAlone(t *testing.T) {
+	if _, _, err := Apply(add(t, New(), "a", 0), Actor{System: true}, Command{Type: CmdRelease}, now); !errors.Is(err, ErrStale) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestCleanName(t *testing.T) {
+	for raw, want := range map[string]string{"  Maya ": "Maya", "Zoë 🎬": "Zoë 🎬"} {
+		if got, ok := CleanName(raw); !ok || got != want {
+			t.Fatalf("CleanName(%q) = %q, %v", raw, got, ok)
+		}
+	}
+	for _, raw := range []string{"", "   ", "a\x00b", "a\nb", "a\tb", "\x7f", strings.Repeat("x", 33), "a\xffb"} {
+		if got, ok := CleanName(raw); ok {
+			t.Fatalf("CleanName(%q) accepted as %q", raw, got)
+		}
+	}
 }

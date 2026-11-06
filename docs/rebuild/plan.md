@@ -71,11 +71,13 @@ Never touch the owner's Temporal on 7233. Run k6 only through `grafana/k6`.
 
 ## 3. Room state ownership
 
-- **`room:{id}:state`** holds JSON `{version, playback, queue[], settings}`. A Lua script sets it only if the version matches, then does `XADD room:{id}:log MAXLEN ~1000` and `PUBLISH room:{id}`. On conflict, re-read, re-apply and retry up to 5 times.
+- **`room:{id}:state`** holds JSON `{version, playback, queue[], settings, held?}`. A Lua script sets it only if the version matches, then does `PUBLISH room:{id}:events`. On conflict, re-read, re-apply and retry.
 - **Per-node hub.** One goroutine per locally active room serialises local commands, caches state and fans out to sockets. It is not the authority.
-- **Fan-out.** Each node keeps one pub/sub connection and subscribes per room. A sequence gap is filled with `XRANGE`.
+- **Fan-out.** Each node keeps one pub/sub connection and subscribes per room. Rooms take events through a bounded queue the pub/sub loop only ever offers to, so one stuck room cannot stall the others. An overflowing room drops events and resyncs.
 - **Presence.** `room:{id}:presence` is a sorted set of `user:conn → lastSeen`, refreshed every 10s and pruned after 30s. Several tabs per user are allowed and deduped by user.
-- **Durability.** Queue and playback snapshot go to Postgres, debounced 5s and on last leave. A Redis miss rehydrates from Postgres. Chat inserts straight into Postgres, then publishes; it does not bump the room version.
+- **Durability.** Queue and playback snapshot go to Postgres, debounced 5s, on last leave and on shutdown. Chat inserts straight into Postgres, then publishes; it does not bump the room version.
+- **Redis disruption.** Lost events are repaired, not replayed. `pong` reports the version in Redis, so a node that missed an event cannot hide it. Each room resyncs when its subscription is restored. A command that finds the state key gone rehydrates from the snapshot and retries; a rehydrated room jumps its version to the current time in milliseconds, past anything a client can hold, and publishes a snapshot. With viewers connected it keeps playing; an empty one comes back paused.
+- **Absent host.** A locked room whose host has been gone 30s opens up, and locks again when they return. The room's own timers check, on every server; the clock is in Redis, the lock is kept in `held`, and compare-and-set picks the one server that announces it.
 - **No server timers.** Every state is "position p at server time T, rate r", and T may be in the future.
 
 ## 4. Sync protocol
@@ -83,9 +85,9 @@ Never touch the owner's Temporal on 7233. Run k6 only through `grafana/k6`.
 **State**: `{item, status: idle|playing|paused, pos, at, rate, version}`. Expected position is `pos + (serverNow − at) × rate` while playing.
 
 - **Authority and ordering.** The server orders commands by CAS. Every playback command carries the queue `item` id; a mismatch is rejected, so a stale `seek` or duplicate `ended` cannot affect the next video. `ended` is accepted once and only near the known duration.
-- **Clock sync.** The client sends `ping{t0}` and gets `pong{t0, ts}`. Offset is `ts + rtt/2 − t1`, on `performance.now()`. Send 5 pings at join, then one every 10s; use the lowest-RTT sample of the last 8.
+- **Clock sync.** The client sends `ping{t0}` and gets `pong{t0, ts, version}`. Offset is `ts + rtt/2 − t1`, on `Date.now()`, using the lowest-RTT sample of the last 8; a negative round trip is dropped. Send 5 pings at join, then one every 10s. `ct` is rounded to whole milliseconds, and the server accepts fractions anyway.
 - **Latency compensation.** Commands carry `pos` and `ct`, the client's estimate of server time at sampling. The server sets `at = clamp(ct, now−2s, now)`.
-- **Synchronised start.** A media change or resume sets `at = now + 3s`. Clients cue, send `ready`, and hold. When all present clients are ready the server pulls `at` in to `now + 300ms`. Everyone starts at `at` regardless.
+- **Synchronised start.** A media change sets `at = now + 1.5s`. Everyone starts at `at` regardless; nobody is waited for.
 - **Drift correction.** A 1 Hz loop runs while playing, with thresholds set from M0 measurements:
 
 | Drift | Fine-rate sources (HTML5; Vimeo **[U]**) | Discrete-rate sources (YouTube) |
@@ -98,9 +100,12 @@ Never touch the owner's Temporal on 7233. Run k6 only through `grafana/k6`.
 - **Buffering.** A buffering viewer does not stall the room. They report `status: buffering` and catch up. A room setting "wait for everyone" is off by default.
 - **Ads.** Never blocked, skipped or seeked through. A viewer whose time is not advancing while the player is not paused reports `status: stalled`; the room continues and they catch up afterwards. The IFrame API has no ad event **[U]**, so M0 measures this.
 - **Late joiners.** `welcome` carries the full snapshot. The client loads at expected position plus lead, then the drift loop takes over. The Join click is the user gesture for autoplay. If playback is still blocked after 2s, start muted with a "Tap to unmute" control outside the player. Safari behaviour is **[U]**.
-- **Reconnect.** Backoff 250ms to 5s with jitter, a new ticket, then `hello{resume: seq}`. The server replays from the stream or sends a snapshot. Presence has a 15s grace. The client keeps playing by extrapolation while offline.
+- **Versions.** The client applies only the next version. A gap makes it send `sync` and wait for a snapshot, a `state` with `cause: "sync"`, which it takes whatever version it holds. Failing that, a pong disagreeing with its version on two pongs in a row makes it reconnect. Disagreement covers both directions, since Redis can go backwards.
+- **Dead connections.** The server closes a socket after 90s of silence; hidden tabs run timers once a minute, so it must not be shorter. The client tears down after 3 unanswered heartbeat pings, without waiting for `onclose`, which a dead network can delay for minutes. The join burst doesn't count.
+- **Reconnect.** Backoff 250ms to 5s with jitter, then a new ticket and a fresh `welcome`. The client keeps playing by extrapolation while offline. On shutdown the server closes sockets with 1001 after saving the room.
 - **Native controls stay on.** User intent inside the iframe is inferred from state changes and time discontinuities over 1s with no pending programmatic operation. Player events are ignored for up to 1.5s after applying a remote command.
-- **Who may control.** Roles are host, mod and member, and guests count as members. `control_mode` is `everyone` (default) or `hosts`; `queue_mode` likewise. A viewer without permission is snapped back with a toast. Limits: 5 playback commands per second per connection; seek is sent on release.
+- **Inferring a seek.** It moves the whole room, so only this counts: two consecutive `playing` ticks at most 2.5s apart, the player's own time having moved by more than the threshold, to somewhere other than our own pending seek. While the room is paused, a player must first be seen resting on the room's position; one that never got there, like a joiner still at 0, is seeked locally and reports nothing.
+- **Who may control.** Roles are host and member, and guests count as members. `control_mode` is `everyone` (default) or `hosts`; `queue_mode` likewise. A viewer without permission is snapped back with a toast. Anything that changes what is on screen needs control permission, even when it arrives as a queue command: `queue.add` with mode `now`, removing the current video, and `ended` when the duration is unknown. Limits: 5 playback commands per second per connection; seek is sent on release.
 
 ## 5. Source adapters
 
@@ -159,21 +164,23 @@ HTTP, JSON, under `/v1`:
 | `POST /session/guest {name?}` | Sets the httpOnly guest cookie |
 | `GET /me`, `GET /me/rooms` | Identity and own rooms |
 | `POST /rooms {url?}` | Creates a room; creates a guest session if none |
-| `GET /rooms/{slug}` | Public preview: name, now playing, member count |
+| `GET /rooms/{slug}` | Public preview: name, now playing, `playback{status,pos}`, members, `maxMembers`. Problem codes `room_not_found`, `room_closed` |
 | `PATCH`, `DELETE /rooms/{slug}` | Host only |
 | `POST /rooms/{slug}/ticket` | Single-use WS ticket, 30s |
-| `GET /rooms/{slug}/messages?before=&limit=` | Keyset pagination |
-| `POST /media/resolve {url}` | Returns `Media` |
-| `GET /media/search?source=&q=` | Returns `{items, remaining}` |
-| `GET /media/trending?source=` | Cached trending |
+| `GET /rooms/{slug}/messages?before=` | Keyset pagination. Needs a session cookie |
+| `GET /media/search?q=` | Returns `{items}`. 20 an hour per IP, on top of the daily budget |
+| `GET /media/trending` | Cached trending |
 | `POST /telemetry` | Batched; `sendBeacon` allowed |
 | `POST /webhooks/clerk` | Svix-verified |
 | `GET /healthz`, `/readyz` | Health |
 
-WebSocket `/v1/ws?ticket=`, envelope `{v:1, t, id?, seq?, d}`:
+WebSocket `/v1/ws?ticket=`, envelope `{t, id?, d}`:
 
-- **Client to server**: `hello{resume?}`, `ping`, `play|pause|seek{item,pos,ct}`, `rate`, `ready{item}`, `ended{item}`, `status{item,state,drift}`, `media_error`, `queue.add{url|ref, playNow?}`, `queue.remove|move|play{itemId}`, `queue.clear`, `skip{item}`, `chat.send{text,nonce}`, `react{emoji}`.
-- **Server to client**: `welcome{self, room, state, members, seq, serverTime}`, `pong`, `playback{state, by, cause}`, `queue{op}`, `member.join|leave|update`, `chat`, `react`, `ack{id}`, `error{code, re}`, `kicked`, `room.closed`.
+- **Client to server**: `ping{t0}`, `sync`, `play|pause|seek{item,pos,ct}`, `ended{item}`, `skip{item}`, `status{state,drift}`, `media_error{item,code}`, `queue.add{url,mode}`, `queue.remove{target}`, `queue.move{target,index}`, `queue.play{target}`, `settings{settings}`, `chat.send{text}`, `react{emoji}`, `rename{name}`. `mode` is `now`, `next` (index 1) or `end`. `status.state` is one of `waiting`, `synced`, `correcting`, `buffering`, `stalled`; anything else is dropped.
+- **Server to client**: `welcome{self, room, state, members}`, `pong{t0, ts, version}`, `playback{version, playback, cause, by}`, `state{version, playback, queue, settings, cause, by}`, `members{members}`, `member.status{userId, state, drift?, item?}`, `member.rename{userId, name}`, `chat{message}`, `react{emoji, name}`, `notice{kind, text, url?}`, `ack{id}`, `error{re, code, message}`.
+- **Answers.** A message with an `id` gets `ack{id}` or `error{re: id}`; that covers playback, queue, settings, `chat.send` and `rename`. `status`, `media_error`, `react`, `ping` and `sync` never get one. Without an `id` a stale command is corrected quietly by a snapshot, and any other error shows as a notice.
+- `playback` omits the queue. `state` always carries it, because an empty queue is news.
+- **Limits.** 10 sockets per person per room, enforced on the ticket and again on join. `media_error` allows a burst of 3, then one per 5s per connection. A video is hidden from search only once 2 different people report that it refuses embedding, within 7 days, and the block lasts 7 days.
 
 The client sends only URLs or ids. The server resolves all titles and thumbnails.
 
@@ -252,8 +259,9 @@ Layout: `server/` (`cmd/s2g`, `internal/{room,hub,store,source,auth,api,telemetr
 - **Identity** comes only from the verified token behind the WS ticket (`GETDEL`, 30s). Origin allowlist on upgrade. 8KB message cap.
 - **Authorization** by role is checked in the reducer and on every HTTP route. Room deletion and settings are host only.
 - **Rate limits** in Redis: per connection, per user, and per IP for room creation and guest sessions. Chat has a length cap and slow mode and is rendered as text.
-- **CSP** with `frame-src` and `script-src` limited to the enabled player origins. `Referrer-Policy: strict-origin-when-cross-origin`.
-- **Direct URLs**: `https` only, no server-side fetch. If probing is ever added, use a dialer that blocks private ranges and re-validates redirects.
+- **CSP** with `frame-src` and `script-src` limited to the enabled player origins, and `connect-src` to the page's own origin, plus `https:` only when direct media is on because hls.js fetches segments. `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Client addresses**: `TRUSTED_PROXY=true` makes rate limits use the last `X-Forwarded-For` entry, the one the proxy added. Only set it with exactly one proxy in front.
+- **Direct URLs**: `https` only outside dev, no server-side fetch. If probing is ever added, use a dialer that blocks private ranges and re-validates redirects.
 - **Secrets** live in a gitignored `.env`; `.env.example` holds names only. Gitleaks runs in pre-commit and CI. YouTube keys go in the header, never in URLs or logs.
 - **Runtime**: distroless non-root image, least-privilege database role, `sqlc` parameterised queries.
 

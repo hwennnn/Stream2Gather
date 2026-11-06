@@ -2,7 +2,12 @@
 // every ordering and permission decision can be tested without a server.
 package room
 
-import "errors"
+import (
+	"errors"
+	"strings"
+	"unicode"
+	"unicode/utf8"
+)
 
 // Playback statuses.
 const (
@@ -31,6 +36,7 @@ const (
 	// endToleranceMS is how early an "ended" report is believed.
 	endToleranceMS = 5000
 	maxQueue       = 200
+	maxNameRunes   = 32
 )
 
 // Rejected commands. A stale command refers to a video that is no longer
@@ -79,12 +85,17 @@ type Settings struct {
 	QueueMode   string `json:"queueMode"`
 }
 
+// Locked reports whether anything is limited to the host.
+func (s Settings) Locked() bool { return s.ControlMode == ModeHosts || s.QueueMode == ModeHosts }
+
 // State is the whole live room. Queue[0] is the current video when one is set.
 type State struct {
 	Version  int64    `json:"version"`
 	Playback Playback `json:"playback"`
 	Queue    []Item   `json:"queue"`
 	Settings Settings `json:"settings"`
+	// Held keeps the host's lock while it is released for an absent host.
+	Held *Settings `json:"held,omitempty"`
 }
 
 // New returns an empty room.
@@ -102,6 +113,20 @@ func (p Playback) Position(now int64) float64 {
 		return p.Pos
 	}
 	return p.Pos + float64(now-p.At)/1000*p.Rate
+}
+
+// CleanName returns a display name fit to store, or false if it is not one.
+// Control characters are refused because Postgres rejects NUL and every viewer
+// would otherwise render the rest.
+func CleanName(raw string) (string, bool) {
+	name := strings.TrimSpace(raw)
+	if name == "" || utf8.RuneCountInString(name) > maxNameRunes || !utf8.ValidString(name) {
+		return "", false
+	}
+	if strings.ContainsFunc(name, unicode.IsControl) {
+		return "", false
+	}
+	return name, true
 }
 
 // Actor is who issued a command.

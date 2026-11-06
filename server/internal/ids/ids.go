@@ -4,7 +4,6 @@ package ids
 import (
 	"crypto/rand"
 	"encoding/base32"
-	"fmt"
 	"math/big"
 	"strings"
 )
@@ -28,10 +27,12 @@ func pick(words []string) string {
 	return words[index.Int64()]
 }
 
-// Slug returns a readable room address.
+// Slug returns a readable room address. The 40-bit suffix keeps a room's link
+// from being guessed: there are about 4 x 10^14 of them.
 func Slug() string {
-	suffix, _ := rand.Int(rand.Reader, big.NewInt(10000))
-	return fmt.Sprintf("%s-%s-%04d", pick(adjectives), pick(nouns), suffix.Int64())
+	buffer := make([]byte, 5)
+	_, _ = rand.Read(buffer) // crypto/rand never fails on supported platforms.
+	return pick(adjectives) + "-" + pick(nouns) + "-" + encoding.EncodeToString(buffer)
 }
 
 // RoomName returns a friendly default name.

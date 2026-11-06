@@ -2,15 +2,12 @@
 package api
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"html"
 	"io"
 	"log/slog"
-	"mime"
 	"net"
 	"net/http"
 	"net/url"
@@ -38,7 +35,21 @@ const (
 	sessionCookie = "s2g_session"
 	sessionTTL    = 90 * 24 * time.Hour
 	maxBodyBytes  = 64 << 10
+	// High enough for a watch party behind one campus or office address.
+	guestsPerHour = 600
+	// Each search can spend YouTube quota the whole site shares.
+	searchesPerHour = 20
+	// Tabs flush every ten seconds. This leaves room for a shared address.
+	telemetryPerMinute = 240
+	// Per person, per room. The hub holds the same line for anyone racing past.
+	maxSocketsPerUser = 10
+	slugAttempts      = 5
 )
+
+// ClerkVerifier turns a Clerk session token into the person it belongs to.
+type ClerkVerifier interface {
+	Verify(ctx context.Context, token string) (auth.Identity, error)
+}
 
 // Server holds what the routes need.
 type Server struct {
@@ -54,6 +65,13 @@ type Server struct {
 	PublicOrigin string
 	WebDir       string
 	Secure       bool
+	// DirectMedia means viewers may play media from any https host.
+	DirectMedia bool
+	// TrustedProxy means one proxy in front of this server sets X-Forwarded-For.
+	TrustedProxy bool
+	// Clerk is nil when sign-in is not configured; guests still work.
+	Clerk               ClerkVerifier
+	ClerkPublishableKey string
 
 	assets sync.Map
 }
@@ -66,29 +84,65 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/config", s.config)
 	mux.HandleFunc("GET /v1/me", s.me)
 	mux.HandleFunc("PATCH /v1/me", s.rename)
+	mux.HandleFunc("POST /v1/session/clerk", s.clerkSession)
+	mux.HandleFunc("DELETE /v1/session", s.endSession)
 	mux.HandleFunc("POST /v1/rooms", s.createRoom)
 	mux.HandleFunc("GET /v1/rooms/{slug}", s.roomPreview)
 	mux.HandleFunc("POST /v1/rooms/{slug}/ticket", s.ticket)
 	mux.HandleFunc("GET /v1/rooms/{slug}/messages", s.messages)
-	mux.HandleFunc("POST /v1/media/resolve", s.resolve)
 	mux.HandleFunc("GET /v1/media/search", s.search)
 	mux.HandleFunc("GET /v1/media/trending", s.trending)
 	mux.HandleFunc("POST /v1/telemetry", s.telemetry)
 	mux.HandleFunc("GET /v1/ws", s.socket)
 	mux.HandleFunc("GET /r/{slug}", s.roomPage)
 	mux.HandleFunc("GET /", s.static)
-	return securityHeaders(mux)
+	return securityHeaders(mux, contentPolicy(auth.ClerkHost(s.ClerkPublishableKey), socketOrigin(s.PublicOrigin), s.DirectMedia))
 }
 
-func securityHeaders(next http.Handler) http.Handler {
-	const policy = "default-src 'self'; " +
-		"script-src 'self' https://www.youtube.com https://s.ytimg.com; " +
-		"frame-src https://www.youtube.com https://www.youtube-nocookie.com; " +
-		"img-src 'self' https://i.ytimg.com data:; " +
+// socketOrigin is the page's own origin as a WebSocket address. Not every
+// browser takes 'self' to cover it.
+func socketOrigin(public string) string {
+	if rest, ok := strings.CutPrefix(public, "https://"); ok {
+		return "wss://" + rest
+	}
+	if rest, ok := strings.CutPrefix(public, "http://"); ok {
+		return "ws://" + rest
+	}
+	return ""
+}
+
+// contentPolicy allows Clerk's script, sign-in calls and bot check only when
+// sign-in is configured. Direct media needs https: because hls.js fetches its
+// playlists and segments, from whatever host they are on, with fetch.
+func contentPolicy(clerkHost, socket string, directMedia bool) string {
+	script, frame, images, connect := "", "", "", ""
+	if socket != "" {
+		connect = " " + socket
+	}
+	if directMedia {
+		connect += " https:"
+	}
+	if clerkHost != "" {
+		const challenge = " https://challenges.cloudflare.com"
+		const protection = " https://*.protect.clerk.com"
+		script = " https://" + clerkHost + challenge + protection
+		frame = challenge
+		images = " https://img.clerk.com"
+		// Clerk's bot check probes several ports on this host.
+		connect += " https://" + clerkHost + protection + ":*"
+	}
+	return "default-src 'self'; " +
+		"script-src 'self' https://www.youtube.com https://s.ytimg.com" + script + "; " +
+		"frame-src https://www.youtube.com https://www.youtube-nocookie.com" + frame + "; " +
+		"img-src 'self' https://i.ytimg.com data:" + images + "; " +
 		"media-src 'self' https: blob:; " +
 		"style-src 'self' 'unsafe-inline'; " +
-		"connect-src 'self' ws: wss:; " +
+		"worker-src 'self' blob:; " +
+		"connect-src 'self'" + connect + "; " +
 		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+}
+
+func securityHeaders(next http.Handler, policy string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
 		header.Set("Content-Security-Policy", policy)
@@ -128,7 +182,19 @@ func decode(w http.ResponseWriter, r *http.Request, into any) bool {
 	return true
 }
 
-func clientIP(r *http.Request) string {
+// clientIP returns the address limits are charged to. Behind a proxy that is the
+// last X-Forwarded-For entry, the one the proxy added itself: anything before it
+// came from the client and can say whatever the client likes.
+func (s *Server) clientIP(r *http.Request) string {
+	if s.TrustedProxy {
+		forwarded := r.Header.Values("X-Forwarded-For")
+		if len(forwarded) > 0 {
+			hops := strings.Split(forwarded[len(forwarded)-1], ",")
+			if last := strings.TrimSpace(hops[len(hops)-1]); last != "" {
+				return last
+			}
+		}
+	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		return r.RemoteAddr
@@ -151,7 +217,7 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) config(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"sources": s.Catalog.Names(), "clerkEnabled": false})
+	writeJSON(w, http.StatusOK, map[string]any{"sources": s.Catalog.Names(), "clerkPublishableKey": s.ClerkPublishableKey})
 }
 
 // session returns the caller's identity, if any.
@@ -161,11 +227,20 @@ func (s *Server) session(r *http.Request) (auth.Claims, bool) {
 		return auth.Claims{}, false
 	}
 	claims, err := s.Issuer.Verify(cookie.Value)
-	return claims, err == nil
+	if err != nil {
+		return auth.Claims{}, false
+	}
+	// Cookies from before names were checked can hold what Postgres refuses.
+	if name, ok := room.CleanName(claims.Name); ok {
+		claims.Name = name
+	} else {
+		claims.Name = ids.GuestName()
+	}
+	return claims, true
 }
 
-func (s *Server) setSession(w http.ResponseWriter, subject, name string) (auth.Claims, error) {
-	token, err := s.Issuer.Issue(subject, name, sessionTTL)
+func (s *Server) setSession(w http.ResponseWriter, claims auth.Claims) (auth.Claims, error) {
+	token, err := s.Issuer.Issue(claims, sessionTTL)
 	if err != nil {
 		return auth.Claims{}, err
 	}
@@ -178,7 +253,7 @@ func (s *Server) setSession(w http.ResponseWriter, subject, name string) (auth.C
 		Secure:   s.Secure,
 		SameSite: http.SameSiteLaxMode,
 	})
-	return auth.Claims{Subject: subject, Name: name}, nil
+	return claims, nil
 }
 
 // ensureSession signs a visitor in as a guest the first time they act, so no
@@ -187,14 +262,14 @@ func (s *Server) ensureSession(w http.ResponseWriter, r *http.Request) (auth.Cla
 	if claims, ok := s.session(r); ok {
 		return claims, s.DB.EnsureUser(r.Context(), claims.Subject, claims.Name)
 	}
-	allowed, err := s.Live.Limit(r.Context(), "guest:"+clientIP(r), 60, time.Hour)
+	allowed, err := s.Live.Limit(r.Context(), "guest:"+s.clientIP(r), guestsPerHour, time.Hour)
 	if err != nil {
 		return auth.Claims{}, err
 	}
 	if !allowed {
 		return auth.Claims{}, errRateLimited
 	}
-	claims, err := s.setSession(w, "g_"+ids.New(), ids.GuestName())
+	claims, err := s.setSession(w, auth.Claims{Subject: "g_" + ids.New(), Name: ids.GuestName()})
 	if err != nil {
 		return auth.Claims{}, err
 	}
@@ -217,7 +292,71 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"user": nil})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": map[string]string{"id": claims.Subject, "name": claims.Name}})
+	writeJSON(w, http.StatusOK, map[string]any{"user": publicUser(claims)})
+}
+
+func publicUser(claims auth.Claims) map[string]any {
+	return map[string]any{"id": claims.Subject, "name": claims.Name, "avatarUrl": claims.Avatar, "signedIn": claims.Account}
+}
+
+// clerkSession swaps a Clerk session token for this app's own cookie, so the
+// rest of the app treats a signed-in person and a guest the same way.
+func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
+	if s.Clerk == nil {
+		writeProblem(w, http.StatusNotFound, "not_found", "Sign-in is not available.")
+		return
+	}
+	token, found := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if !found {
+		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Sign in again.")
+		return
+	}
+	allowed, err := s.Live.Limit(r.Context(), "clerk:"+s.clientIP(r), 300, time.Hour)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !allowed {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many sign-ins. Try again later.")
+		return
+	}
+	identity, err := s.Clerk.Verify(r.Context(), token)
+	if errors.Is(err, auth.ErrInvalidToken) {
+		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Sign in again.")
+		return
+	}
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+
+	current, _ := s.session(r)
+	name := identity.Name
+	if name == "" {
+		name = current.Name
+	}
+	if name == "" {
+		name = ids.GuestName()
+	}
+	id, name, err := s.DB.LinkClerkUser(r.Context(), identity.ClerkID, current.Subject, "u_"+ids.New(), name, identity.AvatarURL)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	claims, err := s.setSession(w, auth.Claims{Subject: id, Name: name, Avatar: identity.AvatarURL, Account: true})
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": publicUser(claims)})
+}
+
+// endSession signs the browser out. The next action starts a new guest.
+func (s *Server) endSession(w http.ResponseWriter, _ *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Secure, SameSite: http.SameSiteLaxMode,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"user": nil})
 }
 
 func (s *Server) rename(w http.ResponseWriter, r *http.Request) {
@@ -227,9 +366,9 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &request) {
 		return
 	}
-	name := strings.TrimSpace(request.Name)
-	if name == "" || len([]rune(name)) > 32 {
-		writeProblem(w, http.StatusBadRequest, "invalid", "Names can be up to 32 characters.")
+	name, ok := room.CleanName(request.Name)
+	if !ok {
+		writeProblem(w, http.StatusBadRequest, "invalid", "Names can be up to 32 characters, without control characters.")
 		return
 	}
 	claims, err := s.ensureSession(w, r)
@@ -237,15 +376,17 @@ func (s *Server) rename(w http.ResponseWriter, r *http.Request) {
 		s.sessionFailed(w, err)
 		return
 	}
-	if _, err := s.setSession(w, claims.Subject, name); err != nil {
-		s.internal(w, err)
-		return
-	}
+	claims.Name = name
+	// The database goes first: a cookie must never promise what it refused.
 	if err := s.DB.EnsureUser(r.Context(), claims.Subject, name); err != nil {
 		s.internal(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": map[string]string{"id": claims.Subject, "name": name}})
+	if _, err := s.setSession(w, claims); err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": publicUser(claims)})
 }
 
 func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
@@ -260,7 +401,7 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		s.sessionFailed(w, err)
 		return
 	}
-	allowed, err := s.Live.Limit(r.Context(), "rooms:"+clientIP(r), 30, time.Hour)
+	allowed, err := s.Live.Limit(r.Context(), "rooms:"+s.clientIP(r), 30, time.Hour)
 	if err != nil {
 		s.internal(w, err)
 		return
@@ -285,8 +426,12 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	record := store.Room{ID: ids.New(), Slug: ids.Slug(), Name: ids.RoomName(), OwnerID: claims.Subject}
-	if err := s.DB.CreateRoom(r.Context(), record); err != nil {
+	record := store.Room{ID: ids.New(), Name: ids.RoomName(), OwnerID: claims.Subject}
+	record.Slug, err = claimSlug(ids.Slug, func(slug string) error {
+		record.Slug = slug
+		return s.DB.CreateRoom(r.Context(), record)
+	})
+	if err != nil {
 		s.internal(w, err)
 		return
 	}
@@ -295,6 +440,18 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"slug": record.Slug, "name": record.Name})
+}
+
+// claimSlug retries on the rare address that is already in use.
+func claimSlug(next func() string, create func(slug string) error) (string, error) {
+	err := store.ErrSlugTaken
+	for range slugAttempts {
+		slug := next()
+		if err = create(slug); !errors.Is(err, store.ErrSlugTaken) {
+			return slug, err
+		}
+	}
+	return "", err
 }
 
 func (s *Server) mediaFailed(w http.ResponseWriter, err error) {
@@ -308,7 +465,7 @@ func (s *Server) mediaFailed(w http.ResponseWriter, err error) {
 func (s *Server) findRoom(w http.ResponseWriter, r *http.Request) (store.Room, bool) {
 	record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug"))
 	if errors.Is(err, store.ErrNotFound) {
-		writeProblem(w, http.StatusNotFound, "not_found", "This room does not exist.")
+		writeProblem(w, http.StatusNotFound, "room_not_found", "This room does not exist.")
 		return store.Room{}, false
 	}
 	if err != nil {
@@ -316,7 +473,7 @@ func (s *Server) findRoom(w http.ResponseWriter, r *http.Request) (store.Room, b
 		return store.Room{}, false
 	}
 	if record.ClosedAt != nil {
-		writeProblem(w, http.StatusGone, "closed", "This room has closed.")
+		writeProblem(w, http.StatusGone, "room_closed", "This room has closed.")
 		return store.Room{}, false
 	}
 	return record, true
@@ -327,11 +484,19 @@ type preview struct {
 	Slug       string         `json:"slug"`
 	Name       string         `json:"name"`
 	NowPlaying *room.Media    `json:"nowPlaying"`
+	Playback   *playbackPeek  `json:"playback"`
 	Members    []store.Person `json:"members"`
+	MaxMembers int            `json:"maxMembers"`
+}
+
+// playbackPeek is where a room is, without the fields only the sync engine needs.
+type playbackPeek struct {
+	Status string  `json:"status"`
+	Pos    float64 `json:"pos"`
 }
 
 func (s *Server) buildPreview(ctx context.Context, record store.Room) (preview, error) {
-	out := preview{Slug: record.Slug, Name: record.Name, Members: []store.Person{}}
+	out := preview{Slug: record.Slug, Name: record.Name, Members: []store.Person{}, MaxMembers: record.MaxMembers}
 	state, found, err := s.Live.Load(ctx, record.ID)
 	if err != nil {
 		return out, err
@@ -343,6 +508,7 @@ func (s *Server) buildPreview(ctx context.Context, record store.Room) (preview, 
 	}
 	if len(state.Queue) > 0 {
 		out.NowPlaying = &state.Queue[0].Media
+		out.Playback = &playbackPeek{Status: state.Playback.Status, Pos: state.Playback.Position(time.Now().UnixMilli())}
 	}
 	people, err := s.Live.People(ctx, record.ID)
 	if err != nil {
@@ -376,6 +542,15 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sockets, err := s.Live.Sockets(r.Context(), record.ID, claims.Subject)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if sockets >= maxSocketsPerUser {
+		writeProblem(w, http.StatusConflict, "too_many_connections", "You have this room open in too many tabs.")
+		return
+	}
 	people, err := s.Live.People(r.Context(), record.ID)
 	if err != nil {
 		s.internal(w, err)
@@ -399,7 +574,7 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		RoomID:   record.ID,
 		RoomSlug: record.Slug,
 		RoomName: record.Name,
-		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role},
+		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar},
 	})
 	if err != nil {
 		s.internal(w, err)
@@ -433,6 +608,10 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
+	if _, ok := s.session(r); !ok {
+		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Join the room to read its chat.")
+		return
+	}
 	record, ok := s.findRoom(w, r)
 	if !ok {
 		return
@@ -446,23 +625,8 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
-func (s *Server) resolve(w http.ResponseWriter, r *http.Request) {
-	var request struct {
-		URL string `json:"url"`
-	}
-	if !decode(w, r, &request) {
-		return
-	}
-	media, err := s.Catalog.Resolve(r.Context(), request.URL)
-	if err != nil {
-		s.mediaFailed(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, media)
-}
-
 func (s *Server) search(w http.ResponseWriter, r *http.Request) {
-	allowed, err := s.Live.Limit(r.Context(), "search:"+clientIP(r), 60, time.Hour)
+	allowed, err := s.Live.Limit(r.Context(), "search:"+s.clientIP(r), searchesPerHour, time.Hour)
 	if err != nil {
 		s.internal(w, err)
 		return
@@ -481,7 +645,7 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) trending(w http.ResponseWriter, r *http.Request) {
-	items, err := s.Catalog.Trending(r.Context(), "youtube", r.URL.Query().Get("region"))
+	items, err := s.Catalog.Trending(r.Context(), "youtube")
 	if err != nil {
 		s.mediaFailed(w, err)
 		return
@@ -490,6 +654,15 @@ func (s *Server) trending(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) telemetry(w http.ResponseWriter, r *http.Request) {
+	allowed, err := s.Live.Limit(r.Context(), "telemetry:"+s.clientIP(r), telemetryPerMinute, time.Minute)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !allowed {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Slow down a little.")
+		return
+	}
 	var request struct {
 		Events []struct {
 			Name   string  `json:"name"`
@@ -542,81 +715,4 @@ func (s *Server) roomPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	_, _ = w.Write([]byte(strings.Replace(string(page), "</head>", tags+"</head>", 1)))
-}
-
-func (s *Server) static(w http.ResponseWriter, r *http.Request) {
-	clean := filepath.Clean(r.URL.Path)
-	path := filepath.Join(s.WebDir, clean)
-	if info, err := os.Stat(path); err == nil && !info.IsDir() {
-		if strings.HasPrefix(clean, "/assets/") {
-			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-		}
-		s.serveFile(w, r, path, info)
-		return
-	}
-
-	index := filepath.Join(s.WebDir, "index.html")
-	info, err := os.Stat(index)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Cache-Control", "no-cache")
-	s.serveFile(w, r, index, info)
-}
-
-var compressible = map[string]bool{".html": true, ".js": true, ".css": true, ".svg": true}
-
-// serveFile compresses text assets once and keeps the result, since build
-// output never changes while a server runs.
-func (s *Server) serveFile(w http.ResponseWriter, r *http.Request, path string, info os.FileInfo) {
-	extension := filepath.Ext(path)
-	if !compressible[extension] {
-		http.ServeFile(w, r, path)
-		return
-	}
-	w.Header().Add("Vary", "Accept-Encoding")
-	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		http.ServeFile(w, r, path)
-		return
-	}
-
-	compressed, err := s.compressed(path, info)
-	if err != nil {
-		http.ServeFile(w, r, path)
-		return
-	}
-	w.Header().Set("Content-Type", mime.TypeByExtension(extension))
-	w.Header().Set("Content-Encoding", "gzip")
-	http.ServeContent(w, r, "", info.ModTime(), bytes.NewReader(compressed))
-}
-
-type compressedFile struct {
-	modified time.Time
-	body     []byte
-}
-
-func (s *Server) compressed(path string, info os.FileInfo) ([]byte, error) {
-	if cached, ok := s.assets.Load(path); ok {
-		if file := cached.(compressedFile); file.modified.Equal(info.ModTime()) {
-			return file.body, nil
-		}
-	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var buffer bytes.Buffer
-	writer, err := gzip.NewWriterLevel(&buffer, gzip.BestCompression)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := writer.Write(raw); err != nil {
-		return nil, err
-	}
-	if err := writer.Close(); err != nil {
-		return nil, err
-	}
-	s.assets.Store(path, compressedFile{modified: info.ModTime(), body: buffer.Bytes()})
-	return buffer.Bytes(), nil
 }

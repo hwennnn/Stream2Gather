@@ -5,7 +5,7 @@ import { DRIFT_OK_S, expectedPosition, SyncController, type LocalCommand, type P
 
 /** A player whose clock only moves when the test says so. */
 class FakePlayer implements PlayerAdapter {
-  rates: PlayerRates = { kind: 'discrete', values: [0.5, 1, 1.25, 1.5, 2] };
+  rates: PlayerRates = 'discrete';
   current = 0;
   rate = 1;
   status: PlayerState = 'paused';
@@ -161,7 +161,7 @@ describe('SyncController', () => {
   });
 
   it('uses a gentle rate on players with fine rate control', () => {
-    player.rates = { kind: 'fine', min: 0.5, max: 2 };
+    player.rates = 'fine';
     const playback = playing(0, timers.now);
     sync.apply(playback);
     run(2);
@@ -303,5 +303,214 @@ describe('SyncController', () => {
     run(10);
     expect(player.status).toBe('paused');
     expect(player.rate).toBe(1);
+  });
+
+  describe('telling a viewer from a hiccup', () => {
+    const roomAt = (at: number): Playback => ({ item: 'a', status: 'playing', pos: 0, at, rate: 1 });
+
+    /** Ticks at a browser's real, slightly late, pace. */
+    const jittered = (seconds: number, tickMs = 1010) => {
+      let sinceTick = 0;
+      for (let i = 0; i < seconds * 100; i += 1) {
+        timers.advance(10);
+        player.advance(0.01);
+        sinceTick += 10;
+        if (sinceTick >= tickMs) {
+          sync.tick();
+          sinceTick = 0;
+        }
+      }
+    };
+
+    /** The player stops moving but keeps saying it is playing. */
+    const freeze = (ticks: number, tickMs = 1010) => {
+      const frozen = player.current;
+      for (let i = 0; i < ticks; i += 1) {
+        timers.advance(tickMs);
+        player.current = frozen;
+        sync.tick();
+      }
+    };
+
+    it('does not take a frozen player for a seek, on a jittered tick', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      freeze(2);
+      expect(commands).toEqual([]);
+    });
+
+    it('does not take a long stall for a seek', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      freeze(8);
+      expect(commands).toEqual([]);
+    });
+
+    it('does not take recovering from a stall for a seek', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      freeze(2);
+      commands = [];
+      jittered(3);
+      expect(commands).toEqual([]);
+    });
+
+    it('still hears a real seek on a jittered tick', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      player.current += 30;
+      jittered(1.1);
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek' })]);
+    });
+
+    it('still hears a real seek backwards', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(30);
+      commands = [];
+      player.current -= 15;
+      jittered(1.1);
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek' })]);
+    });
+
+    it('never infers a seek while buffering', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      player.status = 'buffering';
+      for (let i = 0; i < 3; i += 1) {
+        timers.advance(1010);
+        player.current += 5;
+        sync.tick();
+      }
+      expect(commands).toEqual([]);
+    });
+
+    it('needs two playing ticks in a row', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      player.status = 'buffering';
+      timers.advance(1010);
+      sync.tick();
+      player.status = 'playing';
+      player.current += 30; // Lands as it comes out of buffering.
+      timers.advance(1010);
+      sync.tick();
+      expect(commands).toEqual([]);
+    });
+
+    it('ignores the gap a throttled tab leaves', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      timers.advance(60_000);
+      player.current += 5;
+      sync.tick();
+      expect(commands).toEqual([]);
+    });
+
+    it('lets a slow join in a playing room land without moving the room', () => {
+      player.status = 'buffering';
+      const landed: number[] = [];
+      player.seek = (seconds) => { landed.push(seconds); };
+      sync.apply({ item: 'a', status: 'playing', pos: 100, at: timers.now, rate: 1 });
+      for (let i = 0; i < 5; i += 1) {
+        timers.advance(1000);
+        sync.tick();
+      }
+      player.current = landed[0] ?? 0;
+      player.status = 'playing';
+      timers.advance(1000);
+      sync.tick();
+      expect(commands).toEqual([]);
+    });
+  });
+
+  describe('paused room', () => {
+    const paused = (pos: number): Playback => ({ item: 'a', status: 'paused', pos, at: timers.now, rate: 1 });
+    const tick = (ms = 1000) => {
+      timers.advance(ms);
+      sync.tick();
+    };
+
+    it('paused late joiner emits nothing', () => {
+      const landed: number[] = [];
+      player.seek = (seconds) => { landed.push(seconds); }; // Accepted, not landed yet.
+      player.status = 'buffering';
+      sync.apply(paused(600));
+      for (let i = 0; i < 5; i += 1) tick();
+      expect(commands).toEqual([]);
+    });
+
+    it('re-seeks a joiner still reporting 0, and only locally', () => {
+      const landed: number[] = [];
+      player.seek = (seconds) => { landed.push(seconds); };
+      sync.apply(paused(600));
+      landed.length = 0;
+      for (let i = 0; i < 4; i += 1) tick();
+      expect(landed.length).toBeGreaterThan(0);
+      expect(landed.every((seconds) => seconds === 600)).toBe(true);
+      expect(commands).toEqual([]);
+    });
+
+    it('does nothing at all until the player says paused', () => {
+      sync.apply(paused(600));
+      player.status = 'buffering';
+      player.seeks = [];
+      for (let i = 0; i < 4; i += 1) tick();
+      expect(player.seeks).toEqual([]);
+      expect(commands).toEqual([]);
+    });
+
+    it('treats leaving the room position as a seek once settled', () => {
+      sync.apply(paused(600));
+      tick();
+      tick();
+      player.current = 40;
+      tick();
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 40 })]);
+    });
+
+    it('needs the player to settle again after the room moves', () => {
+      const landed: number[] = [];
+      sync.apply(paused(100));
+      tick();
+      tick();
+      player.seek = (seconds) => { landed.push(seconds); };
+      sync.apply(paused(700));
+      for (let i = 0; i < 4; i += 1) tick();
+      expect(commands).toEqual([]);
+    });
+
+    it('stays settled when the same pause is applied again', () => {
+      sync.apply(paused(100));
+      tick();
+      tick();
+      sync.apply(paused(100));
+      tick();
+      tick();
+      player.current = 40;
+      tick();
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 40 })]);
+    });
+  });
+
+  describe('ServerClock sampling', () => {
+    it('stays on whole milliseconds with an odd round trip', () => {
+      const clock = new ServerClock(() => 1_000_000);
+      clock.addSample(1000, 2000, 1041); // rtt 41, so the offset ends in .5
+      expect(Number.isInteger(clock.now())).toBe(true);
+    });
+
+    it('ignores a sample where the wall clock stepped back', () => {
+      const clock = new ServerClock(() => 1_000_000);
+      clock.addSample(1000, 2000, 1040);
+      clock.addSample(5000, 6000, 3000);
+      expect(clock.offset).toBe(980);
+      expect(clock.rtt).toBe(40);
+    });
   });
 });

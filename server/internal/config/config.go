@@ -23,6 +23,9 @@ type Config struct {
 	YouTubeAPIKey     string
 	YouTubeBaseURL    string
 	AllowDirectMedia  bool
+	TrustedProxy      bool
+	ClerkPublishable  string
+	ClerkSecret       string
 	SearchDailyBudget int
 }
 
@@ -47,6 +50,9 @@ func Load() (Config, error) {
 		YouTubeAPIKey:     os.Getenv("YOUTUBE_API_KEY"),
 		YouTubeBaseURL:    env("YOUTUBE_BASE_URL", "https://www.googleapis.com/youtube/v3"),
 		AllowDirectMedia:  os.Getenv("ALLOW_DIRECT_MEDIA") == "true",
+		TrustedProxy:      os.Getenv("TRUSTED_PROXY") == "true",
+		ClerkPublishable:  os.Getenv("CLERK_PUBLISHABLE_KEY"),
+		ClerkSecret:       os.Getenv("CLERK_SECRET_KEY"),
 		SearchDailyBudget: 90,
 	}
 	if cfg.Env != "dev" && cfg.SessionKey == "" {

@@ -9,13 +9,13 @@
 
 ## Overview
 
-**Stream2Gather** is a virtual co-viewing platform designed to provide a seamless media playback experience. It mimics watching YouTube videos with friends in real life by synchronizing play, pause, and seek events within a virtual room using Socket.io. Users can search for videos by keyword and add them to a playlist queue.
-
-Powered by web sockets, **Stream2Gather** allows real-time communication within rooms through live chats. Currently, the platform fully supports YouTube, and the next update will introduce support for Dailymotion and Twitch.
+**Stream2Gather** is a watch-together web app. Everyone in a room sees the same YouTube video at the same moment, with a shared queue and live chat. Play, pause and seek reach the whole room over a WebSocket, and each browser keeps itself on the room's timeline. Nobody needs an account to join.
 
 > **Rebuild in progress.** `server/` (Go) and `web/` (Vite, React) replace `backend/` and `frontend/`. See [the plan](docs/rebuild/plan.md) and [the measurements](docs/rebuild/measurements.md).
 >
 > To run it, add `YOUTUBE_API_KEY` to `server/.env.local`, then run `make up web serve` and open <http://127.0.0.1:18080>. Background jobs need `make temporal` and `make worker`.
+>
+> `make test` runs the unit tests. `make e2e` runs real browsers against a private server on port 18082; it needs `make up`, Google Chrome and ffmpeg, and builds everything else itself.
 
 ## Quick Demo
 
@@ -29,20 +29,17 @@ Powered by web sockets, **Stream2Gather** allows real-time communication within 
 
 ## Built With
 
-- [React](https://reactjs.org/) - JavaScript library for building user interfaces
-- [Next.js](https://nextjs.org/) - React framework for server-side rendering and static site generation
-- [Chakra UI](https://chakra-ui.com/) - Modular and accessible component library for React
-- [Express.js](https://expressjs.com/) - Web application framework for Node.js
-- [GraphQL with Apollo Server](https://www.apollographql.com/docs/apollo-server/) - Data query language and server for building a unified API
-- [PostgreSQL](https://www.postgresql.org/) - Relational database management system for data storage
-- [Redis](https://redis.io/) - In-memory data store used for caching and session management
-- [Socket.io](https://socket.io/) - Library for real-time web applications
-- [TypeORM](https://typeorm.io/) - ORM for TypeScript and JavaScript (ES7) that supports different databases
-- [Firebase Authentication](https://firebase.google.com/products/auth) - Service for user authentication and authorization
+- [Go](https://go.dev/) - The server: HTTP API, WebSocket hub and background jobs
+- [Redis](https://redis.io/) - Live room state, presence and pub/sub between servers
+- [PostgreSQL](https://www.postgresql.org/) - Rooms, chat history and cached video metadata
+- [React](https://react.dev/) with [Vite](https://vite.dev/) - The web client, styled with [Tailwind CSS](https://tailwindcss.com/)
+- [Temporal](https://temporal.io/) - Background jobs, kept off the playback path
+- [ClickHouse](https://clickhouse.com/) and [Grafana](https://grafana.com/) - Playback telemetry
+- [Clerk](https://clerk.com/) - Optional sign-in; guests need no account
 
 ## Installation
 
-Please refer to the [frontend](/frontend/README.md) folder and [backend](/backend/README.md) folder for the respective installation.
+See the note under [Overview](#overview) to run the rebuild. The [frontend](/frontend/README.md) and [backend](/backend/README.md) folders hold the legacy app, with their own instructions.
 
 ## License
 

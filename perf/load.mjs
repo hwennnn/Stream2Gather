@@ -69,6 +69,13 @@ let sent = 0;
 let received = 0;
 let closed = 0;
 
+// The server drops a socket after 90s of silence, and most of these only listen.
+setInterval(() => {
+  for (const viewer of rooms.flatMap((room) => room.viewers)) {
+    if (viewer.socket.readyState === WebSocket.OPEN) viewer.socket.send('{"t":"ping","d":{"t0":0}}');
+  }
+}, 30_000).unref();
+
 for (let i = 0; i < ROOMS; i += 1) {
   await clearLimits();
   const { slug } = await createRoom();

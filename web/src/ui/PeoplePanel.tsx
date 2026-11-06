@@ -2,7 +2,7 @@ import { lazy, useEffect, useRef, useState, type FormEvent } from 'react';
 import { account } from '../auth/account';
 import type { RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
-import { isHost, isLocked, isOffline } from './rules';
+import { isHost, isLocked, isOffline, rosterFor } from './rules';
 import { Slot } from './Slot';
 import { toastError } from './Toasts';
 
@@ -33,13 +33,12 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
   return (
     <div className="flex h-full flex-col">
       <ul className="rail-scroll min-h-0 flex-1 py-1">
-        {view.members.map((person) => {
+        {rosterFor(view).map((person) => {
           const own = person.userId === view.self?.userId;
-          const status = view.viewerStates[person.userId];
-          const detail = (status && STATUS_TEXT.get(status)) ?? (person.role === 'host' ? 'Host' : '');
+          const status = STATUS_TEXT.get(view.viewerStates[person.userId] ?? '');
           const speaking = view.speaking.includes(person.userId);
           const voice = speaking ? 'Speaking' : VOICE_TEXT.get(person.voice ?? '');
-          const badges = [person.member ? 'Crew' : undefined, voice].filter(Boolean);
+          const badges = [person.role === 'host' ? 'Host' : undefined, person.member ? 'Crew' : undefined, voice].filter(Boolean);
 
           if (own && editing) {
             return (
@@ -51,16 +50,18 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
           return (
             <li key={person.userId} data-speaking={speaking} className="flex min-h-11 items-center gap-2.5">
               <Avatar person={person} className="size-7 text-xs" />
-              <span className="flex min-w-0 flex-1 items-baseline gap-1 font-medium">
-                <span className="min-w-0 truncate">{person.name}</span>
-                {own && <span className="shrink-0 font-normal text-dim">(you)</span>}
-              </span>
+              <div className="min-w-0 flex-1">
+                <span className="flex min-w-0 items-baseline gap-1 font-medium">
+                  <span className="min-w-0 truncate">{person.name}</span>
+                  {own && <span className="shrink-0 font-normal text-dim">(you)</span>}
+                </span>
+                {status && <span className="block truncate text-[13px] leading-4 text-dim">{status}</span>}
+              </div>
               {badges.map((badge) => (
                 <span key={badge} className="chip shrink-0">
                   {badge}
                 </span>
               ))}
-              {detail && <span className="shrink-0 text-[13px] text-dim">{detail}</span>}
               {own && (
                 <button type="button" onClick={() => setEditing(true)} className="btn btn-quiet btn-sm">
                   Rename

@@ -1,8 +1,14 @@
-import type { Media } from '../api/http';
+import type { Media, Person } from '../api/http';
 import type { ChatEntry, RoomView } from '../room/session';
 import type { SyncHealth } from '../sync/controller';
 
 export const isHost = (view: RoomView): boolean => view.self?.role === 'host';
+
+/** You first, then the host, then everyone else in the order they came. */
+export const rosterFor = (view: RoomView): Person[] => {
+  const rank = ({ userId, role }: Person) => (userId === view.self?.userId ? 0 : role === 'host' ? 1 : 2);
+  return [...view.members].sort((a, b) => rank(a) - rank(b) || (a.since ?? 0) - (b.since ?? 0));
+};
 
 export const canControl = (view: RoomView): boolean => view.settings.controlMode === 'everyone' || isHost(view);
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { api, ApiError, type RoomPreview } from '../api/http';
 import { account, useAccount } from '../auth/account';
-import { RoomSession, type ChatEntry, type RoomView } from '../room/session';
+import { RoomSession, type RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { ChatPanel, useUnread } from '../ui/ChatPanel';
 import { DeadEnd, ENDINGS, fullRoom, type Ending } from '../ui/DeadEnd';
@@ -92,7 +92,7 @@ const Room = ({ slug, copied }: { slug: string; copied: boolean }) => {
     return () => session.close();
   }, [session]);
 
-  useEffect(() => account.onIdentityChange(() => session.rejoin()), [session]);
+  useEffect(() => account.onIdentityChange(() => session.retry()), [session]);
 
   useEffect(() => {
     if (view.connection === 'live' && session.marks.joinMs !== undefined) {
@@ -158,30 +158,6 @@ const Waiting = ({ session, view }: { session: RoomSession; view: RoomView }) =>
   );
 };
 
-/** The session narrates what it hears, but not this, so the room says it here. */
-const useLockLines = (session: RoomSession, view: RoomView): ChatEntry[] => {
-  const [lines, setLines] = useState<ChatEntry[]>([]);
-  const mode = view.settings.controlMode;
-  const previous = useRef(mode);
-
-  useEffect(() => {
-    if (previous.current === mode) return;
-    previous.current = mode;
-    const who = view.lastAction?.cause === 'settings' ? view.lastAction.by : 'The host';
-    const text = `${who} turned ${mode === 'hosts' ? 'on' : 'off'} host controls`;
-    const createdAt = new Date(session.clock.now()).toISOString();
-    setLines((list) => [...list, { kind: 'system', id: `lock-${createdAt}`, text, createdAt }]);
-  }, [mode, session, view.lastAction]);
-
-  return useMemo(
-    () =>
-      lines.length === 0
-        ? view.messages
-        : [...view.messages, ...lines].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
-    [lines, view.messages],
-  );
-};
-
 const OfflineBar = ({ elapsed, onRetry }: { elapsed: number; onRetry: () => void }) => {
   const long = elapsed >= STILL_TRYING_MS;
   return (
@@ -206,7 +182,6 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
   const { toasts, toast } = useToasts();
   const fullscreen = useFullscreen();
   const player = useRoomPlayer(session, view);
-  const entries = useLockLines(session, view);
   const wide = useMediaQuery('(min-width: 1024px)');
   const visible = usePageVisible();
 
@@ -214,7 +189,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
   const railHidden = theatre && wide && !fullscreen.on && current !== undefined;
   const inviteUrl = `${window.location.origin}/r/${slug}`;
 
-  const unread = useUnread(entries, view.self?.userId, tab === 'chat' && !railHidden && visible);
+  const unread = useUnread(view.messages, view.self?.userId, tab === 'chat' && !railHidden && visible);
 
   const back = useCallback(() => toast('You’re back'), [toast]);
   const offlineFor = useOfflineNotice(view, back);
@@ -381,7 +356,6 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
             <ChatPanel
               session={session}
               view={view}
-              entries={entries}
               active={tab === 'chat'}
               inviteUrl={inviteUrl}
               onCopyInvite={() => void copyInvite()}

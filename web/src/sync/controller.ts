@@ -32,6 +32,8 @@ const browserTimers: Timers = {
 export const DRIFT_OK_S = 0.15;
 /** Every correction a player without rate control makes is a visible jump, so it allows more. */
 const SEEK_ONLY_OK_S = 1.5;
+/** Up to this a correction is the app's business. Beyond it, "In sync" would be untrue. */
+const IN_SYNC_S = 0.4;
 const NUDGE_AHEAD_MAX_S = 2;
 const NUDGE_BEHIND_MAX_S = 3;
 const CATCH_UP_RATE = 1.25;
@@ -175,7 +177,8 @@ export class SyncController {
     }
 
     const expected = expectedPosition(playback, now);
-    const jumped = Math.abs(this.player.time() - expected) > NUDGE_BEHIND_MAX_S;
+    const off = this.player.time() - expected;
+    const jumped = Math.abs(off) > NUDGE_BEHIND_MAX_S;
     // A new timeline is a command: everyone goes there now, however short the move.
     const sameTimeline = previous !== null && samePlayback(previous, playback);
     this.act(() => {
@@ -185,6 +188,7 @@ export class SyncController {
       this.player.setRate(playback.rate);
       this.playPlayer();
     });
+    if (Math.abs(off) >= IN_SYNC_S) this.reportDrift(off);
   }
 
   private holdUntilStart(playback: Playback, now: number): void {
@@ -329,12 +333,9 @@ export class SyncController {
   private correct(drift: number, expected: number, now: number): void {
     const size = Math.abs(drift);
     this.noteHeld(size, now);
+    this.reportDrift(drift);
     const seekOnly = this.player.rates === 'none';
-    if (size < (seekOnly ? SEEK_ONLY_OK_S : DRIFT_OK_S)) {
-      this.report({ health: 'synced', drift });
-      return;
-    }
-    this.report({ health: 'correcting', drift });
+    if (size < (seekOnly ? SEEK_ONLY_OK_S : DRIFT_OK_S)) return;
     const ahead = drift > 0;
     const mayJump = !this.settling(now) && now - this.lastSeekAt >= SEEK_COOLDOWN_MS;
     if (this.wasBuffering && !ahead && size >= STALL_SEEK_S && mayJump) {
@@ -405,6 +406,16 @@ export class SyncController {
   private clearStart(): void {
     if (this.startTimer !== null) this.timers.clearTimeout(this.startTimer);
     this.startTimer = null;
+  }
+
+  /** Only a running player on the room's position is in sync, however close a stopped one is. */
+  private reportDrift(drift: number): void {
+    const state = this.player.state();
+    if (state === 'buffering' || state === 'loading') this.report({ health: 'buffering', drift });
+    else {
+      const limit = this.player.rates === 'none' ? SEEK_ONLY_OK_S : IN_SYNC_S;
+      this.report({ health: state === 'playing' && Math.abs(drift) < limit ? 'synced' : 'correcting', drift });
+    }
   }
 
   private jumpToRoom(expected: number, now: number): void {
@@ -521,6 +532,7 @@ export class SyncController {
     const status = this.asked ?? playback.status;
     if (state === 'paused' && status === 'playing') {
       this.markAction();
+      this.reportDrift(time - expectedPosition(playback, now));
       // A pause that lands away from the player is the timeline being grabbed.
       this.holdPause(time, this.jumped(playback, time, now) ? SCRUB_REST_MS : PAUSE_HOLD_MS);
     } else if (state === 'playing' && status === 'paused') {

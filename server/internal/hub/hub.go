@@ -343,6 +343,31 @@ func encodeSnapshot(state room.State) []byte {
 
 const causeSync = "sync"
 
+// limits belong to a person, not a tab, so that neither opening more tabs nor
+// reconnecting buys more of them.
+type limits struct {
+	control *rate.Limiter
+	chat    *rate.Limiter
+	// reactions has its own limit, so a burst of them can't cost a chat message.
+	reactions *rate.Limiter
+	// status has its own too, so a flapping player can't cost a pause.
+	status  *rate.Limiter
+	reports *rate.Limiter
+	// voiceRate has its own limit, so push-to-talk can't cost a pause.
+	voiceRate *rate.Limiter
+}
+
+func newLimits() *limits {
+	return &limits{
+		control:   rate.NewLimiter(5, 10),
+		chat:      rate.NewLimiter(2, 5),
+		reactions: rate.NewLimiter(2, 5),
+		status:    rate.NewLimiter(2, 5),
+		reports:   rate.NewLimiter(rate.Every(5*time.Second), 3),
+		voiceRate: rate.NewLimiter(5, 10),
+	}
+}
+
 // conn is one browser tab.
 type conn struct {
 	id      string
@@ -354,13 +379,9 @@ type conn struct {
 	once    sync.Once
 	code    websocket.StatusCode
 	reason  string
-	control *rate.Limiter
-	chat    *rate.Limiter
-	// reactions has its own limit, so a burst of them can't cost a chat message.
-	reactions *rate.Limiter
-	reports   *rate.Limiter
-	// voiceRate has its own limit, so push-to-talk can't cost a pause.
-	voiceRate *rate.Limiter
+	*limits
+	// pings is per tab, because each tab has its own clock to keep.
+	pings *rate.Limiter
 
 	mu     sync.RWMutex
 	person store.Person
@@ -426,9 +447,24 @@ type liveRoom struct {
 	saves chan struct{}
 	// savedAt is when this server last asked for a save. Zero means not yet.
 	savedAt time.Time
+	// people outlives any one connection, for as long as the room is open here.
+	peopleMu sync.Mutex
+	people   map[string]*limits
 	// subscribed turns true on Redis's first confirmation. Any later one means
 	// the subscription was lost and restored.
 	subscribed atomic.Bool
+}
+
+func (r *liveRoom) limitsFor(userID string) *limits {
+	r.peopleMu.Lock()
+	defer r.peopleMu.Unlock()
+	if r.people == nil {
+		r.people = make(map[string]*limits)
+	}
+	if _, found := r.people[userID]; !found {
+		r.people[userID] = newLimits()
+	}
+	return r.people[userID]
 }
 
 func (r *liveRoom) do(work func()) {

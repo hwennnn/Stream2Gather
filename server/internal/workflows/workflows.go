@@ -9,10 +9,13 @@ import (
 	"time"
 
 	"go.temporal.io/api/serviceerror"
+	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporal"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
+
+	"stream2gather/internal/telemetry"
 )
 
 const (
@@ -27,9 +30,17 @@ type RoomCloser interface {
 	CloseExpiredRooms(ctx context.Context) (int64, error)
 }
 
-// MediaRefresher renews stored metadata.
+// MediaRefresher keeps stored metadata inside the source's time limits.
 type MediaRefresher interface {
 	RefreshStale(ctx context.Context, limit int) (refreshed, deleted int, err error)
+	// StaleBacklog is how much is past due after a refresh.
+	StaleBacklog(ctx context.Context) (int64, error)
+	PurgeSearches(ctx context.Context) (int64, error)
+}
+
+// Metrics takes samples for ClickHouse.
+type Metrics interface {
+	Add(event telemetry.Event)
 }
 
 // Activities are the steps that touch the outside world.
@@ -37,13 +48,16 @@ type Activities struct {
 	Rooms    RoomCloser
 	Media    MediaRefresher
 	Sessions SessionStore
+	Metrics  Metrics
 }
 
 // Summary reports what one maintenance run did.
 type Summary struct {
-	RoomsClosed  int64
-	Refreshed    int
-	MediaDeleted int
+	RoomsClosed    int64
+	Refreshed      int
+	MediaDeleted   int
+	Backlog        int64
+	SearchesPurged int64
 }
 
 // CloseRooms ends expired rooms.
@@ -57,8 +71,34 @@ func (a *Activities) RefreshMedia(ctx context.Context) (Summary, error) {
 	return Summary{Refreshed: refreshed, MediaDeleted: deleted}, err
 }
 
-// Maintenance closes expired rooms and refreshes media. The steps are separate
-// so an outage at YouTube cannot stop rooms from expiring.
+// MeasureBacklog raises the alarm while metadata is waiting past its refresh age.
+// Nothing else would say a run is falling behind the 30-day limit.
+func (a *Activities) MeasureBacklog(ctx context.Context) (int64, error) {
+	backlog, err := a.Media.StaleBacklog(ctx)
+	if err != nil {
+		return 0, err
+	}
+	a.metric("media_stale_backlog", float64(backlog))
+	if backlog > 0 {
+		activity.GetLogger(ctx).Error("media_stale_backlog above zero", "backlog", backlog)
+	}
+	return backlog, nil
+}
+
+// PurgeSearches clears result lists too old to serve.
+func (a *Activities) PurgeSearches(ctx context.Context) (int64, error) {
+	return a.Media.PurgeSearches(ctx)
+}
+
+func (a *Activities) metric(name string, value float64) {
+	if a.Metrics != nil {
+		at := time.Now().UTC().Format("2006-01-02 15:04:05.000")
+		a.Metrics.Add(telemetry.Event{At: at, Name: name, Value: value})
+	}
+}
+
+// Maintenance closes expired rooms, refreshes media and clears old searches. The
+// steps are separate so an outage at YouTube cannot stop the others.
 func Maintenance(ctx workflow.Context) (Summary, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: 5 * time.Minute,
@@ -73,7 +113,10 @@ func Maintenance(ctx workflow.Context) (Summary, error) {
 	refreshErr := workflow.ExecuteActivity(ctx, activities.RefreshMedia).Get(ctx, &refresh)
 	summary.Refreshed, summary.MediaDeleted = refresh.Refreshed, refresh.MediaDeleted
 
-	return summary, errors.Join(closeErr, refreshErr)
+	backlogErr := workflow.ExecuteActivity(ctx, activities.MeasureBacklog).Get(ctx, &summary.Backlog)
+	purgeErr := workflow.ExecuteActivity(ctx, activities.PurgeSearches).Get(ctx, &summary.SearchesPurged)
+
+	return summary, errors.Join(closeErr, refreshErr, backlogErr, purgeErr)
 }
 
 // Register adds workflows, activities and schedules before a worker starts.

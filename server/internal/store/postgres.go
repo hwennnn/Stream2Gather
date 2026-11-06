@@ -332,9 +332,25 @@ func (p *Postgres) DeleteMedia(ctx context.Context, source string, sourceIDs []s
 	return err
 }
 
+// CountStaleMedia says how much metadata is past maxAge, so past due for a refresh.
+func (p *Postgres) CountStaleMedia(ctx context.Context, source string, maxAge time.Duration) (int64, error) {
+	var count int64
+	err := p.pool.QueryRow(ctx, `
+		SELECT count(*) FROM media WHERE source = $1 AND fetched_at < $2`, source, time.Now().Add(-maxAge),
+	).Scan(&count)
+	return count, err
+}
+
+// PurgeSearches drops cached result lists no reader would accept any more.
+func (p *Postgres) PurgeSearches(ctx context.Context, maxAge time.Duration) (int64, error) {
+	tag, err := p.pool.Exec(ctx, `DELETE FROM search_cache WHERE fetched_at < $1`, time.Now().Add(-maxAge))
+	return tag.RowsAffected(), err
+}
+
 // CloseExpiredRooms ends temporary rooms nobody has used, and reports how many.
+// A closed room never reopens, so its snapshot and the titles in it go too.
 func (p *Postgres) CloseExpiredRooms(ctx context.Context) (int64, error) {
 	tag, err := p.pool.Exec(ctx, `
-		UPDATE rooms SET closed_at = now() WHERE closed_at IS NULL AND expires_at < now()`)
+		UPDATE rooms SET closed_at = now(), snapshot = NULL WHERE closed_at IS NULL AND expires_at < now()`)
 	return tag.RowsAffected(), err
 }

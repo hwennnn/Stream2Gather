@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"go.temporal.io/sdk/testsuite"
+
+	"stream2gather/internal/telemetry"
 )
 
 type fakeRooms struct {
@@ -20,12 +22,21 @@ func (f *fakeRooms) CloseExpiredRooms(context.Context) (int64, error) {
 
 type fakeMedia struct {
 	refreshed, deleted int
+	backlog, purged    int64
 	err                error
 }
 
 func (f *fakeMedia) RefreshStale(context.Context, int) (int, int, error) {
 	return f.refreshed, f.deleted, f.err
 }
+
+func (f *fakeMedia) StaleBacklog(context.Context) (int64, error) { return f.backlog, nil }
+
+func (f *fakeMedia) PurgeSearches(context.Context) (int64, error) { return f.purged, nil }
+
+type fakeMetrics struct{ events []telemetry.Event }
+
+func (f *fakeMetrics) Add(event telemetry.Event) { f.events = append(f.events, event) }
 
 func run(t *testing.T, activities *Activities) (Summary, error) {
 	t.Helper()
@@ -56,9 +67,27 @@ func TestMaintenanceReportsBothJobs(t *testing.T) {
 	}
 }
 
-func TestYouTubeOutageDoesNotStopRoomExpiry(t *testing.T) {
+func TestMaintenanceReportsTheBacklogAndPurgesSearches(t *testing.T) {
+	metrics := &fakeMetrics{}
+	summary, err := run(t, &Activities{
+		Rooms:   &fakeRooms{},
+		Media:   &fakeMedia{backlog: 12, purged: 7},
+		Metrics: metrics,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Backlog != 12 || summary.SearchesPurged != 7 {
+		t.Fatalf("summary = %+v", summary)
+	}
+	if len(metrics.events) != 1 || metrics.events[0].Name != "media_stale_backlog" || metrics.events[0].Value != 12 {
+		t.Fatalf("metrics = %+v", metrics.events)
+	}
+}
+
+func TestYouTubeOutageDoesNotStopTheOtherJobs(t *testing.T) {
 	rooms := &fakeRooms{closed: 1}
-	_, err := run(t, &Activities{Rooms: rooms, Media: &fakeMedia{err: errors.New("youtube down")}})
+	_, err := run(t, &Activities{Rooms: rooms, Media: &fakeMedia{purged: 1, err: errors.New("youtube down")}})
 	if err == nil {
 		t.Fatal("expected the failed refresh to surface")
 	}

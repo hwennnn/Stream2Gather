@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { formatTime } from '../../ui/format';
 import { Thumb } from '../../ui/Thumb';
 
-const CHAT = [
+export const CHAT = [
   { name: 'Maya', color: '#8fa8ff', text: 'wait for this part' },
   { name: 'Sam', color: '#5eead4', text: 'no spoilers!!' },
   { name: 'Priya', color: '#f0abfc', text: 'okay that was incredible' },
@@ -79,13 +79,13 @@ export const HeroPreview = ({ thumbnail, title }: { thumbnail: string; title: st
         </div>
       </div>
 
-      <div className="hero-float absolute -right-3 -bottom-12 w-40 overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl shadow-black/50 lg:-right-6 phone:hidden">
+      <div className="hero-float absolute -right-3 -bottom-12 w-40 overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl shadow-black/50 lg:-right-3 phone:hidden land:hidden">
         <Thumb src={thumbnail} className="w-full" />
         <div className="p-2.5">
           <Bar time={time} />
           <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-muted">
             <span className="size-1.5 rounded-full bg-good" />
-            Sam’s phone, in sync
+            On Sam’s phone
           </p>
         </div>
       </div>

@@ -551,7 +551,8 @@ body {
 
 .hero-halo {
   position: absolute;
-  inset: -8% -6%;
+  /* Blur spills past the box for free. The box itself must stay inside the page. */
+  inset: -8% 0;
   border-radius: 40%;
   background: linear-gradient(120deg, rgb(125 211 252 / 0.3), rgb(167 139 250 / 0.34));
   filter: blur(70px);
@@ -586,11 +587,17 @@ body {
   }
 }
 
+.room-tile {
+  background:
+    radial-gradient(22rem 12rem at 50% -10%, rgb(124 111 255 / 0.2), transparent 75%),
+    rgb(18 23 48 / 0.6);
+}
+
 .closing {
   background:
-    radial-gradient(34rem 18rem at 50% 120%, rgb(124 111 255 / 0.42), transparent 70%),
-    radial-gradient(26rem 14rem at 0% 0%, rgb(56 150 255 / 0.2), transparent 70%),
-    var(--color-panel);
+    radial-gradient(40rem 22rem at 100% 120%, rgb(167 139 250 / 0.5), transparent 70%),
+    radial-gradient(34rem 20rem at 0% -20%, rgb(56 150 255 / 0.42), transparent 70%),
+    linear-gradient(100deg, #1b2a63, #2c2470);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -51,6 +51,8 @@ export type ChatMessage = {
   author: string;
   body: string;
   createdAt: string;
+  /** The sender's name for this line, the same on every retry. Old lines have none. */
+  clientId?: string;
 };
 
 export class ApiError extends Error {

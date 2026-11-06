@@ -630,6 +630,57 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('chat line ids', () => {
+    const sent = (socket: FakeSocket) => socket.ofType('chat.send').map((frame) => frame.d as unknown as { text: string; clientId: string });
+    const live = async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      return { session, socket };
+    };
+    const echo = (id: number, body: string, clientId: string) => ({
+      message: { id, userId: 'g_1', author: 'Ada', body, clientId, createdAt: new Date().toISOString() },
+    });
+
+    it('names every line differently, even with the same words', async () => {
+      const { session, socket } = await live();
+      void session.sendChat('hi');
+      void session.sendChat('hi');
+      const [first, second] = sent(socket);
+      expect(first?.clientId).toBeTruthy();
+      expect(first?.clientId).not.toBe(second?.clientId);
+    });
+
+    it('sends a retry under the same name, so the server can spot it', async () => {
+      const { session, socket } = await live();
+      const line = session.sendChat('hi');
+      const [frame] = socket.ofType('chat.send');
+      socket.deliver('error', { re: frame?.id, code: 'unavailable', message: 'Your message did not send.' });
+      const { id } = await line;
+      session.retryChat(id);
+      const [first, retried] = sent(socket);
+      expect(first?.clientId).toBeTruthy();
+      expect(retried?.clientId).toBe(first?.clientId);
+    });
+
+    it('settles the line the server names, not the first with those words', async () => {
+      const { session, socket } = await live();
+      void session.sendChat('hi');
+      void session.sendChat('hi');
+      socket.deliver('chat', echo(9, 'hi', sent(socket)[1]?.clientId ?? ''));
+      expect(entries(session).map((entry) => entry.kind === 'chat' && entry.serverId)).toEqual([undefined, 9]);
+    });
+
+    it('shows one line when a retry is told twice', async () => {
+      const { session, socket } = await live();
+      void session.sendChat('hi');
+      const clientId = sent(socket)[0]?.clientId ?? '';
+      socket.deliver('chat', echo(9, 'hi', clientId));
+      socket.deliver('chat', echo(9, 'hi', clientId));
+      expect(entries(session)).toHaveLength(1);
+    });
+  });
+
   describe('chat history', () => {
     const history = (...ids: number[]) =>
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
@@ -929,7 +980,7 @@ describe('RoomSession', () => {
       next.deliver('chat', { message: chatLine(1) });
 
       session.retryChat(id);
-      expect(next.ofType('chat.send').at(-1)?.d).toEqual({ text: 'hello' });
+      expect(next.ofType('chat.send').at(-1)?.d).toMatchObject({ text: 'hello' });
       expect(entries(session).at(-1)).toMatchObject({ id, delivery: 'sending' });
       next.ack();
       await vi.advanceTimersByTimeAsync(0);

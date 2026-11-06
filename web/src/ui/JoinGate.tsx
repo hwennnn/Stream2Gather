@@ -17,7 +17,7 @@ const SHOWN = 4;
 /** A room you arrive at early still has places in it. */
 const MIN_EMPTY = 2;
 
-const WhereItIs = ({ preview }: { preview: RoomPreview }) => {
+export const WhereItIs = ({ preview }: { preview: RoomPreview }) => {
   const { playback, nowPlaying } = preview;
   if (!nowPlaying || !playback || playback.status === 'idle') return null;
   const time = <span className="fig text-[13px]">{formatTime(playback.pos)}</span>;

@@ -6,6 +6,12 @@ import { track } from '../room/telemetry';
 import { ChatPanel, useUnread } from '../ui/ChatPanel';
 import { DeadEnd, ENDINGS, fullRoom, type Ending } from '../ui/DeadEnd';
 import { JoinGate } from '../ui/JoinGate';
+import { InviteSheet } from '../ui/InviteSheet';
+import { rememberRoom } from './landing/recent';
+import { Page } from '../ui/Page';
+import { firstName } from '../ui/people';
+import { OfflineNote, useLatestAct } from '../ui/RoomStatus';
+import { useSeats } from '../ui/Seats';
 import { PeoplePanel } from '../ui/PeoplePanel';
 import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerStage';
 import { ReactionLane } from '../ui/Reactions';
@@ -31,7 +37,6 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 const CONNECT_PATIENCE_MS = 15_000;
-const STILL_TRYING_MS = 30_000;
 
 const arrival = () => (window.history.state ?? {}) as { joined?: boolean; copied?: boolean };
 
@@ -159,26 +164,12 @@ const Waiting = ({ session, view }: { session: RoomSession; view: RoomView }) =>
     );
   }
   return (
-    <main className="glow flex h-full items-center justify-center px-6 text-center" role="status">
-      <div>
-        <span className="spinner mx-auto block size-7 text-accent" />
-        <p className="mt-4 text-muted">{view.connection === 'reconnecting' ? 'Still connecting…' : 'Joining the room…'}</p>
-      </div>
-    </main>
-  );
-};
-
-const OfflineBar = ({ elapsed, onRetry }: { elapsed: number; onRetry: () => void }) => {
-  const long = elapsed >= STILL_TRYING_MS;
-  return (
-    <div role="status" className="flex min-h-9 shrink-0 items-center justify-center gap-3 bg-warn/12 px-4 py-1 text-[13px] text-warn">
-      {long ? 'Still trying. Check your connection.' : 'Connection lost. Reconnecting…'}
-      {long && (
-        <button type="button" onClick={onRetry} className="btn btn-sm bg-warn font-semibold text-ink">
-          Try again
-        </button>
-      )}
-    </div>
+    <Page status>
+      <p className="flex items-center gap-2.5 text-muted">
+        <span className="spinner" />
+        {view.connection === 'reconnecting' ? 'Still connecting…' : 'Joining the room…'}
+      </p>
+    </Page>
   );
 };
 
@@ -189,6 +180,10 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
   const [theatre, setTheatre] = useState(false);
   const [finished, setFinished] = useState(false);
   const [changing, setChanging] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const row = useSeats(view);
+  const act = useLatestAct(view);
+  const actor = view.playback.status === 'paused' ? (view.playback.pausedBy ?? null) : (act?.by ?? null);
   const { toasts, toast } = useToasts();
   const fullscreen = useFullscreen();
   const player = useRoomPlayer(session, view);
@@ -220,6 +215,8 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
     if (copied && !welcomed.current) toast('Link copied. Paste it to a friend.');
     welcomed.current = true;
   }, [copied, toast]);
+
+  useEffect(() => rememberRoom(slug, view.name), [slug, view.name]);
 
   useEffect(() => {
     document.title = unread > 0 ? `(${unread}) ${view.name}` : view.name;
@@ -265,12 +262,21 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
   };
 
   const invite = async () => {
+    setInviting(true);
+    setTheatre(false);
     if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
-      await navigator.share({ title: view.name, url: inviteUrl }).catch(() => {});
+      await navigator.share({ title: `${firstName(view.self?.name ?? '')} saved you a seat`, text: view.name, url: inviteUrl }).catch(() => {});
       return;
     }
     await copyInvite();
   };
+
+  const openPeople = () => {
+    setTab('people');
+    setTheatre(false);
+  };
+
+  const offlineNote = offlineFor !== null ? <OfflineNote elapsed={offlineFor} onRetry={() => session.retry()} /> : null;
 
   const moveTab = (event: KeyboardEvent) => {
     const index = TABS.findIndex(({ id }) => id === tab);
@@ -302,12 +308,12 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           session={session}
           view={view}
           adapter={player.adapter}
+          row={row}
+          actor={actor}
+          note={current ? <span className="hidden land:inline">{offlineNote}</span> : offlineNote}
           onAccountOpen={() => setTheatre(false)}
           onInvite={() => void invite()}
-          onPeople={() => {
-            setTab('people');
-            setTheatre(false);
-          }}
+          onPeople={openPeople}
           landscapeControls={
             current && (
               <>
@@ -319,7 +325,6 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           }
         />
       )}
-      {offlineFor !== null && <OfflineBar elapsed={offlineFor} onRetry={() => session.retry()} />}
 
       <div className="room-body">
         <PlayerStage
@@ -334,14 +339,22 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           onTheatre={() => setTheatre(!theatre)}
           onFullscreen={fullscreen.toggle}
           onPickAnother={openQueue}
+          onPeople={openPeople}
+          onInvite={() => void invite()}
           onShowQueue={() => setTab('queue')}
+          row={row}
+          act={act}
+          actor={actor}
+          queueOpen={tab === 'queue'}
+          offlineNote={offlineNote}
           onToast={toast}
           railHidden={railHidden}
-          toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink/90 px-4 empty:hidden', 1)}
+          toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink px-4 empty:hidden', 1)}
         />
 
         {/* Hidden rather than removed, so a chat draft survives theatre mode. */}
         <aside aria-label="Room" hidden={railHidden} className="room-rail">
+          {inviting && !view.alone && <InviteSheet view={view} url={inviteUrl} onCopy={() => void copyInvite()} onClose={() => setInviting(false)} />}
           <div role="tablist" aria-label="Room panels" onKeyDown={moveTab} className="rail-edge flex shrink-0 gap-5 border-b border-line">
             {TABS.map(({ id, label }) => {
               const count = id === 'queue' ? Math.max(view.queue.length - 1, 0) : id === 'people' ? view.members.length : 0;
@@ -355,12 +368,12 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
                   aria-controls={`panel-${id}`}
                   tabIndex={tab === id ? 0 : -1}
                   onClick={() => setTab(id)}
-                  className={`btn flex-1 ${tab === id ? 'bg-white/[0.09] text-text' : 'text-muted hover:text-text'}`}
+                  className="tab"
                 >
                   {label}
-                  {count > 0 && <span className="font-normal text-muted">{count}</span>}
+                  {count > 0 && <span className="fig font-normal text-dim">{count}</span>}
                   {id === 'chat' && unread > 0 && (
-                    <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-ink">
+                    <span className="fig font-medium text-text">
                       <span className="sr-only">, unread: </span>
                       {unread}
                     </span>

@@ -19,6 +19,7 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews", s.createCrew)
 	mux.HandleFunc("GET /v1/crews/{slug}", s.crewHome)
 	mux.HandleFunc("POST /v1/crews/{slug}/join", s.joinCrew)
+	mux.HandleFunc("POST /v1/rooms/{slug}/crew", s.promoteRoom)
 }
 
 // crewSummary is what GET /v1/rooms/{slug} says about a room's crew.
@@ -107,6 +108,8 @@ func (s *Server) crewFailed(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusConflict, "crew_full", "This crew is full.")
 	case errors.Is(err, store.ErrInvalidInvite):
 		writeProblem(w, http.StatusForbidden, "invalid_invite", "This invite link has expired. Ask for a new one.")
+	case errors.Is(err, store.ErrRoomClosed):
+		writeProblem(w, http.StatusGone, "room_closed", "This room has closed.")
 	default:
 		s.internal(w, err)
 	}
@@ -153,6 +156,34 @@ func (s *Server) createCrew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"slug": record.Slug, "name": name, "inviteToken": crew.InviteToken})
+}
+
+// promoteRoom is "Keep this room": the link and everyone's connection stay put.
+func (s *Server) promoteRoom(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	record, ok := s.findRoom(w, r)
+	if !ok {
+		return
+	}
+	if record.OwnerID != claims.Subject {
+		writeProblem(w, http.StatusForbidden, "forbidden", "Only the room's owner can keep it.")
+		return
+	}
+	err := s.DB.PromoteRoom(r.Context(), record, store.Crew{ID: ids.New(), InviteToken: ids.New()})
+	if err != nil {
+		s.crewFailed(w, err)
+		return
+	}
+	crew, err := s.DB.CrewOfRoom(r.Context(), record)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	s.publishCrew(r.Context(), record.ID, "settings")
+	writeJSON(w, http.StatusOK, map[string]string{"slug": record.Slug, "name": record.Name, "inviteToken": crew.InviteToken})
 }
 
 func (s *Server) joinCrew(w http.ResponseWriter, r *http.Request) {

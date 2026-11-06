@@ -8,8 +8,8 @@ const EMOJI = ['😂', '❤️', '🔥', '😮', '👏', '😭'];
 const SPARKS = [-1, -0.4, 0.4, 1];
 
 /**
- * Rises up the right of the rail, in the gutter chat lines leave for their time,
- * so it crosses no one's words. It lives in the rail, so it can't reach the player.
+ * Rises up the right of the rail, in the room chat lines leave for it, so it
+ * crosses no one's words. It lives in the rail, so it can't reach the player.
  */
 export const ReactionLane = ({ reactions }: { reactions: RoomView['reactions'] }) => (
   <div className="reaction-lane" aria-hidden="true">

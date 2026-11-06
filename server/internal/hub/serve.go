@@ -449,6 +449,7 @@ var embedRefused = map[int]bool{101: true, 150: true}
 func (r *liveRoom) mediaError(c *conn, message Message) {
 	var report struct {
 		Item string `json:"item"`
+		Kind string `json:"kind"`
 		Code int    `json:"code"`
 	}
 	if err := json.Unmarshal(message.Data, &report); err != nil || !c.reports.Allow() {
@@ -486,7 +487,13 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 		return
 	}
 
-	notice := skippedNotice(item, refused)
+	why := wontLoad
+	if refused {
+		why = youTubeRefused
+	} else if item.Source == "direct" && report.Kind == "embed_blocked" {
+		why = streamRefused
+	}
+	notice := skippedNotice(item, why)
 	r.do(func() {
 		skipCtx, done := opContext()
 		defer done()
@@ -497,19 +504,19 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 	})
 }
 
-func skippedNotice(item room.Item, refused bool) map[string]string {
-	notice := map[string]string{"kind": "skipped", "text": skipNotice(item, refused)}
+// The reasons a video was skipped, finishing the sentence in skippedNotice.
+const (
+	wontLoad       = "it wouldn’t load"
+	youTubeRefused = "YouTube won’t let it play here"
+	streamRefused  = "this stream doesn’t allow playback here"
+)
+
+func skippedNotice(item room.Item, why string) map[string]string {
+	notice := map[string]string{"kind": "skipped", "text": "Skipped “" + item.Title + "” because " + why + "."}
 	if item.Source == "youtube" {
 		notice["url"] = item.URL
 	}
 	return notice
-}
-
-func skipNotice(item room.Item, refused bool) string {
-	if refused {
-		return "Skipped “" + item.Title + "” because YouTube won’t let it play here."
-	}
-	return "Skipped “" + item.Title + "” because it wouldn’t load."
 }
 
 // noteEmbedBlock hides a video from everyone's search only once more than one

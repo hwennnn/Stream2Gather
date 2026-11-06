@@ -33,10 +33,12 @@ const percentile = (values, p) => {
  * latencyMs delays each direction of the viewer's socket by that much.
  * timerScale stretches setInterval, the way a background tab's timers run late.
  */
-const viewer = async (name, { latencyMs = 0, timerScale = 1 } = {}) => {
+const viewer = async (name, { latencyMs = 0, timerScale = 1, hlsJs = false } = {}) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
   const page = await context.newPage();
+  // Chrome plays HLS itself now, so a browser that can't has to be pretended.
+  if (hlsJs) await page.addInitScript(() => { HTMLMediaElement.prototype.canPlayType = () => ''; });
   // Offline mode leaves open WebSockets alone, so tests need a way to cut one.
   // Browser network throttling doesn't reach them either, so latency goes here.
   await page.addInitScript((scale) => {
@@ -256,6 +258,33 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   await a.page.screenshot({ path: `${OUT}/room-mp4.png` });
   report.mp4Errors = [...new Set([...a.errors, ...b.errors, ...c.errors])].slice(0, 5);
   await Promise.all([a, b, c].map((v) => v.context.close()));
+}
+
+// HLS has to hold the same line as a plain file, played by the browser or by hls.js.
+const usedHlsJs = (v) => v.page.evaluate(() => performance.getEntriesByType('resource').some(({ name }) => /\/hls[-.]/.test(name)));
+
+for (const [path, hlsJs] of [['native', false], ['hls.js', true]]) {
+  const [a, b] = await Promise.all(['a', 'b'].map((name) => viewer(name, { hlsJs })));
+  const room = await createRoom(a, `${BASE}/hls/index.m3u8`);
+  await join(b, room.url);
+  check(`hls ${path}: both start`, await waitPlaying([a, b]), '');
+  check(`hls ${path}: it is the path under test`, (await usedHlsJs(a)) === hlsJs, '');
+  report[`hls ${path}`] = await measure([a, b], 12);
+  check(`hls ${path}: steady drift under 80ms p95`, report[`hls ${path}`].p95 < 80, JSON.stringify(report[`hls ${path}`]));
+  await Promise.all([a, b].map((v) => v.context.close()));
+}
+
+// Only hls.js can be refused: it fetches, and a plain video doesn't need the host's leave.
+{
+  const refused = await viewer('refused', { hlsJs: true });
+  await createRoom(refused, `${BASE.replace('127.0.0.1', 'localhost')}/hls/index.m3u8`);
+  const said = await refused.page
+    .getByText('doesn’t allow playback here')
+    .first()
+    .waitFor({ timeout: 15000 })
+    .then(() => true, () => false);
+  check('hls.js: a host that refuses us is named as the reason', said, '');
+  await refused.context.close();
 }
 
 // An event that leaves playback alone must not swallow a real pause. Each of these

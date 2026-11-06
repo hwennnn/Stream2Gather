@@ -562,6 +562,16 @@ func TestSkipNoticeForAnythingElse(t *testing.T) {
 	}
 }
 
+func TestSkipNoticeNamesAStreamThatRefusedUs(t *testing.T) {
+	r := newRig(t, testRedis)
+	c := r.joined(t, r.newRoom(t, directVideo(t)), "u", room.RoleMember)
+	c.send(t, "media_error", map[string]any{"item": "item1", "kind": "embed_blocked", "code": 0})
+	notice := noticeOf(t, c.expect(t, "notice"))
+	if notice["text"] != "Skipped “a” because this stream doesn’t allow playback here." {
+		t.Fatalf("text = %q", notice["text"])
+	}
+}
+
 func TestMediaErrorsAreRateLimited(t *testing.T) {
 	r := newRig(t, testRedis)
 	id := r.newRoom(t, directVideo(t))

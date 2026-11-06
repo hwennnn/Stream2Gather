@@ -1,4 +1,13 @@
-import { createBlockedChannel, createErrorChannel, type PlayerAdapter, type PlayerState } from './types';
+import { createBlockedChannel, createErrorChannel, type PlayerAdapter, type PlayerError, type PlayerState } from './types';
+
+/**
+ * A host that doesn't allow other sites fails with no status at all, which is the
+ * only sign a browser gives. Offline looks the same, so that is ruled out first.
+ */
+export const hlsError = (network: boolean, status: number, online: boolean): PlayerError => {
+  if (!network) return { kind: 'unavailable', code: status };
+  return { kind: status === 0 && online ? 'embed_blocked' : 'network', code: status };
+};
 
 /** Plays a media file directly, which gives the tightest sync of any source. */
 export const createHtml5Player = async (
@@ -34,8 +43,7 @@ export const createHtml5Player = async (
         hls.recoverMediaError();
         return;
       }
-      const kind = data.type === Hls.ErrorTypes.NETWORK_ERROR ? 'network' : 'unavailable';
-      errors.report({ kind, code: data.response?.code ?? 0 });
+      errors.report(hlsError(data.type === Hls.ErrorTypes.NETWORK_ERROR, data.response?.code ?? 0, navigator.onLine));
     });
     hls.loadSource(url);
     hls.attachMedia(video);

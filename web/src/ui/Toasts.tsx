@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { RoomSession, RoomView } from '../room/session';
 import { canControl, isOffline } from './rules';
+import { openLabel } from './sources';
 
 const LIFE_MS = 4000;
 const MAX_SHOWN = 3;
@@ -71,7 +72,7 @@ export const ToastStack = ({ toasts, notices, limit = MAX_SHOWN, className, chil
             <>
               {' '}
               <a href={url} target="_blank" rel="noreferrer noopener" className="text-link underline underline-offset-2">
-                Open on YouTube
+                {openLabel(url)}
               </a>
             </>
           )}

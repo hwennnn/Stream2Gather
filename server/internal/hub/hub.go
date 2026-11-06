@@ -724,7 +724,7 @@ func (r *liveRoom) settleFailures(ctx context.Context, people []store.Person) {
 		return
 	}
 	if r.applySystem(ctx, room.Command{Type: room.CmdSkip, Item: item.ID}) {
-		r.publishNotice(ctx, skippedNotice(item, false))
+		r.publishNotice(ctx, skippedNotice(item, wontLoad))
 	}
 }
 

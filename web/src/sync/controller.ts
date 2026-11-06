@@ -28,6 +28,11 @@ const browserTimers: Timers = {
   clearTimeout: (id) => window.clearTimeout(id),
 };
 
+type Page = Pick<Document, 'hidden' | 'pictureInPictureElement'>;
+
+/** Nobody can reach a player they can't see. A picture-in-picture window stays in reach of a hidden tab. */
+export const outOfReach = (page: Page): boolean => page.hidden && !page.pictureInPictureElement;
+
 /** Below this, viewers cannot perceive the gap and correcting only adds risk. */
 export const DRIFT_OK_S = 0.15;
 /** Every correction a player without rate control makes is a visible jump, so it allows more. */
@@ -145,6 +150,7 @@ export class SyncController {
     private readonly emit: (command: LocalCommand) => void,
     private readonly report: (report: SyncReport) => void,
     private readonly timers: Timers = browserTimers,
+    private readonly unseen: () => boolean = () => outOfReach(document),
   ) {
     player.onState((state) => this.handlePlayerState(state));
   }
@@ -573,6 +579,9 @@ export class SyncController {
     // Until the room answers, its status is older than what this viewer just did.
     const status = this.asked ?? playback.status;
     if (state === 'paused' && status === 'playing') {
+      // The browser stops a player as its tab goes out of sight. Only this viewer's player
+      // stopped, and `tick` starts it again, so the room must not stop with it.
+      if (this.unseen()) return;
       this.markAction();
       this.reportDrift(time - expectedPosition(playback, now));
       // A pause that lands away from the player is the timeline being grabbed.

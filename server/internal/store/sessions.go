@@ -272,3 +272,17 @@ func (p *Postgres) EndSession(ctx context.Context, sessionID string, at time.Tim
 	}
 	return true, tx.Commit(ctx)
 }
+
+// SecondSessions counts crews whose first session is at least 14 days old, and
+// how many of those held another within 14 days of it.
+func (p *Postgres) SecondSessions(ctx context.Context) (cohort, returned int64, err error) {
+	err = p.pool.QueryRow(ctx, `
+		WITH firsts AS (
+		  SELECT crew_id, min(started_at) AS first FROM crew_sessions
+		  GROUP BY crew_id HAVING min(started_at) <= now() - interval '14 days')
+		SELECT count(*), count(*) FILTER (WHERE EXISTS (
+		  SELECT 1 FROM crew_sessions s
+		  WHERE s.crew_id = f.crew_id AND s.started_at > f.first AND s.started_at <= f.first + interval '14 days'))
+		FROM firsts f`).Scan(&cohort, &returned)
+	return cohort, returned, err
+}

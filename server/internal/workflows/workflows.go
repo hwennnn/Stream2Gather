@@ -120,7 +120,9 @@ func Maintenance(ctx workflow.Context) (Summary, error) {
 
 	snapshotErr := workflow.ExecuteActivity(ctx, activities.RefreshSnapshots).Get(ctx, &summary.Snapshots)
 
-	return summary, errors.Join(closeErr, refreshErr, backlogErr, purgeErr, snapshotErr)
+	crewsErr := workflow.ExecuteActivity(ctx, activities.MeasureCrews).Get(ctx, nil)
+
+	return summary, errors.Join(closeErr, refreshErr, backlogErr, purgeErr, snapshotErr, crewsErr)
 }
 
 // Register adds workflows, activities and schedules before a worker starts.

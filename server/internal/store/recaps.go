@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -115,4 +117,84 @@ func (p *Postgres) UnbuiltSessions(ctx context.Context, limit int) ([]string, er
 		return nil, err
 	}
 	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// SessionRecap is a stored recap. Doc is nil while it hasn't been built.
+type SessionRecap struct {
+	SessionID  string
+	CrewName   string
+	StartedAt  time.Time
+	Doc        *recap.Doc
+	ShareToken string
+}
+
+func scanRecap(row pgx.Row) (SessionRecap, error) {
+	var r SessionRecap
+	var doc []byte
+	var token *string
+	if err := row.Scan(&r.SessionID, &r.CrewName, &r.StartedAt, &doc, &token); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return r, ErrNotFound
+		}
+		return r, err
+	}
+	if token != nil {
+		r.ShareToken = *token
+	}
+	if doc != nil {
+		r.Doc = &recap.Doc{}
+		return r, json.Unmarshal(doc, r.Doc)
+	}
+	return r, nil
+}
+
+const recapColumns = `
+	SELECT s.id, rm.name, s.started_at, r.doc, r.share_token
+	FROM crew_sessions s
+	JOIN crews c ON c.id = s.crew_id
+	JOIN rooms rm ON rm.id = c.room_id
+	LEFT JOIN session_recaps r ON r.session_id = s.id`
+
+// RecapOf finds one of a crew's finished sessions, built or not.
+func (p *Postgres) RecapOf(ctx context.Context, crewID, sessionID string) (SessionRecap, error) {
+	return scanRecap(p.pool.QueryRow(ctx, recapColumns+`
+		WHERE s.id = $1 AND s.crew_id = $2 AND s.ended_at IS NOT NULL`, sessionID, crewID))
+}
+
+// RecapByToken finds a shared recap. A revoked token finds nothing.
+func (p *Postgres) RecapByToken(ctx context.Context, token string) (SessionRecap, error) {
+	return scanRecap(p.pool.QueryRow(ctx, recapColumns+` WHERE r.share_token = $1`, token))
+}
+
+// ShareRecap sets the recap's public token, or takes it away when token is "".
+func (p *Postgres) ShareRecap(ctx context.Context, sessionID, token string) error {
+	var value *string
+	if token != "" {
+		value = &token
+	}
+	tag, err := p.pool.Exec(ctx, `UPDATE session_recaps SET share_token = $2 WHERE session_id = $1`, sessionID, value)
+	if err == nil && tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return err
+}
+
+// Attended reports whether someone was at a session.
+func (p *Postgres) Attended(ctx context.Context, sessionID, userID string) (bool, error) {
+	var here bool
+	err := p.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM session_people WHERE session_id = $1 AND user_id = $2)`, sessionID, userID).Scan(&here)
+	return here, err
+}
+
+// SessionItemOf finds the first time a session played a video, for linking to it.
+func (p *Postgres) SessionItemOf(ctx context.Context, sessionID, source, sourceID string) (int64, error) {
+	var id *int64
+	err := p.pool.QueryRow(ctx, `
+		SELECT min(id) FROM session_items WHERE session_id = $1 AND source = $2 AND source_id = $3`,
+		sessionID, source, sourceID).Scan(&id)
+	if err != nil || id == nil {
+		return 0, err
+	}
+	return *id, nil
 }

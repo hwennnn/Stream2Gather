@@ -34,6 +34,7 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews/{slug}/invite", s.rotateInvite)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/members/{userId}", s.removeMember)
 	mux.HandleFunc("GET /v1/crews/{slug}/sessions", s.crewSessions)
+	mux.HandleFunc("GET /v1/crews/{slug}/sessions/{id}/recap", s.sessionRecap)
 	mux.HandleFunc("GET /v1/crews/{slug}/watchlist", s.watchlist)
 	mux.HandleFunc("POST /v1/crews/{slug}/watchlist", s.addWatch)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/watchlist/{id}", s.removeWatch)

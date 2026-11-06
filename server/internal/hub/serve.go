@@ -70,7 +70,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	}
 }
 
-// readMessage gives up on a peer that has gone silent. Clients ping every ten
+// readMessage gives up on a peer that has gone silent. Clients ping every three
 // seconds, so this only fires on a connection that died without saying so.
 func readMessage(ctx context.Context, ws *websocket.Conn, idle time.Duration) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, idle)

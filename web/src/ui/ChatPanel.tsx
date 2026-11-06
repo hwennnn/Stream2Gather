@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import type { ChatMessage } from '../api/http';
-import type { ChatEntry, RoomSession, RoomView } from '../room/session';
+import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
 import { Avatar } from './Avatar';
 import { avatarColor, formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
@@ -23,7 +22,7 @@ type Props = {
   onToast: (text: string) => void;
 };
 
-type Block = { kind: 'system'; entry: Extract<ChatEntry, { kind: 'system' }> } | { kind: 'chat'; messages: ChatMessage[] };
+type Block = { kind: 'system'; entry: Extract<ChatEntry, { kind: 'system' }> } | { kind: 'chat'; messages: ChatLine[] };
 
 const toBlocks = (entries: ChatEntry[]): Block[] => {
   const blocks: Block[] = [];
@@ -185,7 +184,7 @@ const InviteCard = ({ url, onCopy }: { url: string; onCopy: () => void }) => (
   </div>
 );
 
-type GroupProps = { session: RoomSession; view: RoomView; messages: ChatMessage[]; onToast: (text: string) => void };
+type GroupProps = { session: RoomSession; view: RoomView; messages: ChatLine[]; onToast: (text: string) => void };
 
 const MessageGroup = ({ session, view, messages, onToast }: GroupProps) => {
   const first = messages[0];
@@ -213,7 +212,7 @@ const MessageGroup = ({ session, view, messages, onToast }: GroupProps) => {
   );
 };
 
-type MessageProps = { session: RoomSession; view: RoomView; message: ChatMessage; onToast: (text: string) => void };
+type MessageProps = { session: RoomSession; view: RoomView; message: ChatLine; onToast: (text: string) => void };
 
 const Message = ({ session, view, message, onToast }: MessageProps) => {
   const parts = splitLinks(message.body);

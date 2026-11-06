@@ -45,7 +45,7 @@ const welcome = (version: number) => ({
   members: [],
 });
 
-const pong = (version: number) => ({ t0: 0, ts: 0, version });
+const pong = (version: number) => ({ t0: 1, ts: 0, version });
 
 const idle = { item: '', status: 'idle', pos: 0, at: 0, rate: 1 };
 
@@ -133,8 +133,8 @@ describe('RoomSession', () => {
   it('ignores a pong that has no version to report', async () => {
     const { socket } = await connected();
     socket.deliver('welcome', welcome(5));
-    socket.deliver('pong', { t0: 0, ts: 0 });
-    socket.deliver('pong', { t0: 0, ts: 0 });
+    socket.deliver('pong', { t0: 1, ts: 0 });
+    socket.deliver('pong', { t0: 1, ts: 0 });
     expect(socket.closed).toBe(0);
   });
 
@@ -412,11 +412,13 @@ describe('RoomSession', () => {
       expect(FakeSocket.opened).toBe(1);
     });
 
-    it('tears down a socket that stopped answering, without waiting for onclose', async () => {
+    it('calls a silent socket dead within ten seconds, without waiting for onclose', async () => {
       const { session, socket } = await connected();
       socket.deliver('welcome', welcome(1));
       socket.onopen?.();
-      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(7900);
+      expect(socket.closed).toBe(0);
+      await vi.advanceTimersByTimeAsync(2100);
       expect(socket.closed).toBe(1);
       expect(socket.onclose).toBeNull();
       expect(session.getView().connection).toBe('reconnecting');
@@ -425,24 +427,48 @@ describe('RoomSession', () => {
       expect(FakeSocket.opened).toBe(2);
     });
 
-    it('does not count the opening burst as unanswered', async () => {
+    it('keeps a socket that goes on answering', async () => {
       const { socket } = await connected();
       socket.deliver('welcome', welcome(1));
       socket.onopen?.();
-      await vi.advanceTimersByTimeAsync(1000); // Five pings sent, no answer yet.
-      socket.deliver('pong', pong(1));
-      await vi.advanceTimersByTimeAsync(25_000);
+      for (let i = 0; i < 20; i += 1) {
+        await vi.advanceTimersByTimeAsync(5000);
+        socket.deliver('pong', { t0: 0, ts: 0 });
+      }
       expect(socket.closed).toBe(0);
     });
 
-    it('keeps a socket that answers late', async () => {
+    it('counts any frame as a sign of life, not just a pong', async () => {
       const { socket } = await connected();
       socket.deliver('welcome', welcome(1));
       socket.onopen?.();
-      for (let i = 0; i < 10; i += 1) {
-        await vi.advanceTimersByTimeAsync(10_000);
-        socket.deliver('pong', pong(1));
-      }
+      await vi.advanceTimersByTimeAsync(6000);
+      socket.deliver('react', { emoji: '🔥', name: 'Maya' });
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(socket.closed).toBe(0);
+    });
+
+    it('does not blame the socket when the browser slept through its timers', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.onopen?.();
+      vi.setSystemTime(Date.now() + 60_000); // No timer ran for a minute.
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(socket.closed).toBe(0);
+    });
+
+    it('samples the clock and checks versions at the old pace, not on every ping', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(9));
+      socket.onopen?.();
+      await vi.advanceTimersByTimeAsync(5000);
+      socket.deliver('pong', { t0: 0, ts: 0 });
+      await vi.advanceTimersByTimeAsync(4000);
+      const pings = socket.ofType('ping').slice(-3);
+      expect(pings.map((ping) => ping.d?.t0 !== undefined)).toEqual([false, false, true]);
+      // A pong that only proves life can't count towards a version gap.
+      socket.deliver('pong', { t0: 0, ts: 0, version: 12 });
+      socket.deliver('pong', { t0: 0, ts: 0, version: 12 });
       expect(socket.closed).toBe(0);
     });
 
@@ -672,6 +698,127 @@ describe('RoomSession', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(session.getView().messages).toEqual([]);
       expect(session.getView().connection).toBe('live');
+    });
+  });
+
+  describe('own chat lines', () => {
+    const sent = async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      const result = session.sendChat('hello');
+      return { session, socket, result, line: () => entries(session).find((entry) => entry.kind === 'chat') };
+    };
+    const echo = (id: number, body = 'hello', at = Date.now()) => ({
+      message: { id, userId: 'g_1', author: 'Ada', body, createdAt: new Date(at).toISOString() },
+    });
+
+    it('shows the line at once, marked as sending', async () => {
+      const { line } = await sent();
+      expect(line()).toMatchObject({ body: 'hello', author: 'Ada', delivery: 'sending' });
+    });
+
+    it('is one line once the server echoes it, whichever answer lands first', async () => {
+      const first = await sent();
+      first.socket.deliver('chat', echo(7));
+      first.socket.ack();
+      await first.result;
+      expect(chatIds(first.session)).toHaveLength(1);
+      expect(first.line()).toMatchObject({ serverId: 7, delivery: undefined });
+
+      const second = await sent();
+      second.socket.ack();
+      await second.result;
+      expect(second.line()).toMatchObject({ delivery: undefined });
+      second.socket.deliver('chat', echo(8));
+      expect(chatIds(second.session)).toHaveLength(1);
+    });
+
+    it('keeps its id when confirmed, so unread counts and scrolling see one line', async () => {
+      const { socket, line } = await sent();
+      const id = line()?.id;
+      socket.deliver('chat', echo(7));
+      expect(line()?.id).toBe(id);
+    });
+
+    it('says it was not sent after five seconds', async () => {
+      const { result, line } = await sent();
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(line()).toMatchObject({ delivery: 'sending' });
+      await vi.advanceTimersByTimeAsync(200);
+      expect(line()).toMatchObject({ delivery: 'failed' });
+      expect((await result).limited).toBe(false);
+    });
+
+    it('fails the line when the socket drops under it', async () => {
+      const { socket, result, line } = await sent();
+      socket.onclose?.();
+      await result;
+      expect(line()).toMatchObject({ delivery: 'failed' });
+    });
+
+    it('recovers a line the server had all along', async () => {
+      const { socket, line } = await sent();
+      await vi.advanceTimersByTimeAsync(6000);
+      socket.deliver('chat', echo(7));
+      expect(line()).toMatchObject({ serverId: 7, delivery: undefined });
+    });
+
+    it('reports a rate limit, so the text can go back in the box', async () => {
+      const { socket, result } = await sent();
+      socket.deliver('error', { re: socket.sent.at(-1)?.id, code: 'rate_limited', message: 'Slow down a little.' });
+      expect((await result).limited).toBe(true);
+    });
+
+    it('retries from the end of the chat', async () => {
+      const { session, socket, result, line } = await sent();
+      socket.onclose?.();
+      const { id } = await result;
+      await vi.advanceTimersByTimeAsync(6000);
+      const next = FakeSocket.last;
+      next.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      next.deliver('chat', { message: chatLine(1) });
+
+      session.retryChat(id);
+      expect(next.ofType('chat.send').at(-1)?.d).toEqual({ text: 'hello' });
+      expect(entries(session).at(-1)).toMatchObject({ id, delivery: 'sending' });
+      next.ack();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(line()?.kind).toBe('chat');
+      expect(entries(session).at(-1)).toMatchObject({ id, delivery: undefined });
+    });
+
+    it('confirms a lost line from the history after a reconnect, without repeating it', async () => {
+      const { session, socket, result } = await sent();
+      const stored = echo(7).message;
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ticket: 't', items: [stored] })));
+      socket.onclose?.();
+      await result;
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toHaveLength(1);
+      expect(entries(session).at(-1)).toMatchObject({ serverId: 7, delivery: undefined });
+    });
+
+    it('does not mistake an old message for the one that was lost', async () => {
+      const { session, socket, result } = await sent();
+      const old = echo(3, 'hello', Date.now() - 60_000).message;
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ticket: 't', items: [old] })));
+      socket.onclose?.();
+      await result;
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toHaveLength(2);
+      expect(entries(session).at(-1)).toMatchObject({ delivery: 'failed' });
+    });
+
+    it('takes a line away on request', async () => {
+      const { session, result } = await sent();
+      await vi.advanceTimersByTimeAsync(6000);
+      session.discardChat((await result).id);
+      expect(chatIds(session)).toEqual([]);
     });
   });
 

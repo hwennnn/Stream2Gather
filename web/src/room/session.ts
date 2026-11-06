@@ -7,10 +7,22 @@ export type QueueItem = Media & { id: string; addedBy: string; addedByName: stri
 
 export type Settings = { controlMode: 'everyone' | 'hosts'; queueMode: 'everyone' | 'hosts' };
 
-export type ChatEntry =
+export type ChatLine = Omit<ChatMessage, 'id'> & {
+  kind: 'chat';
+  /** A string until proven otherwise: this viewer's own line, shown before the server has it. */
+  id: number | string;
   /** History is what was said before this viewer joined, so none of it is news. */
-  | (ChatMessage & { kind: 'chat'; history?: true })
-  | { kind: 'system'; id: string; text: string; createdAt: string };
+  history?: true;
+  /** How far this viewer's own line has got. Unset once the server has it. */
+  delivery?: 'sending' | 'failed';
+  /** The server's id for an own line. The local id stays, so unread and scrolling see one line. */
+  serverId?: number;
+};
+
+export type ChatEntry = ChatLine | { kind: 'system'; id: string; text: string; createdAt: string };
+
+/** Limited means the server refused it for speed, so the text is still worth keeping. */
+export type ChatResult = { id: string; limited: boolean };
 
 export type QueueMode = 'now' | 'next' | 'end';
 
@@ -73,10 +85,16 @@ const MAX_BACKOFF_MS = 5000;
 const REACTION_LIFE_MS = 2600;
 const NOTICE_LIFE_MS = 8000;
 const MAX_ENTRIES = 300;
-const PING_EVERY_MS = 10_000;
+const PING_EVERY_MS = 3000;
+/** Only every third ping samples the clock and compares versions, so both keep their pace. */
+const CHECK_EVERY_PINGS = 3;
 /** A dead network can take minutes to fire onclose, so silence counts as closed. */
-const MAX_UNANSWERED_PINGS = 3;
+const SILENCE_LIMIT_MS = 8000;
 const REQUEST_TIMEOUT_MS = 15_000;
+/** How long a chat line stays dimmed before it says it wasn't sent. */
+const SEND_PATIENCE_MS = 5000;
+/** The server stamps a line a moment after this viewer's estimate of the same time. */
+const STAMP_SLACK_MS = 2000;
 /** How long a requested snapshot may take before pongs may force a reconnect. */
 const RESYNC_WAIT_MS = 5000;
 const OFFLINE_COPY = 'You’re offline right now. Try again once you’re back.';
@@ -85,6 +103,35 @@ const TIMEOUT_COPY = 'That took too long. Try again.';
 
 const copyFor = (error: unknown): string =>
   error instanceof ApiError ? error.message : 'Something went wrong. Try again.';
+
+/** A refusal from the server, with the copy to show and the code to act on. */
+class Refused extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+const serverIdOf = (entry: ChatEntry) => (entry.kind === 'chat' ? (entry.serverId ?? entry.id) : entry.id);
+
+/** Settles the viewer's own waiting line with the message the server made of it. */
+const confirmOwn = (entries: ChatEntry[], message: ChatMessage): ChatEntry[] | null => {
+  const sentAt = Date.parse(message.createdAt);
+  const own = entries.find(
+    (entry) =>
+      entry.kind === 'chat' &&
+      typeof entry.id === 'string' &&
+      entry.serverId === undefined &&
+      entry.userId === message.userId &&
+      entry.body === message.body &&
+      sentAt >= Date.parse(entry.createdAt) - STAMP_SLACK_MS,
+  );
+  if (!own) return null;
+  const settled = { ...own, serverId: message.id, createdAt: message.createdAt, delivery: undefined };
+  return entries.map((entry) => (entry === own ? settled : entry));
+};
 
 /** Owns the connection to one room and everything the UI reads about it. */
 export class RoomSession {
@@ -100,7 +147,9 @@ export class RoomSession {
   private generation = 0;
   private nextId = 1;
   private pending = new Map<string, Pending>();
-  private unanswered = 0;
+  private beats = 0;
+  private lastBeat = 0;
+  private lastHeard = 0;
   private joinStartedAt = performance.now();
   private lastStatus = '';
   private behindAt: number | null = null;
@@ -187,10 +236,10 @@ export class RoomSession {
   }
 
   private startClock(): void {
-    // The opening burst tunes the clock. It is not counted, because a slow link
-    // sends all of it before the first answer can arrive.
+    // The opening burst tunes the clock.
     for (let i = 0; i < 5; i += 1) window.setTimeout(() => this.ping(), i * 120);
-    this.unanswered = 0;
+    this.lastBeat = Date.now();
+    this.lastHeard = this.lastBeat;
     this.pinger = window.setInterval(() => this.heartbeat(), PING_EVERY_MS);
   }
 
@@ -200,13 +249,18 @@ export class RoomSession {
   }
 
   private heartbeat(): void {
-    if (this.unanswered >= MAX_UNANSWERED_PINGS) {
+    const now = Date.now();
+    // A background tab's timers run late, and then the silence proves nothing.
+    if (now - this.lastBeat > PING_EVERY_MS * 2) this.lastHeard = now;
+    this.lastBeat = now;
+    if (now - this.lastHeard >= SILENCE_LIMIT_MS) {
       this.dropSocket();
       this.handleClose();
       return;
     }
-    this.unanswered += 1;
-    this.ping();
+    this.beats += 1;
+    if (this.beats % CHECK_EVERY_PINGS === 0) this.ping();
+    else this.send('ping');
   }
 
   private dropSocket(): void {
@@ -229,7 +283,7 @@ export class RoomSession {
   }
 
   /** Resolves on the server's ack. Rejects with copy the UI can show as it is. */
-  request(type: string, data?: unknown): Promise<void> {
+  request(type: string, data?: unknown, patience = REQUEST_TIMEOUT_MS): Promise<void> {
     return new Promise((resolve, reject) => {
       const id = `r${this.nextId++}`;
       if (!this.transmit({ t: type, id, d: data })) {
@@ -239,7 +293,7 @@ export class RoomSession {
       const timer = window.setTimeout(() => {
         const request = this.pending.get(id);
         if (request) this.settle(id, request, new Error(TIMEOUT_COPY));
-      }, REQUEST_TIMEOUT_MS);
+      }, patience);
       this.pending.set(id, { resolve, reject, timer });
     });
   }
@@ -279,6 +333,7 @@ export class RoomSession {
   }
 
   private receive(raw: string): void {
+    this.lastHeard = Date.now();
     const { t, d } = JSON.parse(raw) as { t: string; d: never };
     switch (t) {
       case 'welcome':
@@ -323,9 +378,9 @@ export class RoomSession {
     if (request) this.settle(data.id, request);
   }
 
-  private failed(data: { re?: string; message: string }): void {
+  private failed(data: { re?: string; code?: string; message: string }): void {
     const request = data.re ? this.pending.get(data.re) : undefined;
-    if (request && data.re) this.settle(data.re, request, new Error(data.message));
+    if (request && data.re) this.settle(data.re, request, new Refused(data.message, data.code));
     else this.notice({ text: data.message });
   }
 
@@ -372,19 +427,21 @@ export class RoomSession {
     // What comes in on a reconnect was said while this viewer was in the room.
     const history = this.historyLoaded ? {} : { history: true as const };
     this.historyLoaded = true;
-    const known = new Set(this.view.messages.map((entry) => entry.id));
+    // A line that seemed lost may have reached the server after all.
+    const lines = items.reduce((entries, message) => confirmOwn(entries, message) ?? entries, this.view.messages);
+    const known = new Set(lines.map(serverIdOf));
     const missing = items
       .filter((message) => !known.has(message.id))
       .map((message): ChatEntry => ({ ...message, kind: 'chat', ...history }));
-    if (missing.length === 0) return;
-    const merged = [...missing, ...this.view.messages].sort(
+    if (missing.length === 0 && lines === this.view.messages) return;
+    const merged = [...missing, ...lines].sort(
       (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
     );
     this.update({ messages: merged.slice(-MAX_ENTRIES) });
   }
 
   private pong(data: { t0: number; ts: number; version?: number }): void {
-    this.unanswered = 0;
+    if (data.t0 === 0) return; // A ping that only asked whether anyone is there.
     this.clock.addSample(data.t0, data.ts, Date.now());
     if (this.view.connection !== 'live' || data.version === undefined) return;
     if (this.resyncAt !== null && Date.now() - this.resyncAt < RESYNC_WAIT_MS) return;
@@ -483,8 +540,53 @@ export class RoomSession {
   }
 
   private chat(data: { message: ChatMessage }): void {
-    if (this.view.messages.some((entry) => entry.id === data.message.id)) return;
-    this.append({ ...data.message, kind: 'chat' });
+    if (this.view.messages.some((entry) => serverIdOf(entry) === data.message.id)) return;
+    const confirmed = confirmOwn(this.view.messages, data.message);
+    if (confirmed) this.update({ messages: confirmed });
+    else this.append({ ...data.message, kind: 'chat' });
+  }
+
+  /** Shows the line now, and settles it when the server answers. */
+  async sendChat(body: string): Promise<ChatResult> {
+    const id = `c${this.nextId++}`;
+    const { userId = '', name: author = '' } = this.view.self ?? {};
+    const createdAt = new Date(this.clock.now()).toISOString();
+    this.append({ kind: 'chat', id, userId, author, body, createdAt, delivery: 'sending' });
+    return { id, limited: await this.deliver(id, body) };
+  }
+
+  /** Sends a failed line again, from the end of the chat, where it will now land. */
+  retryChat(id: string): void {
+    const line = this.view.messages.find((entry) => entry.id === id);
+    if (line?.kind !== 'chat') return;
+    const createdAt = new Date(this.clock.now()).toISOString();
+    this.update({
+      messages: [...this.view.messages.filter((entry) => entry !== line), { ...line, createdAt, delivery: 'sending' }],
+    });
+    void this.deliver(id, line.body);
+  }
+
+  discardChat(id: string): void {
+    this.update({ messages: this.view.messages.filter((entry) => entry.id !== id) });
+  }
+
+  /** True when the server refused the line for speed. */
+  private async deliver(id: string, body: string): Promise<boolean> {
+    try {
+      await this.request('chat.send', { text: body }, SEND_PATIENCE_MS);
+      this.markLine(id, undefined);
+      return false;
+    } catch (error) {
+      this.markLine(id, 'failed');
+      return error instanceof Refused && error.code === 'rate_limited';
+    }
+  }
+
+  /** The echo can beat the answer, and a settled line stays settled. */
+  private markLine(id: string, delivery: ChatLine['delivery']): void {
+    const line = this.view.messages.find((entry) => entry.id === id);
+    if (line?.kind !== 'chat' || line.serverId !== undefined) return;
+    this.update({ messages: this.view.messages.map((entry) => (entry === line ? { ...line, delivery } : entry)) });
   }
 
   private reaction(data: { emoji: string; name: string }): void {

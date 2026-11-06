@@ -42,6 +42,11 @@ const (
 	hostGrace = 30 * time.Second
 	// An empty room keeps running briefly, so a reload resumes seamlessly.
 	emptyGraceMS = 60_000
+	// sessionCheckEvery bounds how long a signed-out socket stays open.
+	sessionCheckEvery = 10 * time.Second
+	// statusSignedOut closes a socket whose session has ended. Reconnecting then
+	// finds out who the cookie is now, if anyone.
+	statusSignedOut = websocket.StatusCode(4401)
 	// MaxSocketsPerUser is per person, per room, across every server.
 	MaxSocketsPerUser = 10
 	// How many distinct people must report an embed block before it is believed.
@@ -59,19 +64,23 @@ type Hub struct {
 	recorder Recorder
 
 	// Timings are fields so tests need not wait them out.
-	idleTimeout time.Duration
-	hostGrace   time.Duration
-	touchEvery  time.Duration
-	snapshots   time.Duration
-	keepAlive   time.Duration
+	idleTimeout  time.Duration
+	hostGrace    time.Duration
+	touchEvery   time.Duration
+	snapshots    time.Duration
+	keepAlive    time.Duration
+	sessionCheck time.Duration
 
 	// mu is held across Redis subscribes, which keeps them in order. Delivery
 	// must never wait for that, so it reads active instead of rooms.
-	mu      sync.Mutex
-	rooms   map[string]*liveRoom
-	active  sync.Map // room id to *liveRoom
-	closing bool
-	serving sync.WaitGroup
+	mu     sync.Mutex
+	rooms  map[string]*liveRoom
+	active sync.Map // room id to *liveRoom
+	// accounts holds every signed-in *conn. It sits apart from the rooms so that
+	// checking them needs nothing from a room's goroutine.
+	accounts sync.Map
+	closing  bool
+	serving  sync.WaitGroup
 }
 
 // New returns a hub. Call Run to start delivering events.
@@ -83,11 +92,12 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 		log:     log,
 		pubsub:  rdb.Subscribe(context.Background()),
 
-		idleTimeout: idleTimeout,
-		hostGrace:   hostGrace,
-		touchEvery:  touchEvery,
-		snapshots:   snapshotEvery,
-		keepAlive:   keepAliveEvery,
+		idleTimeout:  idleTimeout,
+		hostGrace:    hostGrace,
+		touchEvery:   touchEvery,
+		snapshots:    snapshotEvery,
+		keepAlive:    keepAliveEvery,
+		sessionCheck: sessionCheckEvery,
 
 		rooms: make(map[string]*liveRoom),
 	}
@@ -99,6 +109,7 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 // carries every room on this server, so nothing here may ever wait for a room.
 func (h *Hub) Run(ctx context.Context) {
 	go h.recorder.Run(ctx)
+	go h.watchSessions(ctx)
 	messages := h.pubsub.ChannelWithSubscriptions(redis.WithChannelSize(eventBuffer))
 	for {
 		select {
@@ -121,6 +132,49 @@ func (h *Hub) Run(ctx context.Context) {
 					r.requestResync()
 				}
 			}
+		}
+	}
+}
+
+// watchSessions ends sockets whose session has been signed out. The check is on a
+// timer rather than an event so that it cannot be missed, whatever was down at
+// the moment of sign-out, and one query covers every signed-in viewer here.
+func (h *Hub) watchSessions(ctx context.Context) {
+	ticker := time.NewTicker(h.sessionCheck)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			h.endSignedOut(ctx)
+		}
+	}
+}
+
+func (h *Hub) endSignedOut(ctx context.Context) {
+	var conns []*conn
+	var ids []string
+	h.accounts.Range(func(key, _ any) bool {
+		c := key.(*conn)
+		conns = append(conns, c)
+		ids = append(ids, c.who().UserID)
+		return true
+	})
+	if len(ids) == 0 {
+		return
+	}
+	ctx, cancel := context.WithTimeout(ctx, opTimeout)
+	defer cancel()
+	versions, err := h.db.SessionVersions(ctx, ids)
+	if err != nil {
+		// Not knowing is no reason to drop a party. The next check will tell.
+		h.log.Warn("session check failed", "error", err)
+		return
+	}
+	for _, c := range conns {
+		if version, found := versions[c.who().UserID]; !found || version != c.version {
+			c.shut(statusSignedOut, "signed out")
 		}
 	}
 }
@@ -293,6 +347,8 @@ const causeSync = "sync"
 type conn struct {
 	id      string
 	address string
+	// version is the session version of a signed-in person.
+	version int64
 	out     chan []byte
 	closed  chan struct{}
 	once    sync.Once

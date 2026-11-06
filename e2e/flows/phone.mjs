@@ -84,6 +84,12 @@ flow('phone: queue rows open a tray with every action', async (t) => {
   await startRoom(t, a, { url: golden.url });
   await addByMessage(t, a.page, [train.url, rain.url]);
   await openTab(a.page, 'Queue');
+  const onTop = await a.page.locator('.row-grip').first().evaluate((el) => {
+    const box = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+  });
+  t.check('a thumb on the grip gets the grip, not the row', onTop);
+  await openTab(a.page, 'Queue');
   const row = ui.upNext(a.page).getByRole('listitem').filter({ hasText: rain.title });
   await row.getByRole('button', { name: `More for ${rain.title}` }).tap();
   await t.see('the tray', row.getByRole('button', { name: 'Remove', exact: true }));

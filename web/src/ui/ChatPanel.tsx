@@ -168,7 +168,7 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
           role="log"
           aria-label="Chat messages"
           tabIndex={0}
-          className="rail-scroll flex h-full flex-col py-3 outline-offset-[-2px]"
+          className="rail-scroll flex h-full flex-col py-3 outline-offset-[-2px] short:py-1.5"
         >
           {spoilers > 0 && !revealed && (
             <p className="mb-3 text-sm text-muted">
@@ -196,7 +196,7 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
 
       {toasts}
 
-      <form onSubmit={(event) => void submit(event)} className="rail-edge relative border-t border-line py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <form onSubmit={(event) => void submit(event)} className="rail-edge relative border-t border-line py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] short:pt-2 short:pb-[max(0.5rem,env(safe-area-inset-bottom))]">
         <label htmlFor="chat" className="sr-only">
           Message
         </label>

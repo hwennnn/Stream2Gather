@@ -23,7 +23,9 @@ type Claims struct {
 	Name    string `json:"name"`
 	Avatar  string `json:"avatar,omitempty"`
 	// Account is true once the person has signed in, rather than being a guest.
-	Account bool  `json:"acct,omitempty"`
+	Account bool `json:"acct,omitempty"`
+	// Version is the session version the account had when this was issued.
+	Version int64 `json:"ver,omitempty"`
 	Expires int64 `json:"exp"`
 }
 

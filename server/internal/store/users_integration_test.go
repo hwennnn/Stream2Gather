@@ -28,26 +28,62 @@ func testPostgres(t *testing.T) *Postgres {
 	return NewPostgres(pool)
 }
 
-func TestGuestKeepsTheirIdentityOnFirstSignIn(t *testing.T) {
+func TestFirstSignInMakesANewUserAndMovesTheGuestsRooms(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
-	guest, clerkID := "g_"+ids.New(), "user_"+ids.New()
+	guest, clerkID, newID := "g_"+ids.New(), "user_"+ids.New(), "u_"+ids.New()
 	if err := db.EnsureUser(ctx, guest, "Amber panda"); err != nil {
 		t.Fatal(err)
 	}
+	slug := ids.New()
+	if err := db.CreateRoom(ctx, Room{ID: ids.New(), Slug: slug, Name: "Movie night", OwnerID: guest}); err != nil {
+		t.Fatal(err)
+	}
 
-	id, name, err := db.LinkClerkUser(ctx, clerkID, guest, "u_"+ids.New(), "Ada", "")
+	account, err := db.LinkClerkUser(ctx, clerkID, guest, newID, "Ada", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != guest || name != "Ada" {
-		t.Fatalf("got %q %q, want the guest id and the account name", id, name)
+	if account.ID != newID || account.Name != "Ada" {
+		t.Fatalf("got %+v, want a new user: the old guest cookie must not become the account", account)
+	}
+	record, err := db.RoomBySlug(ctx, slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.OwnerID != newID {
+		t.Fatalf("room owner is %q, want %q", record.OwnerID, newID)
+	}
+}
+
+func TestSignOutBumpsTheSessionVersion(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	clerkID := "user_" + ids.New()
+	account, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if account.SessionVersion != 0 {
+		t.Fatalf("new account at version %d", account.SessionVersion)
+	}
+	if err := db.BumpSessionVersion(ctx, account.ID); err != nil {
+		t.Fatal(err)
+	}
+	if version, err := db.SessionVersion(ctx, account.ID); err != nil || version != 1 {
+		t.Fatalf("version = %d, err = %v", version, err)
+	}
+	again, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
+	if err != nil || again.SessionVersion != 1 {
+		t.Fatalf("signing in again: %+v, err = %v", again, err)
+	}
+	if _, err := db.SessionVersion(ctx, "u_"+ids.New()); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown user: err = %v", err)
 	}
 }
 
 func TestExistingAccountTakesOverTheGuestsRooms(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
 	clerkID := "user_" + ids.New()
-	owner, _, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
+	owner, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,45 +97,45 @@ func TestExistingAccountTakesOverTheGuestsRooms(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	id, _, err := db.LinkClerkUser(ctx, clerkID, guest, "u_"+ids.New(), "Ada", "")
+	account, err := db.LinkClerkUser(ctx, clerkID, guest, "u_"+ids.New(), "Ada", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if id != owner {
-		t.Fatalf("signed in as %q, want %q", id, owner)
+	if account.ID != owner.ID {
+		t.Fatalf("signed in as %q, want %q", account.ID, owner.ID)
 	}
 	record, err := db.RoomBySlug(ctx, slug)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record.OwnerID != owner {
-		t.Fatalf("room owner is %q, want %q", record.OwnerID, owner)
+	if record.OwnerID != owner.ID {
+		t.Fatalf("room owner is %q, want %q", record.OwnerID, owner.ID)
 	}
 }
 
 func TestAnotherAccountCannotTakeRoomsFromASignedInUser(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
-	first, _, err := db.LinkClerkUser(ctx, "user_"+ids.New(), "", "u_"+ids.New(), "Ada", "")
+	first, err := db.LinkClerkUser(ctx, "user_"+ids.New(), "", "u_"+ids.New(), "Ada", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	slug := ids.New()
-	if err := db.CreateRoom(ctx, Room{ID: ids.New(), Slug: slug, Name: "Movie night", OwnerID: first}); err != nil {
+	if err := db.CreateRoom(ctx, Room{ID: ids.New(), Slug: slug, Name: "Movie night", OwnerID: first.ID}); err != nil {
 		t.Fatal(err)
 	}
 
 	second := "user_" + ids.New()
-	if _, _, err := db.LinkClerkUser(ctx, second, "", "u_"+ids.New(), "Grace", ""); err != nil {
+	if _, err := db.LinkClerkUser(ctx, second, "", "u_"+ids.New(), "Grace", ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := db.LinkClerkUser(ctx, second, first, "u_"+ids.New(), "Grace", ""); err != nil {
+	if _, err := db.LinkClerkUser(ctx, second, first.ID, "u_"+ids.New(), "Grace", ""); err != nil {
 		t.Fatal(err)
 	}
 	record, err := db.RoomBySlug(ctx, slug)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if record.OwnerID != first {
+	if record.OwnerID != first.ID {
 		t.Fatalf("room moved to %q", record.OwnerID)
 	}
 }
@@ -107,15 +143,15 @@ func TestAnotherAccountCannotTakeRoomsFromASignedInUser(t *testing.T) {
 func TestDisplayNameSurvivesSigningInAgain(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
 	clerkID := "user_" + ids.New()
-	id, _, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
+	account, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.EnsureUser(ctx, id, "Countess"); err != nil {
+	if err := db.EnsureUser(ctx, account.ID, "Countess"); err != nil {
 		t.Fatal(err)
 	}
-	if _, name, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", ""); err != nil || name != "Countess" {
-		t.Fatalf("name = %q, err = %v", name, err)
+	if again, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", ""); err != nil || again.Name != "Countess" {
+		t.Fatalf("name = %q, err = %v", again.Name, err)
 	}
 }
 
@@ -126,11 +162,11 @@ func TestConcurrentFirstSignInsMakeOneUser(t *testing.T) {
 	var wait sync.WaitGroup
 	for i := range found {
 		wait.Go(func() {
-			id, _, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
+			account, err := db.LinkClerkUser(ctx, clerkID, "", "u_"+ids.New(), "Ada", "")
 			if err != nil {
 				t.Error(err)
 			}
-			found[i] = id
+			found[i] = account.ID
 		})
 	}
 	wait.Wait()

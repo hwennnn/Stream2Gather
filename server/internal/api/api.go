@@ -331,6 +331,9 @@ func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
 	}
 
 	current, _ := s.session(r)
+	if current.Account {
+		current = auth.Claims{} // Only a guest hands anything over to an account.
+	}
 	name := identity.Name
 	if name == "" {
 		name = current.Name
@@ -338,12 +341,14 @@ func (s *Server) clerkSession(w http.ResponseWriter, r *http.Request) {
 	if name == "" {
 		name = ids.GuestName()
 	}
-	id, name, err := s.DB.LinkClerkUser(r.Context(), identity.ClerkID, current.Subject, "u_"+ids.New(), name, identity.AvatarURL)
+	account, err := s.DB.LinkClerkUser(r.Context(), identity.ClerkID, current.Subject, "u_"+ids.New(), name, identity.AvatarURL)
 	if err != nil {
 		s.internal(w, err)
 		return
 	}
-	claims, err := s.setSession(w, auth.Claims{Subject: id, Name: name, Avatar: identity.AvatarURL, Account: true})
+	claims, err := s.setSession(w, auth.Claims{
+		Subject: account.ID, Name: account.Name, Avatar: identity.AvatarURL, Account: true, Version: account.SessionVersion,
+	})
 	if err != nil {
 		s.internal(w, err)
 		return

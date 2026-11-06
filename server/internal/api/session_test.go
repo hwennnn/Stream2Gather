@@ -21,14 +21,23 @@ import (
 type fakeClerk struct{ identity auth.Identity }
 
 func (f fakeClerk) Verify(_ context.Context, token string) (auth.Identity, error) {
-	if token != "good" {
-		return auth.Identity{}, auth.ErrInvalidToken
+	switch token {
+	case "good":
+		return f.identity, nil
+	case "other":
+		return auth.Identity{ClerkID: f.identity.ClerkID + "_other", Name: "Grace"}, nil
 	}
-	return f.identity, nil
+	return auth.Identity{}, auth.ErrInvalidToken
 }
 
 // This test needs the stack from deploy/compose.yaml and skips without it.
 func sessionServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	test, _ := sessionStack(t)
+	return test
+}
+
+func sessionStack(t *testing.T) (*httptest.Server, *Server) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -54,7 +63,7 @@ func sessionServer(t *testing.T) *httptest.Server {
 	}
 	test := httptest.NewServer(server.Handler())
 	t.Cleanup(test.Close)
-	return test
+	return test, server
 }
 
 func call(t *testing.T, method, url, token string, cookies []*http.Cookie) (*http.Response, map[string]any) {
@@ -109,6 +118,89 @@ func TestClerkSessionSignsInAndOut(t *testing.T) {
 	response, _ = call(t, http.MethodDelete, test.URL+"/v1/session", "", cookies)
 	if cleared := response.Cookies(); len(cleared) != 1 || cleared[0].MaxAge >= 0 {
 		t.Fatalf("cookie not cleared: %v", cleared)
+	}
+}
+
+func meOf(t *testing.T, test *httptest.Server, cookies []*http.Cookie) map[string]any {
+	t.Helper()
+	_, body := call(t, http.MethodGet, test.URL+"/v1/me", "", cookies)
+	user, _ := body["user"].(map[string]any)
+	return user
+}
+
+func ticketFor(t *testing.T, test *httptest.Server, server *Server, slug string, cookies []*http.Cookie) store.Person {
+	t.Helper()
+	response, body := call(t, http.MethodPost, test.URL+"/v1/rooms/"+slug+"/ticket", "", cookies)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("ticket: %d %v", response.StatusCode, body)
+	}
+	id, _ := body["ticket"].(string)
+	ticket, found, err := server.Live.TakeTicket(context.Background(), id)
+	if err != nil || !found {
+		t.Fatalf("ticket %q: found %v, err %v", id, found, err)
+	}
+	return ticket.Person
+}
+
+func signInAs(t *testing.T, test *httptest.Server, token string, cookies []*http.Cookie) []*http.Cookie {
+	t.Helper()
+	response, body := call(t, http.MethodPost, test.URL+"/v1/session/clerk", token, cookies)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("sign-in: %d %v", response.StatusCode, body)
+	}
+	return response.Cookies()
+}
+
+func TestAnOldGuestCookieIsNeverTheAccount(t *testing.T) {
+	test, server := sessionStack(t)
+	response, body := call(t, http.MethodPost, test.URL+"/v1/rooms", "", nil)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("create: %d %v", response.StatusCode, body)
+	}
+	slug, _ := body["slug"].(string)
+	guestCookie := response.Cookies()
+	guest := meOf(t, test, guestCookie)
+
+	account := signInAs(t, test, "good", guestCookie)
+
+	user := meOf(t, test, account)
+	if user["id"] == guest["id"] || !strings.HasPrefix(user["id"].(string), "u_") {
+		t.Fatalf("account %v, guest %v", user, guest)
+	}
+	// The room came along, and the new socket shows the account's name and picture.
+	person := ticketFor(t, test, server, slug, account)
+	if person.Role != "host" || person.Name != "Ada" || person.AvatarURL != "https://img.clerk.com/a" || person.UserID != user["id"] {
+		t.Fatalf("account in its room = %+v", person)
+	}
+
+	if old := meOf(t, test, guestCookie); old["id"] != guest["id"] || old["signedIn"] != false {
+		t.Fatalf("old guest cookie = %v", old)
+	}
+	if person := ticketFor(t, test, server, slug, guestCookie); person.Role != "member" || person.UserID == user["id"] {
+		t.Fatalf("old guest cookie in the room = %+v", person)
+	}
+}
+
+func TestSigningInOverAnAccountMovesNothing(t *testing.T) {
+	test, server := sessionStack(t)
+	ada := signInAs(t, test, "good", nil)
+	response, body := call(t, http.MethodPost, test.URL+"/v1/rooms", "", ada)
+	if response.StatusCode != http.StatusCreated {
+		t.Fatalf("create: %d %v", response.StatusCode, body)
+	}
+	slug, _ := body["slug"].(string)
+
+	grace := signInAs(t, test, "other", ada)
+
+	record, err := server.DB.RoomBySlug(context.Background(), slug)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if record.OwnerID != meOf(t, test, ada)["id"] {
+		t.Fatalf("room moved to %q", record.OwnerID)
+	}
+	if user := meOf(t, test, grace); user["name"] != "Grace" || user["id"] == record.OwnerID {
+		t.Fatalf("second account = %v", user)
 	}
 }
 

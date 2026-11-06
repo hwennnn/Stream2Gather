@@ -43,7 +43,7 @@ flow('host lock: a guest loses the controls but keeps the chat', async (t) => {
   await openTab(host.page, 'Chat');
   await t.see('chat works', ui.chatLog(host.page).getByText('can still talk'));
   await react(guest.page, '🔥');
-  await t.see('reactions work', ui.rail(host.page).getByText('🔥'));
+  await t.see('reactions work', ui.seats(host.page).getByText('🔥'));
 });
 
 flow('host lock: a guest pausing or seeking is put back, with a reason', async (t) => {

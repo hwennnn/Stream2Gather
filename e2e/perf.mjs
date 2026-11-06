@@ -163,7 +163,7 @@ const measureRoom = async (host, peer, bots) => {
 
   await windowed(page, 'add_queue', async () => ({
     feedbackMs: await feedback(page, () => /Adding|Added|Already/.test(document.querySelector('[aria-label="Search results"]').textContent), () =>
-      rows.nth(5).hover().then(() => rows.nth(5).getByRole('button', { name: /^Queue:/ }).click()),
+      rows.nth(5).hover().then(() => rows.nth(5).getByRole('button', { name: /^(Add|Queue):/ }).click()),
     ),
   }));
 
@@ -189,7 +189,7 @@ const measureRoom = async (host, peer, bots) => {
     const times = [];
     for (let n = 0; n < 4; n += 1) {
       times.push(
-        await feedback(page, () => document.querySelector('.reaction') !== null, () => page.getByRole('button', { name: 'React 🔥' }).click()),
+        await feedback(page, () => document.querySelector('.reaction, .seat-said') !== null, () => page.getByRole('button', { name: 'React 🔥' }).click()),
       );
       await sleep(3300);
     }

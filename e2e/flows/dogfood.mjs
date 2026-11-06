@@ -48,6 +48,7 @@ flow('dogfood: a full empty room in a short window keeps every seat apart, under
   const bots = await crowd(t, room.slug, 9);
   const faces = seatRow(a.page).locator('.seat-disc, .seat-empty, .seat-more');
   await t.until('the row fills', async () => (await faces.count()) >= 9, 8000);
+  await t.sleep(1000); // Sitting down squashes a seat for a moment, and this is about how they rest.
   const screen = await box(a.page.locator('.stage'));
   const spans = await faces.evaluateAll((list) => list.map((face) => {
     const { left, right, width, height } = face.getBoundingClientRect();
@@ -77,7 +78,7 @@ const stagePaint = (page) => page.evaluate(() => {
   return colour;
 });
 
-flow('dogfood: theatre takes the height, on black, with reactions still rising', async (t) => {
+flow('dogfood: theatre takes the height, on black, with reactions still landing', async (t) => {
   const { a, b } = await watching(t, golden.url);
   const before = await box(a.page.locator('[data-player]'));
   await a.page.getByRole('button', { name: 'Theatre' }).click();
@@ -93,22 +94,22 @@ flow('dogfood: theatre takes the height, on black, with reactions still rising',
   t.eq('left of the video is the stage colour', await paintAt(a.page, after.left / 2, middle), black);
   t.eq('so is the right', await paintAt(a.page, (after.right + LAPTOP.width) / 2, middle), black);
   await react(b.page, '🔥');
-  const rising = a.page.locator('.reaction').filter({ visible: true });
-  await t.see('a reaction rising', rising);
+  const said = a.page.locator('.seat-said').filter({ visible: true });
+  const mark = a.page.locator('.wake-mark > span').filter({ visible: true });
+  await t.see('a reaction on the seat', said);
+  await t.see('and on the track', mark);
   let [crossed, seen] = [0, 0];
   const deadline = Date.now() + 2800;
   while (Date.now() < deadline) {
-    const boxes = await rising.evaluateAll((nodes) => nodes.flatMap((node) => [node, ...node.children]).map((node) => {
+    const boxes = await said.or(mark).evaluateAll((nodes) => nodes.map((node) => {
       const { left, right, top, bottom } = node.getBoundingClientRect();
       return { left, right, top, bottom };
     }));
     seen += boxes.length > 0 ? 1 : 0;
-    // The lane clips what it holds, so only what's left of the clip can reach the video.
-    const lane = await a.page.locator('.reaction-lane').filter({ visible: true }).first().evaluate((node) => node.getBoundingClientRect().left).catch(() => Infinity);
-    crossed += boxes.filter((one) => Math.max(one.left, lane) < after.right && one.right > after.left && one.top < after.bottom && one.bottom > after.top).length;
+    crossed += boxes.filter((one) => one.left < after.right && one.right > after.left && one.top < after.bottom && one.bottom > after.top).length;
     await t.sleep(100);
   }
-  t.check('it stayed on screen for its rise', seen >= 10, `seen in ${seen} samples`);
+  t.check('it stayed on screen for its moment', seen >= 10, `seen in ${seen} samples`);
   t.eq('it never touched the video', crossed, 0);
   const cover = await playerCover(a.page);
   t.check('nothing covers the player', cover?.hits.length === 0, JSON.stringify(cover));

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { RoomView } from '../room/session';
-import { placeDots, playheadOffset } from './playheads';
+import { isApart, placeDots, playheadOffset } from './playheads';
 
 const view = (patch: Partial<RoomView>) =>
   ({ playback: { status: 'playing', rate: 1 }, viewerDrift: {}, viewerStates: {}, ...patch }) as unknown as RoomView;
@@ -23,6 +23,18 @@ describe('playheadOffset', () => {
   it('has everyone together while the room is paused', () => {
     const paused = view({ playback: { status: 'paused', rate: 1 } as RoomView['playback'], viewerDrift: { a: { drift: -9, at: 0 } } });
     expect(playheadOffset(paused, 'a', 9000)).toBe(0);
+  });
+});
+
+describe('isApart', () => {
+  it('leaves a report’s ordinary wobble with the room', () => {
+    expect(isApart(0)).toBe(false);
+    expect(isApart(-0.6)).toBe(false);
+  });
+
+  it('peels off anyone a second or more away, either side', () => {
+    expect(isApart(-1)).toBe(true);
+    expect(isApart(4)).toBe(true);
   });
 });
 

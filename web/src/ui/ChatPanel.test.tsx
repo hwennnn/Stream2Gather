@@ -101,6 +101,54 @@ describe('ChatPanel system lines', () => {
   });
 });
 
+describe('ChatPanel comings and goings', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  const came = (id: string, name: string): ChatEntry => ({ kind: 'system', id, text: `${name} joined`, arrived: id, createdAt: '2026-11-06T00:00:00Z' });
+  const went = (id: string, name: string): ChatEntry => ({ kind: 'system', id, text: `${name} left`, createdAt: '2026-11-06T00:00:00Z' });
+  const log = () => screen.getByRole('log').textContent;
+
+  it('says one person sat down', () => {
+    setup([came('a', 'Maya Patel')]);
+    expect(log()).toContain('Maya took a seat');
+  });
+
+  it('puts a whole group on one line, however many came', () => {
+    setup([came('a', 'Maya'), came('b', 'Sam')]);
+    expect(log()).toContain('Maya and Sam took seats');
+    cleanup();
+    setup([came('a', 'Maya'), came('b', 'Sam'), came('c', 'Priya')]);
+    expect(log()).toContain('Maya, Sam and Priya took seats');
+    cleanup();
+    setup(['Maya', 'Sam', 'Priya', 'Noor', 'Ravi'].map((name) => came(name, name)));
+    expect(log()).toContain('Maya, Sam and 3 others took seats');
+  });
+
+  it('keeps people who came either side of something said apart', () => {
+    setup([came('a', 'Maya'), line({ id: 'x', userId: 'hana', body: 'hello' }), came('b', 'Sam')]);
+    expect(log()).toContain('Maya took a seat');
+    expect(log()).toContain('Sam took a seat');
+  });
+
+  it('puts everyone who left together on one line', () => {
+    setup([went('a', 'Maya Patel'), went('b', 'Sam')]);
+    expect(log()).toContain('Maya and Sam left');
+  });
+
+  it('leaves the host’s handover as it was', () => {
+    setup([{ kind: 'system', id: 'h', text: 'Maya left, so Sam is the host now.', createdAt: '2026-11-06T00:00:00Z' }]);
+    expect(log()).toContain('Maya left, so Sam is the host now.');
+  });
+});
+
 describe('ChatPanel invitations', () => {
   beforeEach(() => {
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));

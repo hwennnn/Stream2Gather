@@ -9,9 +9,14 @@ export const ui = {
   join: (page) => page.getByRole('button', { name: 'Take your seat', exact: true }),
   rail: (page) => page.getByRole('complementary', { name: 'Room' }),
   tab: (page, name) => page.getByRole('tab', { name: new RegExp(`^${name}`) }),
+  /** The row of people, wherever it is at this size. */
+  seats: (page) => page.getByRole('list', { name: 'In the room' }).filter({ visible: true }).first(),
+  seat: (page, name) => ui.seats(page).getByRole('listitem').filter({ hasText: name }),
   invite: (page) => page.getByRole('button', { name: 'Invite', exact: true }).filter({ visible: true }).first(),
   chatBox: (page) => page.getByRole('textbox', { name: 'Message' }),
   chatLog: (page) => page.getByRole('log', { name: 'Chat messages' }),
+  /** The line saying someone sat down. A group shares one, so this finds it by the first name in it. */
+  arrival: (page, name) => page.getByRole('log', { name: 'Chat messages' }).getByText(/took (a seat|seats)$/).filter({ hasText: name.split(' ')[0] }),
   addBox: (page) => page.getByRole('textbox', { name: 'Add a video' }).first(),
   results: (page) => page.getByRole('region', { name: 'Search results' }),
   upNext: (page) => page.getByRole('region', { name: 'Up next', exact: true }),

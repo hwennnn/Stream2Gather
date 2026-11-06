@@ -1,24 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RoomView } from '../room/session';
 import { expectedPosition } from '../sync/controller';
-import { hueOf } from './people';
+import { firstName, hueOf } from './people';
 import { actFor, laggingFriend, statusFor, type Act, type Part } from './status';
 import { useSyncReport, type RoomPlayer } from './useRoomPlayer';
 
 const ACT_MS = 4000;
+
+/** One sentence for everyone who sat down while the last one was still news. */
+const seated = ([first = '', second, ...rest]: string[]): Act => {
+  if (!second) return { by: first, text: 'took a seat' };
+  return { by: first, text: rest.length === 0 ? `and ${firstName(second)} took seats` : `and ${rest.length + 1} others took seats` };
+};
 
 /** The latest thing someone did, for as long as it's news. */
 export const useLatestAct = (view: RoomView): Act | null => {
   const [act, setAct] = useState<Act | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const seen = useRef<Map<string, string> | null>(null);
+  const arrivals = useRef<string[]>([]);
   const position = useRef(view.playback.pos);
   position.current = view.playback.pos;
+  const showing = useRef(view.playback.item);
+  const action = useRef(view.lastAction);
 
   const say = (next: Act) => {
     window.clearTimeout(timer.current);
     setAct(next);
-    timer.current = window.setTimeout(() => setAct(null), ACT_MS);
+    timer.current = window.setTimeout(() => {
+      arrivals.current = [];
+      setAct(null);
+    }, ACT_MS);
   };
 
   useEffect(() => {
@@ -26,12 +38,28 @@ export const useLatestAct = (view: RoomView): Act | null => {
     if (next) say(next);
   }, [view.lastAction]);
 
+  // Whose pick this is, when it's someone else's and nobody just skipped to it.
+  useEffect(() => {
+    const skipped = view.lastAction !== action.current && view.lastAction?.cause === 'skip';
+    action.current = view.lastAction;
+    if (view.playback.item === showing.current) return;
+    showing.current = view.playback.item;
+    const item = view.queue[0];
+    if (item?.id === view.playback.item && !skipped && item.addedByName && item.addedBy !== view.self?.userId) say({ by: item.addedByName, text: 'picked this' });
+    // Reads what the room is showing at the moment the video changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.playback.item, view.lastAction]);
+
   useEffect(() => {
     const before = seen.current;
     const now = new Map(view.members.map((person) => [person.userId, person.name]));
     seen.current = now;
     if (!before) return;
-    for (const [id, name] of now) if (!before.has(id)) say({ by: name, text: 'took a seat' });
+    const came = [...now].filter(([id]) => !before.has(id)).map(([, name]) => name);
+    if (came.length > 0) {
+      arrivals.current = [...arrivals.current, ...came];
+      say(seated(arrivals.current));
+    }
     for (const [id, name] of before) if (!now.has(id)) say({ by: name, text: 'stepped out' });
   }, [view.members]);
 
@@ -99,7 +127,7 @@ export const RoomStatus = ({ view, player, act, offlineFor, onRetry, compact = f
   const { state, parts, tail, tone, retry } = statusFor({ view, health, failed, act, position, started: player.started, slow, gap, friendGap, offlineFor, refused: player.refused, live: view.queue[0]?.isLive });
   return (
     <p data-room-status={state} role={state === 'offline' ? 'status' : undefined} className={`flex min-w-0 items-center gap-2 text-[13px] leading-5 ${tone === 'warn' ? 'text-warn' : 'text-muted'} ${className}`}>
-      <span className="truncate">
+      <span key={state} className="enter truncate">
         {parts.map((part, index) => (
           <Piece key={index} part={part} />
         ))}

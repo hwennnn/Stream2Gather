@@ -91,7 +91,7 @@ const pausedLine = (view: RoomView, time: Part): Status => {
   if (!pausedBy) return { state: 'paused', parts: ['Paused when everyone left'], tone: 'plain' };
   const here = view.members.find(({ userId, name }) => (pausedById ? userId === pausedById : name === pausedBy));
   if (!here) return { state: 'paused', parts: ['Paused at ', time], tone: 'plain' };
-  return { state: 'paused', parts: ['Paused by ', person(view, here.name, false), ' at ', time], tone: 'plain' };
+  return { state: 'paused', parts: ['Paused by ', person(view, here.name, false), ' at ', time], tail: view.alone ? undefined : ', everyone’s waiting', tone: 'plain' };
 };
 
 /** The one description of what the room is doing. Names a person whenever one did it. */

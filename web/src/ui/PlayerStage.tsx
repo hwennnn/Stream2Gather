@@ -1,11 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import type { Media } from '../api/http';
 import type { PlayerError } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { Icon } from './Icon';
 import { AddBox, SearchResults, useSearch } from './Omnibox';
-import { listNames, firstName } from './people';
-import { ReactionBar, ReactionTicker } from './Reactions';
+import { plural } from './format';
+import { listNames, firstName, hueOf } from './people';
+import { ReactionBar } from './Reactions';
 import { DrivingChip } from './RoomHeader';
 import { RoomStatus } from './RoomStatus';
 import { canControl, canQueue, failureNote, isLocked, isOffline } from './rules';
@@ -17,9 +18,12 @@ import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { UpNext } from './UpNext';
 import { useAdder, type Adder } from './useAdder';
+import type { Beat } from './useBeat';
+import { NO_FRONT_ROW, useMediaQuery } from './useMediaQuery';
 import type { RoomPlayer } from './useRoomPlayer';
 import type { Act } from './status';
 import { useTrending, notInRoom } from './useTrending';
+import { Whisper } from './Whisper';
 
 type StageProps = {
   session: RoomSession;
@@ -38,6 +42,11 @@ type StageProps = {
   act: Act | null;
   /** Whoever has their hand on the player right now. */
   actor: string | null;
+  beat: Beat | null;
+  /** The invite link has gone out, and nobody has come in on it yet. */
+  saved: boolean;
+  /** Everything this tab has seen the room play. */
+  watched: QueueItem[];
   /** How long the connection has been gone, or null while it's fine. */
   offlineFor: number | null;
   onRetryConnection: () => void;
@@ -48,30 +57,28 @@ type StageProps = {
   railHidden: boolean;
   /** Toasts in theatre mode, when there's no rail to hold them. */
   toastSlot: ReactNode;
-  /** Floating reactions in theatre mode. Beside the screen, never in it. */
-  laneSlot?: ReactNode;
 };
 
 export const PlayerStage = (props: StageProps) => {
-  const { session, view, player, row, actor, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
+  const { session, view, player, row, actor, beat, saved, watched, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
   const current = view.queue[0];
+  const noFrontRow = useMediaQuery(NO_FRONT_ROW);
 
   return (
     <main className="room-main">
       <div className="stage-well">
         <div className={current ? 'stage aspect-video' : 'stage stage-idle'}>
           <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
-          {!current && <IdleStage session={session} view={view} extra={props.extra} />}
+          {!current && <IdleStage session={session} view={view} watched={watched} extra={props.extra} />}
           {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} onRetry={player.retry} />}
           {current && !player.failure && !player.ready && <Poster item={current} />}
         </div>
-        {props.laneSlot}
       </div>
 
       <div className="front-row" data-idle={!current || undefined}>
-        <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} />
+        <Seats view={view} row={row} actor={actor} beat={beat} saved={saved} onInvite={onInvite} onPeople={onPeople} />
         {current && !railHidden && <ReactionBar session={session} disabled={isOffline(view)} className="hidden xl:flex land:hidden" />}
-        {current && <SeatTrack view={view} />}
+        {current && !noFrontRow && <SeatTrack view={view} />}
       </div>
 
       {current && <PlayerBar {...props} item={current} />}
@@ -132,17 +139,42 @@ export const FailurePanel = ({ item, error, view, onPickAnother, onRetry }: Fail
 
 const PICKS = 4;
 
-const IdleStage = ({ session, view, extra }: { session: RoomSession; view: RoomView; extra?: ReactNode }) => {
+const CREDITS = 5;
+
+/** The screen's off and the lights are up, so it says what the room just watched and whose idea it was. */
+const Credits = ({ items }: { items: QueueItem[] }) => {
+  const rolled = items.slice(-CREDITS);
+  const earlier = items.length - rolled.length;
+  return (
+    <div className="credits">
+      <ol aria-label="What the room watched" style={{ '--lines': rolled.length } as CSSProperties} className="credits-roll">
+        {earlier > 0 && <li className="credit-earlier">and {plural(earlier, 'earlier video')}</li>}
+        {rolled.map((item) => (
+          <li key={item.id} className="credit">
+            <span className="line-clamp-2 text-right wrap-anywhere">{item.title}</span>
+            <span style={{ color: hueOf(item.addedBy) }} className="truncate font-medium">
+              {firstName(item.addedByName)}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+};
+
+const IdleStage = ({ session, view, watched, extra }: { session: RoomSession; view: RoomView; watched: QueueItem[]; extra?: ReactNode }) => {
   const finished = view.ranOut;
   const adder = useAdder(session, view);
   const search = useSearch(adder);
   const trending = useTrending();
   const editable = canQueue(view);
   const searching = search.query !== null;
+  const rolling = finished && !searching && watched.length > 0;
 
   return (
     <div data-searching={searching || undefined} className="stage-dock flex h-full w-full flex-col px-4 py-6 land:py-3">
-      <h2 className="text-xl leading-7 font-semibold tracking-[-0.015em] land:text-[15px] land:leading-5">{finished ? 'The queue’s finished.' : 'What are we watching?'}</h2>
+      {rolling && <Credits items={watched} />}
+      <h2 className={`text-xl leading-7 font-semibold tracking-[-0.015em] land:text-[15px] land:leading-5 ${rolling ? 'credits-end' : ''}`}>{finished ? 'The queue’s finished.' : 'What are we watching?'}</h2>
       {!editable && <p className="mt-1 text-muted">The host picks what’s next.</p>}
 
       {editable && (
@@ -256,7 +288,7 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
           <RoomStatus view={view} player={player} act={act} offlineFor={offlineFor} onRetry={onRetryConnection} />
         </div>
 
-        {railHidden && <ReactionTicker reactions={view.reactions} />}
+        {railHidden && <Whisper messages={view.messages} selfId={view.self?.userId} />}
         {railHidden && <ReactionBar session={session} disabled={isOffline(view)} className="flex" />}
 
         <div className={`flex shrink-0 items-center gap-2 ${stacked ? 'phone:w-full' : ''}`}>

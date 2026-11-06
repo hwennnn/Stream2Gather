@@ -3,7 +3,7 @@ import { request } from '../api/http';
 import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
 import { formatClock, isYouTubeUrl, plural, splitLinks } from './format';
 import { Icon } from './Icon';
-import { firstName, hueOf } from './people';
+import { firstName, hueOf, listNames } from './people';
 import { ReactionPicker } from './Reactions';
 import { canQueue, chatScroll, countUnread, isOffline } from './rules';
 import { toastError } from './Toasts';
@@ -22,14 +22,21 @@ type Props = {
   toasts?: ReactNode;
 };
 
-type Block = { kind: 'system'; entry: Extract<ChatEntry, { kind: 'system' }> } | { kind: 'chat'; messages: ChatLine[] } | { kind: 'time'; at: string };
+type SystemLine = Extract<ChatEntry, { kind: 'system' }>;
+type Block = { kind: 'system'; entry: SystemLine } | { kind: 'arrivals'; entries: SystemLine[] } | { kind: 'departures'; entries: SystemLine[] } | { kind: 'chat'; messages: ChatLine[] } | { kind: 'time'; at: string };
+
+const DEPARTED = / left$/;
 
 const toBlocks = (entries: ChatEntry[]): Block[] => {
   const blocks: Block[] = [];
   let spoken: ChatLine | undefined;
   for (const entry of entries) {
     if (entry.kind === 'system') {
-      blocks.push({ kind: 'system', entry });
+      const before = blocks.at(-1);
+      const kind = entry.arrived ? 'arrivals' : DEPARTED.test(entry.text) ? 'departures' : null;
+      if (!kind) blocks.push({ kind: 'system', entry });
+      else if (before?.kind === kind) before.entries.push(entry);
+      else blocks.push(kind === 'arrivals' ? { kind, entries: [entry] } : { kind, entries: [entry] });
       continue;
     }
     const gap = spoken ? Date.parse(entry.createdAt) - Date.parse(spoken.createdAt) : Infinity;
@@ -79,9 +86,17 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
             </time>
           );
         }
+        if (block.kind === 'arrivals') return <Arrivals key={block.entries[0]?.id} entries={block.entries} />;
+        if (block.kind === 'departures') {
+          return (
+            <p key={block.entries[0]?.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+              {listNames(block.entries.map(({ text }) => firstName(text.replace(DEPARTED, ''))))} left
+            </p>
+          );
+        }
         if (block.kind === 'system') {
           return (
-            <p key={block.entry.id} className="chat-line mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+            <p key={block.entry.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
               {block.entry.text}
               {block.entry.url && (
                 <>
@@ -232,6 +247,29 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
   );
 };
 
+const nameOf = ({ text }: SystemLine) => firstName(text.replace(/ joined$/, ''));
+
+/** Everyone who sat down together is one line, so a full room doesn't push the talk out of the log. */
+const Arrivals = ({ entries }: { entries: SystemLine[] }) => {
+  const [first, second, third] = entries;
+  if (!first) return null;
+  const who = (entry: SystemLine) => (
+    <span style={{ color: hueOf(entry.arrived) }} className="font-medium">
+      {nameOf(entry)}
+    </span>
+  );
+  const rest = entries.length - 2;
+  return (
+    <p data-arrived={entries.map(nameOf).join(' ')} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+      {who(first)}
+      {second && (third ? ', ' : ' and ')}
+      {second && who(second)}
+      {third && (entries.length === 3 ? <> and {who(third)}</> : ` and ${rest} others`)}
+      {second ? ' took seats' : ' took a seat'}
+    </p>
+  );
+};
+
 type LineProps = { session: RoomSession; canAdd: boolean; offline: boolean; onToast: (text: string) => void };
 
 type GroupProps = LineProps & { selfId: string | undefined; messages: ChatLine[] };
@@ -284,7 +322,7 @@ const Message = memo(({ session, canAdd, offline, message, name, onToast }: Mess
 
   return (
     <div title={formatClock(message.createdAt)}>
-      <p data-delivery={message.delivery} className={`chat-line leading-5 transition-opacity [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}>
+      <p data-delivery={message.delivery} className={`leading-5 transition-opacity [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}>
         {name && (
           <span style={{ color: hueOf(message.userId) }} className="mr-1.5 inline-block max-w-[90%] truncate align-bottom font-semibold">
             {name}

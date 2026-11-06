@@ -22,6 +22,8 @@ const SIGNING_IN = 's2g:signing-in';
 let view: AccountView = { user: null, publishableKey: '', clerkWanted: false, problem: null };
 let clerk: ClerkControls | null = null;
 let openWhenReady = false;
+/** The sign-in was opened by this page, so it may still be showing. */
+let openedHere = false;
 const listeners = new Set<() => void>();
 const identityListeners = new Set<() => void>();
 
@@ -37,11 +39,14 @@ const setUser = (user: Account | null) => {
 };
 
 const open = () => {
+  openedHere = true;
   const here = window.location.href;
   clerk?.openSignIn({ forceRedirectUrl: here, signUpForceRedirectUrl: here });
 };
 
 export const account = {
+  current: () => view,
+
   async start(): Promise<void> {
     try {
       const [config, me] = await Promise.all([api.config(), api.me()]);
@@ -104,8 +109,14 @@ export const account = {
     }
   },
 
+  /**
+   * Clerk says this on every load and right as a sign-in opens, so on its own it
+   * settles nothing. Only a page that opened nothing itself knows the attempt
+   * that set the flag is over: back from a redirect signed out, or reloaded after
+   * closing the sign-in. A return that did sign in reports that instead.
+   */
   async clerkSignedOut(): Promise<void> {
-    if (!openWhenReady) sessionStorage.removeItem(SIGNING_IN);
+    if (!openWhenReady && !openedHere) sessionStorage.removeItem(SIGNING_IN);
     if (view.user?.signedIn) setUser((await api.signOut()).user);
   },
 

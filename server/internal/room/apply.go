@@ -345,6 +345,27 @@ func applyHostPass(s *State, actor Actor, cmd Command) error {
 	return nil
 }
 
+// Narrate is what the chat says about a change, if anything. Pauses and seeks are
+// left to the status line, because a chat full of them hides what people wrote.
+func Narrate(before, after State, change Change) string {
+	if change.By == "" {
+		return ""
+	}
+	moved := before.Playback.ItemID != after.Playback.ItemID && len(after.Queue) > 0
+	switch {
+	case change.Cause == CmdQueuePlay && moved:
+		return change.By + " jumped to " + after.Queue[0].Title
+	case change.Cause == CmdQueueUndo && moved:
+		return change.By + " went back to " + after.Queue[0].Title
+	case change.Cause == CmdSettings && before.Settings.ControlMode != after.Settings.ControlMode:
+		if after.Settings.ControlMode == ModeHosts {
+			return change.By + " turned on host controls"
+		}
+		return change.By + " turned off host controls"
+	}
+	return ""
+}
+
 func validMode(mode string) bool { return mode == ModeEveryone || mode == ModeHosts }
 
 func indexOf(queue []Item, id string) int {

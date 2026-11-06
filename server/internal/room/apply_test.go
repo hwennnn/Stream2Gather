@@ -612,3 +612,44 @@ func TestRestedStopsAtTheSaveTime(t *testing.T) {
 		t.Fatalf("a paused room moved: %+v", rested.Playback)
 	}
 }
+
+func TestNarrateSaysOnlyWhatChangedTheRoom(t *testing.T) {
+	playing := add(t, add(t, New(), "a", 0), "b", 0)
+	playing.Queue[1].Title = "Second"
+	by := Actor{ID: "m", Name: "Maya", Role: RoleHost}
+
+	jumped, change, err := Apply(playing, by, Command{Type: CmdQueuePlay, Target: "b"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Narrate(playing, jumped, change); got != "Maya jumped to Second" {
+		t.Fatalf("jump: %q", got)
+	}
+	back, change, err := Apply(jumped, by, Command{Type: CmdQueueUndo, Target: "b"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Narrate(jumped, back, change); got != "Maya went back to "+back.Queue[0].Title {
+		t.Fatalf("undo: %q", got)
+	}
+
+	locked := Settings{ControlMode: ModeHosts, QueueMode: ModeEveryone}
+	closed, change, err := Apply(playing, by, Command{Type: CmdSettings, Settings: &locked}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Narrate(playing, closed, change); got != "Maya turned on host controls" {
+		t.Fatalf("lock: %q", got)
+	}
+
+	for _, cmd := range []Command{{Type: CmdPause}, {Type: CmdPlay}, {Type: CmdSeek, Pos: 5}} {
+		cmd.Item = playing.Playback.ItemID
+		next, change, err := Apply(playing, by, cmd, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := Narrate(playing, next, change); got != "" {
+			t.Fatalf("%s: %q, but the status line says this", cmd.Type, got)
+		}
+	}
+}

@@ -78,7 +78,7 @@ flow('landing: an empty room opens on the stage, ready to pick a video', async (
   await t.see('the prompt', ui.stageHeading(a.page));
   await t.see('the box', ui.addBox(a.page));
   await t.see('popular picks', a.page.getByRole('region', { name: 'Popular on YouTube' }).getByRole('button').first());
-  await t.see('the invite card', ui.chatLog(a.page).getByRole('button', { name: /invite/i }));
+  await t.see('the invite card', a.page.getByRole('region', { name: 'Invite' }));
 });
 
 flow('landing: a trending pick starts a room with it', async (t) => {

@@ -18,6 +18,15 @@ export const useSeats = (view: RoomView): Row => {
   return row.current;
 };
 
+const InviteSeat = ({ alone, onInvite }: { alone: boolean; onInvite: () => void }) => (
+  <button type="button" aria-label="Invite" onClick={onInvite} className="seat-invite" data-alone={alone}>
+    <span className="seat-empty">
+      <Icon name="plus" className="size-3.5" />
+    </span>
+    <span className="seat-name">Invite</span>
+  </button>
+);
+
 type Props = {
   view: RoomView;
   row: Row;
@@ -47,13 +56,8 @@ export const Seats = ({ view, row, actor, onInvite, onPeople, compact = false }:
             );
           }
           return (
-            <li key={index} className="seat">
-              <button type="button" aria-label="Invite" onClick={onInvite} className="seat-invite" data-alone={view.alone}>
-                <span className="seat-empty">
-                  <Icon name="plus" className="size-3.5" />
-                </span>
-                <span className="seat-name">Invite</span>
-              </button>
+            <li key={index} className="seat seat-pin">
+              <InviteSeat alone={view.alone} onInvite={onInvite} />
             </li>
           );
         }
@@ -89,10 +93,16 @@ export const Seats = ({ view, row, actor, onInvite, onPeople, compact = false }:
         );
       })}
       {extra > 0 && (
-        <li className="seat">
+        <li className="seat seat-pin" data-count={true}>
           <button type="button" onClick={onPeople} aria-label={`${extra} more people`} className="seat-invite">
             <span className="seat-more">+{extra}</span>
           </button>
+        </li>
+      )}
+      {/* A busy room is when people ask for the link, so a full row still offers it. */}
+      {firstEmpty < 0 && (
+        <li className="seat seat-pin">
+          <InviteSeat alone={view.alone} onInvite={onInvite} />
         </li>
       )}
     </ul>

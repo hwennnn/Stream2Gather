@@ -38,6 +38,13 @@ flow('seats: a full row says how many more, and that opens People', async (t) =>
   await t.see('how many more', more, 8000);
   await more.click();
   await t.see('the whole list', ui.rail(a.page).getByRole('listitem').filter({ hasText: 'Guest 14' }));
+  const row = a.page.getByRole('list', { name: 'In the room' }).filter({ visible: true });
+  const invite = row.getByRole('button', { name: 'Invite' });
+  await t.see('Invite stays beside the count', invite);
+  t.check('and all of it is inside the row', await invite.evaluate((button) => {
+    const seats = button.closest('ul').getBoundingClientRect();
+    return button.getBoundingClientRect().right <= seats.right + 0.5;
+  }));
   bots.forEach((bot) => bot.close());
 });
 

@@ -14,6 +14,11 @@ describe('InviteSheet', () => {
     expect(screen.getByRole('button', { name: 'Copied' })).toBeTruthy();
   });
 
+  it('says the card is a preview, so your own name on it reads as what friends get', () => {
+    render(<InviteSheet view={view} url="http://test/r/room" copied={false} onCopy={vi.fn()} />);
+    expect(screen.getByText('What friends will see')).toBeTruthy();
+  });
+
   it('offers to copy until then', () => {
     render(<InviteSheet view={view} url="http://test/r/room" copied={false} onCopy={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();

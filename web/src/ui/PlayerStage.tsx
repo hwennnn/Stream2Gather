@@ -69,6 +69,8 @@ export const PlayerStage = (props: StageProps) => {
       </div>
 
       {current && <PlayerBar {...props} item={current} />}
+      {/* Under the player rather than in chat, so it's there on every tab. */}
+      {current && <ReactionBar session={session} disabled={isOffline(view)} className="hidden justify-between border-b border-line px-3 phone:flex land:hidden" />}
       {!current && <Suggestions session={session} view={view} />}
       {current && (queueOpen ? <Suggestions session={session} view={view} /> : <UpNext session={session} view={view} onPickAnother={onPickAnother} onShowQueue={onShowQueue} onToast={onToast} />)}
     </main>

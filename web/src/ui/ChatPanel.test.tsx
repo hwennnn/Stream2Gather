@@ -31,10 +31,6 @@ const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
       session={session as unknown as RoomSession}
       view={view(messages, patch)}
       active
-      inviteCopied={false}
-      inviteUrl="http://x/r/y"
-      onCopyInvite={() => {}}
-      onInvite={() => {}}
       onToast={() => {}}
     />,
   );
@@ -72,16 +68,11 @@ describe('ChatPanel invitations', () => {
     vi.unstubAllGlobals();
   });
 
-  it('asks for company while the room is still picking', () => {
+  it('says you are alone and leaves the invite to the rail', () => {
     setup([], { alone: true });
-    expect(screen.getByText('Invite someone while you pick')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Invite' })).toBeTruthy();
-  });
-
-  it('offers the link once something is playing', () => {
-    setup([], { alone: true, queue: [{}] as RoomView['queue'] });
-    expect(screen.queryByText('Invite someone while you pick')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+    expect(screen.getByText('Only you so far.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Invite' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull();
   });
 });
 
@@ -150,7 +141,7 @@ describe('a long chat', () => {
   const session = {} as RoomSession;
   const onToast = () => {};
   const panel = (next: RoomView) => (
-    <ChatPanel session={session} view={next} active inviteUrl="" inviteCopied={false} onCopyInvite={() => {}} onInvite={() => {}} onToast={onToast} />
+    <ChatPanel session={session} view={next} active onToast={onToast} />
   );
   const drawn = () => vi.mocked(splitLinks).mock.calls.length;
 

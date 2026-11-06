@@ -38,7 +38,6 @@ type StageProps = {
   act: Act | null;
   /** Whoever has their hand on the player right now. */
   actor: string | null;
-  queueOpen: boolean;
   /** How long the connection has been gone, or null while it's fine. */
   offlineFor: number | null;
   onRetryConnection: () => void;
@@ -52,7 +51,7 @@ type StageProps = {
 };
 
 export const PlayerStage = (props: StageProps) => {
-  const { session, view, player, row, actor, queueOpen, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
+  const { session, view, player, row, actor, railHidden, onInvite, onPeople, onPickAnother, onShowQueue, onToast } = props;
   const current = view.queue[0];
 
   return (
@@ -74,7 +73,7 @@ export const PlayerStage = (props: StageProps) => {
       {/* Under the player rather than in chat, so it's there on every tab. */}
       {current && <ReactionBar session={session} disabled={isOffline(view)} className="hidden justify-between border-b border-line px-3 phone:flex land:hidden" />}
       {!current && <Suggestions session={session} view={view} />}
-      {current && (queueOpen ? <Suggestions session={session} view={view} /> : <UpNext session={session} view={view} onPickAnother={onPickAnother} onShowQueue={onShowQueue} onToast={onToast} />)}
+      {current && <UpNext session={session} view={view} onPickAnother={onPickAnother} onShowQueue={onShowQueue} onToast={onToast} />}
     </main>
   );
 };
@@ -289,15 +288,15 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
 
 const STRIP_ITEMS = 6;
 
-/** While the queue tab shows what's next, this space goes to what could be. */
+/** With nothing on yet, this space goes to what could be. Once a video plays it's Up next, on every tab. */
 const Suggestions = ({ session, view }: { session: RoomSession; view: RoomView }) => {
   const adder = useAdder(session, view);
   const items = notInRoom(useTrending(), view.queue)?.slice(0, STRIP_ITEMS);
   if (!items?.length || !canQueue(view)) return <div className="up-next" />;
   return (
     <section aria-label="Popular on YouTube" className="up-next">
-      <div className="up-next-inner items-start gap-3 px-4 py-3">
-        <h3 className="w-14 shrink-0 pt-1 text-[13px] leading-[18px] font-semibold">Popular</h3>
+      <div className="up-next-inner h-full items-center gap-3 px-4 py-3">
+        <h3 className="w-16 shrink-0 text-[13px] leading-snug font-semibold">Popular</h3>
         <ol className="up-next-cards up-next-flow">
           {items.map((media) => (
             <li key={media.sourceId} className="min-w-0">

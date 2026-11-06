@@ -97,7 +97,7 @@ export const UpNext = ({ session, view, onPickAnother, onShowQueue, onToast }: U
                   type="button"
                   onClick={onShowQueue}
                   aria-label={`${strip.more} more in the queue`}
-                  className="flex size-full min-h-14 cursor-pointer items-center justify-center rounded-md bg-raised text-[13px] font-semibold transition-colors hover:bg-line"
+                  className="up-next-more flex w-full cursor-pointer items-center justify-center rounded-md bg-raised text-[13px] font-semibold transition-colors hover:bg-line"
                 >
                   +{strip.more} more
                 </button>

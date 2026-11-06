@@ -551,15 +551,54 @@ describe('RoomSession', () => {
   });
 
   describe('system lines', () => {
-    const live = async (members = [ada]) => {
+    const live = async (extra: object = {}, members = [ada]) => {
       const { session, socket } = await connected();
-      socket.deliver('welcome', { ...welcome(1), members });
+      socket.deliver('welcome', { ...welcome(1), members, ...extra });
       await vi.advanceTimersByTimeAsync(0);
       return { session, socket };
     };
+    const line = (id: string, text: string, at = 1_000_000) => ({ id, text, createdAt: new Date(at).toISOString() });
+
+    it('shows what the server says, once', async () => {
+      const { session, socket } = await live();
+      socket.deliver('line', line('l1', 'Sam joined'));
+      socket.deliver('line', line('l1', 'Sam joined'));
+      expect(lines(session)).toEqual(['Sam joined']);
+    });
+
+    it('reads what came before from the welcome, in order with the chat', async () => {
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ items: [chatLine(2)] })));
+      const { session } = await live({ lines: [line('l1', 'Sam joined', 1_001_000), line('l2', 'Sam left', 1_003_000)] });
+      expect(entries(session).map((entry) => (entry.kind === 'system' ? entry.text : entry.body))).toEqual([
+        'Sam joined',
+        'line 2',
+        'Sam left',
+      ]);
+    });
+
+    it('keeps its place when a line beat the welcome', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('line', line('l2', 'Sam left', 1_002_000));
+      socket.deliver('welcome', { ...welcome(1), lines: [line('l1', 'Sam joined'), line('l2', 'Sam left', 1_002_000)] });
+      expect(lines(session)).toEqual(['Sam joined', 'Sam left']);
+    });
+
+    it('picks up what it missed on reconnecting, without repeats', async () => {
+      const { session, socket } = await live({ lines: [line('l1', 'Sam joined')] });
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', { ...welcome(1), lines: [line('l1', 'Sam joined'), line('l2', 'Sam left', 1_002_000)] });
+      expect(lines(session)).toEqual(['Sam joined', 'Sam left']);
+    });
+
+    it('keeps a link the line came with', async () => {
+      const { session, socket } = await live();
+      socket.deliver('line', { ...line('l1', 'Skipped “Clip”.'), url: 'https://youtu.be/x' });
+      expect(entries(session)[0]).toMatchObject({ kind: 'system', url: 'https://youtu.be/x' });
+    });
 
     it('writes nothing of its own, so viewers can’t disagree', async () => {
-      const { session, socket } = await live([ada, maya]);
+      const { session, socket } = await live({}, [ada, maya]);
       const zelda = { ...item('z'), title: 'Zelda trailer' };
       const at = (pos: number) => ({ ...idle, status: 'paused', pos });
       socket.deliver('members', { members: [ada, maya, sam] });

@@ -18,7 +18,10 @@ export type ChatLine = Omit<ChatMessage, 'id'> & {
   serverId?: number;
 };
 
-export type ChatEntry = ChatLine | { kind: 'system'; id: string; text: string; createdAt: string };
+/** Something the room itself said. */
+type RoomLine = { id: string; text: string; url?: string; createdAt: string };
+
+export type ChatEntry = ChatLine | ({ kind: 'system' } & RoomLine);
 
 /** Limited means the server refused it for speed, so the text is still worth keeping. */
 export type ChatResult = { id: string; limited: boolean };
@@ -407,6 +410,9 @@ export class RoomSession {
       case 'react':
         this.reaction(d);
         break;
+      case 'line':
+        this.addLines([d]);
+        break;
       case 'notice':
         this.notice(d);
         break;
@@ -435,6 +441,7 @@ export class RoomSession {
     room: { name: string };
     state: { version: number; playback: RoomPlayback; queue: QueueItem[]; settings: Settings };
     members: Person[];
+    lines?: RoomLine[];
   }): void {
     this.attempts = 0;
     this.behindAt = null;
@@ -454,6 +461,7 @@ export class RoomSession {
       members: data.members ?? [],
       viewerStates: {},
     });
+    this.addLines(data.lines ?? []);
     this.playbackListener(data.state.playback, true);
     // A call outlives the socket, but the server forgets it with the old connection.
     if (this.voice !== 'off') this.send('voice', { state: this.voice });
@@ -482,6 +490,13 @@ export class RoomSession {
       .map((message): ChatEntry => ({ ...message, kind: 'chat', ...history }));
     if (missing.length === 0 && lines === this.view.messages) return;
     this.update({ messages: inTimeOrder([...missing, ...lines]) });
+  }
+
+  /** The server writes these, so every viewer reads the same history. */
+  private addLines(lines: RoomLine[]): void {
+    const known = new Set(this.view.messages.map(serverIdOf));
+    const missing = lines.filter((line) => !known.has(line.id)).map((line): ChatEntry => ({ ...line, kind: 'system' }));
+    if (missing.length > 0) this.update({ messages: inTimeOrder([...missing, ...this.view.messages]) });
   }
 
   private pong(data: { t0: number; ts: number; version?: number }): void {

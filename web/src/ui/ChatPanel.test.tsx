@@ -40,6 +40,22 @@ const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
   return { session, box, send, answer: (result: ChatResult) => act(async () => finish(result)) };
 };
 
+describe('ChatPanel system lines', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('offers the video a skip took away, after its toast has gone', () => {
+    setup([{ kind: 'system', id: 'l1', text: 'Skipped “Clip”.', url: 'https://youtu.be/x', createdAt: new Date(0).toISOString() }]);
+    expect(screen.getByRole('link', { name: 'Open on YouTube' }).getAttribute('href')).toBe('https://youtu.be/x');
+  });
+});
+
 describe('ChatPanel invitations', () => {
   beforeEach(() => {
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));

@@ -19,9 +19,10 @@ const line = (patch: Partial<Extract<ChatEntry, { kind: 'chat' }>>): ChatEntry =
   kind: 'chat', id: 'c1', userId: 'me', author: 'Ada', body: 'hello', createdAt: new Date(0).toISOString(), ...patch,
 });
 
-const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
+const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}, slug = 'room') => {
   let finish: (result: ChatResult) => void = () => {};
   const session = {
+    slug,
     sendChat: vi.fn(() => new Promise<ChatResult>((resolve) => (finish = resolve))),
     retryChat: vi.fn(),
     discardChat: vi.fn(),
@@ -115,6 +116,44 @@ describe('ChatPanel invitations', () => {
     expect(screen.getByText('Only you so far.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Invite' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Copy link' })).toBeNull();
+  });
+});
+
+describe('ChatPanel spoilers', () => {
+  const spoiled = [line({ id: 'a', userId: 'hana', body: 'the butler did it', missed: true }), line({ id: 'b', userId: 'hana', body: 'hello again' })];
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('keeps chat from a missed session behind Catch up', () => {
+    setup(spoiled);
+
+    expect(screen.queryByText('the butler did it')).toBeNull();
+    expect(screen.getByText('hello again')).toBeTruthy();
+    expect(screen.getByText(/1 message from a session you missed/)).toBeTruthy();
+  });
+
+  it('goes to the missed video', async () => {
+    const assign = vi.fn();
+    vi.stubGlobal('location', { ...window.location, assign });
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ items: [{ itemId: 9 }] }), { status: 200 })));
+    setup(spoiled, undefined, 'sundays');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Catch up' }));
+
+    await vi.waitFor(() => expect(assign).toHaveBeenCalledWith('/r/sundays/catchup/9'));
+  });
+
+  it('shows the chat when there is nothing left to watch', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200 })));
+    setup(spoiled, undefined, 'sundays');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Catch up' }));
+
+    expect(await screen.findByText('the butler did it')).toBeTruthy();
   });
 });
 

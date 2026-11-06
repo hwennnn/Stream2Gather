@@ -1,6 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { request } from '../api/http';
 import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
-import { formatClock, isYouTubeUrl, splitLinks } from './format';
+import { formatClock, isYouTubeUrl, plural, splitLinks } from './format';
 import { Icon } from './Icon';
 import { firstName, hueOf } from './people';
 import { ReactionPicker } from './Reactions';
@@ -41,6 +42,16 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   return blocks;
 };
 
+const isSpoiler = (entry: ChatEntry) => entry.kind === 'chat' && entry.missed === true;
+
+/** Goes to what was missed, or if it can't be watched any more, shows the chat instead. */
+const catchUp = async (slug: string, reveal: () => void) => {
+  const crew = `/v1/crews/${encodeURIComponent(slug)}`;
+  const { items } = await request<{ items: { itemId: number }[] }>(`${crew}/missed`).catch(() => ({ items: [] }));
+  if (items[0]) window.location.assign(`/r/${encodeURIComponent(slug)}/catchup/${items[0].itemId}`);
+  else reveal();
+};
+
 export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => {
   const [text, setText] = useState('');
   const [slow, setSlow] = useState(false);
@@ -49,7 +60,9 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
   const stuck = useRef(true);
   const draft = useRef('');
   const offline = isOffline(view);
-  const entries = view.messages;
+  const [revealed, setRevealed] = useState(false);
+  const spoilers = useMemo(() => view.messages.filter(isSpoiler).length, [view.messages]);
+  const entries = useMemo(() => (revealed ? view.messages : view.messages.filter((entry) => !isSpoiler(entry))), [view.messages, revealed]);
   const empty = text.trim().length === 0;
 
   const blocks = useMemo(() => toBlocks(entries), [entries]);
@@ -157,6 +170,14 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
           tabIndex={0}
           className="rail-scroll flex h-full flex-col py-3 outline-offset-[-2px]"
         >
+          {spoilers > 0 && !revealed && (
+            <p className="mb-3 text-sm text-muted">
+              {plural(spoilers, 'message')} from a session you missed.{' '}
+              <button type="button" onClick={() => void catchUp(session.slug, () => setRevealed(true))} className="text-link">
+                Catch up
+              </button>
+            </p>
+          )}
           {!hasChat &&
             (view.alone ? <p className="mt-auto font-semibold">Only you so far.</p> : <p className="mt-auto text-muted">Nothing said yet.</p>)}
           {lines}

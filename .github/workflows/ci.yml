@@ -2,8 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [master, rebuild/go-platform]
+    branches: [master]
+    paths-ignore: ['docs/**', '**/*.md']
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore: ['docs/**', '**/*.md']
+
+# A new push to a PR replaces its run. Master keeps a run for every commit.
+concurrency:
+  group: ci-${{ github.head_ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   server:
@@ -67,6 +75,8 @@ jobs:
   # Every user flow in headless Chrome. The YouTube API is a recorded fixture and the
   # player a stand-in, so no key is needed and nothing here can fail because of YouTube.
   flows:
+    # The dearest job by far: drafts wait until they're marked ready.
+    if: github.event_name == 'push' || !github.event.pull_request.draft
     runs-on: ubuntu-latest
     timeout-minutes: 12
     strategy:

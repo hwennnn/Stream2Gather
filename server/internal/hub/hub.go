@@ -30,8 +30,11 @@ const (
 	eventBuffer     = 1024
 	touchEvery      = 10 * time.Second
 	snapshotEvery   = 5 * time.Second
-	opTimeout       = 5 * time.Second
-	versionTimeout  = time.Second
+	// A room with viewers saves this often even if nothing changes. Saving is what
+	// extends its life, and a paused room full of chat must not expire under people.
+	keepAliveEvery = time.Hour
+	opTimeout      = 5 * time.Second
+	versionTimeout = time.Second
 	// Chrome runs a hidden tab's timers once a minute, so a healthy viewer can
 	// go that long between pings. Anything shorter drops people who tabbed away.
 	idleTimeout = 90 * time.Second
@@ -59,6 +62,8 @@ type Hub struct {
 	idleTimeout time.Duration
 	hostGrace   time.Duration
 	touchEvery  time.Duration
+	snapshots   time.Duration
+	keepAlive   time.Duration
 
 	// mu is held across Redis subscribes, which keeps them in order. Delivery
 	// must never wait for that, so it reads active instead of rooms.
@@ -81,6 +86,8 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 		idleTimeout: idleTimeout,
 		hostGrace:   hostGrace,
 		touchEvery:  touchEvery,
+		snapshots:   snapshotEvery,
+		keepAlive:   keepAliveEvery,
 
 		rooms: make(map[string]*liveRoom),
 	}
@@ -354,6 +361,8 @@ type liveRoom struct {
 	done   chan struct{}
 	conns  map[*conn]struct{}
 	dirty  bool
+	// savedAt is when this server last saved the room. Zero means not yet.
+	savedAt time.Time
 	// subscribed turns true on Redis's first confirmation. Any later one means
 	// the subscription was lost and restored.
 	subscribed atomic.Bool
@@ -399,7 +408,7 @@ func (r *liveRoom) requestResync() {
 func (r *liveRoom) run() {
 	touch := time.NewTicker(r.hub.touchEvery)
 	defer touch.Stop()
-	snapshot := time.NewTicker(snapshotEvery)
+	snapshot := time.NewTicker(r.hub.snapshots)
 	defer snapshot.Stop()
 
 	for {
@@ -415,6 +424,9 @@ func (r *liveRoom) run() {
 		case <-touch.C:
 			r.touchAll()
 		case <-snapshot.C:
+			if len(r.conns) > 0 && time.Since(r.savedAt) >= r.hub.keepAlive {
+				r.dirty = true
+			}
 			r.saveSnapshot()
 		}
 	}
@@ -572,6 +584,7 @@ func (r *liveRoom) saveSnapshot() {
 		return
 	}
 	r.dirty = false
+	r.savedAt = time.Now()
 }
 
 func (r *liveRoom) publishMembers(ctx context.Context) {

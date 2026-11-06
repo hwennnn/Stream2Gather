@@ -805,3 +805,36 @@ func TestHostReloadKeepsTheLock(t *testing.T) {
 		t.Fatalf("a reload released the lock: %s", message.D)
 	}
 }
+
+func TestAWatchedRoomIsSavedEvenIfNothingChanges(t *testing.T) {
+	r := newRig(t, testRedis, func(h *Hub) { h.snapshots = 10 * time.Millisecond })
+	ctx := context.Background()
+	id := r.newRoom(t, directVideo(t))
+	r.joined(t, id, "u", room.RoleMember)
+
+	eventually(t, "the video was never saved, so losing Redis would lose it", func() bool {
+		state, _, err := r.db.LoadSnapshot(ctx, id)
+		return err == nil && len(state.Queue) == 1
+	})
+}
+
+func TestAWatchedRoomDoesNotExpireUnderItsViewers(t *testing.T) {
+	r := newRig(t, testRedis, func(h *Hub) {
+		h.snapshots = 10 * time.Millisecond
+		h.keepAlive = 20 * time.Millisecond
+	})
+	ctx := context.Background()
+	id := r.newRoom(t, directVideo(t))
+	r.joined(t, id, "u", room.RoleMember)
+
+	expired := func() bool {
+		var past bool
+		err := r.pool.QueryRow(ctx, `SELECT expires_at < now() FROM rooms WHERE id = $1`, id).Scan(&past)
+		return err == nil && past
+	}
+	time.Sleep(50 * time.Millisecond) // Past the save a first join causes.
+	if _, err := r.pool.Exec(ctx, `UPDATE rooms SET expires_at = now() - interval '1 minute' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "a room in use was left to expire", func() bool { return !expired() })
+}

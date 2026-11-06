@@ -525,6 +525,12 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
+	// Nothing else saves a room that plays what it was made with, so without this
+	// losing Redis would lose its video.
+	if err := s.DB.SaveSnapshot(r.Context(), record.ID, state); err != nil {
+		s.internal(w, err)
+		return
+	}
 	if err := s.Live.Seed(r.Context(), record.ID, state); err != nil {
 		s.internal(w, err)
 		return

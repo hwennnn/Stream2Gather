@@ -1,4 +1,4 @@
-import { api, ApiError, type ChatMessage, type Media, type Person } from '../api/http';
+import { api, ApiError, type ChatMessage, type Media, type Person, type VoiceState } from '../api/http';
 import { ServerClock } from '../sync/clock';
 import type { Playback, SyncHealth } from '../sync/controller';
 import { Narrator } from './narrate';
@@ -53,6 +53,8 @@ export type RoomView = {
   queue: QueueItem[];
   settings: Settings;
   members: Person[];
+  /** The user ids talking right now. Only this tab's call knows, and only while in it. */
+  speaking: string[];
   /** True when nobody else is in the room. */
   alone: boolean;
   viewerStates: Record<string, string>;
@@ -85,6 +87,7 @@ const initialView: RoomView = {
   queue: [],
   settings: { controlMode: 'everyone', queueMode: 'everyone' },
   members: [],
+  speaking: [],
   alone: false,
   viewerStates: {},
   messages: [],
@@ -94,6 +97,8 @@ const initialView: RoomView = {
 };
 
 const MAX_BACKOFF_MS = 5000;
+/** Push-to-talk flips fast, and only where it ended up matters to the room. */
+const VOICE_REPORT_MS = 200;
 const REACTION_LIFE_MS = 3000;
 const NOTICE_LIFE_MS = 8000;
 const UNDO_LIFE_MS = 5000;
@@ -172,6 +177,9 @@ export class RoomSession {
   private resyncAt: number | null = null;
   private historyLoaded = false;
   private jumpTimer: number | null = null;
+  private voice: VoiceState | 'off' = 'off';
+  private voiceTimer: number | null = null;
+  private closing: () => void = () => {};
   private narrator = new Narrator({
     say: (text, quiet) => this.say(text, quiet),
     rewrite: (lineId, text) => this.rewrite(lineId, text),
@@ -180,7 +188,7 @@ export class RoomSession {
   });
   readonly marks: { joinMs?: number } = {};
 
-  constructor(private readonly slug: string) {}
+  constructor(readonly slug: string) {}
 
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -435,6 +443,8 @@ export class RoomSession {
       viewerStates: {},
     });
     this.playbackListener(data.state.playback, true);
+    // A call outlives the socket, but the server forgets it with the old connection.
+    if (this.voice !== 'off') this.send('voice', { state: this.voice });
     void this.loadHistory();
   }
 
@@ -667,9 +677,35 @@ export class RoomSession {
     void this.connect();
   }
 
+  /** Tells the room where this tab is in the call. */
+  setVoice(state: VoiceState | 'off'): void {
+    this.voice = state;
+    this.voiceTimer ??= window.setTimeout(() => {
+      this.voiceTimer = null;
+      this.send('voice', { state: this.voice });
+    }, VOICE_REPORT_MS);
+  }
+
+  setSpeaking(speaking: string[]): void {
+    this.update({ speaking });
+  }
+
+  /** Shows a passing message, for something outside the room that the viewer should know. */
+  tell(text: string): void {
+    this.notice({ text });
+  }
+
+  /** The room is being left, so whatever was running alongside it should stop. */
+  onClosing(listener: () => void): void {
+    this.closing = listener;
+  }
+
   close(): void {
+    this.closing();
     this.generation += 1;
     this.clearReconnect();
+    if (this.voiceTimer !== null) clearTimeout(this.voiceTimer);
+    this.voiceTimer = null;
     this.dropSocket();
   }
 }

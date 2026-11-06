@@ -44,6 +44,11 @@ const setUser = (user: Account | null) => {
   if (changed) for (const listener of identityListeners) listener();
 };
 
+/** Loaded only here, so guests don't pay for it. It mustn't hold up signing out. */
+const stopPings = () => {
+  void import('../push/push').then((push) => push.stopPings()).catch(() => {});
+};
+
 const open = () => {
   openedHere = true;
   const here = window.location.href;
@@ -99,6 +104,7 @@ export const account = {
   },
 
   async signOut(): Promise<void> {
+    stopPings();
     await clerk?.signOut();
     try {
       setUser((await api.signOut()).user);
@@ -137,7 +143,10 @@ export const account = {
    */
   async clerkSignedOut(): Promise<void> {
     if (!openWhenReady && !openedHere) sessionStorage.removeItem(SIGNING_IN);
-    if (view.user?.signedIn) setUser((await api.signOut()).user);
+    if (view.user?.signedIn) {
+      stopPings();
+      setUser((await api.signOut()).user);
+    }
   },
 
   clerkFailed(): void {

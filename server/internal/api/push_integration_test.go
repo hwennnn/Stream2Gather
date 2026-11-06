@@ -70,6 +70,31 @@ func TestABrowserSubscribesOnceAndCanBeRemoved(t *testing.T) {
 	}
 }
 
+// A lost laptop is signed out from another device. Its lock screen shouldn't go on
+// naming the crew and who's watching.
+func TestSigningOutStopsEveryDevicesPings(t *testing.T) {
+	s, pool := stackServer(t)
+	account, hana := signUp(t, s, "Hana")
+	key, auth := browserKeys(t)
+	for range 2 {
+		response, _ := serve(s, http.MethodPost, "/v1/push/subscriptions", subscribeBody(pushEndpoint(), key, auth), hana)
+		if response.Code != http.StatusCreated {
+			t.Fatalf("subscribe: %d %s", response.Code, response.Body)
+		}
+	}
+
+	serve(s, http.MethodDelete, "/v1/session", "", hana)
+
+	var left int
+	err := pool.QueryRow(context.Background(), `SELECT count(*) FROM push_subscriptions WHERE user_id = $1`, account.Subject).Scan(&left)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if left != 0 {
+		t.Fatalf("%d devices still get pings for someone signed out", left)
+	}
+}
+
 func TestOnlyAPushServiceAndRealKeysAreStored(t *testing.T) {
 	s, _ := stackServer(t)
 	s.Secure = true

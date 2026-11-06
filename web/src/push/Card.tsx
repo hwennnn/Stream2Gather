@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/http';
 import {
-  deviceName, isThisDevice, readPushState, readSettings, removeDevice, setCrewPings, turnOn,
+  deviceName, isThisDevice, readPushState, readSettings, removeDevice, saveThisDevice, setCrewPings, turnOn,
   type PushCrew, type PushDevice, type PushState,
 } from './push';
 
@@ -82,7 +82,11 @@ export default function Card({ slug }: { slug: string }) {
   const refresh = () => void readPushState().then(setState, () => setState('unsupported'));
 
   useEffect(() => {
-    refresh();
+    // Failing costs nothing: the card says what the browser says, as it always has.
+    void readPushState().then(async (found) => {
+      if (found === 'on') await saveThisDevice().catch(() => {});
+      setState(found);
+    }, () => setState('unsupported'));
     api.config().then((config) => setPublicKey(config.vapidPublicKey), () => setPublicKey(''));
   }, []);
 

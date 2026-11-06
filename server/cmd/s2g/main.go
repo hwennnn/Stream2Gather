@@ -29,8 +29,12 @@ import (
 	"stream2gather/migrations"
 )
 
-// A closing socket waits up to five seconds for a dead peer's reply.
-const shutdownTimeout = 10 * time.Second
+const (
+	// A closing socket waits up to five seconds for a dead peer's reply.
+	shutdownTimeout = 10 * time.Second
+	// A request's whole body must arrive in this long. Bodies are small.
+	readTimeout = 30 * time.Second
+)
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -142,19 +146,15 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	rooms := hub.New(db, live, rdb, catalog, log)
 	go rooms.Run(ctx)
 
-	server := &http.Server{
-		Addr: cfg.HTTPAddr,
-		Handler: (&api.Server{
-			DB: db, Live: live, Pool: pool, Redis: rdb, Hub: rooms, Catalog: catalog,
-			Issuer: issuer, Sink: sink, Log: log,
-			PublicOrigin: cfg.PublicOrigin, WebDir: cfg.WebDir, Secure: cfg.Env != "dev",
-			DirectMedia: cfg.AllowDirectMedia, TrustedProxy: cfg.TrustedProxy,
-			Clerk: clerkVerifier(cfg), ClerkPublishableKey: cfg.ClerkPublishable,
-			Voice: cfg.LiveKit, VAPIDPublicKey: cfg.VAPID.PublicKey,
-			Vimeo: cfg.EnableVimeo, Twitch: cfg.EnableTwitch, TwitchParent: cfg.TwitchParent,
-		}).Handler(),
-		ReadHeaderTimeout: 5 * time.Second,
-	}
+	server := newHTTPServer(cfg.HTTPAddr, (&api.Server{
+		DB: db, Live: live, Pool: pool, Redis: rdb, Hub: rooms, Catalog: catalog,
+		Issuer: issuer, Sink: sink, Log: log,
+		PublicOrigin: cfg.PublicOrigin, WebDir: cfg.WebDir, Secure: cfg.Env != "dev",
+		DirectMedia: cfg.AllowDirectMedia, TrustedProxy: cfg.TrustedProxy,
+		Clerk: clerkVerifier(cfg), ClerkPublishableKey: cfg.ClerkPublishable,
+		Voice: cfg.LiveKit, VAPIDPublicKey: cfg.VAPID.PublicKey,
+		Vimeo: cfg.EnableVimeo, Twitch: cfg.EnableTwitch, TwitchParent: cfg.TwitchParent,
+	}).Handler(), readTimeout)
 
 	stopped := make(chan struct{})
 	go func() {
@@ -176,6 +176,18 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	}
 	<-stopped
 	return nil
+}
+
+// newHTTPServer gives a slow client a time limit. A hijacked WebSocket keeps none
+// of these: Go clears the connection's deadlines when it is handed over.
+func newHTTPServer(addr string, handler http.Handler, read time.Duration) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       read,
+		IdleTimeout:       2 * time.Minute,
+	}
 }
 
 // clerkVerifier returns nil, not a typed nil, so guests keep working without keys.

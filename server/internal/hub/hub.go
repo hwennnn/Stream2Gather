@@ -66,12 +66,13 @@ type Hub struct {
 	recorder Recorder
 
 	// Timings are fields so tests need not wait them out.
-	idleTimeout  time.Duration
-	hostGrace    time.Duration
-	touchEvery   time.Duration
-	snapshots    time.Duration
-	keepAlive    time.Duration
-	sessionCheck time.Duration
+	idleTimeout     time.Duration
+	hostGrace       time.Duration
+	touchEvery      time.Duration
+	snapshots       time.Duration
+	keepAlive       time.Duration
+	sessionCheck    time.Duration
+	commandPatience time.Duration
 
 	// mu is held across Redis subscribes, which keeps them in order. Delivery
 	// must never wait for that, so it reads active instead of rooms.
@@ -94,12 +95,13 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 		log:     log,
 		pubsub:  rdb.Subscribe(context.Background()),
 
-		idleTimeout:  idleTimeout,
-		hostGrace:    hostGrace,
-		touchEvery:   touchEvery,
-		snapshots:    snapshotEvery,
-		keepAlive:    keepAliveEvery,
-		sessionCheck: sessionCheckEvery,
+		idleTimeout:     idleTimeout,
+		hostGrace:       hostGrace,
+		touchEvery:      touchEvery,
+		snapshots:       snapshotEvery,
+		keepAlive:       keepAliveEvery,
+		sessionCheck:    sessionCheckEvery,
+		commandPatience: opTimeout,
 
 		rooms: make(map[string]*liveRoom),
 	}

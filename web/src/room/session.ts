@@ -19,7 +19,7 @@ export type ChatLine = Omit<ChatMessage, 'id'> & {
 };
 
 /** Something the room itself said. */
-type RoomLine = { id: string; text: string; url?: string; createdAt: string };
+type RoomLine = { id: string; text: string; url?: string; arrived?: string; createdAt: string };
 
 export type ChatEntry = ChatLine | ({ kind: 'system' } & RoomLine);
 
@@ -514,6 +514,8 @@ export class RoomSession {
       settings: data.state.settings,
       members: data.members ?? [],
       viewerStates: {},
+      // The server can announce a join before it has told this page who it is.
+      messages: this.view.messages.filter((entry) => entry.kind !== 'system' || entry.arrived !== data.self.userId),
     });
     this.addLines(data.lines ?? []);
     this.playbackListener(data.state.playback, true);
@@ -547,10 +549,10 @@ export class RoomSession {
     this.update({ messages: inTimeOrder([...missing, ...lines]) });
   }
 
-  /** The server writes these, so every viewer reads the same history. */
+  /** The server writes these, so every viewer reads the same history, bar their own arrival. */
   private addLines(lines: RoomLine[]): void {
     const known = new Set(this.view.messages.map(serverIdOf));
-    const missing = lines.filter((line) => !known.has(line.id)).map((line): ChatEntry => ({ ...line, kind: 'system' }));
+    const missing = lines.filter((line) => !known.has(line.id) && line.arrived !== this.view.self?.userId).map((line): ChatEntry => ({ ...line, kind: 'system' }));
     if (missing.length > 0) this.update({ messages: inTimeOrder([...missing, ...this.view.messages]) });
   }
 

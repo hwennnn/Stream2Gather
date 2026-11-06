@@ -96,6 +96,76 @@ func TestOwnerLimitHoldsUnderParallelCreates(t *testing.T) {
 	}
 }
 
+func TestJoiningNeedsTheInviteAndStopsAtFifty(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	owner, as := signUp(t, s, "Hana")
+	slug, token := newCrew(t, s, as)
+	joinPath := "/v1/crews/" + slug + "/join"
+	body := `{"token":"` + token + `"}`
+
+	friend, friendAs := signUp(t, s, "Mika")
+	if response, got := serve(s, http.MethodPost, joinPath, `{"token":"wrong"}`, friendAs); response.Code != http.StatusForbidden || got["code"] != "invalid_invite" {
+		t.Fatalf("wrong token: %d %s", response.Code, response.Body)
+	}
+	if response, _ := serve(s, http.MethodGet, "/v1/crews/"+slug, "", friendAs); response.Code != http.StatusForbidden {
+		t.Fatalf("home before joining: %d", response.Code)
+	}
+	if response, _ := serve(s, http.MethodPost, joinPath, body, friendAs); response.Code != http.StatusOK {
+		t.Fatalf("join: %d %s", response.Code, response.Body)
+	}
+	if response, _ := serve(s, http.MethodPost, joinPath, `{"token":"old"}`, friendAs); response.Code != http.StatusOK {
+		t.Fatalf("a member's old link must still work: %d", response.Code)
+	}
+	response, home := serve(s, http.MethodGet, "/v1/crews/"+slug, "", friendAs)
+	if response.Code != http.StatusOK || home["name"] != "Movie night" || home["ownerId"] != owner.Subject {
+		t.Fatalf("home: %d %s", response.Code, response.Body)
+	}
+	roster := home["roster"].([]any)
+	if len(roster) != 2 || roster[0].(map[string]any)["userId"] != owner.Subject || roster[1].(map[string]any)["userId"] != friend.Subject {
+		t.Fatalf("roster: %s", response.Body)
+	}
+
+	var crewID string
+	err := pool.QueryRow(ctx, `SELECT c.id FROM crews c JOIN rooms r ON r.id = c.room_id WHERE r.slug = $1`, slug).Scan(&crewID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range store.MaxCrewMembers - 3 {
+		extra, _ := signUp(t, s, "Extra")
+		if _, err := pool.Exec(ctx, `INSERT INTO crew_members (crew_id, user_id) VALUES ($1, $2)`, crewID, extra.Subject); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// The last place goes to one of these, whatever order they arrive in.
+	codes := make(chan int, 2)
+	var group sync.WaitGroup
+	for range cap(codes) {
+		group.Go(func() {
+			_, late := signUp(t, s, "Late")
+			response, _ := serve(s, http.MethodPost, joinPath, body, late)
+			codes <- response.Code
+		})
+	}
+	group.Wait()
+	if first, second := <-codes, <-codes; first+second != http.StatusOK+http.StatusConflict {
+		t.Fatalf("racing for the last place: %d and %d", first, second)
+	}
+}
+
+func TestGuestsGetNoCrewHomeOrMembership(t *testing.T) {
+	s, _ := stackServer(t)
+	_, as := signUp(t, s, "Hana")
+	slug, token := newCrew(t, s, as)
+	guest := signedIn(t, s, auth.Claims{Subject: "g_" + ids.New(), Name: "Guest"})
+	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, guest); response.Code != http.StatusUnauthorized {
+		t.Fatalf("join as guest: %d", response.Code)
+	}
+	if response, _ := serve(s, http.MethodGet, "/v1/crews/"+slug, "", guest); response.Code != http.StatusUnauthorized {
+		t.Fatalf("home as guest: %d", response.Code)
+	}
+}
+
 func TestMembersOnlyRoomTurnsNonMembersAwayAtTheTicket(t *testing.T) {
 	s, pool := stackServer(t)
 	owner, as := signUp(t, s, "Hana")
@@ -126,5 +196,9 @@ func TestRoomWithoutACrewIsUntouched(t *testing.T) {
 	response, body := serve(s, http.MethodGet, "/v1/rooms/"+record.Slug, "", fresh())
 	if response.Code != http.StatusOK || body["crew"] != nil {
 		t.Fatalf("preview: %d %s", response.Code, response.Body)
+	}
+	_, as := signUp(t, s, "Hana")
+	if response, _ := serve(s, http.MethodGet, "/v1/crews/"+record.Slug, "", as); response.Code != http.StatusNotFound {
+		t.Fatalf("crew home: %d", response.Code)
 	}
 }

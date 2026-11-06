@@ -1,8 +1,11 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"time"
 
 	"stream2gather/internal/auth"
@@ -14,6 +17,8 @@ import (
 // crewRoutes adds the crew routes. Track A owns this file.
 func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/crews", s.createCrew)
+	mux.HandleFunc("GET /v1/crews/{slug}", s.crewHome)
+	mux.HandleFunc("POST /v1/crews/{slug}/join", s.joinCrew)
 }
 
 // crewSummary is what GET /v1/rooms/{slug} says about a room's crew.
@@ -67,10 +72,41 @@ func (s *Server) account(w http.ResponseWriter, r *http.Request) (auth.Claims, b
 	return claims, true
 }
 
+// findCrew loads the crew at this address. Callers decide what this caller may see.
+func (s *Server) findCrew(w http.ResponseWriter, r *http.Request) (store.Room, store.Crew, bool) {
+	record, ok := s.findRoom(w, r)
+	if !ok {
+		return store.Room{}, store.Crew{}, false
+	}
+	crew, err := s.DB.CrewOfRoom(r.Context(), record)
+	if errors.Is(err, store.ErrNotFound) {
+		writeProblem(w, http.StatusNotFound, "crew_not_found", "This room has no crew.")
+		return store.Room{}, store.Crew{}, false
+	}
+	if err != nil {
+		s.internal(w, err)
+		return store.Room{}, store.Crew{}, false
+	}
+	return record, crew, true
+}
+
+// publishCrew tells everyone in the room to fetch the crew again. The change has
+// already been made, so failing to say so is not worth failing the request.
+func (s *Server) publishCrew(ctx context.Context, roomID, changed string) {
+	event, _ := json.Marshal(map[string]any{"t": "crew", "d": map[string]string{"changed": changed}})
+	if err := s.Live.Publish(context.WithoutCancel(ctx), roomID, event); err != nil {
+		s.Log.Warn("crew event not sent", "room", roomID, "error", err)
+	}
+}
+
 func (s *Server) crewFailed(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, store.ErrCrewLimit):
 		writeProblem(w, http.StatusConflict, "crew_limit", "You can have up to 10 crews.")
+	case errors.Is(err, store.ErrCrewFull):
+		writeProblem(w, http.StatusConflict, "crew_full", "This crew is full.")
+	case errors.Is(err, store.ErrInvalidInvite):
+		writeProblem(w, http.StatusForbidden, "invalid_invite", "This invite link has expired. Ask for a new one.")
 	default:
 		s.internal(w, err)
 	}
@@ -117,4 +153,65 @@ func (s *Server) createCrew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"slug": record.Slug, "name": name, "inviteToken": crew.InviteToken})
+}
+
+func (s *Server) joinCrew(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	var request struct {
+		Token string `json:"token"`
+	}
+	if !decode(w, r, &request) {
+		return
+	}
+	record, crew, ok := s.findCrew(w, r)
+	if !ok {
+		return
+	}
+	if err := s.DB.JoinCrew(r.Context(), crew.ID, claims.Subject, request.Token); err != nil {
+		s.crewFailed(w, err)
+		return
+	}
+	s.publishCrew(r.Context(), record.ID, "members")
+	writeJSON(w, http.StatusOK, map[string]bool{"joined": true})
+}
+
+// crewDocument is the crew home. Who is here and what is playing come from the
+// live room, so nothing from a video's source is stored for it.
+type crewDocument struct {
+	preview
+	OwnerID     string             `json:"ownerId"`
+	InviteToken string             `json:"inviteToken"`
+	GuestAccess bool               `json:"guestAccess"`
+	Roster      []store.CrewMember `json:"roster"`
+}
+
+func (s *Server) crewHome(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	record, crew, ok := s.findCrew(w, r)
+	if !ok {
+		return
+	}
+	roster, err := s.DB.CrewRoster(r.Context(), crew.ID)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !slices.ContainsFunc(roster, func(m store.CrewMember) bool { return m.UserID == claims.Subject }) {
+		writeProblem(w, http.StatusForbidden, "not_member", "Join the crew to see this.")
+		return
+	}
+	live, err := s.buildPreview(r.Context(), record)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, crewDocument{
+		preview: live, OwnerID: record.OwnerID, InviteToken: crew.InviteToken, GuestAccess: crew.GuestAccess, Roster: roster,
+	})
 }

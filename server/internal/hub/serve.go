@@ -20,6 +20,12 @@ import (
 func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket) {
 	ws.SetReadLimit(maxMessageBytes)
 
+	if !h.admit(ticket.Address) {
+		_ = ws.Close(websocket.StatusPolicyViolation, "too many connections")
+		return
+	}
+	defer h.dismiss(ticket.Address)
+
 	r, err := h.acquire(ctx, ticket.RoomID)
 	if errors.Is(err, errClosing) {
 		_ = ws.Close(websocket.StatusGoingAway, "server restarting")
@@ -81,6 +87,32 @@ func readMessage(ctx context.Context, ws *websocket.Conn, idle time.Duration) ([
 	defer cancel()
 	_, payload, err := ws.Read(ctx)
 	return payload, err
+}
+
+// admit counts a socket against its address, or refuses it. A socket with no
+// address is one the server made for itself.
+func (h *Hub) admit(address string) bool {
+	if address == "" {
+		return true
+	}
+	h.addressMu.Lock()
+	defer h.addressMu.Unlock()
+	if h.addresses[address] >= h.maxPerAddress {
+		return false
+	}
+	h.addresses[address]++
+	return true
+}
+
+func (h *Hub) dismiss(address string) {
+	if address == "" {
+		return
+	}
+	h.addressMu.Lock()
+	defer h.addressMu.Unlock()
+	if h.addresses[address]--; h.addresses[address] <= 0 {
+		delete(h.addresses, address)
+	}
 }
 
 // keepAlive ends a connection whose peer no longer answers at all. A ping waits

@@ -3,27 +3,28 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import { account, useAccount } from './auth/account';
 import { Landing } from './routes/Landing';
-import { loadRoomPage } from './routes/router';
+import { loadRoomPage, routeFor } from './routes/router';
 import { ErrorBoundary } from './ui/ErrorBoundary';
 
 const ClerkBridge = lazy(() => import('./auth/ClerkBridge'));
 const RoomPage = lazy(() => loadRoomPage().then((module) => ({ default: module.RoomPage })));
+const DeepLink = lazy(() => import('./routes/DeepLink'));
 
-const slugFromPath = () => /^\/r\/([^/]+)/.exec(window.location.pathname)?.[1] ?? null;
+const currentRoute = () => routeFor(window.location.pathname);
 
 const App = () => {
-  const [slug, setSlug] = useState(slugFromPath);
+  const [route, setRoute] = useState(currentRoute);
 
   useEffect(() => {
-    const update = () => setSlug(slugFromPath());
+    const update = () => setRoute(currentRoute());
     window.addEventListener('popstate', update);
     return () => window.removeEventListener('popstate', update);
   }, []);
 
-  if (!slug) return <Landing />;
+  if (route.page === 'landing') return <Landing />;
   return (
     <Suspense fallback={<div className="h-full bg-ink" />}>
-      <RoomPage key={slug} slug={slug} />
+      {route.page === 'room' ? <RoomPage key={route.slug} slug={route.slug} /> : <DeepLink route={route} />}
     </Suspense>
   );
 };

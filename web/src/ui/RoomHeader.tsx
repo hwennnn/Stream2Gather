@@ -1,14 +1,21 @@
-import type { ReactNode } from 'react';
-import type { RoomView } from '../room/session';
+import { lazy, type ReactNode } from 'react';
+import type { PlayerAdapter } from '../players/types';
+import type { RoomSession, RoomView } from '../room/session';
 import { AccountMenu } from './AccountMenu';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
-import { isLocked } from './rules';
+import { isHost, isLocked } from './rules';
+import { Slot } from './Slot';
+
+const KeepRoom = lazy(() => import('../crew/KeepRoom'));
+const VoiceButton = lazy(() => import('../voice/VoiceButton'));
 
 const SHOWN = 4;
 
 type RoomHeaderProps = {
+  session: RoomSession;
   view: RoomView;
+  adapter: () => PlayerAdapter | null;
   /** Controls that move up here when a sideways phone hides the bar under the player. */
   landscapeControls: ReactNode;
   onAccountOpen: () => void;
@@ -23,7 +30,7 @@ export const HostChip = ({ className = '' }: { className?: string }) => (
   </span>
 );
 
-export const RoomHeader = ({ view, landscapeControls, onAccountOpen, onInvite, onPeople }: RoomHeaderProps) => {
+export const RoomHeader = ({ session, view, adapter, landscapeControls, onAccountOpen, onInvite, onPeople }: RoomHeaderProps) => {
   const extra = view.members.length - SHOWN;
   return (
     <header className="room-header flex h-[52px] shrink-0 items-center gap-3 border-b border-line px-4 land:h-10 land:gap-2 land:pr-[max(0.5rem,env(safe-area-inset-right))] land:pl-[max(0.75rem,env(safe-area-inset-left))]">
@@ -50,6 +57,14 @@ export const RoomHeader = ({ view, landscapeControls, onAccountOpen, onInvite, o
             </span>
           )}
         </button>
+        <Slot>
+          <VoiceButton session={session} view={view} adapter={adapter} />
+        </Slot>
+        {isHost(view) && (
+          <Slot>
+            <KeepRoom session={session} view={view} />
+          </Slot>
+        )}
         <button type="button" onClick={onInvite} className="btn btn-primary">
           Invite
         </button>

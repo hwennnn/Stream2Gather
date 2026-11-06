@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
+import { lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { api, ApiError, type RoomPreview } from '../api/http';
 import { account, useAccount } from '../auth/account';
 import { RoomSession, type RoomView } from '../room/session';
@@ -12,12 +12,15 @@ import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
 import { canControl, toastLift } from '../ui/rules';
+import { Slot } from '../ui/Slot';
 import { JumpToast, ToastStack, useToasts } from '../ui/Toasts';
 import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
 import { useMediaQuery } from '../ui/useMediaQuery';
 import { useOfflineNotice } from '../ui/useOfflineNotice';
 import { usePageVisible } from '../ui/usePageVisible';
 import { useRoomPlayer } from '../ui/useRoomPlayer';
+
+const CrewHome = lazy(() => import('./CrewHome'));
 
 type Tab = 'chat' | 'queue' | 'people';
 
@@ -79,7 +82,13 @@ export const RoomPage = ({ slug }: { slug: string }) => {
   if (!joined) {
     if (ending) return <DeadEnd {...ending} onRetry={ending === ENDINGS.unreachable ? () => setAttempt(attempt + 1) : undefined} />;
     if (preview && isFull(preview, user?.id)) return <DeadEnd {...fullRoom(preview.members.length, preview.maxMembers)} />;
-    return <JoinGate preview={preview} onJoin={join} />;
+    const gate = <JoinGate preview={preview} onJoin={join} />;
+    if (!preview?.crew) return gate;
+    return (
+      <Slot fallback={gate}>
+        <CrewHome slug={slug} preview={preview} onJoin={join} />
+      </Slot>
+    );
   }
   return <Room slug={slug} copied={copied} />;
 };
@@ -290,7 +299,9 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
     <div data-fullscreen={fullscreen.on} className="room-shell flex h-dvh flex-col bg-ink">
       {!fullscreen.on && (
         <RoomHeader
+          session={session}
           view={view}
+          adapter={player.adapter}
           onAccountOpen={() => setTheatre(false)}
           onInvite={() => void invite()}
           onPeople={() => {

@@ -29,6 +29,9 @@ export type QueueMode = 'now' | 'next' | 'end';
 /** Who paused is the room's business, not the sync engine's. */
 export type RoomPlayback = Playback & { pausedBy?: string; pausedById?: string };
 
+/** What changed about the room's crew. The event carries no data, so refetch it. */
+export type CrewChange = 'settings' | 'members' | 'watchlist';
+
 type Reaction = { id: number; emoji: string; name: string };
 
 type Notice = { id: number; text: string; url?: string };
@@ -149,6 +152,7 @@ export class RoomSession {
   private socket: WebSocket | null = null;
   private listeners = new Set<() => void>();
   private playbackListener: (playback: Playback, resync: boolean) => void = () => {};
+  private crewListeners = new Set<(changed: CrewChange) => void>();
   private pinger: number | null = null;
   private reconnectTimer: number | null = null;
   private attempts = 0;
@@ -193,6 +197,11 @@ export class RoomSession {
   /** Resync is true when the room is insisting, not reporting a change. */
   onPlayback(listener: (playback: Playback, resync: boolean) => void): void {
     this.playbackListener = listener;
+  }
+
+  onCrew(listener: (changed: CrewChange) => void): () => void {
+    this.crewListeners.add(listener);
+    return () => this.crewListeners.delete(listener);
   }
 
   async connect(): Promise<void> {
@@ -376,6 +385,9 @@ export class RoomSession {
         break;
       case 'notice':
         this.notice(d);
+        break;
+      case 'crew':
+        for (const listener of this.crewListeners) listener((d as { changed: CrewChange }).changed);
         break;
       case 'error':
         this.failed(d);

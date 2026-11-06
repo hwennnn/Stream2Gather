@@ -536,6 +536,210 @@ body {
   width: 100%;
 }
 
+/* ---- Seats ---------------------------------------------------------------
+ * The room's signature. Fixed places under the screen, one per person, in the
+ * order they sat down. Nothing here is ever drawn over the player.
+ */
+
+.front-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  height: var(--seats);
+  padding-inline: 1rem;
+}
+
+/* On a phone, and sideways, the seats sit in the top bar, which leaves the height for chat. */
+@media (max-width: 639px), (orientation: landscape) and (max-height: 500px) {
+  .front-row {
+    display: none;
+  }
+}
+
+.seats {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.seat {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 4.5rem;
+  color: var(--color-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.seat-disc,
+.seat-empty,
+.seat-more {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+}
+
+.seat-disc {
+  animation: seat-arrive 140ms var(--ease-room) both;
+}
+
+.seat-empty {
+  border: 1px dashed #55534f;
+  color: var(--color-muted);
+}
+
+.seat-more {
+  background: var(--color-raised);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.seat-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  color: var(--color-muted);
+  cursor: pointer;
+  transition: color 140ms var(--ease-room);
+}
+
+.seat-invite:hover,
+.seat-invite[data-alone='true'] {
+  color: var(--color-text);
+}
+
+.seat-invite:hover .seat-empty,
+.seat-invite[data-alone='true'] .seat-empty {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+/* Whoever just touched the player: their own hue, around their own seat. */
+.seat[data-acting='true'] {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.seat[data-acting='true'] .seat-disc {
+  box-shadow:
+    0 0 0 2px var(--color-ink),
+    0 0 0 4px var(--hue);
+}
+
+.seat[data-away='true'] .seat-disc {
+  opacity: 0.35;
+}
+
+.seat[data-away='true'] {
+  color: var(--color-dim);
+}
+
+.seat[data-trouble='true'] {
+  color: var(--color-warn);
+}
+
+.seat[data-trouble='true'] .seat-disc {
+  box-shadow:
+    0 0 0 2px var(--color-ink),
+    0 0 0 3px var(--color-warn);
+}
+
+/* A reaction lands on the seat that sent it, bigger than the seat, and leaves. */
+.seat-reaction {
+  position: absolute;
+  inset: -0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--color-ink);
+  font-size: 2rem;
+  line-height: 1;
+  animation: seat-react 140ms var(--ease-room) both;
+}
+
+.seats[data-gate='true'] .seat {
+  width: 3.5rem;
+}
+
+.seat-you {
+  color: var(--color-text);
+}
+
+/* In the top bar the row is discs only, so all eight fit on a phone. */
+.seats[data-compact='true'] {
+  gap: 0;
+}
+
+.seats[data-compact='true'] .seat {
+  width: 2.125rem;
+  height: 2.75rem;
+  justify-content: center;
+}
+
+.seats[data-compact='true'] .seat-name {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.seats[data-compact='true'] .seat-invite {
+  height: 100%;
+  justify-content: center;
+}
+
+.seats[data-compact='true'] .seat-disc,
+.seats[data-compact='true'] .seat-empty,
+.seats[data-compact='true'] .seat-more {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.seats[data-compact='true'] .seat-disc span {
+  font-size: 0.6875rem;
+}
+
+.seats[data-compact='true'] .seat-reaction {
+  inset: -0.25rem;
+  font-size: 1.375rem;
+}
+
+@keyframes seat-arrive {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+@keyframes seat-react {
+  from {
+    transform: scale(0.9);
+  }
+}
+
 /* ---- Rows ----------------------------------------------------------------
  * The one primitive: a list of these, ruled, with the title first.
  */

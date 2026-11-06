@@ -21,10 +21,15 @@ const row = (page, title) => ui.results(page).getByRole('listitem').filter({ has
 const upNextTitles = (page) =>
   ui.upNext(page).getByRole('listitem').evaluateAll((rows) => rows.map((li) => li.querySelector('p')?.textContent ?? ''));
 
-const pressRow = async (page, title, action) => {
-  await row(page, title).hover();
-  await row(page, title).getByRole('button', { name: `${action}: ${title}` }).click();
+/** Play now waits behind ⋯ on every row, so nobody interrupts the room by reflex. */
+const press = async (line, title, action) => {
+  await line.hover();
+  if (action !== 'Play now') return line.getByRole('button', { name: `${action}: ${title}` }).click();
+  await line.getByRole('button', { name: `More for ${title}` }).click();
+  return line.getByRole('button', { name: 'Play now', exact: true }).click();
 };
+
+const pressRow = (page, title, action) => press(row(page, title), title, action);
 
 flow('search: results come back with title, channel and length', async (t) => {
   const a = await t.person('Ana');
@@ -49,7 +54,7 @@ flow('search: from the empty stage, a result starts the room', async (t) => {
   await joinRoom(b, room.url);
   await search(a.page, 'something');
   await t.see('results on the stage', row(a.page, rain.title));
-  await pressRow(a.page, rain.title, 'Queue');
+  await pressRow(a.page, rain.title, 'Add');
   await t.see('Ana watches it', ui.bar(a.page).getByRole('heading', { name: rain.title }));
   await t.see('Ben watches it', ui.bar(b.page).getByRole('heading', { name: rain.title }));
 });
@@ -63,12 +68,12 @@ flow('search row: Play now replaces the video for everyone and offers Undo', asy
   await t.see('the row says so', row(a.page, train.title).getByText(/added|playing now/i));
 });
 
-flow('search row: Play next lands first in line, Queue lands last', async (t) => {
+flow('search row: Play next lands first in line, Add lands last', async (t) => {
   const { a, b } = await twoInRoom(t);
   await addByMessage(t, a.page, [coffee.url]);
   await search(a.page, 'mix');
-  await pressRow(a.page, rain.title, 'Queue');
-  await t.see('Queue answers', row(a.page, rain.title).getByText(/added/i));
+  await pressRow(a.page, rain.title, 'Add');
+  await t.see('Add answers', row(a.page, rain.title).getByText(/added/i));
   await pressRow(a.page, train.title, 'Play next');
   await t.see('Play next answers', row(a.page, train.title).getByText(/added/i));
   await a.page.keyboard.press('Escape');
@@ -189,10 +194,7 @@ const three = async (t) => {
 
 const upNextRow = (page, title) => ui.upNext(page).getByRole('listitem').filter({ hasText: title });
 
-const pressUpNext = async (page, title, action) => {
-  await upNextRow(page, title).hover();
-  await upNextRow(page, title).getByRole('button', { name: `${action}: ${title}` }).click();
-};
+const pressUpNext = (page, title, action) => press(upNextRow(page, title), title, action);
 
 flow('queue: Move up, Move down and Remove reach everyone', async (t) => {
   const { a, b } = await three(t);

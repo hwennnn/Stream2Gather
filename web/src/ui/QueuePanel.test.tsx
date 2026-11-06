@@ -76,7 +76,9 @@ describe('tapping a queue row', () => {
 
   it('plays only from the tray, on purpose', () => {
     const { session, rowTap } = setup();
+    expect(screen.queryByRole('button', { name: /^Play now:/ })).toBeNull();
     fireEvent.click(rowTap() as Element);
+    expect(screen.getByRole('button', { name: 'Play now' }).className).not.toContain('btn-primary');
     fireEvent.click(screen.getByRole('button', { name: 'Play now' }));
     expect(session.request).toHaveBeenCalledWith('queue.play', { target: 'b' });
   });

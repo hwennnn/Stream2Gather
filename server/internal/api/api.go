@@ -6,14 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -107,6 +104,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/telemetry", s.telemetry)
 	mux.HandleFunc("GET /v1/ws", s.socket)
 	mux.HandleFunc("GET /r/{slug}", s.roomPage)
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { s.pageWithCard(w, r, siteCard) })
 	mux.HandleFunc("GET /", s.static)
 	s.crewRoutes(mux)
 	s.voiceRoutes(mux)
@@ -851,28 +849,13 @@ func (s *Server) telemetry(w http.ResponseWriter, r *http.Request) {
 
 // roomPage serves the app with link-preview tags for this room.
 func (s *Server) roomPage(w http.ResponseWriter, r *http.Request) {
-	page, err := os.ReadFile(filepath.Join(s.WebDir, "index.html"))
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	title, description, image := "Join a watch party", "Watch together, perfectly in sync.", ""
-	record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug"))
-	if err == nil {
-		title = record.Name
-		if out, err := s.buildPreview(r.Context(), record); err == nil && out.NowPlaying != nil {
-			description = "Watching " + out.NowPlaying.Title
-			image = out.NowPlaying.ThumbnailURL
+	card := siteCard
+	if record, err := s.DB.RoomBySlug(r.Context(), r.PathValue("slug")); err == nil {
+		var playing *room.Media
+		if out, err := s.buildPreview(r.Context(), record); err == nil {
+			playing = out.NowPlaying
 		}
+		card = roomCard(record.Name, playing)
 	}
-
-	tags := `<meta property="og:title" content="` + html.EscapeString(title) + `">` +
-		`<meta property="og:description" content="` + html.EscapeString(description) + `">`
-	if image != "" {
-		tags += `<meta property="og:image" content="` + html.EscapeString(image) + `">`
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	_, _ = w.Write([]byte(strings.Replace(string(page), "</head>", tags+"</head>", 1)))
+	s.pageWithCard(w, r, card)
 }

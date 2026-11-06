@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../../api/http';
-import { badLink, emptyNote, failureFor, linkKinds } from './notes';
+import { badLink, emptyNote, failureFor, linkKinds, youtubeId } from './notes';
 
 describe('landing notes', () => {
   it('leaves the empty room to the link below the note', () => {
@@ -20,6 +20,16 @@ describe('landing notes', () => {
   it('still offers an empty room after other failures', () => {
     expect(failureFor(new ApiError(0, 'network', 'Could not reach the server. Try again.'), 'YouTube').canStartRoom).toBe(true);
     expect(failureFor(new Error('boom'), 'YouTube').canStartRoom).toBe(true);
+  });
+
+  it('finds the video in every way of writing a YouTube link', () => {
+    for (const link of ['https://youtu.be/dQw4w9WgXcQ', 'youtu.be/dQw4w9WgXcQ?t=3', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', 'https://m.youtube.com/watch?t=30s&v=dQw4w9WgXcQ', 'https://www.youtube.com/shorts/dQw4w9WgXcQ', 'www.youtube.com/embed/dQw4w9WgXcQ']) {
+      expect(youtubeId(link)).toBe('dQw4w9WgXcQ');
+    }
+  });
+
+  it('finds nothing in anything else', () => {
+    for (const text of ['cats playing piano', 'https://vimeo.com/76979871', 'https://youtu.be/short', 'https://www.youtube.com/watch?v=waytoolongtobeanid']) expect(youtubeId(text)).toBeNull();
   });
 
   it('names only the sources this server has on', () => {

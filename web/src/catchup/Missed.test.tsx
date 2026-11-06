@@ -12,13 +12,14 @@ afterEach(() => {
 describe('Missed', () => {
   it('offers each missed video by its link', async () => {
     vi.spyOn(catchupApi, 'missed').mockResolvedValue({
-      items: [{ itemId: 9, startedAt: '2026-11-01T20:00:00Z', moments: 4, media: { title: 'Heat' } as never }],
+      items: [{ itemId: 9, startedAt: '2026-11-01T20:00:00Z', moments: 4, media: { title: 'Heat', thumbnailUrl: '' } as never }],
     });
 
     render(<Missed slug="sundays" />);
 
-    expect((await screen.findByRole('link', { name: 'You missed this. Catch up.' })).getAttribute('href')).toBe('/r/sundays/catchup/9');
+    expect((await screen.findByRole('link', { name: 'Catch up on Heat' })).getAttribute('href')).toBe('/r/sundays/catchup/9');
     expect(screen.getByText('Heat')).toBeTruthy();
+    expect(screen.getByText(/without you\. They left 4 moments\./)).toBeTruthy();
   });
 
   it('stays out of the way with nothing to offer', async () => {

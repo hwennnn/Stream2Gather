@@ -57,7 +57,7 @@ const measureLoads = async (browser, thumbs, slug) => {
     const { context, page } = await viewer(browser, thumbs);
     const started = Date.now();
     await page.goto(`${BASE}/r/${slug}`, { waitUntil: 'commit' });
-    const button = page.getByRole('button', { name: 'Join' });
+    const button = page.getByRole('button', { name: 'Take your seat' });
     await button.and(page.locator(':enabled')).waitFor();
     const gate = Date.now() - started;
     const paints = await paintsOf(page);
@@ -242,7 +242,7 @@ const measureRoom = async (host, peer, bots) => {
 const measureTray = async (browser, thumbs, slug) => {
   const { context, page } = await viewer(browser, thumbs, { device: PHONE });
   await page.goto(`${BASE}/r/${slug}`);
-  await page.getByRole('button', { name: 'Join' }).tap();
+  await page.getByRole('button', { name: 'Take your seat' }).tap();
   await page.getByRole('tab', { name: 'Queue' }).tap();
   await sleep(1000);
   await windowed(page, 'row_expand', async () => {
@@ -286,14 +286,14 @@ const main = async () => {
     await host.page.goto(`${BASE}/r/${slug}`);
     // The host of a new room walks straight in; anyone else stops at the gate.
     const tabs = host.page.locator('[role=tablist]');
-    const join = host.page.getByRole('button', { name: 'Join' });
+    const join = host.page.getByRole('button', { name: 'Take your seat' });
     await tabs.or(join).first().waitFor();
     if (await join.isVisible()) await join.click();
     await tabs.waitFor();
 
     const peer = await viewer(browser, thumbs, { slow: false });
     await peer.page.goto(`${BASE}/r/${slug}`);
-    await peer.page.getByRole('button', { name: 'Join' }).and(peer.page.locator(':enabled')).click();
+    await peer.page.getByRole('button', { name: 'Take your seat' }).and(peer.page.locator(':enabled')).click();
     await peer.page.locator('[role=tablist]').waitFor();
 
     const bots = await seedRoom(slug);

@@ -2,11 +2,12 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'rea
 import { useAccount } from '../auth/account';
 import { Missed } from '../catchup/Missed';
 import { RecapCard } from '../recap/RecapCard';
+import { nightOf } from '../recap/words';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
 import { WhereItIs } from '../ui/JoinGate';
 import { NARROW_COLUMN, SiteHeader } from '../ui/Page';
-import { firstName } from '../ui/people';
+import { firstName, listNames } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { inviteLink, type CrewDocument } from './api';
 import { CrewAdmin, GearIcon } from './CrewSettings';
@@ -60,6 +61,43 @@ const Invite = ({ slug, home }: Pick<Props, 'slug' | 'home'>) => {
   );
 };
 
+/** How many seats a crew's page draws before it counts the rest. */
+const SEATS = 11;
+
+/** Everyone keeps their seat, here tonight or not. Whoever's in is lit, and the last place is the next person's. */
+const CrewSeats = ({ home }: { home: CrewDocument }) => {
+  const here = new Set(home.members.map(({ userId }) => userId));
+  const visitors = home.members.filter(({ userId }) => !home.roster.some((member) => member.userId === userId));
+  const everyone = [...home.roster, ...visitors];
+  return (
+    <ul aria-label="The crew" data-kept="true" className="seats mt-4">
+      {everyone.slice(0, SEATS).map((person) => (
+        <li key={person.userId} data-away={!here.has(person.userId)} data-here={here.has(person.userId)} className="seat">
+          <span className="seat-disc">
+            <Avatar person={person} labelled={false} className="size-full" />
+          </span>
+          <span className="seat-name">{firstName(person.name)}</span>
+        </li>
+      ))}
+      {everyone.length > SEATS && (
+        <li className="seat">
+          <span className="seat-more">+{everyone.length - SEATS}</span>
+        </li>
+      )}
+      <li aria-hidden="true" className="seat">
+        <span className="seat-empty" />
+      </li>
+    </ul>
+  );
+};
+
+/** Who's in now, or when the crew last sat down. */
+const whoIsIn = (home: CrewDocument, lastNight?: string): string => {
+  const names = home.members.map(({ name }) => firstName(name));
+  if (names.length > 0) return `${listNames(names)} ${names.length > 1 ? 'are' : 'is'} in.`;
+  return lastNight ? `Nobody’s in. Last together ${nightOf(lastNight)}.` : 'Nobody’s in.';
+};
+
 const Frame = ({ children }: { children: ReactNode }) => (
   <div className="flex min-h-full flex-col">
     <SiteHeader>
@@ -76,7 +114,6 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
   const [admin, setAdmin] = useState(false);
   const [sessions, setSessions] = useSessions(slug);
   const latest = sessions?.items[0];
-  const here = home.members.length;
 
   const enter = () => {
     setJoining(true);
@@ -106,32 +143,18 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
         </p>
       )}
 
-      {latest && <RecapCard key={latest.id} slug={slug} sessionId={latest.id} />}
+      <CrewSeats home={home} />
+      <p className="mt-3 text-sm text-muted">{whoIsIn(home, latest?.startedAt)}</p>
 
-      <Missed slug={slug} />
-
-      <section aria-label="Now" className="mt-6">
+      <section aria-label="Now" className="mt-3">
         {home.nowPlaying && (
-          <div className="mb-4 flex items-center gap-3">
-            <Thumb src={home.nowPlaying.thumbnailUrl} className="w-28 rounded-md" />
+          <div className="mb-3 flex items-center gap-3">
+            <Thumb src={home.nowPlaying.thumbnailUrl} className="w-20 rounded-md" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{home.nowPlaying.title}</p>
               <WhereItIs preview={home} />
             </div>
           </div>
-        )}
-        {here === 0 && <p className="mb-4 text-sm text-muted">Nobody’s here</p>}
-        {here > 0 && (
-          <ul aria-label="Here now" data-gate="true" className="seats mb-4">
-            {home.members.map((person) => (
-              <li key={person.userId} className="seat">
-                <span className="seat-disc">
-                  <Avatar person={person} labelled={false} className="size-full text-[13px]" />
-                </span>
-                <span className="seat-name">{firstName(person.name)}</span>
-              </li>
-            ))}
-          </ul>
         )}
         <button type="button" disabled={joining} onClick={enter} className="btn btn-primary h-12 w-full text-base">
           Join the room
@@ -143,6 +166,10 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
       <Suspense fallback={null}>
         <PushCard />
       </Suspense>
+
+      <Missed slug={slug} />
+
+      {latest && <RecapCard key={latest.id} slug={slug} sessionId={latest.id} people={latest.people} />}
 
       <Watchlist slug={slug} items={home.watchlist} selfId={user?.id} onChange={refresh} />
 

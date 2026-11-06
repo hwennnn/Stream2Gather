@@ -9,7 +9,7 @@ import { closedRoom, DeadEnd, ENDINGS, fullRoom, type Ending } from '../ui/DeadE
 import { JoinGate } from '../ui/JoinGate';
 import { InviteSheet } from '../ui/InviteSheet';
 import { peopleLastIn, rememberRoom } from './landing/recent';
-import { Page } from '../ui/Page';
+import { Door } from '../ui/Door';
 import { firstName } from '../ui/people';
 import { RoomStatus, useLatestAct } from '../ui/RoomStatus';
 import { useSeats } from '../ui/Seats';
@@ -175,12 +175,12 @@ const Waiting = ({ session, view }: { session: RoomSession; view: RoomView }) =>
     );
   }
   return (
-    <Page status>
-      <p className="flex items-center gap-2.5 text-muted">
+    <Door>
+      <p role="status" className="flex items-center gap-2.5 text-muted">
         <span className="spinner" />
         {view.connection === 'reconnecting' ? 'Still connecting…' : 'Joining the room…'}
       </p>
-    </Page>
+    </Door>
   );
 };
 

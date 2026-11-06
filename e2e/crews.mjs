@@ -79,6 +79,9 @@ await mika.page.goto(invite);
 await button(mika, 'Join the crew').click();
 check('joining opens the home', await visible(button(mika, /Join the room/)));
 check('joining strips the token', !mika.page.url().includes('join='), mika.page.url());
+const crewSeats = mika.page.getByRole('list', { name: 'The crew' });
+check('everyone on the crew keeps a seat', (await crewSeats.innerText()).includes('Hana') && (await crewSeats.innerText()).includes('Mika'));
+check('nobody in is shown as away', (await crewSeats.locator('.seat[data-away="true"]').count()) === 2);
 await hana.page.reload();
 await button(hana, 'Members and settings').click();
 check('the owner sees the new member', await visible(hana.page.getByRole('list').getByText('Mika')));
@@ -90,7 +93,7 @@ const guest = await person(null);
 await guest.page.goto(invite);
 check('a visitor is told what they get', await visible(guest.page.getByText(/You can watch, chat and react tonight/)));
 await guest.page.screenshot({ path: `${OUT}/crew-gate.png` });
-await guest.page.getByRole('button', { name: 'Join', exact: true }).click();
+await guest.page.getByRole('button', { name: 'Take your seat', exact: true }).click();
 check('guest reaches the room', await visible(guest.page.getByRole('tab', { name: 'People' })));
 await guest.context.close();
 
@@ -116,7 +119,7 @@ await sleep(300);
 const shut = await person(null);
 await shut.page.goto(hana.page.url());
 check('members only says whose room it is', await visible(shut.page.getByText('This room is for its crew. Ask them for an invite.')));
-check('members only has no guest way in', (await shut.page.getByRole('button', { name: 'Join', exact: true }).count()) === 0);
+check('members only has no guest way in', (await shut.page.getByRole('button', { name: 'Take your seat', exact: true }).count()) === 0);
 await shut.context.close();
 
 // Removing someone ends the old invite.
@@ -142,7 +145,7 @@ const friend = await person('Sol');
 const passerby = await person(null);
 for (const viewer of [friend, passerby]) {
   await viewer.page.goto(roomUrl);
-  await button(viewer, 'Join').click();
+  await button(viewer, 'Take your seat').click();
   await viewer.page.getByRole('tab', { name: 'People' }).waitFor();
 }
 await sleep(500);

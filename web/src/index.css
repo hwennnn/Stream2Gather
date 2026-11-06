@@ -1294,3 +1294,379 @@ body {
     animation: none;
   }
 }
+
+/* ---- The door ------------------------------------------------------------
+ * Every page that isn't the room is a view of it: the screen, the seats under it,
+ * and a rail where the chat will be. Nothing here touches a live player.
+ */
+
+.door {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.door-stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.door-screen {
+  position: relative;
+  flex: none;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--color-stage);
+}
+
+.door-screen img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: enter 140ms var(--ease-room) both;
+}
+
+.door-row {
+  flex: none;
+  gap: 0.75rem;
+  padding: 1rem var(--gutter);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.door-row .seat {
+  align-items: center;
+  width: 4.5rem;
+  font-size: 0.8125rem;
+}
+
+.door-row .seat-disc,
+.door-row .seat-empty,
+.door-row .seat-more {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.door-row .seat-disc > span {
+  font-size: 1.125rem;
+}
+
+.door-rail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1.25rem var(--gutter) 1.5rem;
+}
+
+/* Your place, before you're in it: your outline, your initials. */
+.door-mine {
+  border: 1.5px dashed var(--hue, var(--color-text));
+  color: var(--hue, var(--color-text));
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.door-sit {
+  animation: door-sit 140ms var(--ease-room) both;
+}
+
+@keyframes door-sit {
+  from {
+    transform: scale(1.12);
+    opacity: 0.4;
+  }
+}
+
+/* Wide enough, the frame is the room's own: the screen takes what's left and the rail keeps its width. */
+@media (min-width: 1024px), (orientation: landscape) and (max-height: 500px) {
+  .door {
+    grid-template-columns: minmax(0, 1fr) var(--rail);
+  }
+
+  .door-screen {
+    flex: 1;
+    aspect-ratio: auto;
+  }
+
+  .door-row {
+    border-bottom: 0;
+  }
+
+  /* The words sit level with the seats, where the eye lands coming down from the screen. */
+  .door-rail {
+    justify-content: flex-end;
+    border-left: 1px solid var(--color-line);
+  }
+}
+
+/* A sideways phone: short, so the row gives up its size and the rail scrolls if it has to. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .door-row {
+    padding-block: 0.5rem;
+  }
+
+  .door-row .seat-disc,
+  .door-row .seat-empty,
+  .door-row .seat-more {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .door-rail {
+    justify-content: flex-start;
+    padding-block: 0.75rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .door-row {
+    gap: 0.25rem;
+    justify-content: space-between;
+  }
+
+  .door-row .seat {
+    flex: 0 1 4rem;
+    min-width: 0;
+  }
+
+  .door-row .seat-disc,
+  .door-row .seat-empty,
+  .door-row .seat-more {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+/* ---- The landing's picture -----------------------------------------------
+ * Five seconds of a room, played once by delays alone, and it stops. Opacity and
+ * transform only, so nothing here costs a layout. Reduced motion gets the last frame.
+ */
+
+.picture-row {
+  margin-top: 1rem;
+  padding-top: 2.25rem;
+}
+
+.picture-row .seats {
+  justify-content: space-between;
+}
+
+/* As wide as the disc, so the row starts and stops on the page's edges. Names may run past it. */
+.picture-seat {
+  flex: none;
+  align-items: center;
+  width: 3.5rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.picture-seat .seat-name {
+  max-width: none;
+  overflow: visible;
+}
+
+.picture-open {
+  border-color: var(--color-text);
+}
+
+.picture-seat .seat-disc,
+.picture-seat .seat-empty {
+  width: 3.5rem;
+  height: 3.5rem;
+}
+
+.picture-seat .seat-disc > span {
+  font-size: 1.125rem;
+}
+
+.picture-seat .seat-disc {
+  animation-delay: var(--sat);
+}
+
+.picture-say {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  opacity: 0;
+  translate: -50% 0;
+  animation: picture-say 1100ms var(--ease-room) var(--at) both;
+}
+
+.picture-say[data-stays='true'] {
+  animation-name: enter;
+  animation-duration: 140ms;
+  opacity: 1;
+}
+
+.picture-ring {
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--hue);
+  border-radius: 999px;
+  animation: enter 140ms var(--ease-room) var(--at) both;
+}
+
+.picture-react {
+  opacity: 0;
+  animation: picture-say 1100ms var(--ease-room) var(--at) both;
+}
+
+.picture-missing {
+  color: var(--color-text);
+  animation: enter 140ms var(--ease-room) var(--at) both;
+}
+
+.picture-status {
+  display: grid;
+  margin-top: 0.75rem;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.picture-status > span {
+  grid-area: 1 / 1;
+}
+
+.picture-before {
+  animation: picture-out 140ms var(--ease-room) var(--at) both;
+}
+
+.picture-after {
+  animation: enter 140ms var(--ease-room) var(--at) both;
+}
+
+.picture-ready {
+  opacity: 0;
+}
+
+.picture-row[data-ready='true'] .picture-ready {
+  opacity: 1;
+}
+
+.picture-row[data-ready='true'] .picture-before,
+.picture-row[data-ready='true'] .picture-after {
+  visibility: hidden;
+}
+
+@keyframes picture-say {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  12%,
+  88% {
+    opacity: 1;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes picture-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* A phone has the width for one line at a time and five places. */
+@media (max-width: 639px) {
+  .picture-spare {
+    display: none;
+  }
+
+  .picture-seat .seat-disc,
+  .picture-seat .seat-empty {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  .picture-seat {
+    width: 3rem;
+  }
+
+  /* The seats sit close here, so the words take two lines under their own seat. */
+  .picture-missing {
+    align-self: center;
+    width: 4rem;
+    max-width: none;
+    overflow: visible;
+    text-align: center;
+    white-space: normal;
+  }
+}
+
+/* The first line would run off the page's edge, so it starts on it. */
+.picture-seat:first-child .picture-say {
+  left: 0;
+  translate: 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .picture-say,
+  .picture-react,
+  .picture-before,
+  .picture-seat .seat-disc {
+    animation: none;
+  }
+
+  .picture-say,
+  .picture-react,
+  .picture-before {
+    opacity: 0;
+  }
+
+  .picture-say[data-stays='true'] {
+    animation: none;
+    opacity: 1;
+  }
+
+  .picture-ring,
+  .picture-missing,
+  .picture-after {
+    animation: none;
+  }
+}
+
+/* ---- A night ------------------------------------------------------------- */
+
+/* The room's track again: a hairline, a dot per reaction, in each person's colour. */
+.night-track {
+  display: flex;
+  align-items: center;
+  height: 0.75rem;
+  margin-top: 0.25rem;
+  padding-inline: 3.5px;
+}
+
+.night-moment {
+  margin-top: 0.75rem;
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--color-line);
+}
+
+/* A seat in a recap or a catch-up: someone who isn't here now. */
+.seats[data-kept='true'] {
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+.seats[data-kept='true'] .seat {
+  flex: none;
+  width: 3.25rem;
+}
+
+.seats[data-kept='true'] .seat-disc span {
+  font-size: 0.875rem;
+}

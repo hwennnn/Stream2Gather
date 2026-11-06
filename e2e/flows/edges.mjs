@@ -102,7 +102,7 @@ flow('error pages: a page that does not exist is not a blank screen', async (t) 
   const { page } = await t.person('a');
   const response = await page.goto(`${t.base}/no/such/page`);
   t.eq('the address is honest about being missing', response.status(), 404);
-  await t.see('it says so', page.getByRole('heading', { name: /page doesn.t exist/i }));
+  await t.see('it says so', page.getByRole('heading', { name: /nothing.s showing here/i }));
   await page.getByRole('link', { name: 'Go home' }).click();
   await t.see('and the way home works', ui.linkBox(page));
 });

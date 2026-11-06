@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import type { Person } from '../api/http';
 import { startRoom } from '../routes/router';
-import { Avatar } from './Avatar';
-import { Page } from './Page';
+import { Door, EmptySeats, MoreSeats, SeatedPerson, SHOWN_SEATS, type Seated } from './Door';
 import { firstName, listNames } from './people';
 
 export type Ending = {
@@ -14,19 +13,18 @@ export type Ending = {
   past?: boolean;
   /** The room is fine and only a seat is missing, so a new room would split the group. */
   full?: boolean;
+  /** There are no chairs to show, because there may be nothing wrong with the room. */
+  bare?: boolean;
 };
 
-type Seated = Pick<Person, 'userId' | 'name' | 'avatarUrl'>;
-
-/** What fits a 320px phone, the same as the gate. */
-const SEATS = 4;
-const EMPTY = [0, 1, 2, 3];
+/** A room nobody's in still has its chairs. */
+const EMPTY_ROW = 5;
 
 export const ENDINGS = {
   missing: { title: 'This room doesn’t exist.', body: 'The link may be wrong. Check it with whoever sent it.' },
   closed: { title: 'This room’s night is over.', body: 'Start a new one and send the link round.', past: true },
-  unreachable: { title: 'Can’t reach this room.', body: 'Check your connection, then try again.' },
-  page: { title: 'This page doesn’t exist.', body: 'The link may be wrong. Check it, or start from the home page.' },
+  unreachable: { title: 'Can’t reach this room.', body: 'Check your connection, then try again.', bare: true },
+  page: { title: 'Nothing’s showing here.', body: 'There’s no page at this address. Check the link, or go home and start a room.' },
 } as const;
 
 export const closedRoom = (people: Seated[]): Ending => {
@@ -41,25 +39,22 @@ export const fullRoom = (people: (Seated & Pick<Person, 'role'>)[]): Ending => {
 };
 
 const SeatRow = ({ people, past }: { people: Seated[]; past?: boolean }) => (
-  <ul aria-label="Seats" data-gate="true" className="seats mb-6">
-    {people.slice(0, SEATS).map((person) => (
-      <li key={person.userId} data-away={past} className="seat">
-        <span className="seat-disc">
-          <Avatar person={person} labelled={false} className="size-full text-[13px]" />
-        </span>
-        <span className="seat-name">{firstName(person.name)}</span>
-      </li>
+  <ul aria-label="Seats" className="seats door-row">
+    {people.slice(0, SHOWN_SEATS).map((person) => (
+      <SeatedPerson key={person.userId} person={person} away={past} />
     ))}
-    {people.length > SEATS && (
-      <li className="seat">
-        <span className="seat-more">+{people.length - SEATS}</span>
-      </li>
-    )}
+    <MoreSeats count={people.length - SHOWN_SEATS} />
+  </ul>
+);
+
+const EmptyRow = () => (
+  <ul aria-hidden="true" className="seats door-row">
+    <EmptySeats count={EMPTY_ROW} />
   </ul>
 );
 
 /** Every way a room can be out of reach ends here, with a way forward. */
-export const DeadEnd = ({ title, body, people = [], past = false, full = false, home = false, onRetry }: Ending & { onRetry?: () => void; home?: boolean }) => {
+export const DeadEnd = ({ title, body, people = [], past = false, full = false, bare = false, home = false, onRetry }: Ending & { onRetry?: () => void; home?: boolean }) => {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -75,20 +70,10 @@ export const DeadEnd = ({ title, body, people = [], past = false, full = false, 
   };
 
   return (
-    <Page>
-      {people.length > 0 && <SeatRow people={people} past={past} />}
-      {people.length === 0 && past && (
-        <ul aria-hidden="true" data-gate="true" className="seats mb-6">
-          {EMPTY.map((seat) => (
-            <li key={seat} className="seat">
-              <span className="seat-empty" />
-            </li>
-          ))}
-        </ul>
-      )}
+    <Door seats={people.length > 0 ? <SeatRow people={people} past={past} /> : !bare && <EmptyRow />}>
       <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-balance">{title}</h1>
       <p className="mt-1.5 text-muted">{body}</p>
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-col gap-2">
         {onRetry && (
           <button type="button" onClick={onRetry} className="btn btn-primary">
             Try again
@@ -115,6 +100,6 @@ export const DeadEnd = ({ title, body, people = [], past = false, full = false, 
           {problem}
         </p>
       )}
-    </Page>
+    </Door>
   );
 };

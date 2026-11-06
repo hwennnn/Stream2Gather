@@ -4,7 +4,7 @@ export type RecapPerson = { name: string; isGuest: boolean };
 
 export type RecapVideo = { source: string; sourceId: string; reactions: number; media: Media | null };
 
-export type Biggest = { posMs: number; emojis: Record<string, number>; people: number; media: Media | null; itemId?: number };
+export type Biggest = { source: string; sourceId: string; posMs: number; emojis: Record<string, number>; people: number; media: Media | null; itemId?: number };
 
 export type Recap = {
   sessionId: string;
@@ -24,7 +24,7 @@ export type PublicRecap = {
   startedAt: string;
   wallMs: number;
   people: string[];
-  videos: { title: string; url: string; reactions: number }[];
+  videos: { title: string; url: string; thumbnailUrl?: string; reactions: number }[];
   reactions: Record<string, number>;
   biggest: { title: string; posMs: number; emojis: Record<string, number>; people: number } | null;
 };

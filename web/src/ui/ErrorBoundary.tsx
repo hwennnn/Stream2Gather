@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { Page } from './Page';
 
 type State = { failed: boolean };
 
@@ -14,15 +15,13 @@ export class ErrorBoundary extends Component<{ children: ReactNode; fallback?: R
     if (!this.state.failed) return this.props.children;
     if (this.props.fallback !== undefined) return this.props.fallback;
     return (
-      <main className="glow flex h-full items-center justify-center px-6 text-center">
-        <div className="enter max-w-sm">
-          <h1 className="text-2xl font-semibold tracking-tight">That wasn’t supposed to happen</h1>
-          <p className="mt-2 text-muted">Something broke on this page. A reload usually fixes it, and the room keeps going without you.</p>
-          <button type="button" onClick={() => window.location.reload()} className="btn btn-primary mt-6">
-            Reload
-          </button>
-        </div>
-      </main>
+      <Page>
+        <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em]">That wasn’t supposed to happen</h1>
+        <p className="mt-1.5 text-muted">Something broke on this page. A reload usually fixes it, and the room keeps going without you.</p>
+        <button type="button" onClick={() => window.location.reload()} className="btn btn-primary mt-5">
+          Reload
+        </button>
+      </Page>
     );
   }
 }

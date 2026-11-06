@@ -12,6 +12,12 @@ export const linkKinds = (sources: string[] = []): string => {
   return kinds.length > 0 ? `${kinds.join(', ')} or ${last}` : `${last}`;
 };
 
+/** The video in a YouTube link, for the picture on the page. The server still decides if it plays. */
+export const youtubeId = (text: string): string | null =>
+  /(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:[^#]*&)?v=|shorts\/|embed\/|live\/))([\w-]{11})(?![\w-])/.exec(text)?.[1] ?? null;
+
+export const stillOf = (id: string): string => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+
 export const badLink = (kinds: string): string => `That isn’t a ${kinds} link.`;
 export const emptyNote = (kinds: string): string => `Paste a ${kinds} link first.`;
 

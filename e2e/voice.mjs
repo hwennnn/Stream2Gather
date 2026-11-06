@@ -66,7 +66,7 @@ const viewer = async (browser, { deny } = {}) => {
 
 const inRoom = async (who, url) => {
   await who.page.goto(url);
-  await who.page.getByRole('button', { name: 'Join' }).first().click();
+  await who.page.getByRole('button', { name: 'Take your seat' }).first().click();
   await who.page.getByRole('tab', { name: /People/ }).waitFor();
 };
 
@@ -325,7 +325,7 @@ const run = async () => {
 };
 
 const inRoomAfterReload = async (who) => {
-  const gate = who.page.getByRole('button', { name: 'Join', exact: true });
+  const gate = who.page.getByRole('button', { name: 'Take your seat', exact: true });
   if (await gate.count()) await gate.click();
   await who.page.getByRole('tab', { name: /People/ }).waitFor();
 };

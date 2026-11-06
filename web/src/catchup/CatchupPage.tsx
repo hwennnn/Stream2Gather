@@ -3,8 +3,9 @@ import { ApiError, type Media } from '../api/http';
 import { useAccount } from '../auth/account';
 import { createPlayer } from '../players/registry';
 import type { PlayerAdapter } from '../players/types';
-import { Wordmark } from '../ui/Wordmark';
+import { SiteHeader, WIDE_COLUMN } from '../ui/Page';
 import { catchupApi, type CrewVideo, type Moment } from './api';
+import { Company } from './Company';
 import { Compose } from './Compose';
 import { Density } from './Density';
 import { createFiring } from './firing';
@@ -20,17 +21,12 @@ const home = (slug: string) => `/r/${encodeURIComponent(slug)}`;
 
 const Frame = ({ slug, crewName, children }: { slug: string; crewName?: string; children: ReactNode }) => (
   <div className="flex min-h-full flex-col">
-    <header className="h-14 shrink-0 border-b border-line">
-      <div className="mx-auto flex h-full max-w-5xl items-center justify-between px-6 phone:px-4">
-        <a href="/" aria-label="Stream2Gather home">
-          <Wordmark />
-        </a>
-        <a href={home(slug)} className="truncate text-sm text-muted">
-          {crewName ?? 'Crew home'}
-        </a>
-      </div>
-    </header>
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 pt-6 pb-10 phone:px-4">{children}</main>
+    <SiteHeader>
+      <a href={home(slug)} className="min-w-0 truncate text-sm text-muted hover:text-text">
+        {crewName ?? 'Crew home'}
+      </a>
+    </SiteHeader>
+    <main className={`${WIDE_COLUMN} flex-1 pt-6 pb-10`}>{children}</main>
   </div>
 );
 
@@ -139,6 +135,7 @@ const Watch = ({ slug, video, media }: { slug: string; video: CrewVideo; media: 
           <>
             <div ref={host} data-player className="aspect-video w-full overflow-hidden rounded-md bg-stage" />
             <Density moments={all ?? []} lengthMs={media.durationMs} onSeek={(ms) => adapter.current?.seek(ms / 1000)} />
+            <Company moments={all ?? []} passed={passed} fired={fired} selfId={user?.id} />
           </>
         )}
       </div>
@@ -185,7 +182,8 @@ export default function CatchupPage({ slug, itemId }: Props) {
   if (video === 'gone' || !video.media) {
     return (
       <Frame slug={slug} crewName={video === 'gone' ? undefined : video.crewName}>
-        <p className="text-sm text-muted">Video unavailable</p>
+        <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em]">Video unavailable</h1>
+        <p className="mt-1.5 text-muted">It can’t be played here any more. The night it was part of is still on the crew’s page.</p>
       </Frame>
     );
   }

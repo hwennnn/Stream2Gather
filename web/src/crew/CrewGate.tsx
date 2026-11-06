@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, type RoomPreview } from '../api/http';
 import { account, useAccount } from '../auth/account';
+import { joinCrewAsk } from '../auth/words';
 import { JoinGate } from '../ui/JoinGate';
 import { crewApi, WANTS_JOIN } from './api';
 
@@ -50,12 +51,14 @@ export const CrewGate = ({ slug, preview, onJoin, onJoined }: Props) => {
       return;
     }
     sessionStorage.setItem(WANTS_JOIN, slug);
-    account.signIn();
+    account.signIn(joinCrewAsk(preview.name));
   };
 
   const canJoinCrew = token !== null && problem === null && (signedIn || publishableKey !== '');
   const canVisit = crew?.guestAccess !== false;
   const joinCrewLabel = busy ? 'Joining…' : 'Join the crew';
+  const count = crew?.memberCount ?? 0;
+  const signInFirst = !signedIn && <span className="text-dim"> You’ll sign in first. New here? That makes your account.</span>;
   const aside = (
     <div className="mt-3">
       {problem && (
@@ -64,18 +67,24 @@ export const CrewGate = ({ slug, preview, onJoin, onJoined }: Props) => {
         </p>
       )}
       {canVisit ? (
-        <p className="text-sm text-muted">
-          You can watch, chat and react tonight. The watchlist and past nights stay with the crew.{' '}
+        <p className="text-[13px] text-muted">
+          You can watch, chat and react tonight. The watchlist and past nights stay with {count > 1 ? `the ${count} of them` : 'the crew'}.{' '}
           {canJoinCrew && (
-            <button type="button" disabled={busy} onClick={start} className="cursor-pointer text-text underline underline-offset-2">
-              {joinCrewLabel}
-            </button>
+            <>
+              <button type="button" disabled={busy} onClick={start} className="cursor-pointer text-text underline underline-offset-2">
+                {joinCrewLabel}
+              </button>
+              {signInFirst}
+            </>
           )}
         </p>
       ) : canJoinCrew ? (
-        <button type="button" disabled={busy} onClick={start} className="btn btn-primary w-full">
-          {joinCrewLabel}
-        </button>
+        <>
+          <button type="button" disabled={busy} onClick={start} className="btn btn-primary w-full">
+            {joinCrewLabel}
+          </button>
+          {signInFirst && <p className="mt-1.5 text-[13px]">{signInFirst}</p>}
+        </>
       ) : (
         <p className="text-sm text-muted">This room is for its crew. Ask them for an invite.</p>
       )}

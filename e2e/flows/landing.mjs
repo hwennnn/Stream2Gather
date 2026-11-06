@@ -22,6 +22,51 @@ flow('landing: pasting a link opens a room playing it, and leaves the clipboard 
   await t.until('it plays', async () => (await a.sample())?.state === 'playing');
 });
 
+flow('landing: a pasted link goes up on the screen before there is a room', async (t) => {
+  const { page } = await t.person('a');
+  await page.goto(t.base);
+  await ui.linkBox(page).fill(golden.url);
+  await t.see('what to do next', page.getByText('That’s your screen. Start the room, then send the link.'));
+  t.check('your video is on the screen', (await page.locator('figure img').getAttribute('src')).includes(golden.id));
+  t.eq('still no room', new URL(page.url()).pathname, '/');
+  await ui.linkBox(page).fill('cats playing piano');
+  t.check('anything else leaves the picture alone', !(await page.locator('figure img').getAttribute('src')).includes(golden.id));
+});
+
+flow('landing: the picture plays through once and stops on the empty seat', async (t) => {
+  const { page } = await t.person('a');
+  await page.goto(t.base);
+  await t.see('the seat nobody is in', page.getByText('Who’s missing?'));
+  await t.until('it has finished', () => page.evaluate(() => !document.getAnimations().some((run) => run.playState === 'running' && run.effect.target?.closest('.picture-row'))), 8000);
+  await t.see('where it stopped', page.getByText('Paused by Maya at 3:20'));
+  t.eq('one line left', await page.locator('.picture-say').evaluateAll((all) => all.filter((line) => getComputedStyle(line).opacity !== '0').length), 1);
+});
+
+flow('landing: reduced motion gets the last frame at once', async (t) => {
+  const { page } = await t.person('a');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(t.base);
+  await t.see('the headline', page.getByRole('heading', { level: 1 }));
+  const shown = await page.evaluate(() => [...document.querySelectorAll('.picture-say, .picture-before, .picture-after, .picture-missing')].map((part) => [part.textContent.trim(), getComputedStyle(part).opacity]));
+  t.eq('only the end of it', shown.filter(([, opacity]) => opacity !== '0').map(([text]) => text).sort().join(' / '), 'Paused by Maya at 3:20 / Who’s missing? / we’ll wait');
+});
+
+flow('landing: nothing runs off a phone', async (t) => {
+  const { page } = await t.person('a', { viewport: { width: 390, height: 844 }, phone: true });
+  await page.goto(t.base);
+  await t.see('the seat nobody is in', page.getByText('Who’s missing?'));
+  t.eq('no sideways scroll', await page.evaluate(() => document.documentElement.scrollWidth), 390);
+  const touching = await page.evaluate(() => {
+    const rects = [...document.querySelectorAll('.picture-row .seat-name')].map((name) => {
+      const range = document.createRange();
+      range.selectNodeContents(name);
+      return range.getBoundingClientRect();
+    });
+    return rects.slice(1).filter((rect, index) => rect.left < rects[index].right + 4).length;
+  });
+  t.eq('the names keep apart', touching, 0);
+});
+
 flow('landing: every way of writing a YouTube link works', async (t) => {
   const a = await t.person('a');
   for (const link of [

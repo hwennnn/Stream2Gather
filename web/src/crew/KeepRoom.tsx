@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/http';
 import { account, useAccount } from '../auth/account';
+import { joinCrewAsk, KEEP_ROOM } from '../auth/words';
 import type { RoomSession, RoomView } from '../room/session';
 import { LeaveLink } from '../ui/LeaveLink';
 import { isHost, onCrew } from '../ui/rules';
@@ -114,7 +115,7 @@ export default function KeepRoom({ session, view }: { session: RoomSession; view
       }
       sessionStorage.setItem(WANTS_JOIN, slug);
       window.history.replaceState(window.history.state, '', `${window.location.pathname}?join=${token}`);
-      account.signIn();
+      account.signIn(joinCrewAsk(view.name));
     };
     return (
       <button type="button" disabled={busy} onClick={start} className="btn btn-ghost btn-sm">
@@ -132,7 +133,7 @@ export default function KeepRoom({ session, view }: { session: RoomSession; view
       return;
     }
     sessionStorage.setItem(WANTS_KEEP, slug);
-    account.signIn();
+    account.signIn(KEEP_ROOM);
   };
   return (
     <button type="button" disabled={busy} onClick={start} className="btn btn-quiet btn-sm">

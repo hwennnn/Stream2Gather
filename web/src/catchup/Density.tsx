@@ -28,7 +28,7 @@ export const Density = ({ moments, lengthMs, onSeek }: Props) => {
       }}
     >
       {bars(moments, lengthMs).map((height, index) => (
-        <span key={index} className="min-w-0 flex-1 bg-primary" style={{ height: height ? `${Math.max(height * 100, 10)}%` : 1 }} />
+        <span key={index} className="min-w-0 flex-1 bg-dim" style={{ height: height ? `${Math.max(height * 100, 10)}%` : 1 }} />
       ))}
     </div>
   );

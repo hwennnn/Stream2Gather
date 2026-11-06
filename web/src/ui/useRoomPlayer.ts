@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { watchAutoplay } from '../players/autoplay';
 import { createPlayer } from '../players/registry';
-import { notStarted, type PlayerAdapter, type PlayerError } from '../players/types';
+import { notStarted, type PlayerAdapter, type PlayerError, type PlayerState } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { expectedPosition, SyncController, type SyncReport } from '../sync/controller';
@@ -13,7 +13,7 @@ declare global {
 }
 
 const LOAD_TIMEOUT_MS = 20_000;
-/** Some browsers won't fetch a file until play is pressed, so the poster can't wait for it. */
+/** A player can sit unstarted until it's pressed, so the poster can't wait for it. */
 const POSTER_LIMIT_MS = 8000;
 
 type Events = {
@@ -40,19 +40,24 @@ export const watchFirstFrame = (player: PlayerAdapter, item: QueueItem, onPlayed
   return () => window.clearInterval(timer);
 };
 
-/** YouTube is ready once its own loader shows. A file is ready once it can play. */
-const watchReady = (player: PlayerAdapter, item: QueueItem, onReady: () => void): Cleanup => {
-  if (item.source === 'youtube' || player.state() !== 'loading') {
-    onReady();
-    return () => {};
-  }
+/** Buffering can't be waiting for a click, so it may take as long as a load may. */
+const nothingToShow = (state: PlayerState, waited: number): boolean =>
+  state === 'buffering' ? waited < LOAD_TIMEOUT_MS : state === 'loading' && waited < POSTER_LIMIT_MS;
+
+/**
+ * Keeps the poster up until the player has a picture of its own. YouTube's iframe
+ * is black until then. This checks every frame, because the poster must be gone
+ * as soon as a video plays: nothing may be drawn over one.
+ */
+export const watchReady = (player: PlayerAdapter, onReady: () => void): Cleanup => {
   const startedAt = performance.now();
-  const timer = window.setInterval(() => {
-    if (player.state() === 'loading' && performance.now() - startedAt < POSTER_LIMIT_MS) return;
-    window.clearInterval(timer);
-    onReady();
-  }, 100);
-  return () => window.clearInterval(timer);
+  let frame = 0;
+  const check = () => {
+    if (nothingToShow(player.state(), performance.now() - startedAt)) frame = requestAnimationFrame(check);
+    else onReady();
+  };
+  check();
+  return () => cancelAnimationFrame(frame);
 };
 
 const exposeForTests = (session: RoomSession, player: PlayerAdapter, health: () => string): Cleanup => {
@@ -165,7 +170,7 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
       events.onPlayer(created);
       created.onError(fail);
       cleanups.push(
-        watchReady(created, item, events.onReady),
+        watchReady(created, events.onReady),
         watchFirstFrame(created, item, () => session.send('media_ok', { item: item.id })),
         startSync(session, created, item, events),
       );

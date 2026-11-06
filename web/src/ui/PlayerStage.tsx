@@ -75,11 +75,11 @@ export const PlayerStage = (props: StageProps) => {
   );
 };
 
-/** Stands in until the player is ready, and is gone before anything can play. */
+/** Stands in until the player has a picture, and is gone as soon as a video plays. */
 const Poster = ({ item, changing }: { item: QueueItem; changing: boolean }) => (
   <div className="absolute inset-0 overflow-hidden bg-stage">
-    {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover opacity-30" />}
-    <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center" role="status">
+    {item.thumbnailUrl && <img src={item.thumbnailUrl} alt="" className="absolute inset-0 size-full object-cover opacity-70" />}
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/30 px-6 text-center" role="status">
       {changing && (
         <p className="enter mb-2 max-w-xl text-[15px] leading-snug font-semibold text-balance">
           Up next: {item.title}, added by {item.addedByName}.

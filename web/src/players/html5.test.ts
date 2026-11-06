@@ -7,7 +7,7 @@ class FakeVideo extends EventTarget {
   canPlayType = () => '';
   load = () => {};
   removeAttribute = () => {};
-  play = async () => {};
+  play: () => Promise<void> = async () => {};
   pause = () => {};
 }
 
@@ -24,6 +24,28 @@ const mount = async () => {
 describe('createHtml5Player', () => {
   beforeEach(() => vi.unstubAllGlobals());
   afterEach(() => vi.unstubAllGlobals());
+
+  it('says when the browser refuses to play', async () => {
+    const { video, player } = await mount();
+    const blocked = vi.fn();
+    player.onBlocked(blocked);
+    video.play = () => Promise.reject(Object.assign(new Error('no'), { name: 'NotAllowedError' }));
+    player.play();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(blocked).toHaveBeenCalledOnce();
+  });
+
+  it('does not take a play cut short by a pause for a refusal', async () => {
+    const { video, player } = await mount();
+    const blocked = vi.fn();
+    player.onBlocked(blocked);
+    video.play = () => Promise.reject(Object.assign(new Error('no'), { name: 'AbortError' }));
+    player.play();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(blocked).not.toHaveBeenCalled();
+  });
 
   it('reports a viewer pausing', async () => {
     const { video, states } = await mount();

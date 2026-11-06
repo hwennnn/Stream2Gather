@@ -29,8 +29,27 @@ export interface PlayerAdapter {
   volume(): number | null;
   onState(listener: (state: PlayerState) => void): void;
   onError(listener: (error: PlayerError) => void): void;
+  /** The browser refused to start it, which is the only sure sign of an autoplay block. */
+  onBlocked(listener: () => void): void;
   destroy(): void;
 }
+
+/** Holds on to a refusal made before anyone is listening, as `createErrorChannel` does. */
+export const createBlockedChannel = () => {
+  let listener: (() => void) | null = null;
+  let early = false;
+  return {
+    report: () => {
+      if (listener) listener();
+      else early = true;
+    },
+    listen: (next: () => void) => {
+      listener = next;
+      if (early) next();
+      early = false;
+    },
+  };
+};
 
 /**
  * Holds on to an error raised before anyone is listening. A player can fail

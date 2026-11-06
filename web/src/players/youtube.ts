@@ -1,4 +1,4 @@
-import { createErrorChannel, type PlayerAdapter, type PlayerError, type PlayerState } from './types';
+import { createBlockedChannel, createErrorChannel, type PlayerAdapter, type PlayerError, type PlayerState } from './types';
 
 declare global {
   interface Window {
@@ -71,6 +71,7 @@ export const createYouTubePlayer = async (
   let state: PlayerState = 'loading';
   let stateListener: (state: PlayerState) => void = () => {};
   const errors = createErrorChannel();
+  const blocked = createBlockedChannel();
 
   const target = document.createElement('div');
   element.replaceChildren(target);
@@ -94,6 +95,7 @@ export const createYouTubePlayer = async (
           state = STATE_NAMES[event.data] ?? state;
           stateListener(state);
         },
+        onAutoplayBlocked: blocked.report,
         onError: (event) => {
           // Before onReady the promise must still settle, and the error waits
           // in the channel for the caller to subscribe.
@@ -124,6 +126,7 @@ export const createYouTubePlayer = async (
       stateListener = listener;
     },
     onError: errors.listen,
+    onBlocked: blocked.listen,
     destroy: () => {
       player.destroy?.();
       element.replaceChildren();

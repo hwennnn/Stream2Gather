@@ -159,6 +159,30 @@ describe('a player mounted in a paused room', () => {
   });
 });
 
+describe('a browser refusing to autoplay', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('reaches a listener that subscribes afterwards', async () => {
+    type Events = { onReady: () => void; onAutoplayBlocked: () => void };
+    class FakePlayer {
+      constructor(_target: unknown, options: { events: Events }) {
+        queueMicrotask(() => {
+          options.events.onAutoplayBlocked();
+          options.events.onReady();
+        });
+      }
+    }
+    const YT = { Player: FakePlayer };
+    vi.stubGlobal('YT', YT);
+    vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
+    vi.stubGlobal('document', { createElement: () => ({}) });
+    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0, true);
+    const blocked = vi.fn();
+    player.onBlocked(blocked);
+    expect(blocked).toHaveBeenCalledOnce();
+  });
+});
+
 describe('createErrorChannel', () => {
   it('passes errors straight through once someone listens', () => {
     const channel = createErrorChannel();

@@ -65,7 +65,7 @@ describe('ServerClock', () => {
     const clock = new ServerClock(() => 0);
     clock.addSample(0, 1000, 2);
     for (let i = 0; i < 8; i += 1) clock.addSample(0, 2000, 100);
-    expect(clock.rtt).toBe(100);
+    expect(clock.offset).toBe(1950);
   });
 });
 
@@ -305,6 +305,92 @@ describe('SyncController', () => {
     expect(player.rate).toBe(1);
   });
 
+  describe('events that repeat the same playback', () => {
+    const lockToggle = (playback: Playback) => sync.apply({ ...playback });
+
+    /** What a viewer pressing pause in the native controls looks like. */
+    const viewerPauses = () => player.fire('paused');
+
+    it.each([100, 500, 1200])('hears a pause %dms after a lock toggle', (delay) => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(3);
+      lockToggle(playback);
+      timers.advance(delay);
+      viewerPauses();
+      expect(commands).toEqual([expect.objectContaining({ type: 'pause' })]);
+    });
+
+    it('does not undo that pause while the room answers', () => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(3);
+      lockToggle(playback);
+      timers.advance(100);
+      viewerPauses();
+      run(1);
+      expect(player.status).toBe('paused');
+      sync.apply({ ...playback, status: 'paused', pos: player.time(), at: timers.now });
+      run(3);
+      expect(player.status).toBe('paused');
+      expect(commands.length).toBe(1);
+    });
+
+    it('hears a seek right after a lock toggle, and leaves it be', () => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(3);
+      lockToggle(playback);
+      player.current = 60;
+      run(1);
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek' })]);
+      expect(player.seeks).toEqual([]);
+      expect(player.current).toBeGreaterThan(60);
+    });
+
+    it('hears a play right after an event in a paused room', () => {
+      const playback: Playback = { item: 'a', status: 'paused', pos: 5, at: timers.now, rate: 1 };
+      sync.apply(playback);
+      run(3);
+      lockToggle(playback);
+      timers.advance(100);
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'play' })]);
+    });
+
+    it('does not touch the player at all', () => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(3);
+      player.seeks = [];
+      player.current += 1;
+      player.play = () => { throw new Error('played'); };
+      player.pause = () => { throw new Error('paused'); };
+      lockToggle(playback);
+      expect(player.seeks).toEqual([]);
+    });
+
+    it('does not cut a nudge short', () => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(2);
+      player.current -= 0.8;
+      run(1);
+      expect(player.rate).toBe(1.25);
+      lockToggle(playback);
+      expect(player.rate).toBe(1.25);
+    });
+
+    it('always goes through when the room insists', () => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(3);
+      player.status = 'paused'; // A pause the room refused.
+      sync.apply({ ...playback }, true);
+      expect(player.status).toBe('playing');
+    });
+  });
+
   describe('telling a viewer from a hiccup', () => {
     const roomAt = (at: number): Playback => ({ item: 'a', status: 'playing', pos: 0, at, rate: 1 });
 
@@ -485,6 +571,53 @@ describe('SyncController', () => {
       expect(commands).toEqual([]);
     });
 
+    it('turns a viewer playing into a room command, once', () => {
+      sync.apply(paused(5));
+      tick(3000);
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'play', pos: 5 })]);
+      tick(500);
+      expect(commands.length).toBe(1);
+    });
+
+    it('leaves that player running while the room answers', () => {
+      sync.apply(paused(5));
+      tick(3000);
+      player.fire('playing');
+      tick(500);
+      expect(player.status).toBe('playing');
+      sync.apply(playing(5, timers.now));
+      for (let i = 0; i < 4; i += 1) tick();
+      expect(player.status).toBe('playing');
+    });
+
+    it('does not let a viewer play alone when the room never agrees', () => {
+      sync.apply(paused(5));
+      tick(3000);
+      player.fire('playing');
+      for (let i = 0; i < 3; i += 1) tick();
+      expect(player.status).toBe('paused');
+      expect(commands.length).toBe(1);
+    });
+
+    it('stops at once when the room refuses', () => {
+      const room = paused(5);
+      sync.apply(room);
+      tick(3000);
+      player.fire('playing');
+      sync.apply({ ...room }, true); // The snapshot sent with the refusal.
+      expect(player.status).toBe('paused');
+    });
+
+    it('stops a player it never heard start', () => {
+      sync.apply(paused(5));
+      tick(3000);
+      player.status = 'playing';
+      tick();
+      expect(player.status).toBe('paused');
+      expect(commands).toEqual([]);
+    });
+
     it('stays settled when the same pause is applied again', () => {
       sync.apply(paused(100));
       tick();
@@ -510,7 +643,6 @@ describe('SyncController', () => {
       clock.addSample(1000, 2000, 1040);
       clock.addSample(5000, 6000, 3000);
       expect(clock.offset).toBe(980);
-      expect(clock.rtt).toBe(40);
     });
   });
 });

@@ -29,10 +29,6 @@ export class ServerClock {
     return best?.offset ?? 0;
   }
 
-  get rtt(): number {
-    return Math.min(...this.samples.map((sample) => sample.rtt), Infinity);
-  }
-
   /** Whole milliseconds, because an odd round trip puts the offset on a half. */
   now(): number {
     return Math.round(this.localNow() + this.offset);

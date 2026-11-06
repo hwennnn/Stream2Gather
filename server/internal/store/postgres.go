@@ -241,6 +241,21 @@ func (p *Postgres) Messages(ctx context.Context, roomID string, before int64, li
 	})
 }
 
+// MessagesSince is Messages for someone who may only see the chat from a moment on.
+func (p *Postgres) MessagesSince(ctx context.Context, roomID string, since time.Time, before int64, limit int) ([]Message, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT id, user_id, author_name, body, created_at, COALESCE(client_id, '') FROM messages
+		WHERE room_id = $1 AND created_at >= $2 AND ($3 = 0 OR id < $3)
+		ORDER BY id DESC LIMIT $4`, roomID, since, before, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (Message, error) {
+		var m Message
+		return m, row.Scan(&m.ID, &m.UserID, &m.Author, &m.Body, &m.CreatedAt, &m.ClientID)
+	})
+}
+
 // GetMedia returns cached metadata if it is younger than maxAge.
 func (p *Postgres) GetMedia(ctx context.Context, source, sourceID string, maxAge time.Duration) (room.Media, bool, error) {
 	var m room.Media
@@ -406,10 +421,21 @@ func (p *Postgres) StaleMedia(ctx context.Context, source string, maxAge time.Du
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
-// DeleteMedia removes metadata that can no longer be refreshed.
+// DeleteMedia removes metadata that can no longer be refreshed, and every place
+// that remembers the video.
 func (p *Postgres) DeleteMedia(ctx context.Context, source string, sourceIDs []string) error {
-	_, err := p.pool.Exec(ctx, `DELETE FROM media WHERE source = $1 AND source_id = ANY($2)`, source, sourceIDs)
-	return err
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `DELETE FROM media WHERE source = $1 AND source_id = ANY($2)`, source, sourceIDs); err != nil {
+		return err
+	}
+	if err := purgeMediaRefs(ctx, tx, source, sourceIDs); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // SavedRoom is a permanent room's saved state.

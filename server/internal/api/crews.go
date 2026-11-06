@@ -80,7 +80,20 @@ func (s *Server) crewEntry(w http.ResponseWriter, r *http.Request, record store.
 
 // roomMessages is the room's chat as this caller may see it.
 func (s *Server) roomMessages(r *http.Request, record store.Room, before int64, limit int) ([]store.Message, error) {
-	return s.DB.Messages(r.Context(), record.ID, before, limit)
+	claims, _, _ := s.session(r) // Unchecked here means not a member, which sees less.
+	access, err := s.DB.CrewAccessOf(r.Context(), record.ID, claims.Subject)
+	if err != nil {
+		return nil, err
+	}
+	if !access.Exists || access.Member {
+		return s.DB.Messages(r.Context(), record.ID, before, limit)
+	}
+	// A crew's history is the crew's. A guest sees the party they came to.
+	since, open, err := s.DB.OpenSessionStart(r.Context(), record.ID)
+	if err != nil || !open {
+		return nil, err
+	}
+	return s.DB.MessagesSince(r.Context(), record.ID, since, before, limit)
 }
 
 // account is the signed-in caller. Crews are the one thing guests can't hold.

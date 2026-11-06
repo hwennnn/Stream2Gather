@@ -349,7 +349,9 @@ func (p *Postgres) DeleteAccount(ctx context.Context, userID string) ([]string, 
 	}
 	for _, statement := range []string{
 		`DELETE FROM rooms WHERE owner_id = $1`,
+		`DELETE FROM moments WHERE user_id = $1`,
 		`DELETE FROM messages WHERE user_id = $1`,
+		`UPDATE session_people SET display_name = 'Former member' WHERE user_id = $1`,
 		`DELETE FROM users WHERE id = $1`,
 	} {
 		if _, err := tx.Exec(ctx, statement, userID); err != nil {

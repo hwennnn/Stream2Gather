@@ -273,6 +273,33 @@ func (p *Postgres) EndSession(ctx context.Context, sessionID string, at time.Tim
 	return true, tx.Commit(ctx)
 }
 
+// purgeMediaRefs forgets a video that has left media. A session keeps its row, so
+// it still says that something was on.
+func purgeMediaRefs(ctx context.Context, tx pgx.Tx, source string, sourceIDs []string) error {
+	for _, statement := range []string{
+		`DELETE FROM watchlist_items WHERE source = $1 AND source_id = ANY($2)`,
+		`DELETE FROM moments WHERE source = $1 AND source_id = ANY($2)`,
+		`UPDATE session_items SET source_id = NULL WHERE source = $1 AND source_id = ANY($2)`,
+	} {
+		if _, err := tx.Exec(ctx, statement, source, sourceIDs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// OpenSessionStart says when the room's running session began, if one is running.
+func (p *Postgres) OpenSessionStart(ctx context.Context, roomID string) (time.Time, bool, error) {
+	var at time.Time
+	err := p.pool.QueryRow(ctx, `
+		SELECT s.started_at FROM crew_sessions s JOIN crews c ON c.id = s.crew_id
+		WHERE c.room_id = $1 AND s.ended_at IS NULL`, roomID).Scan(&at)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return time.Time{}, false, nil
+	}
+	return at, err == nil, err
+}
+
 // SecondSessions counts crews whose first session is at least 14 days old, and
 // how many of those held another within 14 days of it.
 func (p *Postgres) SecondSessions(ctx context.Context) (cohort, returned int64, err error) {

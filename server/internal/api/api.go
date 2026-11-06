@@ -703,22 +703,23 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 	for _, person := range people {
 		present = present || person.UserID == claims.Subject
 	}
-	if !present && len(people) >= record.MaxMembers {
-		writeProblem(w, http.StatusConflict, "room_full", "This room is full.")
-		return
-	}
-
 	role := room.RoleMember
 	if claims.Subject == record.OwnerID {
 		role = room.RoleHost
 	}
+	// A crowd must never lock the owner out of their own room.
+	if !present && role != room.RoleHost && len(people) >= record.MaxMembers {
+		writeProblem(w, http.StatusConflict, "room_full", "This room is full.")
+		return
+	}
 	id := ids.New()
 	err = s.Live.PutTicket(r.Context(), id, store.Ticket{
-		RoomID:   record.ID,
-		RoomSlug: record.Slug,
-		RoomName: record.Name,
-		Address:  s.clientIP(r),
-		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar, Member: member},
+		RoomID:     record.ID,
+		RoomSlug:   record.Slug,
+		RoomName:   record.Name,
+		MaxMembers: record.MaxMembers,
+		Address:    s.clientIP(r),
+		Person:     store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar, Member: member},
 	})
 	if err != nil {
 		s.internal(w, err)

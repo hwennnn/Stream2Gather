@@ -748,6 +748,13 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 		return
 	}
 
+	// Tickets are checked before anyone joins, so a crowd holding them all at once
+	// gets past that. The reconnect this causes is what shows the reason.
+	if r.full(ctx, person, ticket.MaxMembers) {
+		c.shut(websocket.StatusPolicyViolation, "room full")
+		return
+	}
+
 	state, err := r.ensureState(ctx)
 	if err != nil {
 		r.hub.log.Error("join failed", "room", r.id, "error", err)
@@ -778,6 +785,20 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 	}))
 	r.publishMembers(ctx)
 	r.settleHost(ctx)
+}
+
+// full reports whether this person would take the room past its cap. The owner
+// and anyone already here are never over it, and Redis failing refuses nobody.
+func (r *liveRoom) full(ctx context.Context, person store.Person, limit int) bool {
+	if limit <= 0 || person.Role == room.RoleHost {
+		return false
+	}
+	people, err := r.hub.live.People(ctx, r.id)
+	if err != nil {
+		return false
+	}
+	here := slices.ContainsFunc(people, func(p store.Person) bool { return p.UserID == person.UserID })
+	return !here && len(people) >= limit
 }
 
 func (r *liveRoom) leave(c *conn) {

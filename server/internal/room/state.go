@@ -66,6 +66,8 @@ type Media struct {
 	ThumbnailURL string `json:"thumbnailUrl"`
 	DurationMS   int64  `json:"durationMs"`
 	IsLive       bool   `json:"isLive"`
+	// Refused marks a search result that viewers' players have recently refused.
+	Refused bool `json:"refused,omitempty"`
 }
 
 // Item is one entry in a room's queue.

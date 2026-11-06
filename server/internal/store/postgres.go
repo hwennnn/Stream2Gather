@@ -288,6 +288,14 @@ func (p *Postgres) MarkEmbedBlocked(ctx context.Context, source, sourceID string
 	return err
 }
 
+// ClearEmbedBlock forgets a refusal, because the video has since played.
+func (p *Postgres) ClearEmbedBlock(ctx context.Context, source, sourceID string) error {
+	_, err := p.pool.Exec(ctx, `
+		UPDATE media SET embed_blocked_at = NULL
+		WHERE source = $1 AND source_id = $2 AND embed_blocked_at IS NOT NULL`, source, sourceID)
+	return err
+}
+
 // EmbedBlocked returns which of the ids are known not to play when embedded.
 func (p *Postgres) EmbedBlocked(ctx context.Context, source string, sourceIDs []string) (map[string]bool, error) {
 	rows, err := p.pool.Query(ctx, `
@@ -324,18 +332,18 @@ func (p *Postgres) CachedSearch(ctx context.Context, source, query, region strin
 	}
 
 	rows, err := p.pool.Query(ctx, `
-		SELECT source, m.source_id, url, title, author, thumbnail_url, duration_ms, is_live
+		SELECT source, m.source_id, url, title, author, thumbnail_url, duration_ms, is_live,
+		       COALESCE(m.embed_blocked_at > now() - make_interval(days => $3), false) AS refused
 		FROM unnest($2::text[]) WITH ORDINALITY AS wanted (source_id, position)
 		JOIN media m ON m.source = $1 AND m.source_id = wanted.source_id
 		WHERE NOT m.is_live
-		  AND (m.embed_blocked_at IS NULL OR m.embed_blocked_at <= now() - make_interval(days => $3))
-		ORDER BY wanted.position`, source, ids, embedBlockDays)
+		ORDER BY refused, wanted.position`, source, ids, embedBlockDays)
 	if err != nil {
 		return nil, false, err
 	}
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (room.Media, error) {
 		var m room.Media
-		return m, row.Scan(&m.Source, &m.SourceID, &m.URL, &m.Title, &m.Author, &m.ThumbnailURL, &m.DurationMS, &m.IsLive)
+		return m, row.Scan(&m.Source, &m.SourceID, &m.URL, &m.Title, &m.Author, &m.ThumbnailURL, &m.DurationMS, &m.IsLive, &m.Refused)
 	})
 	return items, err == nil, err
 }

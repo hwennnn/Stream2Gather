@@ -268,6 +268,7 @@ export const MediaRow = ({ media, status, onAdd }: RowProps) => {
           </button>
         )}
       </div>
+      {media.refused && <p className="mt-1 text-xs text-warn">Often won’t play here. YouTube has refused it for other viewers.</p>}
       {tray && !label && (
         <div className="row-tray">
           {ACTIONS.map(({ mode, label: text }) => (

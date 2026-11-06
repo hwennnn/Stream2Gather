@@ -190,6 +190,8 @@ func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 		r.voice(c, message)
 	case "media_error":
 		r.mediaError(c, message)
+	case "media_ok":
+		r.mediaOK(c, message)
 	case room.CmdPlay, room.CmdPause, room.CmdSeek, room.CmdEnded, room.CmdSkip,
 		room.CmdQueueRemove, room.CmdQueueMove, room.CmdQueuePlay, room.CmdQueueUndo, room.CmdSettings:
 		r.command(c, message)
@@ -538,7 +540,31 @@ func skippedNotice(item room.Item, why string) map[string]string {
 	return notice
 }
 
-// noteEmbedBlock hides a video from everyone's search only once more than one
+// mediaOK clears a refusal once anyone's player shows the video. A refusal can be
+// local to some viewers, and a wrong mark only costs the video its place in search.
+func (r *liveRoom) mediaOK(c *conn, message Message) {
+	var report struct {
+		Item string `json:"item"`
+	}
+	if err := json.Unmarshal(message.Data, &report); err != nil || !c.reports.Allow() {
+		return
+	}
+	ctx, cancel := opContext()
+	defer cancel()
+	state, found, err := r.hub.live.Load(ctx, r.id)
+	if err != nil || !found || state.Playback.ItemID != report.Item || len(state.Queue) == 0 {
+		return
+	}
+	item := state.Queue[0]
+	if err := r.hub.live.ForgetEmbedReports(ctx, item.Source, item.SourceID); err != nil {
+		r.hub.log.Warn("embed reports not cleared", "error", err)
+	}
+	if err := r.hub.db.ClearEmbedBlock(ctx, item.Source, item.SourceID); err != nil {
+		r.hub.log.Warn("embed block not cleared", "error", err)
+	}
+}
+
+// noteEmbedBlock marks a video in everyone's search only once more than one
 // person has seen it refused. Any guest could otherwise blacklist it site-wide.
 func (r *liveRoom) noteEmbedBlock(ctx context.Context, item room.Item, userID string) {
 	reports, err := r.hub.live.ReportEmbedBlocked(ctx, item.Source, item.SourceID, userID)

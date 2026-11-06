@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -202,8 +203,8 @@ func (c *Catalog) Trending(ctx context.Context, sourceName string) ([]room.Media
 	return c.remember(ctx, sourceName, key, region, items)
 }
 
-// remember stores results and leaves out what cannot be played: videos known to
-// refuse embedding, and live streams.
+// remember stores results and leaves out live streams, which cannot be played.
+// Videos viewers saw refused stay findable, marked and below the rest.
 func (c *Catalog) remember(ctx context.Context, sourceName, query, region string, items []room.Media) ([]room.Media, error) {
 	if len(items) == 0 {
 		return items, nil
@@ -225,10 +226,20 @@ func (c *Catalog) remember(ctx context.Context, sourceName, query, region string
 	}
 	kept := items[:0]
 	for _, item := range items {
-		if !blocked[item.SourceID] && !item.IsLive {
+		if !item.IsLive {
+			item.Refused = blocked[item.SourceID]
 			kept = append(kept, item)
 		}
 	}
+	slices.SortStableFunc(kept, func(a, b room.Media) int {
+		switch {
+		case a.Refused == b.Refused:
+			return 0
+		case a.Refused:
+			return 1
+		}
+		return -1
+	})
 	return kept, nil
 }
 

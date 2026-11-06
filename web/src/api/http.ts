@@ -7,6 +7,8 @@ export type Media = {
   thumbnailUrl: string;
   durationMs: number;
   isLive: boolean;
+  /** Viewers' players have recently refused it. Only search results say so. */
+  refused?: boolean;
 };
 
 export type VoiceState = 'listening' | 'muted' | 'live';

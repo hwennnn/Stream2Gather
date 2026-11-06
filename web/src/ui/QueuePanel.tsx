@@ -2,14 +2,15 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { formatTime, plural } from './format';
 import { Icon, type IconName } from './Icon';
-import { AddBox, MediaRow, MediaSkeleton, SearchResults, useSearch } from './Omnibox';
+import { actionRoom, AddBox, MediaRow, MediaSkeleton, SearchResults, useSearch } from './Omnibox';
 import { followPointer } from './pointerDrag';
+import { firstName, hueOf } from './people';
 import { canControl, canQueue, isOffline } from './rules';
 import { sourceName } from './sources';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { useAdder } from './useAdder';
-import { useTrending } from './useTrending';
+import { notInRoom, useTrending } from './useTrending';
 
 type Props = { session: RoomSession; view: RoomView; onToast: (text: string) => void };
 
@@ -17,13 +18,13 @@ const summary = (items: QueueItem[]): string => {
   const parts = [plural(items.length, 'video')];
   const known = items.every((item) => item.durationMs > 0);
   if (known && items.length > 0) parts.push(formatTime(items.reduce((sum, item) => sum + item.durationMs, 0) / 1000));
-  return parts.join(' · ');
+  return parts.join(', ');
 };
 
 export const QueuePanel = ({ session, view, onToast }: Props) => {
   const adder = useAdder(session, view);
   const search = useSearch(adder);
-  const trending = useTrending();
+  const suggestions = notInRoom(useTrending(), view.queue);
   const editable = canQueue(view);
   const current = view.queue[0];
   const upcoming = view.queue.slice(1);
@@ -40,43 +41,40 @@ export const QueuePanel = ({ session, view, onToast }: Props) => {
   return (
     <div className="flex h-full flex-col">
       {editable ? (
-        <div className="p-3 pb-2">
+        <div className="rail-edge pt-3 pb-2">
           <AddBox id="omnibox" search={search} adder={adder} />
         </div>
       ) : (
-        <p className="flex items-center gap-2 px-4 pt-3 pb-1 text-[13px] text-muted">
-          <Icon name="lock" className="size-3.5 shrink-0" />
+        <p className="rail-edge pt-3 pb-1 text-[13px] text-muted">
           Only the host can change the queue.
         </p>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+      <div className="rail-scroll min-h-0 flex-1 pb-3">
         {search.query !== null ? (
           <SearchResults search={search} adder={adder} />
         ) : (
           <>
-            <NowPlaying item={current} paused={view.playback.status === 'paused'} />
-
-            <section aria-label="Up next" className="mt-2">
-              <h3 className="px-4 py-1.5 text-[13px] font-semibold">
+            <section aria-label="Up next">
+              <h3 className="flex justify-between gap-3 py-1.5 text-[13px] font-semibold">
                 Up next
-                {upcoming.length > 0 && <span className="font-normal text-muted"> · {summary(upcoming)}</span>}
+                {upcoming.length > 0 && <span className="fig font-normal text-dim">{summary(upcoming)}</span>}
               </h3>
               {upcoming.length === 0 ? (
-                <p className="px-4 pb-2 text-[13px] text-muted">
-                  {editable ? 'Nothing queued yet. Add something from below.' : 'Nothing queued yet.'}
+                <p className="pb-2 text-[13px] text-muted">
+                  Nothing queued.
                 </p>
               ) : (
                 <UpNextList session={session} view={view} items={upcoming} onToast={onToast} />
               )}
             </section>
 
-            {editable && trending?.length !== 0 && (
-              <section aria-label="Trending" className="mt-3">
-                <h3 className="px-4 py-1.5 text-[13px] font-semibold">Trending</h3>
-                {trending ? (
-                  <ul className="px-1">
-                    {trending.map((media) => (
+            {editable && current && suggestions?.length !== 0 && (
+              <section aria-label="Popular on YouTube" className="mt-3 lg:hidden">
+                <h3 className="py-1.5 text-[13px] font-semibold">Popular on YouTube</h3>
+                {suggestions ? (
+                  <ul>
+                    {suggestions.map((media) => (
                       <MediaRow key={media.sourceId} media={media} status={adder.statusOf(media)} onAdd={(mode) => void adder.addMedia(media, mode)} />
                     ))}
                   </ul>
@@ -91,22 +89,6 @@ export const QueuePanel = ({ session, view, onToast }: Props) => {
     </div>
   );
 };
-
-const NowPlaying = ({ item, paused }: { item: QueueItem; paused: boolean }) => (
-  <section aria-label="Now playing">
-    <h3 className="px-4 py-1.5 text-[13px] font-semibold">Now playing</h3>
-    <div className="mx-2 flex items-center gap-3 rounded-xl bg-white/[0.05] p-2">
-      <Thumb src={item.thumbnailUrl} className="w-20 rounded-md" />
-      <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</p>
-        <p className="mt-0.5 truncate text-xs text-muted">
-          {paused ? 'Paused · ' : ''}
-          {sourceName(item.source)} · Added by {item.addedByName}
-        </p>
-      </div>
-    </div>
-  </section>
-);
 
 type Drag = { id: string; from: number; to: number; dy: number; height: number };
 
@@ -186,7 +168,7 @@ const UpNextList = ({ session, view, items, onToast }: ListProps) => {
 
   return (
     <>
-      <ol ref={list} className="px-1">
+      <ol ref={list}>
         {shown.map((item, index) => (
           <QueueRow
             key={item.id}
@@ -244,9 +226,8 @@ const QueueRow = (props: RowProps) => {
   const { item, index, last, offset, dragging, settling, canPlay, editable, offline } = props;
   const { onDragStart, onMove, onPlay, onRemove } = props;
   const [tray, setTray] = useState(false);
-  const meta = [sourceName(item.source), `Added by ${item.addedByName}`, item.durationMs > 0 ? formatTime(item.durationMs / 1000) : ''].filter(Boolean).join(' · ');
   const actions: RowAction[] = [
-    ...(canPlay ? [{ label: 'Play now', primary: true, disabled: offline, run: onPlay }] : []),
+    ...(canPlay ? [{ label: 'Play now', icon: 'play' as const, primary: true, disabled: offline, run: onPlay }] : []),
     ...(editable
       ? [
           { label: 'Play next', trayOnly: true, disabled: index === 0 || offline, run: () => onMove(0) },
@@ -260,34 +241,36 @@ const QueueRow = (props: RowProps) => {
   return (
     <li
       style={{ transform: offset ? `translateY(${offset}px)` : undefined }}
-      className={`row relative rounded-xl py-1.5 pr-2 pl-1 ${settling && !dragging ? 'transition-transform duration-150' : ''} ${
-        dragging ? 'z-10 bg-raised shadow-2xl' : 'hover:bg-white/[0.04]'
-      }`}
+      className={`row relative py-2 ${settling && !dragging ? 'transition-transform' : ''} ${dragging ? 'float z-10' : ''}`}
     >
       {/* Touch only. Opens the same tray as the ⋯ button, which is the one a screen reader gets. */}
       {(canPlay || editable) && (
-        <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => setTray(!tray)} className="row-tap absolute inset-0 rounded-xl" />
+        <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => setTray(!tray)} className="row-tap absolute inset-0" />
       )}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-3">
         {editable ? (
           <button
             type="button"
             tabIndex={-1}
             aria-hidden="true"
             onPointerDown={onDragStart}
-            className="relative flex h-11 w-6 shrink-0 cursor-grab touch-none items-center justify-center text-muted/60 hover:text-text active:cursor-grabbing"
+            className="row-grip absolute top-0 -left-4 flex h-full w-4 cursor-grab touch-none items-center justify-center text-dim hover:text-text active:cursor-grabbing"
           >
             <Icon name="grip" />
           </button>
-        ) : (
-          <span className="w-1.5 shrink-0" />
-        )}
+        ) : null}
         <Thumb src={item.thumbnailUrl} className="w-20 rounded-md" />
-        <div className="min-w-0 flex-1 pl-1.5">
-          <p className="line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</p>
-          <div className="relative mt-0.5 min-h-[26px]">
-            <p className="row-meta truncate text-xs leading-[26px] text-muted transition-opacity">{meta}</p>
-            <div className="row-actions absolute inset-0 flex items-center gap-1 transition-opacity">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[13px] leading-[18px] font-medium">{item.title}</p>
+          <div style={actionRoom(actions.filter((action) => !action.trayOnly).length)} className="relative min-h-[26px]">
+            <p className="row-meta flex gap-2 text-xs leading-[26px] transition-opacity">
+              <span style={{ color: hueOf(item.addedBy) }} className="min-w-0 truncate">
+                {firstName(item.addedByName)}
+              </span>
+              {item.source !== 'youtube' && <span className="shrink-0 text-dim">{sourceName(item.source)}</span>}
+              {item.durationMs > 0 && <span className="fig shrink-0 text-dim">{formatTime(item.durationMs / 1000)}</span>}
+            </p>
+            <div className="row-actions">
               {actions
                 .filter((action) => !action.trayOnly)
                 .map(({ label, icon, primary, disabled, run }) => (
@@ -295,6 +278,7 @@ const QueueRow = (props: RowProps) => {
                     key={label}
                     type="button"
                     aria-label={`${label}: ${item.title}`}
+                    title={label}
                     disabled={disabled}
                     onClick={run}
                     className={`btn btn-sm ${primary ? 'btn-primary' : 'btn-quiet'} ${icon ? 'btn-icon' : ''}`}
@@ -312,7 +296,7 @@ const QueueRow = (props: RowProps) => {
         )}
       </div>
       {tray && (
-        <div className="relative mt-2 grid grid-cols-2 gap-2 pl-2">
+        <div className="row-tray">
           {actions.map(({ label, primary, disabled, run }) => (
             <button key={label} type="button" disabled={disabled} onClick={run} className={`btn ${primary ? 'btn-primary' : 'btn-quiet'}`}>
               {label}

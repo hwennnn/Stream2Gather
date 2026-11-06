@@ -342,7 +342,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
 
         {/* Hidden rather than removed, so a chat draft survives theatre mode. */}
         <aside aria-label="Room" hidden={railHidden} className="room-rail">
-          <div role="tablist" aria-label="Room panels" onKeyDown={moveTab} className="flex shrink-0 gap-1 border-b border-line p-1.5">
+          <div role="tablist" aria-label="Room panels" onKeyDown={moveTab} className="rail-edge flex shrink-0 gap-5 border-b border-line">
             {TABS.map(({ id, label }) => {
               const count = id === 'queue' ? Math.max(view.queue.length - 1, 0) : id === 'people' ? view.members.length : 0;
               return (
@@ -389,7 +389,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           </div>
 
           <ReactionLane reactions={view.reactions} />
-          {!railHidden && toastStack(`absolute inset-x-3 ${toastLift(tab)}`)}
+          {!railHidden && toastStack(`absolute inset-x-[var(--gutter)] ${toastLift(tab)}`)}
         </aside>
       </div>
     </div>

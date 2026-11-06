@@ -110,7 +110,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
           role="log"
           aria-label="Chat messages"
           tabIndex={0}
-          className="h-full overflow-y-auto px-3 py-3 outline-offset-[-2px]"
+          className="rail-scroll h-full py-3 outline-offset-[-2px]"
         >
           {!hasChat &&
             (view.alone ? (
@@ -144,7 +144,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
         )}
       </div>
 
-      <form onSubmit={(event) => void submit(event)} className="relative border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <form onSubmit={(event) => void submit(event)} className="rail-edge relative border-t border-line py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <label htmlFor="chat" className="sr-only">
           Message
         </label>
@@ -182,7 +182,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
 
 /** Search and trending belong to the stage here, so this side only has to get people in. */
 const PickingCard = ({ onInvite }: { onInvite: () => void }) => (
-  <div className="enter m-1 rounded-2xl border border-line bg-white/[0.03] p-4">
+  <div className="enter my-1 rounded-2xl border border-line bg-white/[0.03] p-4">
     <p className="text-[15px] leading-snug font-semibold text-balance">Invite someone while you pick</p>
     <button type="button" onClick={onInvite} className="btn btn-primary mt-3 w-full">
       <Icon name="link" />
@@ -192,7 +192,7 @@ const PickingCard = ({ onInvite }: { onInvite: () => void }) => (
 );
 
 const InviteCard = ({ url, onCopy }: { url: string; onCopy: () => void }) => (
-  <div className="enter m-1 rounded-2xl border border-line bg-white/[0.03] p-4">
+  <div className="enter my-1 rounded-2xl border border-line bg-white/[0.03] p-4">
     <p className="text-[15px] leading-snug font-semibold text-balance">Just you so far. Send this link to watch together.</p>
     <p className="mt-3 truncate rounded-lg bg-black/30 px-3 py-2 font-mono text-xs text-muted">{url}</p>
     <button type="button" onClick={onCopy} className="btn btn-primary mt-3 w-full">

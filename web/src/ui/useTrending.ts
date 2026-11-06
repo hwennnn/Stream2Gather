@@ -50,3 +50,7 @@ export const useTrending = (): Media[] | null => {
 
   return items;
 };
+
+/** Suggestions the room could still act on. What's playing or queued isn't one. */
+export const notInRoom = (items: Media[] | null, queue: { sourceId: string }[]): Media[] | null =>
+  items && items.filter((media) => !queue.some((item) => item.sourceId === media.sourceId));

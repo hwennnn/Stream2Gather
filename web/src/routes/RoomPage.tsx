@@ -1,6 +1,7 @@
 import { lazy, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react';
 import { api, ApiError, type RoomPreview } from '../api/http';
 import { account, useAccount } from '../auth/account';
+import { useInviteUrl } from '../crew/useInviteUrl';
 import { RoomSession, type RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { ChatPanel, useUnread } from '../ui/ChatPanel';
@@ -195,7 +196,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
 
   const current = view.queue[0];
   const railHidden = theatre && wide && !fullscreen.on && current !== undefined;
-  const inviteUrl = `${window.location.origin}/r/${slug}`;
+  const inviteUrl = useInviteUrl(session, view);
 
   const unread = useUnread(view.messages, view.self?.userId, tab === 'chat' && !railHidden && visible);
 

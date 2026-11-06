@@ -10,6 +10,9 @@ export const rosterFor = (view: RoomView): Person[] => {
   return [...view.members].sort((a, b) => rank(a) - rank(b) || (a.since ?? 0) - (b.since ?? 0));
 };
 
+/** From the member list, because joining a crew happens while connected. */
+export const onCrew = (view: RoomView): boolean => view.members.some((person) => person.userId === view.self?.userId && person.member);
+
 export const canControl = (view: RoomView): boolean => view.settings.controlMode === 'everyone' || isHost(view);
 
 export const canQueue = (view: RoomView): boolean => view.settings.queueMode === 'everyone' || isHost(view);

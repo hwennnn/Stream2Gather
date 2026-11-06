@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { watchAutoplay } from '../players/autoplay';
 import { createHtml5Player } from '../players/html5';
 import type { PlayerAdapter, PlayerError } from '../players/types';
 import { createYouTubePlayer } from '../players/youtube';
@@ -18,7 +19,6 @@ const BEHIND_FOR_MS = 3000;
 const LOAD_TIMEOUT_MS = 20_000;
 /** Some browsers won't fetch a file until play is pressed, so the poster can't wait for it. */
 const POSTER_LIMIT_MS = 8000;
-const AUTOPLAY_CHECK_MS = 2500;
 
 const createPlayer = (element: HTMLElement, item: QueueItem, startAt: number) =>
   item.source === 'youtube'
@@ -59,18 +59,6 @@ const watchReady = (player: PlayerAdapter, item: QueueItem, onReady: () => void)
     onReady();
   }, 100);
   return () => window.clearInterval(timer);
-};
-
-/** Browsers can refuse sound without a gesture. Muted is better than stuck. */
-const watchAutoplay = (session: RoomSession, player: PlayerAdapter, onMuted: Events['onMuted']): Cleanup => {
-  const timer = window.setTimeout(() => {
-    if (session.getView().playback.status === 'playing' && player.state() !== 'playing') {
-      player.setMuted(true);
-      player.play();
-      onMuted(true);
-    }
-  }, AUTOPLAY_CHECK_MS);
-  return () => window.clearTimeout(timer);
 };
 
 const exposeForTests = (session: RoomSession, player: PlayerAdapter, health: () => string): Cleanup => {
@@ -181,7 +169,7 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
       cleanups.push(
         watchReady(created, item, events.onReady),
         watchFirstFrame(created, item),
-        watchAutoplay(session, created, events.onMuted),
+        watchAutoplay(() => session.getView().playback.status === 'playing', created, events.onMuted),
         startSync(session, created, item, events),
       );
     },

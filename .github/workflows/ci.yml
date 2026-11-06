@@ -64,6 +64,87 @@ jobs:
       - run: npm run build
       - run: node scripts/bundle-budget.mjs
 
+  # Every user flow in headless Chrome. The YouTube API is a recorded fixture and the
+  # player a stand-in, so no key is needed and nothing here can fail because of YouTube.
+  flows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    # A new push to a PR replaces its run. Every commit on master keeps its own.
+    concurrency:
+      group: flows-${{ github.head_ref || github.sha }}-${{ matrix.shard }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 3s --health-retries 20
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: s2g
+          POSTGRES_PASSWORD: s2g
+          POSTGRES_DB: s2g
+        ports:
+          - 5432
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U s2g" --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      # The sample videos, and real Korean and emoji for the layout checks to measure.
+      # Cached because apt can hang for longer than this whole job, and that says nothing
+      # about the code. Bump the key when the samples in e2e/lib/stack.mjs change.
+      - uses: actions/cache@v4
+        id: assets
+        with:
+          path: |
+            .data
+            ~/.local/share/fonts
+          key: flows-assets-v1
+      - name: Get what the cache didn't have
+        if: steps.assets.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: |
+          for try in 1 2 3; do
+            timeout 90 sudo apt-get -qq -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update &&
+              timeout 120 sudo apt-get install -y -qq --no-install-recommends ffmpeg fonts-noto-cjk fonts-noto-color-emoji && break
+          done
+          mkdir -p ~/.local/share/fonts
+          cp /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc /usr/share/fonts/truetype/noto/NotoColorEmoji.ttf ~/.local/share/fonts/
+      - run: fc-cache -f
+      - run: npm ci
+        working-directory: e2e
+      # Known failures print but don't fail. A new one gets a second try on its own: a
+      # regression fails both, and one that recovers warns as flaky.
+      - name: Run the flows
+        working-directory: e2e
+        env:
+          FLOWS_REDIS_CONTAINER: ${{ job.services.redis.id }}
+          FLOWS_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          TMPDIR: ${{ runner.temp }}
+        run: node flows.mjs --shard ${{ matrix.shard }}/3 --concurrency 2 --retries 1 --keep --label "shard ${{ matrix.shard }}" --out "$RUNNER_TEMP/flows"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: flows-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/flows
+            ${{ runner.temp }}/s2g-flows-*/server.log
+          retention-days: 7
+
   secrets:
     runs-on: ubuntu-latest
     steps:

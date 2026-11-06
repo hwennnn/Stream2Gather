@@ -98,15 +98,24 @@ flow('leave: a room that has since closed offers no way back to it', async (t) =
   await t.gone('the way back', a.page.getByRole('link', { name: /Back to/ }));
 });
 
-flow('popular: the strip under the player adds what is tapped, and it leaves the strip', async (t) => {
+const firstThumb = (strip) => strip.locator('.up-next-thumb').first().evaluate((thumb) => Math.round(thumb.getBoundingClientRect().left));
+
+flow('dock: Popular and Up next share one geometry, and watching never swaps them', async (t) => {
   const a = await t.person('Ana');
-  await startRoom(t, a, { url: golden.url });
-  await openTab(a.page, 'Queue');
-  const strip = a.page.getByRole('region', { name: 'Popular on YouTube' }).filter({ visible: true }).first();
-  const pick = strip.getByRole('button', { name: new RegExp(train.title) }).first();
-  await t.see('a suggestion', pick);
+  await startRoom(t, a);
+  const popular = a.page.locator('main section[aria-label="Popular on YouTube"]');
+  const pick = popular.getByRole('button', { name: new RegExp(train.title) }).first();
+  await t.see('a suggestion with nothing on', pick);
+  const popularX = await firstThumb(popular);
   await pick.click();
-  await t.see('it is queued', ui.upNext(a.page).getByRole('listitem').filter({ hasText: train.title }));
+  await t.gone('it plays, so suggestions go', popular);
+  await addByMessage(t, a.page, [golden.url]);
+  const upNext = a.page.getByRole('region', { name: 'Up next in the queue' });
+  await t.see('it is queued', upNext.getByRole('listitem').filter({ hasText: golden.title }));
+  t.eq('the first thumbnail starts at the same x', await firstThumb(upNext), popularX);
+  await openTab(a.page, 'Queue');
+  await t.see('Up next stays with the queue open', upNext.getByRole('listitem').filter({ hasText: golden.title }));
+  t.eq('and Popular does not come back', await popular.count(), 0);
 });
 
 flow('links: a catch-up link lands somewhere until that page exists, and a dead recap link says so', async (t) => {

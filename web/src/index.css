@@ -522,6 +522,13 @@ body {
   }
 }
 
+/* The same height as the thumbnails beside it, inside the cards' own padding. */
+.up-next-more {
+  height: calc(100% - 0.5rem);
+  min-height: 3.375rem;
+  margin-block: 0.25rem;
+}
+
 /* UpNext works out how many cards fit, so a card is never cut in half. */
 .up-next-cards {
   display: grid;

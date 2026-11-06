@@ -10,8 +10,16 @@ const TILE = 96;
 const STACK_FROM = 180;
 /** What a standing card spends on its padding, title and name, in pixels. */
 const CARD_TEXT = 96;
+/** A card's own padding, both sides. */
+const CARD_PADDING = 8;
 
 type Strip = { shown: number; more: number; widest: number; stacked: boolean };
+
+/** A standing card's 16:9 thumbnail, in the track the grid will give it beside the "more" tile. */
+export const standingThumbHeight = ({ shown, widest }: Strip, width: number) => {
+  const track = Math.min(widest, (width - TILE - GAP * shown) / shown);
+  return ((track - CARD_PADDING) * 9) / 16;
+};
 
 /** Sizes the row to the space the player leaves. Every video is either a card or counted. */
 export const planStrip = (total: number, width: number, height: number): Strip => {
@@ -56,6 +64,7 @@ export const UpNext = ({ session, view, onPickAnother, onShowQueue, onToast }: U
   // The heading and the padding around the cards are not the cards' to use.
   const strip = planStrip(upcoming.length, width - 108, height);
   const tracks = `repeat(${strip.shown}, minmax(0, ${strip.widest}px))${strip.more > 0 ? ` ${TILE}px` : ''}`;
+  const tile = strip.stacked && strip.more > 0 ? { height: standingThumbHeight(strip, width - 108) } : undefined;
 
   return (
     <section ref={ref} aria-label="Up next in the queue" className="up-next">
@@ -97,7 +106,8 @@ export const UpNext = ({ session, view, onPickAnother, onShowQueue, onToast }: U
                   type="button"
                   onClick={onShowQueue}
                   aria-label={`${strip.more} more in the queue`}
-                  className="flex size-full min-h-14 cursor-pointer items-center justify-center rounded-md bg-raised text-[13px] font-semibold transition-colors hover:bg-line"
+                  style={tile}
+                  className="up-next-more flex w-full cursor-pointer items-center justify-center rounded-md bg-raised text-[13px] font-semibold transition-colors hover:bg-line"
                 >
                   +{strip.more} more
                 </button>

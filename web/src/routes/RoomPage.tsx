@@ -357,7 +357,6 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           row={row}
           act={act}
           actor={actor}
-          queueOpen={tab === 'queue'}
           offlineFor={offlineFor}
           onRetryConnection={retryConnection}
           onToast={toast}

@@ -278,3 +278,24 @@ for (const size of WIDTHS) {
     });
   });
 }
+
+/** A short strip, a taller one, and one tall enough that cards stand up. 1920x1080 leaves no strip to measure. */
+for (const { width, height } of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 1024, height: 960 }]) {
+  flow(`layout ${width}x${height}: the "more" tile stands as tall as the thumbnails beside it`, { timeout: 60_000 }, async (t) => {
+    const { room, bots } = await messyRoom(t);
+    const viewer = await t.person('viewer', { viewport: { width, height } });
+    await joinRoom(viewer, room.url, { name: NAMES[1] });
+    const { page } = viewer;
+    const strip = page.getByRole('region', { name: 'Up next in the queue' });
+    await t.see('the tile', strip.getByRole('button', { name: /more in the queue/ }));
+    const measured = await strip.evaluate((section) => {
+      const box = (el) => el.getBoundingClientRect();
+      const tile = box(section.querySelector('button[aria-label$="more in the queue"]'));
+      const thumbs = [...section.querySelectorAll('.up-next-thumb')].map(box);
+      return { tile: [tile.top, tile.bottom].map(Math.round), thumbs: thumbs.map((thumb) => [thumb.top, thumb.bottom].map(Math.round)) };
+    });
+    t.check(`${width}: there are thumbnails to compare`, measured.thumbs.length > 0);
+    for (const thumb of measured.thumbs) t.eq(`${width}: the tile's top and bottom`, measured.tile.join(), thumb.join());
+    bots.forEach((bot) => bot.close());
+  });
+}

@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
-import { planStrip, UpNext } from './UpNext';
+import { planStrip, standingThumbHeight, UpNext } from './UpNext';
 
 describe('planStrip', () => {
   it('leaves no video unaccounted for, at any size', () => {
@@ -28,6 +28,7 @@ describe('planStrip', () => {
 
   it('stands the cards up when height is what there is', () => {
     expect(planStrip(4, 596, 252)).toMatchObject({ stacked: true, shown: 2, more: 2 });
+    expect(standingThumbHeight(planStrip(4, 596, 400), 596)).toBeCloseTo(131.6, 0);
   });
 });
 

@@ -645,6 +645,26 @@ describe('RoomSession', () => {
       expect(chatIds(session)).toEqual([1]);
     });
 
+    it('marks what was said before joining, and only that', async () => {
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ items: [chatLine(1), chatLine(2)] })));
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      socket.deliver('chat', { message: chatLine(3) });
+      expect(entries(session).map((entry) => entry.kind === 'chat' && entry.history === true)).toEqual([true, true, false]);
+    });
+
+    it('does not mark what was missed during a reconnect', async () => {
+      const replies = [{ ticket: 't' }, { items: [chatLine(1)] }, { items: [chatLine(1), chatLine(2)] }];
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify(replies.shift() ?? { ticket: 't', items: [] })));
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(entries(session).map((entry) => entry.kind === 'chat' && entry.history === true)).toEqual([true, false]);
+    });
+
     it('survives a failed fetch', async () => {
       const { session, socket } = await connected();
       vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));

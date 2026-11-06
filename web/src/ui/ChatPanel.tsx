@@ -5,7 +5,8 @@ import { Avatar } from './Avatar';
 import { avatarColor, formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
 import { ReactionLane, ReactionPicker } from './Reactions';
-import { canQueue, isOffline } from './rules';
+import { canQueue, chatScroll, countUnread, isOffline } from './rules';
+import { toastError } from './Toasts';
 import { PHONE_LANDSCAPE, useMediaQuery } from './useMediaQuery';
 
 const STICK_PX = 80;
@@ -46,6 +47,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
   const [missed, setMissed] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
+  const sending = useRef(false);
   const offline = isOffline(view);
   const entries = view.messages;
   const empty = text.trim().length === 0;
@@ -55,6 +57,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
   const last = entries.at(-1);
   const hasChat = entries.some((entry) => entry.kind === 'chat');
   const mine = last?.kind === 'chat' && last.userId === view.self?.userId;
+  const lastShown = useRef(last?.id);
 
   const toBottom = () => {
     const element = list.current;
@@ -65,8 +68,10 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
 
   useLayoutEffect(() => {
     if (!active) return;
-    if (stuck.current || mine) toBottom();
-    else setMissed(true);
+    const scroll = chatScroll(stuck.current, lastShown.current !== last?.id, mine);
+    lastShown.current = last?.id;
+    if (scroll === 'bottom') toBottom();
+    if (scroll === 'flag') setMissed(true);
     // Keyed on the last line: the list stops growing once it reaches its cap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [last?.id, active]);
@@ -78,11 +83,20 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
     if (stuck.current) setMissed(false);
   };
 
-  const submit = (event: FormEvent) => {
+  /** The draft stays until the server has the message, so a refusal loses nothing. */
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     const body = text.trim();
-    if (!body || offline) return;
-    if (session.send('chat.send', { text: body })) setText('');
+    if (!body || offline || sending.current) return;
+    sending.current = true;
+    try {
+      await session.request('chat.send', { text: body });
+      setText((draft) => (draft.trim() === body ? '' : draft));
+    } catch (error) {
+      toastError(onToast)(error);
+    } finally {
+      sending.current = false;
+    }
   };
 
   return (
@@ -124,7 +138,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
         )}
       </div>
 
-      <form onSubmit={submit} className="relative border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <form onSubmit={(event) => void submit(event)} className="relative border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {sideways && (
           <div className="absolute inset-x-0 bottom-full h-14">
             <ReactionLane reactions={view.reactions} />
@@ -212,7 +226,7 @@ const Message = ({ session, view, message, onToast }: MessageProps) => {
       await session.queueAdd({ url }, 'end');
       onToast('Added to the queue');
     } catch (error) {
-      if (error instanceof Error) onToast(error.message);
+      toastError(onToast)(error);
     } finally {
       setBusy(false);
     }
@@ -254,14 +268,11 @@ export const useUnread = (entries: ChatEntry[], selfId: string | undefined, seei
   const last = entries.at(-1);
 
   useEffect(() => {
-    // History arrives in one go when joining, and none of it is news.
-    if (seen.current === null && entries.length > 1) seen.current = last?.id ?? null;
     if (seeing && last && seen.current !== last.id) {
       seen.current = last.id;
       redraw((count) => count + 1);
     }
-  }, [entries.length, last, seeing]);
+  }, [last, seeing]);
 
-  const from = entries.findIndex((entry) => entry.id === seen.current);
-  return entries.slice(from + 1).filter((entry) => entry.kind === 'chat' && entry.userId !== selfId).length;
+  return countUnread(entries, seen.current, selfId);
 };

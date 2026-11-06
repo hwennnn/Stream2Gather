@@ -1,5 +1,5 @@
 import type { Media } from '../api/http';
-import type { RoomView } from '../room/session';
+import type { ChatEntry, RoomView } from '../room/session';
 import type { SyncHealth } from '../sync/controller';
 
 export const isHost = (view: RoomView): boolean => view.self?.role === 'host';
@@ -14,6 +14,20 @@ export const isLocked = (view: RoomView): boolean =>
 export const isOffline = (view: RoomView): boolean => view.offlineSince !== null;
 
 export const mediaKey = (media: Pick<Media, 'source' | 'sourceId'>): string => `${media.source}:${media.sourceId}`;
+
+/** Chat from other people since the line last seen, not counting history. */
+export const countUnread = (entries: ChatEntry[], seen: ChatEntry['id'] | null, selfId: string | undefined): number => {
+  const from = entries.findIndex((entry) => entry.id === seen);
+  return entries
+    .slice(from + 1)
+    .filter((entry) => entry.kind === 'chat' && !entry.history && entry.userId !== selfId).length;
+};
+
+/** What the chat list does on showing, or on the last line changing. */
+export const chatScroll = (stuck: boolean, fresh: boolean, mine: boolean): 'bottom' | 'flag' | 'stay' => {
+  if (stuck || (fresh && mine)) return 'bottom';
+  return fresh ? 'flag' : 'stay';
+};
 
 export type Pill = { text: string; tone: 'good' | 'calm' | 'warn' | 'bad' };
 

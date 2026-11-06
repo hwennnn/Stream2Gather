@@ -8,6 +8,7 @@ import { ReactionBar, ReactionLane } from './Reactions';
 import { HostChip } from './RoomHeader';
 import { canControl, canQueue, isLocked, isOffline, pillFor } from './rules';
 import { Thumb } from './Thumb';
+import { toastError } from './Toasts';
 import { useAdder, type Adder } from './useAdder';
 import { PHONE_LANDSCAPE, useMediaQuery } from './useMediaQuery';
 import type { RoomPlayer } from './useRoomPlayer';
@@ -197,7 +198,7 @@ export const SkipButton = ({ session, view, onToast, className = '' }: { session
     try {
       await session.request('skip', { item: view.playback.item });
     } catch (error) {
-      if (error instanceof Error) onToast(error.message);
+      toastError(onToast)(error);
     } finally {
       setBusy(false);
     }
@@ -293,7 +294,7 @@ const UpNext = ({ session, view, onPickAnother, onToast }: UpNextProps) => {
                   type="button"
                   disabled={!playable}
                   title={playable ? `Play ${item.title} now` : item.title}
-                  onClick={() => void session.request('queue.play', { target: item.id }).catch((error: unknown) => error instanceof Error && onToast(error.message))}
+                  onClick={() => void session.request('queue.play', { target: item.id }).catch(toastError(onToast))}
                   className="flex w-full items-center gap-2.5 rounded-lg p-1 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-white/[0.05]"
                 >
                   <Thumb src={item.thumbnailUrl} className="up-next-thumb w-24 rounded-md" />

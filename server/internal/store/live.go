@@ -306,6 +306,8 @@ type Ticket struct {
 	RoomID   string `json:"roomId"`
 	RoomSlug string `json:"roomSlug"`
 	RoomName string `json:"roomName"`
+	// MaxMembers is the room's cap, for the check that races can't get past.
+	MaxMembers int `json:"maxMembers,omitempty"`
 	// Address is who to charge for what this connection spends.
 	Address string `json:"address,omitempty"`
 	Person  Person `json:"person"`

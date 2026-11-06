@@ -116,3 +116,51 @@ func TestAMomentLandsWhereTheVideoWasWhenItHappened(t *testing.T) {
 		t.Fatalf("%+v", batch)
 	}
 }
+
+// A reload lands both inside one flush, and the person is still here after it.
+func TestAReloadInsideOneFlushLeavesThePersonHere(t *testing.T) {
+	db := &fakeCaptureStore{crew: "c"}
+	c := newCapture(db, fakeRoomReader{state: playingAt(0, time.Now())}, quiet())
+	hana := store.Person{UserID: "hana", Name: "Hana"}
+
+	c.flush(context.Background(), "r", []recorded{{roomID: "r", left: "hana"}, {roomID: "r", joined: &hana}})
+
+	if left := db.batches[0].Left; len(left) != 0 {
+		t.Fatalf("left = %v, so the store marks someone gone who came straight back", left)
+	}
+}
+
+func TestLeavingForGoodInsideOneFlushStillCounts(t *testing.T) {
+	db := &fakeCaptureStore{crew: "c"}
+	c := newCapture(db, fakeRoomReader{state: playingAt(0, time.Now())}, quiet())
+	hana := store.Person{UserID: "hana", Name: "Hana"}
+
+	c.flush(context.Background(), "r", []recorded{
+		{roomID: "r", left: "hana"}, {roomID: "r", joined: &hana}, {roomID: "r", left: "hana"},
+	})
+
+	if left := db.batches[0].Left; len(left) != 1 {
+		t.Fatalf("left = %v", left)
+	}
+}
+
+// Applause at the end of a film, then the next one starts inside the same second.
+func TestAMomentBelongsToTheVideoItHappenedIn(t *testing.T) {
+	start := time.Now().Add(-time.Minute)
+	film := playingAt(100, start)
+	next := playingAt(0, start.Add(31*time.Second))
+	next.Queue = []room.Item{{ID: "n", Media: room.Media{Source: "youtube", SourceID: "next"}}}
+	next.Playback.ItemID = "n"
+	db := &fakeCaptureStore{crew: "c"}
+	c := newCapture(db, fakeRoomReader{state: next}, quiet())
+
+	c.flush(context.Background(), "r", []recorded{
+		{roomID: "r", moment: &Moment{Kind: MomentReaction, Emoji: "👏", At: start.Add(30 * time.Second)}},
+		{roomID: "r", state: &next, before: &film},
+	})
+
+	moment := db.batches[0].Moments[0]
+	if moment.SourceID != "abc" || moment.PosMs != 130_000 {
+		t.Fatalf("placed in %q at %d ms, want the film at 130000", moment.SourceID, moment.PosMs)
+	}
+}

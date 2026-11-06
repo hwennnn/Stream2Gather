@@ -3,6 +3,7 @@ package hub
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"sync/atomic"
 	"time"
 
@@ -31,8 +32,8 @@ type Moment struct {
 type Recorder interface {
 	// Run does the recorder's work until ctx ends. Hub.Run starts it.
 	Run(ctx context.Context)
-	// Applied sees every state change, system commands included.
-	Applied(roomID string, s room.State)
+	// Applied sees every state change, system commands included, and what it replaced.
+	Applied(roomID string, before, after room.State)
 	// Joined fires for each connection, so a second tab fires it again.
 	Joined(roomID string, p store.Person)
 	// Left fires once the person has no connection left, on any server.
@@ -77,6 +78,7 @@ type roomReader interface {
 type recorded struct {
 	roomID string
 	state  *room.State
+	before *room.State
 	joined *store.Person
 	left   string
 	moment *Moment
@@ -116,7 +118,9 @@ func (c *capture) send(event recorded) {
 	}
 }
 
-func (c *capture) Applied(roomID string, s room.State)  { c.send(recorded{roomID: roomID, state: &s}) }
+func (c *capture) Applied(roomID string, before, after room.State) {
+	c.send(recorded{roomID: roomID, state: &after, before: &before})
+}
 func (c *capture) Joined(roomID string, p store.Person) { c.send(recorded{roomID: roomID, joined: &p}) }
 func (c *capture) Left(roomID, userID string)           { c.send(recorded{roomID: roomID, left: userID}) }
 func (c *capture) Moment(roomID string, m Moment)       { c.send(recorded{roomID: roomID, moment: &m}) }
@@ -182,7 +186,8 @@ func (c *capture) crewOf(ctx context.Context, roomID string) (string, error) {
 }
 
 // write turns events into one Capture. Events arrive in order, so a moment is
-// placed against the state it happened in, which later events in the batch can't change.
+// placed against the state it happened in: what the batch's first change replaced,
+// then each change in turn. Live state alone is what the batch ended on.
 func (c *capture) write(ctx context.Context, roomID, crewID string, events []recorded) error {
 	state, found, err := c.live.Load(ctx, roomID)
 	if err != nil {
@@ -197,6 +202,9 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 	}
 	batch := store.Capture{CrewID: crewID, At: time.Now(), Present: present}
 	placed := state
+	if first := slices.IndexFunc(events, func(e recorded) bool { return e.state != nil }); first >= 0 {
+		placed = *events[first].before
+	}
 	for _, event := range events {
 		switch {
 		case event.state != nil:
@@ -204,6 +212,8 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 			batch.Active = true
 		case event.joined != nil:
 			batch.Joined = append(batch.Joined, *event.joined)
+			// A reload is a leave and a join, and the store seats before it unseats.
+			batch.Left = slices.DeleteFunc(batch.Left, func(id string) bool { return id == event.joined.UserID })
 		case event.left != "":
 			batch.Left = append(batch.Left, event.left)
 		case event.moment != nil:

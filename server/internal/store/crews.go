@@ -334,6 +334,11 @@ func (p *Postgres) DeleteAccount(ctx context.Context, userID string) ([]string, 
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
+	// First, as RecordCapture does: this waits out a flush that is writing this
+	// person, and the same order everywhere means the two can't deadlock.
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM users WHERE id = $1 FOR UPDATE`, userID); err != nil {
+		return nil, err
+	}
 	rows, err := tx.Query(ctx, `
 		UPDATE rooms r SET owner_id = coalesce((
 		         SELECT m.user_id FROM crew_members m JOIN crews c ON c.id = m.crew_id

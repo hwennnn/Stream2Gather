@@ -1134,7 +1134,7 @@ func (r *liveRoom) mutate(ctx context.Context, actor room.Actor, cmd room.Comman
 		state, err = attempt()
 	}
 	if err == nil {
-		r.hub.recorder.Applied(r.id, state)
+		r.hub.recorder.Applied(r.id, before, state)
 		if text := room.Narrate(before, state, change); text != "" {
 			r.say(ctx, text, "")
 		}

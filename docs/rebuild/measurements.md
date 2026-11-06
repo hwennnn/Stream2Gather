@@ -120,3 +120,33 @@ Everything here used a fake push service on this machine, so no real push servic
 | Real-device pass | Not run | Recorded |
 
 The timer alone is 30 to 45 seconds, so the p95 is mostly the wait that stops false starts. `recap.ready` has not run end to end: nothing writes those rows until the recap slices merge. Headless Chrome ran the real worker, with a push delivered through DevTools and tap routing checked; the browser's own push service was stubbed.
+
+## Room performance
+
+`make perf` runs these in headless Chrome at 4x CPU throttle, in a room with bots, a 30-row queue and 300 chat lines. It fails over `e2e/perf-budgets.json`. Measured 2026-11-06 at machine load 40 to 60, so limits sit well above the numbers. Times are ms.
+
+| Measure | Before the render work | Master at 8a28b02 | Budget |
+|---|---|---|---|
+| Landing usable | 472 | 447 | 800 |
+| Landing first-load JS, KB | 78 | 77 | 80 |
+| Room gate ready | 1,078 | 968 | 1,800 |
+| Join to first frame | 507 | 460 | 1,200 |
+| Playing idle, renders/s | 7,240 | 322 | 1,000 |
+| Playing idle, blocking in 15 s | 1,376 | 0 | 400 |
+| Tabs INP | 100 | 56 | 200 |
+| Chat typing INP | 180 | 32 | 200 |
+| Chat scroll INP | 40 | 16 | 200 |
+| Send chat feedback | 110 | 18 | 200 |
+| Search typing INP | 80 | 40 | 200 |
+| Search open feedback | 14 | 15 | 100 |
+| Add to queue feedback | 20 | 19 | 100 |
+| Row expand feedback | 28 | 27 | 100 |
+| Reaction feedback | 134 | 101 | 250 |
+| Pause feedback | 438 | 404 | 700 |
+| Resume feedback | 138 | 100 | 300 |
+| Seek to peer | 271 | 275 | 600 |
+| Play now feedback | 196 | 134 | 350 |
+| Play now to first frame | 1,568 | 1,560 | 2,500 |
+| Paused idle, commits | 0 | 0 | 0 |
+
+The sample file plays here, so none of this covers YouTube's own start. In real Chrome, a viewer who clicked reached playing in 1.4 to 1.8 seconds with sound, and a reload with no click played muted in about 1 second.

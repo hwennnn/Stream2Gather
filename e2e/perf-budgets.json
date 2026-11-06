@@ -1,0 +1,23 @@
+{
+  "load_landing.usable": 800,
+  "load_landing.jsKb": 80,
+  "load_room.gate": 1800,
+  "load_room.frame": 1200,
+  "playing_idle.blockingMs": 400,
+  "playing_idle.rendersPerSecond": 1000,
+  "tabs.inp": 200,
+  "chat_typing.inp": 200,
+  "chat_scroll.inp": 200,
+  "send_chat.feedbackMs": 200,
+  "search_typing.inp": 200,
+  "search_open.feedbackMs": 100,
+  "add_queue.feedbackMs": 100,
+  "row_expand.feedbackMs": 100,
+  "reaction.feedbackMs": 250,
+  "pause.feedbackMs": 700,
+  "resume.feedbackMs": 300,
+  "seek.peerMs": 600,
+  "play_now.feedbackMs": 350,
+  "play_now.frameMs": 2500,
+  "paused_idle.commits": 0
+}

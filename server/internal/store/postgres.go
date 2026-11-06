@@ -55,41 +55,56 @@ func (p *Postgres) EnsureUser(ctx context.Context, id, name string) error {
 	return err
 }
 
-// LinkClerkUser returns the user behind a Clerk account and their display name.
-// A guest signing in for the first time keeps their id, so rooms they host stay
-// theirs. If the account already exists, it takes over the guest's rooms instead.
-func (p *Postgres) LinkClerkUser(ctx context.Context, clerkID, guestID, newID, name, avatar string) (string, string, error) {
+// Account is the user behind a Clerk account.
+type Account struct {
+	ID             string
+	Name           string
+	SessionVersion int64
+}
+
+// LinkClerkUser returns the user behind a Clerk account, creating it on first
+// sign-in. An account never takes over a guest's id, because anyone holding that
+// guest's old cookie would then be the account too. The guest's rooms move to it
+// instead, and only a real guest's: guestID may be anyone's.
+func (p *Postgres) LinkClerkUser(ctx context.Context, clerkID, guestID, newID, name, avatar string) (Account, error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
-		return "", "", err
+		return Account{}, err
 	}
 	defer tx.Rollback(ctx)
 
-	var id, displayName string
+	var account Account
 	err = tx.QueryRow(ctx, `
-		UPDATE users SET avatar_url = $2, last_seen_at = now() WHERE clerk_id = $1
-		RETURNING id, display_name`, clerkID, avatar).Scan(&id, &displayName)
-	switch {
-	case err == nil:
-		_, err = tx.Exec(ctx, `
-			UPDATE rooms SET owner_id = $1
-			WHERE owner_id = $2 AND EXISTS (SELECT 1 FROM users WHERE id = $2 AND kind = 'guest')`, id, guestID)
-	case errors.Is(err, pgx.ErrNoRows):
-		err = tx.QueryRow(ctx, `
-			UPDATE users SET kind = 'clerk', clerk_id = $2, display_name = $3, avatar_url = $4, last_seen_at = now()
-			WHERE id = $1 AND kind = 'guest'
-			RETURNING id, display_name`, guestID, clerkID, name, avatar).Scan(&id, &displayName)
-		if errors.Is(err, pgx.ErrNoRows) {
-			err = tx.QueryRow(ctx, `
-				INSERT INTO users (id, kind, clerk_id, display_name, avatar_url) VALUES ($1, 'clerk', $2, $3, $4)
-				ON CONFLICT (clerk_id) DO UPDATE SET avatar_url = EXCLUDED.avatar_url, last_seen_at = now()
-				RETURNING id, display_name`, newID, clerkID, name, avatar).Scan(&id, &displayName)
-		}
-	}
+		INSERT INTO users (id, kind, clerk_id, display_name, avatar_url) VALUES ($1, 'clerk', $2, $3, $4)
+		ON CONFLICT (clerk_id) DO UPDATE SET avatar_url = EXCLUDED.avatar_url, last_seen_at = now()
+		RETURNING id, display_name, session_version`, newID, clerkID, name, avatar,
+	).Scan(&account.ID, &account.Name, &account.SessionVersion)
 	if err != nil {
-		return "", "", err
+		return Account{}, err
 	}
-	return id, displayName, tx.Commit(ctx)
+	_, err = tx.Exec(ctx, `
+		UPDATE rooms SET owner_id = $1
+		WHERE owner_id = $2 AND EXISTS (SELECT 1 FROM users WHERE id = $2 AND kind = 'guest')`, account.ID, guestID)
+	if err != nil {
+		return Account{}, err
+	}
+	return account, tx.Commit(ctx)
+}
+
+// SessionVersion returns the version a user's cookie must carry.
+func (p *Postgres) SessionVersion(ctx context.Context, id string) (int64, error) {
+	var version int64
+	err := p.pool.QueryRow(ctx, `SELECT session_version FROM users WHERE id = $1`, id).Scan(&version)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrNotFound
+	}
+	return version, err
+}
+
+// BumpSessionVersion turns away every cookie issued to this user so far.
+func (p *Postgres) BumpSessionVersion(ctx context.Context, id string) error {
+	_, err := p.pool.Exec(ctx, `UPDATE users SET session_version = session_version + 1 WHERE id = $1`, id)
+	return err
 }
 
 // CreateRoom inserts a room that expires after a day without use.

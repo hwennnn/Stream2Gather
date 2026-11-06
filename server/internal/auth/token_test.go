@@ -58,3 +58,15 @@ func TestRejectsBadTokens(t *testing.T) {
 		})
 	}
 }
+
+func TestVersionSurvivesTheCookie(t *testing.T) {
+	i := issuer(t, 1)
+	token, err := i.Issue(Claims{Subject: "u_1", Account: true, Version: 4}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claims, err := i.Verify(token)
+	if err != nil || claims.Version != 4 {
+		t.Fatalf("claims = %+v, err = %v", claims, err)
+	}
+}

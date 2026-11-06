@@ -61,6 +61,7 @@ const subscribe = async (who, device) => {
   const key = createECDH('prime256v1');
   key.generateKeys();
   await who.call('POST', '/v1/push/subscriptions', {
+    claim: true,
     endpoint: `http://127.0.0.1:${PUSH_PORT}/${device}`,
     keys: { p256dh: key.getPublicKey('base64url'), auth: randomBytes(16).toString('base64url') },
   });

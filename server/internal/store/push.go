@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -29,9 +30,10 @@ type PushCrew struct {
 	Notify string `json:"notify"`
 }
 
-// SavePushSubscription stores a browser under this person and returns its id. An
-// endpoint is one browser profile, so a second account signing in there takes it
-// over. A saved browser counts as new, or the limit below could remove it at once.
+// SavePushSubscription stores a browser under this person and returns its id, taking
+// it from whoever held it. Only someone pressing Allow gets here, since it decides
+// whose pings a browser shows. A saved browser counts as new, or the limit below
+// could remove it at once.
 func (p *Postgres) SavePushSubscription(ctx context.Context, userID, endpoint, p256dh, auth, userAgent string) (string, error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -56,6 +58,19 @@ func (p *Postgres) SavePushSubscription(ctx context.Context, userID, endpoint, p
 		return "", err
 	}
 	return id, tx.Commit(ctx)
+}
+
+// RefreshPushSubscription updates a browser this person already holds, for a page
+// load, where nobody has agreed to anything. ErrNotFound means it isn't theirs.
+func (p *Postgres) RefreshPushSubscription(ctx context.Context, userID, endpoint, p256dh, auth, userAgent string) (string, error) {
+	var id string
+	err := p.pool.QueryRow(ctx, `
+		UPDATE push_subscriptions SET p256dh = $3, auth = $4, user_agent = $5, created_at = now()
+		WHERE endpoint = $1 AND user_id = $2 RETURNING id`, endpoint, userID, p256dh, auth, userAgent).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	return id, err
 }
 
 // DeletePushSubscription removes one of this person's browsers.

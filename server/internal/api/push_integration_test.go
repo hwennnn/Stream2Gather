@@ -27,7 +27,12 @@ func browserKeys(t *testing.T) (key, auth string) {
 }
 
 func subscribeBody(endpoint, key, auth string) string {
-	return `{"endpoint":"` + endpoint + `","keys":{"p256dh":"` + key + `","auth":"` + auth + `"}}`
+	return `{"claim":true,"endpoint":"` + endpoint + `","keys":{"p256dh":"` + key + `","auth":"` + auth + `"}}`
+}
+
+// reloadBody is what a page load sends, with nobody having agreed to anything.
+func reloadBody(endpoint, key, auth string) string {
+	return strings.Replace(subscribeBody(endpoint, key, auth), `"claim":true,`, "", 1)
 }
 
 func pushEndpoint() string { return "https://fcm.googleapis.com/fcm/send/" + ids.New() }
@@ -72,6 +77,44 @@ func TestABrowserSubscribesOnceAndCanBeRemoved(t *testing.T) {
 
 // A lost laptop is signed out from another device. Its lock screen shouldn't go on
 // naming the crew and who's watching.
+func TestOpeningACrewHomeNeverTakesABrowserFromAnyone(t *testing.T) {
+	s, pool := stackServer(t)
+	hanaID, hana := signUp(t, s, "Hana")
+	boID, bo := signUp(t, s, "Bo")
+	endpoint := pushEndpoint()
+	key, auth := browserKeys(t)
+	holder := func() (id string) {
+		t.Helper()
+		if err := pool.QueryRow(context.Background(), `SELECT user_id FROM push_subscriptions WHERE endpoint = $1`, endpoint).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+
+	if response, body := serve(s, http.MethodPost, "/v1/push/subscriptions", reloadBody(endpoint, key, auth), hana); response.Code != http.StatusConflict || body["code"] != "not_yours" {
+		t.Fatalf("a page load saved a browser nobody allowed: %d %v", response.Code, body)
+	}
+	if response, _ := serve(s, http.MethodPost, "/v1/push/subscriptions", subscribeBody(endpoint, key, auth), hana); response.Code != http.StatusCreated {
+		t.Fatalf("allow: %d", response.Code)
+	}
+	if response, _ := serve(s, http.MethodPost, "/v1/push/subscriptions", reloadBody(endpoint, key, auth), hana); response.Code != http.StatusCreated {
+		t.Fatalf("the holder's page load: %d", response.Code)
+	}
+
+	if response, body := serve(s, http.MethodPost, "/v1/push/subscriptions", reloadBody(endpoint, key, auth), bo); response.Code != http.StatusConflict || body["code"] != "not_yours" {
+		t.Fatalf("someone else's page load: %d %v", response.Code, body)
+	}
+	if holder() != hanaID.Subject {
+		t.Fatal("a page load moved the browser to the next person")
+	}
+	if response, _ := serve(s, http.MethodPost, "/v1/push/subscriptions", subscribeBody(endpoint, key, auth), bo); response.Code != http.StatusCreated {
+		t.Fatalf("allow by the next person: %d", response.Code)
+	}
+	if holder() != boID.Subject {
+		t.Fatal("pressing Allow did not take the browser")
+	}
+}
+
 func TestSigningOutStopsEveryDevicesPings(t *testing.T) {
 	s, pool := stackServer(t)
 	account, hana := signUp(t, s, "Hana")

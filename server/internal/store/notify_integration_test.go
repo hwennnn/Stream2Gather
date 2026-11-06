@@ -122,6 +122,26 @@ func TestThePingCapHoldsForThirtyMinutes(t *testing.T) {
 	}
 }
 
+func TestNoClaimForSomeoneWhoHasGoneAndNoErrorToRetry(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	sessionID, notice, bo, _ := aSession(t, db)
+	for name, claim := range map[string][2]string{
+		"person": {"u_" + ids.New(), notice.CrewID},
+		"crew":   {bo, ids.New()},
+	} {
+		if claimed, err := db.ClaimNotification(ctx, claim[0], claim[1], "session.started", sessionID); err != nil || claimed {
+			t.Fatalf("%s gone: claimed = %v, err = %v", name, claimed, err)
+		}
+	}
+
+	// Anything else may pass, so it still has to come back and be retried.
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := db.ClaimNotification(cancelled, bo, notice.CrewID, "session.started", sessionID); err == nil {
+		t.Fatal("a failure that may pass was swallowed")
+	}
+}
+
 func TestAClaimIsOneSend(t *testing.T) {
 	db, ctx := testPostgres(t), context.Background()
 	sessionID, notice, bo, _ := aSession(t, db)

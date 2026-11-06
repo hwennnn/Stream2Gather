@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // pingCap keeps a crew that starts and stops from pinging anyone twice in a row.
@@ -82,12 +83,17 @@ func (p *Postgres) RecapAudience(ctx context.Context, sessionID string, notice S
 	return pgx.CollectRows(rows, pgx.RowTo[string])
 }
 
-// ClaimNotification reserves this person's one send. False means it's taken, so a
+// ClaimNotification reserves this person's one send. False means it's taken, or the
+// person or crew has gone, so there's nobody to send to and nothing to retry. A
 // retried activity stops here.
 func (p *Postgres) ClaimNotification(ctx context.Context, userID, crewID, kind, ref string) (bool, error) {
 	tag, err := p.pool.Exec(ctx, `
 		INSERT INTO notification_log (user_id, crew_id, kind, ref) VALUES ($1, $2, $3, $4)
 		ON CONFLICT DO NOTHING`, userID, crewID, kind, ref)
+	var failure *pgconn.PgError
+	if errors.As(err, &failure) && failure.Code == foreignKeyViolation {
+		return false, nil
+	}
 	return tag.RowsAffected() == 1, err
 }
 

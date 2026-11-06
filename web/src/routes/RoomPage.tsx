@@ -15,7 +15,6 @@ import { RoomStatus, useLatestAct } from '../ui/RoomStatus';
 import { useSeats } from '../ui/Seats';
 import { PeoplePanel } from '../ui/PeoplePanel';
 import { MainAction, PlayerStage, SkipButton } from '../ui/PlayerStage';
-import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
 import { canControl, noticesToShow, offersInvite, onCrew } from '../ui/rules';
@@ -25,8 +24,10 @@ import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
 import { useMediaQuery } from '../ui/useMediaQuery';
 import { useOfflineNotice } from '../ui/useOfflineNotice';
 import { usePageVisible } from '../ui/usePageVisible';
+import { useBeat } from '../ui/useBeat';
 import { useRoomPlayer } from '../ui/useRoomPlayer';
 import { useShownView } from '../ui/useShownView';
+import { useWatched } from '../ui/useWatched';
 
 const CrewHome = lazy(() => import('./CrewHome'));
 const VoiceButton = lazy(() => import('../voice/VoiceButton'));
@@ -190,8 +191,11 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const [tab, setTab] = useState<Tab>('chat');
   const [theatre, setTheatre] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [saved, setSaved] = useState(false);
   const row = useSeats(view);
   const act = useLatestAct(view);
+  const beat = useBeat(view);
+  const watched = useWatched(view);
   const actor = view.playback.status === 'paused' ? (view.playback.pausedBy ?? null) : (act?.by ?? null);
   const { toasts, toast } = useToasts();
   const fullscreen = useFullscreen();
@@ -270,8 +274,12 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
     }
   };
 
+  // Whoever the link was for has sat down, or at least someone has.
+  useEffect(() => setSaved(false), [view.members.length]);
+
   const invite = async () => {
     setInviting(true);
+    setSaved(true);
     setTheatre(false);
     if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
       await navigator.share({ title: `${firstName(view.self?.name ?? '')} saved you a seat`, text: view.name, url: inviteUrl }).catch(() => {});
@@ -315,7 +323,7 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
   const railToasts = !railHidden && toastStack('rail-edge shrink-0 pb-2 empty:hidden');
 
   return (
-    <div data-fullscreen={fullscreen.on} data-theatre={railHidden} className="room-shell flex h-dvh flex-col bg-ink">
+    <div data-fullscreen={fullscreen.on} data-theatre={railHidden} data-lights={view.playback.status === 'playing' ? 'down' : 'up'} className="room-shell flex h-dvh flex-col bg-ink">
       {!fullscreen.on && (
         <RoomHeader
           session={session}
@@ -323,6 +331,8 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           adapter={player.adapter}
           row={row}
           actor={actor}
+          beat={beat}
+          saved={saved}
           note={!current && offlineFor !== null ? roomStatus('') : null}
           onAccountOpen={() => setTheatre(false)}
           onInvite={() => void invite()}
@@ -357,12 +367,14 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           row={row}
           act={act}
           actor={actor}
+          beat={beat}
+          saved={saved}
+          watched={watched}
           offlineFor={offlineFor}
           onRetryConnection={retryConnection}
           onToast={toast}
           railHidden={railHidden}
           toastSlot={railHidden && toastStack('absolute inset-0 justify-center bg-ink px-4 empty:hidden', 1)}
-          laneSlot={railHidden && <ReactionLane reactions={view.reactions} />}
         />
 
         <div className="flex shrink-0 items-center justify-end gap-2 border-b border-line px-3 py-1.5 empty:hidden">
@@ -419,7 +431,6 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           </div>
 
           {tab !== 'chat' && railToasts}
-          <ReactionLane reactions={view.reactions} />
         </aside>
       </div>
     </div>

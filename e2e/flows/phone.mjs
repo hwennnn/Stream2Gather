@@ -113,7 +113,7 @@ flow('phone: chat works above the keyboard line, with reactions behind one butto
   await sendChat(b.page, 'to a phone');
   await t.see('Ana gets it', ui.chatLog(a.page).getByText('to a phone'));
   await a.page.getByRole('button', { name: 'React 👏' }).filter({ visible: true }).tap();
-  await t.see('Ben sees it', ui.rail(b.page).getByText('👏'));
+  await t.see('Ben sees it', ui.seats(b.page).getByText('👏'));
   await noSideScroll(t, a.page, 'the chat');
 });
 
@@ -179,10 +179,8 @@ flow('phone: the track sits under the seats, in a row kept for it, and a short p
   const header = await box('.room-header');
   await addByMessage(t, a.page, [golden.url]);
   await joinRoom(b, room.url);
-  const dots = slot.locator('.seat-track-dot');
-  await t.until('a dot each', async () => (await dots.count()) === 2);
+  await t.see('the room’s tick', slot.locator('.seat-track-room'));
   await t.see('the room clock', slot.getByText(/^\d+:\d\d$/));
-  t.check('the dots show', await dots.first().isVisible());
   t.eq('the row was already there', await box('.seat-track-slot'), empty);
   t.eq('the header did not grow', await box('.room-header'), header);
   const above = await a.page.evaluate(() => document.querySelector('.seat-track-slot').getBoundingClientRect().bottom <= document.querySelector('[data-player]').getBoundingClientRect().top);
@@ -218,5 +216,5 @@ flow('phone: a small phone keeps real room for messages, even with a notice up, 
   await noSideScroll(t, a.page, 'the small phone');
   await a.page.getByRole('button', { name: 'Send a reaction' }).filter({ visible: true }).tap();
   await a.page.getByRole('button', { name: 'React 👏' }).filter({ visible: true }).tap();
-  await t.see('reactions still work, from beside the box', ui.rail(b.page).getByText('👏'));
+  await t.see('reactions still work, from beside the box', ui.seats(b.page).getByText('👏'));
 });

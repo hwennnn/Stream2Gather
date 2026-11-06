@@ -34,7 +34,7 @@ export type RoomPlayback = Playback & { pausedBy?: string; pausedById?: string }
 /** What changed about the room's crew. The event carries no data, so refetch it. The one exception is the invite, sent to whoever is present when a room becomes a crew. */
 export type CrewChange = 'settings' | 'members' | 'watchlist';
 
-type Reaction = { id: number; emoji: string; name: string };
+type Reaction = { id: number; emoji: string; name: string; userId: string };
 
 type Notice = { id: number; kind?: string; text: string; url?: string };
 
@@ -718,7 +718,8 @@ export class RoomSession {
   react(emoji: string): void {
     if (!this.send('react', { emoji })) return;
     this.ownReactions.push({ emoji, at: Date.now() });
-    this.showReaction(emoji, this.view.self?.name ?? '');
+    const { name = '', userId = '' } = this.view.self ?? {};
+    this.showReaction(emoji, name, userId);
   }
 
   private reaction({ emoji, name, userId }: { emoji: string; name: string; userId: string }): void {
@@ -727,12 +728,12 @@ export class RoomSession {
     this.ownReactions = this.ownReactions.filter((own) => own.at >= recent);
     const own = this.ownReactions.findIndex((sent) => sent.emoji === emoji);
     if (userId === this.view.self?.userId && own >= 0) this.ownReactions.splice(own, 1);
-    else this.showReaction(emoji, name);
+    else this.showReaction(emoji, name, userId);
   }
 
-  private showReaction(emoji: string, name: string): void {
+  private showReaction(emoji: string, name: string, userId: string): void {
     const id = this.nextId++;
-    this.update({ reactions: [...this.view.reactions, { id, emoji, name }] });
+    this.update({ reactions: [...this.view.reactions, { id, emoji, name, userId }] });
     window.setTimeout(
       () => this.update({ reactions: this.view.reactions.filter((reaction) => reaction.id !== id) }),
       REACTION_LIFE_MS,

@@ -39,7 +39,7 @@ describe('viewerState', () => {
 
 describe('statusFor', () => {
   it('never leaves a pause anonymous when it knows who did it', () => {
-    expect(line({ view: view({ playback: paused('Maya', 'm') }) })).toBe('Paused by Maya at 3:20');
+    expect(line({ view: view({ playback: paused('Maya', 'm') }) })).toBe('Paused by Maya at 3:20, everyone’s waiting');
   });
 
   it('tells a viewer the browser refused to press play themselves', () => {
@@ -51,7 +51,11 @@ describe('statusFor', () => {
   });
 
   it('says you when it was you', () => {
-    expect(line({ view: view({ playback: paused('Ada', 'me') }) })).toBe('Paused by you at 3:20');
+    expect(line({ view: view({ playback: paused('Ada', 'me') }) })).toBe('Paused by you at 3:20, everyone’s waiting');
+  });
+
+  it('has nobody waiting when you’re alone', () => {
+    expect(line({ view: view({ alone: true, playback: paused('Ada', 'me') }) })).toBe('Paused by you at 3:20');
   });
 
   it('says so when nobody paused it', () => {
@@ -89,7 +93,7 @@ describe('statusFor', () => {
   });
 
   it('shows the name someone has now', () => {
-    expect(line({ view: view({ members: [me, { ...maya, name: 'Maya K' }], playback: paused('Maya', 'm') }) })).toBe('Paused by Maya K at 3:20');
+    expect(line({ view: view({ members: [me, { ...maya, name: 'Maya K' }], playback: paused('Maya', 'm') }) })).toBe('Paused by Maya K at 3:20, everyone’s waiting');
   });
 
   it('says Loading only before the first frame, and only once it has taken a while', () => {
@@ -99,7 +103,7 @@ describe('statusFor', () => {
   });
 
   it('never says Loading in a paused room', () => {
-    expect(line({ started: false, health: 'buffering', slow: true, view: view({ playback: paused('Maya', 'm') }) })).toBe('Paused by Maya at 3:20');
+    expect(line({ started: false, health: 'buffering', slow: true, view: view({ playback: paused('Maya', 'm') }) })).toBe('Paused by Maya at 3:20, everyone’s waiting');
   });
 
   it('keeps amber for a real gap, not a blip', () => {

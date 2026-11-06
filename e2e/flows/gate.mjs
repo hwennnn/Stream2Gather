@@ -44,7 +44,7 @@ flow('gate: the name typed is the name the room sees', async (t) => {
   for (const name of ['하늘이', '🎬 Movie Night 🍿', 'Zoë O’Brien-Müller the Third']) {
     const guest = await t.person('guest');
     await joinRoom(guest, room.url, { name: name.slice(0, 32) });
-    await t.expect(`${name} in the chat`, ui.chatLog(host.page).getByText(`${name.slice(0, 32)} joined`));
+    await t.expect(`${name} in the chat`, ui.arrival(host.page, name));
     await guest.context.close();
   }
 });

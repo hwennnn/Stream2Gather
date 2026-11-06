@@ -6,20 +6,16 @@ import { flow } from '../lib/runner.mjs';
 
 const rain = video('Rainy Window'); // Not the flows' next video, or the strip has two of one title.
 
-/** Runs in the page: the words a reaction's emoji or name is on right now, as far as anyone can see them. */
-const reactionsOnWords = () => {
+/** Runs in the page: where a reaction is on screen right now, against what it mustn't touch. */
+const reactionsOnScreen = () => {
+  const visible = (el) => el.getClientRects().length > 0;
   const box = (el) => el.getBoundingClientRect();
   const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-  const lane = box(document.querySelector('.reaction-lane'));
-  const log = box(document.querySelector('[role=log]'));
-  const words = [...document.querySelectorAll('[role=log] p')].flatMap((line) => {
-    const range = document.createRange();
-    range.selectNodeContents(line);
-    return [...range.getClientRects()].filter((rect) => hit(rect, log));
-  });
-  const shown = [...document.querySelectorAll('.reaction-emoji, .reaction-name')].filter((el) => hit(box(el), lane));
-  const on = shown.flatMap((el) => words.filter((rect) => hit(box(el), rect)).map((rect) =>
-    `${el.textContent} ${Math.round(box(el).left)}-${Math.round(box(el).right)} on a line ending ${Math.round(rect.right)}`));
+  const video = document.querySelector('[data-player]');
+  const log = document.querySelector('[role=log]');
+  const shown = [...document.querySelectorAll('.seat-said, .wake-mark > span')].filter(visible);
+  const on = shown.flatMap((el) => [video, log].filter((other) => other && visible(other) && hit(box(el), box(other))).map((other) =>
+    `${el.textContent} ${Math.round(box(el).top)}-${Math.round(box(el).bottom)} on ${other.tagName}.${other.getAttribute('role') ?? 'player'} ${Math.round(box(other).top)}-${Math.round(box(other).bottom)}`));
   return { shown: shown.length, on };
 };
 
@@ -142,7 +138,7 @@ const checkPage = async (t, where, page) => {
 };
 
 for (const { width, height, phone } of [...WIDTHS, { width: 844, height: 390, phone: true }]) {
-  flow(`layout ${width}: a reaction crosses nobody's words`, { timeout: 60_000 }, async (t) => {
+  flow(`layout ${width}: a reaction stays on the seats, off the words and the player`, { timeout: 60_000 }, async (t) => {
     const host = await t.person('host', { viewport: { width, height }, phone });
     const guest = await t.person('Bartholomew the Long');
     const room = await startRoom(t, host, { url: video('Golden Hour').url });
@@ -153,15 +149,15 @@ for (const { width, height, phone } of [...WIDTHS, { width: 844, height: 390, ph
     let shown = 0;
     const watching = (async () => {
       for (const end = Date.now() + 6000; Date.now() < end;) {
-        const sample = await host.page.evaluate(reactionsOnWords);
+        const sample = await host.page.evaluate(reactionsOnScreen);
         shown = Math.max(shown, sample.shown);
         sample.on.forEach((one) => on.add(one));
       }
     })();
     for (const emoji of ['🔥', '😂', '❤️', '👏']) await react(guest.page, emoji);
     await watching;
-    t.check(`${width}: reactions rose`, shown > 0);
-    t.check(`${width}: no emoji or name is on a chat line`, on.size === 0, [...on].slice(0, 3).join('; '));
+    t.check(`${width}: reactions showed`, shown > 0);
+    t.check(`${width}: none is on a chat line or the player`, on.size === 0, [...on].slice(0, 3).join('; '));
   });
 }
 
@@ -238,7 +234,7 @@ for (const size of WIDTHS) {
     }
 
     await react(guest.page, '🔥');
-    await t.see('a reaction', ui.rail(host.page).getByText('🔥'));
+    await t.see('a reaction', ui.seats(host.page).getByText('🔥'));
     await checkPlayer(t, `${width} with a reaction`, host.page);
 
     const picker = host.page.getByRole('button', { name: 'Send a reaction' });

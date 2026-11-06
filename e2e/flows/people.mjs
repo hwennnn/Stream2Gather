@@ -66,11 +66,11 @@ flow('people: a second and third person arrive, and everyone sees everyone', asy
   const c = await t.person('Cal');
   const room = await startRoom(t, a, { url: golden.url });
   await joinRoom(b, room.url);
-  await t.see('Ana hears of Ben', ui.chatLog(a.page).getByText('Ben joined'));
+  await t.see('Ana hears of Ben', ui.arrival(a.page, 'Ben'));
   await joinRoom(c, room.url);
-  await t.see('Ana hears of Cal', ui.chatLog(a.page).getByText('Cal joined'));
-  await t.see('Ben hears of Cal', ui.chatLog(b.page).getByText('Cal joined'));
-  t.check('Cal is not told of Cal', !(await ui.chatLog(c.page).getByText('Cal joined').isVisible()));
+  await t.see('Ana hears of Cal', ui.arrival(a.page, 'Cal'));
+  await t.see('Ben hears of Cal', ui.arrival(b.page, 'Cal'));
+  t.check('Cal is not told of Cal', !(await ui.arrival(c.page, 'Cal').isVisible()));
 
   for (const client of [a, b, c]) {
     await openTab(client.page, 'People');
@@ -106,7 +106,7 @@ flow('people: a reload is not a goodbye', async (t) => {
   const b = await t.person('Ben');
   const room = await startRoom(t, a, { url: golden.url });
   await joinRoom(b, room.url);
-  await t.see('Ben arrives', ui.chatLog(a.page).getByText('Ben joined'));
+  await t.see('Ben arrives', ui.arrival(a.page, 'Ben'));
   await b.page.reload();
   await reenter(b.page);
   await t.see('the video back', ui.bar(b.page).getByRole('heading', { name: golden.title }));
@@ -139,7 +139,7 @@ flow('two tabs: one person in two tabs is one person', async (t) => {
   await t.sleep(500);
   t.eq('still two people', await ui.rail(a.page).getByRole('listitem').count(), 2);
   await openTab(a.page, 'Chat');
-  t.eq('Ben joined once', await ui.chatLog(a.page).getByText('Ben joined').count(), 1);
+  t.eq('Ben joined once', await ui.arrival(a.page, 'Ben').count(), 1);
   await sendChat(a.page, 'to both tabs');
   await t.see('first tab', ui.chatLog(b.page).getByText('to both tabs'));
   await t.see('second tab', ui.chatLog(second).getByText('to both tabs'));

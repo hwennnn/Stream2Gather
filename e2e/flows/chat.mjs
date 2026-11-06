@@ -196,13 +196,12 @@ flow('chat: a line that did arrive is not sent twice after a dropped answer', as
   t.eq('one line for Ben', await ui.chatLog(b.page).getByText('heard but unanswered').count(), 1);
 });
 
-flow('reactions: the bar sends to everyone, in the rail, with a name', async (t) => {
+flow('reactions: the bar sends to everyone, on the sender\'s seat', async (t) => {
   const { a, b } = await pair(t);
   await react(a.page, '🔥');
-  await t.see('Ben sees it', ui.rail(b.page).getByText('🔥'));
-  await t.see('with the name', ui.rail(b.page).getByText('Ana', { exact: true }));
-  await t.see('Ana sees it too', ui.rail(a.page).getByText('🔥'));
-  await t.gone('it fades', ui.rail(b.page).getByText('🔥'), 5000);
+  await t.see('Ben sees it on Ana', ui.seat(b.page, 'Ana').getByText('🔥'));
+  await t.see('Ana sees it too', ui.seat(a.page, 'You').getByText('🔥'));
+  await t.gone('it fades', ui.seat(b.page, 'Ana').getByText('🔥'), 5000);
 });
 
 flow('reactions: the picker opens by the chat box on a smaller window', async (t) => {
@@ -212,7 +211,7 @@ flow('reactions: the picker opens by the chat box on a smaller window', async (t
   await joinRoom(b, room.url);
   await a.page.getByRole('button', { name: 'Send a reaction' }).click();
   await a.page.getByRole('button', { name: 'React 😂' }).click();
-  await t.see('Ben sees it', ui.rail(b.page).getByText('😂'));
+  await t.see('Ben sees it', ui.seat(b.page, 'Ana').getByText('😂'));
   await a.page.keyboard.press('Escape');
   await t.gone('Esc closes it', a.page.getByRole('button', { name: 'React 😂' }));
   await a.page.getByRole('button', { name: 'Send a reaction' }).click();

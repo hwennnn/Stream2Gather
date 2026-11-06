@@ -1,6 +1,7 @@
 import { lazy, type ReactNode } from 'react';
 import type { PlayerAdapter } from '../players/types';
 import type { RoomSession, RoomView } from '../room/session';
+import type { Beat } from './useBeat';
 import { AccountMenu } from './AccountMenu';
 import { Icon } from './Icon';
 import { LeaveLink } from './LeaveLink';
@@ -10,6 +11,7 @@ import { Seats } from './Seats';
 import { SeatTrack } from './SeatTrack';
 import type { Row } from './seatRow';
 import { Slot } from './Slot';
+import { TRACK_IN_HEADER, useMediaQuery } from './useMediaQuery';
 
 const KeepRoom = lazy(() => import('../crew/KeepRoom'));
 const VoiceButton = lazy(() => import('../voice/VoiceButton'));
@@ -22,6 +24,8 @@ type RoomHeaderProps = {
   landscapeControls: ReactNode;
   row: Row;
   actor: string | null;
+  beat: Beat | null;
+  saved: boolean;
   /** Where the connection note goes when there's no bar to hold it. */
   note: ReactNode;
   onAccountOpen: () => void;
@@ -31,7 +35,9 @@ type RoomHeaderProps = {
 
 export const DrivingChip = ({ view, className = '' }: { view: RoomView; className?: string }) => <span className={`chip max-w-48 truncate ${className}`}>{drivingLine(view)}</span>;
 
-export const RoomHeader = ({ session, view, adapter, row, actor, note, landscapeControls, onAccountOpen, onInvite, onPeople }: RoomHeaderProps) => (
+export const RoomHeader = ({ session, view, adapter, row, actor, beat, saved, note, landscapeControls, onAccountOpen, onInvite, onPeople }: RoomHeaderProps) => {
+  const track = useMediaQuery(TRACK_IN_HEADER);
+  return (
   <header className="room-header flex h-12 shrink-0 items-center gap-3 border-b border-line px-4 phone:h-auto phone:flex-wrap phone:gap-x-1 phone:gap-y-0 phone:px-1 land:h-10 land:flex-nowrap land:gap-2 land:pr-[max(0.5rem,env(safe-area-inset-right))] land:pl-[max(0.25rem,env(safe-area-inset-left))]">
     <LeaveLink session={session} aria-label="Leave the room" className="shrink-0 phone:hidden land:hidden">
       <Mark />
@@ -43,8 +49,8 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
     <h1 className="min-w-0 truncate text-[15px] font-semibold phone:flex-1 land:sr-only">{view.name}</h1>
     {isLocked(view) && <DrivingChip view={view} className="phone:hidden" />}
     <div className="room-header-seats hidden min-w-0 phone:order-last phone:block phone:w-full phone:px-3 phone:pb-1 land:order-none land:block land:w-auto land:p-0">
-      <Seats view={view} row={row} actor={actor} onInvite={onInvite} onPeople={onPeople} compact />
-      <div className="seat-track-slot">{view.queue[0] && <SeatTrack view={view} />}</div>
+      <Seats view={view} row={row} actor={actor} beat={beat} saved={saved} onInvite={onInvite} onPeople={onPeople} compact />
+      <div className="seat-track-slot">{track && view.queue[0] && <SeatTrack view={view} />}</div>
     </div>
 
     <div className="ml-auto flex min-w-0 shrink-0 items-center gap-3 phone:gap-1 land:shrink land:gap-1.5">
@@ -65,4 +71,5 @@ export const RoomHeader = ({ session, view, adapter, row, actor, note, landscape
       <AccountMenu onOpen={onAccountOpen} />
     </div>
   </header>
-);
+  );
+};

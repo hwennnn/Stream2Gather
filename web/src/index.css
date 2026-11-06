@@ -54,8 +54,10 @@
   --color-warn: #d9aa5a;
   --color-bad: #e0806f;
 
-  /* One curve and one speed for everything that moves. */
+  /* One curve for everything that moves, and one speed for controls. People get --beat. */
   --ease-room: cubic-bezier(0.19, 1, 0.22, 1);
+  /* Except bodies, which have weight: they gather, move, and settle. */
+  --ease-seat: cubic-bezier(0.6, 0, 0.2, 1);
   --default-transition-duration: 140ms;
   --default-transition-timing-function: var(--ease-room);
 }
@@ -65,8 +67,13 @@
   /* Wide enough for chat, then whatever hands the player the height "Up next" doesn't need. */
   --rail: clamp(320px, calc(100vw - (100dvh - 48px - var(--bar) - 104px) * 16 / 9), 420px);
   --gutter: 1rem;
-  --lane: 3rem;
   --seats: 88px;
+  /* What a person does takes longer than what a control does: you're meant to see it happen. */
+  --beat: 420ms;
+  --glance: 540ms;
+  /* The house lights: how far the room's ground comes up when the film isn't running. */
+  --lights: 0.55;
+  --color-lit: color-mix(in srgb, var(--color-raised) 55%, var(--color-ink));
   --info: 64px;
   --bar: calc(var(--seats) + var(--info));
 }
@@ -370,11 +377,6 @@ body {
   overflow-wrap: anywhere;
 }
 
-/* Words stop short of the reaction lane, so a reaction crosses nobody's. */
-.chat-line {
-  padding-right: calc(var(--lane) - var(--gutter) + 0.25rem);
-}
-
 /* A mouse gets a real scrollbar on some systems. Taking it out of the gutter keeps the right edge put. */
 @media (hover: hover) and (pointer: fine) {
   @supports selector(::-webkit-scrollbar) {
@@ -531,7 +533,7 @@ body {
 /*
  * Theatre mode: the video gets every pixel of height that isn't the bar. The seats go up to the top
  * bar as they do on a phone, the reactions to the player bar, and only the track stays under the
- * video. The screen runs edge to edge, and a lane each side keeps reactions off the video.
+ * video. The screen runs edge to edge.
  */
 .room-shell[data-theatre='true'] .stage-well {
   position: relative;
@@ -542,12 +544,7 @@ body {
 }
 
 .room-shell[data-theatre='true'] .stage {
-  width: min(calc(100cqw - 2 * var(--lane)), calc((100cqh - var(--bar)) * 16 / 9));
-}
-
-.room-shell[data-theatre='true'] .reaction-lane {
-  top: 0;
-  bottom: 0;
+  width: min(100cqw, calc((100cqh - var(--bar)) * 16 / 9));
 }
 
 .room-shell[data-theatre='true'] .room-header-seats {
@@ -566,6 +563,15 @@ body {
   grid-row: 1;
 }
 
+/* The row is the track and nothing else here, so a moment can't grow out of it. */
+.room-shell[data-theatre='true'] .wake-mark > span {
+  top: -0.375rem;
+  font-size: 0.6875rem;
+  line-height: 0.75rem;
+  scale: 1;
+  animation-name: enter;
+}
+
 /* Sideways on a short window there's no bar or row to give up, so the height is already the video's. */
 @media (min-height: 501px) {
   .room-shell[data-theatre='true'] {
@@ -580,6 +586,63 @@ body {
     position: fixed;
     inset: auto 0.75rem 0.75rem;
     width: auto;
+  }
+}
+
+/* When the queue runs out the screen's free, so it rolls what was on it, up to the heading: what played, and who picked it, either side of a gutter. */
+.credits {
+  width: 100%;
+  min-height: 0;
+  margin-block: auto;
+  padding-bottom: 1.5rem;
+  overflow: clip;
+}
+
+.credits-roll {
+  animation: credits-roll calc(var(--lines) * 600ms + 600ms) var(--ease-seat) both;
+}
+
+.credit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 1rem;
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  line-height: 1.625rem;
+}
+
+.credit-earlier {
+  color: var(--color-dim);
+  font-size: 0.8125rem;
+  line-height: 1.625rem;
+  text-align: center;
+}
+
+/* The last line of them, on the same centre. */
+.credits-end {
+  text-align: center;
+}
+
+@keyframes credits-roll {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* On a phone the screen grows to hold them, so something has to give, and it can't be the chat. */
+@media (max-width: 639px) {
+  .credits ~ div .stage-picks {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .credits {
+    display: none;
+  }
+
+  .credits-end {
+    text-align: left;
   }
 }
 
@@ -647,6 +710,38 @@ body {
   width: 100%;
 }
 
+/* ---- House lights --------------------------------------------------------
+ * Down while the film runs, up when it doesn't. One flat layer behind everything but the screen,
+ * so a pause reaches the whole room at once and costs a change of opacity.
+ */
+.room-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.room-shell::before,
+.room-rail::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--color-raised);
+  opacity: 0;
+  pointer-events: none;
+  /* They go down slowly, as lights do, and come up quicker, because something's happened. */
+  transition: opacity 900ms var(--ease-room);
+}
+
+.room-rail {
+  isolation: isolate;
+}
+
+.room-shell[data-lights='up']::before,
+.room-shell[data-lights='up'] .room-rail::before {
+  opacity: var(--lights);
+  transition-duration: var(--beat);
+}
+
 /* ---- Seats ---------------------------------------------------------------
  * The room's signature. Fixed places under the screen, one per person, in the
  * order they sat down. Nothing here is ever drawn over the player.
@@ -663,6 +758,8 @@ body {
   gap: 0.25rem 1.5rem;
   height: var(--seats);
   padding-inline: 1rem;
+  /* The row's moments can't reach the player, however far a seat moves. */
+  overflow-y: clip;
 }
 
 /*
@@ -717,7 +814,81 @@ body {
   position: relative;
   flex: 1;
   height: 1px;
+}
+
+/* The last half a minute, up to now. Nothing has happened past the room's tick. */
+.seat-track-line::before {
+  content: '';
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: var(--room-at);
   background: var(--color-line);
+}
+
+/* What the room reacted to, carried back along the track at the speed of the video. */
+.wake {
+  position: absolute;
+  inset: 0;
+  overflow-x: clip;
+  pointer-events: none;
+}
+
+/* As wide as the track, so a percentage of its own width is a place on the track. */
+.wake-mark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0;
+  animation: wake var(--wake) linear both;
+}
+
+.seat-track[data-moving='false'] .wake-mark {
+  animation-play-state: paused;
+}
+
+.wake-mark > span {
+  position: absolute;
+  top: -0.5rem;
+  left: -0.5rem;
+  width: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1rem;
+  text-align: center;
+  scale: calc(1 + (var(--loud) - 1) * 0.12);
+  transition: scale 140ms var(--ease-room);
+  animation: wake-land var(--beat) var(--ease-room) both;
+}
+
+@keyframes wake {
+  from {
+    transform: translateX(calc(var(--room-at) - 0.75rem));
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(0);
+  }
+}
+
+@keyframes wake-land {
+  from {
+    opacity: 0;
+    transform: translateY(-0.375rem) scale(1.5);
+  }
+}
+
+/* The room. Everyone with it is here, so a quiet track means everyone's together. */
+.seat-track-room {
+  position: absolute;
+  top: -4px;
+  left: var(--room-at);
+  width: 1px;
+  height: 9px;
+  background: var(--color-muted);
 }
 
 .seat-track-dot {
@@ -727,6 +898,7 @@ body {
   height: 7px;
   margin-left: -3.5px;
   border-radius: 999px;
+  animation: enter var(--beat) var(--ease-seat) both;
 }
 
 /* On a phone the track comes up to the top bar with the seats, in a row kept whether or not a video is on.
@@ -742,6 +914,15 @@ body {
   .seat-track-slot {
     display: block;
   }
+
+  /* The player starts right under this row, so a moment grows less here. */
+  .seat-track-slot .wake-mark > span {
+    scale: calc(1 + (var(--loud) - 1) * 0.05);
+  }
+}
+
+.room-header-seats {
+  overflow-y: clip;
 }
 
 /* On a phone, and sideways, the seats sit in the top bar, which leaves the height for chat. */
@@ -830,6 +1011,25 @@ body {
   transition: color 140ms var(--ease-room);
 }
 
+.seat-invite .seat-empty svg {
+  transition: transform var(--beat) var(--ease-room);
+}
+
+/* It turns to face whoever's about to be asked. */
+.seat-invite:hover .seat-empty svg {
+  transform: rotate(90deg);
+}
+
+.seat-invite[data-saved='true'] {
+  color: var(--color-text);
+}
+
+.seat-invite[data-saved='true'] .seat-empty {
+  border-style: solid;
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
 .seat-invite:hover,
 .seat-invite[data-alone='true'] {
   color: var(--color-text);
@@ -841,6 +1041,62 @@ body {
   color: var(--color-text);
 }
 
+/*
+ * The row has bodies. Someone sits down into a seat and the others turn to see, whoever pauses gets up
+ * while the rest sit back and watch them, and someone leaving leaves the seat held. Each one starts
+ * at a person's seat and reaches the others in turn: --dist seats away, in direction --toward.
+ * A face turns inside its disc, so looking never moves a seat.
+ */
+.seats[data-live='true'] .seat-disc {
+  transition: transform var(--beat) var(--ease-seat);
+  animation: none;
+}
+
+.seats[data-live='true'] .avatar-face {
+  transition: transform var(--beat) var(--ease-seat) calc(var(--dist) * 40ms);
+}
+
+/* A photo has to have some to spare, or turning shows its edge. */
+.seats .avatar-face > img {
+  scale: 1.25;
+}
+
+.seats[data-beat]:not([data-beat='hold']) .seat:not([data-origin='true']) .avatar-face {
+  animation: seat-look var(--glance) var(--ease-seat) calc(var(--dist) * 40ms) both;
+}
+
+.seats[data-beat='arrive'] .seat[data-origin='true'] .seat-disc {
+  animation: seat-sit var(--beat) var(--ease-seat) both;
+}
+
+/* The seat they filled, pushed out from under them. */
+.seats[data-beat='arrive'] .seat[data-origin='true'] .seat-disc::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--color-dim);
+  border-radius: 999px;
+  animation: seat-filled var(--beat) var(--ease-seat) both;
+}
+
+.seats[data-beat='arrive'] .seat[data-origin='true'] .seat-name {
+  animation: enter 140ms var(--ease-room) 140ms both;
+}
+
+/* A paused room: one person is up, and everyone else has sat back and turned to look at them. */
+.seats[data-held='true'] .seat .seat-disc {
+  transform: translateY(4px);
+}
+
+/* As far as the ring can go and stay in the row. */
+.seats[data-held='true'] .seat[data-acting='true'] .seat-disc {
+  transform: translateY(-2px);
+}
+
+.seats[data-held='true'] .seat .avatar-face {
+  transform: translateX(calc(var(--toward) * 0.3125rem));
+}
+
 /* Whoever just touched the player: their own hue, around their own seat. */
 .seat[data-acting='true'] {
   color: var(--color-text);
@@ -848,24 +1104,38 @@ body {
 }
 
 .seat[data-acting='true'] .seat-disc {
-  box-shadow:
-    0 0 0 2px var(--color-ink),
-    0 0 0 4px var(--hue);
+  outline: 2px solid var(--hue);
+  outline-offset: 2px;
 }
 
 /* Someone talking, in their own hue. Trouble below still wins, as it needs a reaction. */
 .seat[data-speaking='true'] .seat-disc {
-  box-shadow:
-    0 0 0 2px var(--color-ink),
-    0 0 0 3px var(--hue);
+  outline: 1px solid var(--hue);
+  outline-offset: 2px;
 }
 
-.seat[data-away='true'] .seat-disc {
-  opacity: 0.35;
-}
-
+/* Gone, but it might be a reload: the seat stays theirs, in their hue, until the room knows. */
 .seat[data-away='true'] {
   color: var(--color-dim);
+}
+
+.seat[data-away='true'] .seat-disc > :first-child {
+  opacity: 0.35;
+  transform: scale(0.82);
+}
+
+.seats[data-live='true'] .seat-disc > :first-child {
+  transition:
+    opacity var(--beat) var(--ease-seat),
+    transform var(--beat) var(--ease-seat);
+}
+
+.seat[data-away='true'] .seat-disc::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--hue);
+  border-radius: 999px;
 }
 
 .seat[data-trouble='true'] {
@@ -873,9 +1143,90 @@ body {
 }
 
 .seat[data-trouble='true'] .seat-disc {
-  box-shadow:
-    0 0 0 2px var(--color-ink),
-    0 0 0 3px var(--color-warn);
+  outline: 1px solid var(--color-warn);
+  outline-offset: 2px;
+}
+
+/*
+ * A reaction comes from a person: they bounce, and it lands at their shoulder, with their face still
+ * showing. Everyone's is in the same place, so a full row laughing reads as a row of people laughing.
+ */
+.seat[data-hop='0'] .seat-disc > :first-child {
+  animation: seat-hop-a var(--beat) var(--ease-seat) both;
+}
+
+/* Two names, so the next one starts again rather than carrying on. */
+.seat[data-hop='1'] .seat-disc > :first-child {
+  animation: seat-hop-b var(--beat) var(--ease-seat) both;
+}
+
+.seat-said {
+  position: absolute;
+  z-index: 1;
+  top: 0.25rem;
+  left: calc(100% - 0.5rem);
+  font-size: 1.625rem;
+  line-height: 1.75rem;
+  animation: seat-said 3s var(--ease-room) both;
+}
+
+@keyframes seat-look {
+  35%,
+  65% {
+    transform: translateX(calc(var(--toward) * 0.3125rem));
+  }
+}
+
+@keyframes seat-sit {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem) scale(1.08);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(0.125rem) scale(1.03, 0.96);
+  }
+}
+
+@keyframes seat-filled {
+  from {
+    opacity: 1;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes seat-hop-a {
+  35% {
+    transform: translateY(-0.375rem) scale(1.04);
+  }
+}
+
+@keyframes seat-hop-b {
+  35% {
+    transform: translateY(-0.375rem) scale(1.04);
+  }
+}
+
+@keyframes seat-said {
+  from {
+    opacity: 0;
+    transform: translate(-0.5rem, 0.25rem) scale(0.5) rotate(-12deg);
+  }
+  8% {
+    opacity: 1;
+    transform: none;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.125rem);
+  }
 }
 
 /* A reaction lands on the seat that sent it, bigger than the seat, and leaves. */
@@ -951,6 +1302,14 @@ body {
   font-size: 1.375rem;
 }
 
+.seats[data-compact='true'] .seat-said {
+  top: auto;
+  bottom: -0.125rem;
+  left: calc(100% - 0.75rem);
+  font-size: 1.125rem;
+  line-height: 1.25rem;
+}
+
 /* A phone held upright has the width to itself: seats a thumb can read, in a row that
  * slides under the count and Invite when it's longer than the phone. */
 @media (max-width: 639px) and (min-height: 501px) {
@@ -975,6 +1334,16 @@ body {
     font-size: 0.8125rem;
   }
 
+  /* A row that scrolls clips what hangs outside a seat, so everyone stays in theirs and the ring is the news. */
+  .seats[data-compact='true'][data-held='true'] .seat .seat-disc {
+    transform: none;
+  }
+
+  .seats[data-compact='true'] .seat[data-acting='true'] .seat-disc {
+    outline-width: 1px;
+    outline-offset: 1px;
+  }
+
   /* A row that scrolls clips what hangs outside a seat, so this seat is the thumb's full 44px. */
   .seats[data-compact='true'] .seat-invite {
     align-items: center;
@@ -988,10 +1357,26 @@ body {
     z-index: 1;
     width: 2.75rem;
     background: var(--color-ink);
+    transition: background-color var(--beat) var(--ease-room);
+  }
+
+  .room-shell[data-lights='up'] .seats[data-compact='true'] .seat-pin {
+    background: var(--color-lit);
   }
 
   .seats[data-compact='true'] .seat-pin[data-count] {
     right: 2.75rem;
+  }
+
+  /* A sliver of the next seat isn't a hint that there's more: the count says that. */
+  .seats[data-compact='true'] .seat-pin[data-count]::before {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    right: 100%;
+    width: 0.5rem;
+    background: inherit;
+    transition: inherit;
   }
 }
 
@@ -1154,100 +1539,6 @@ body {
   }
 }
 
-/* ---- Reactions ------------------------------------------------------------
- * The lane sits in the rail, or in theatre mode beside the video, and clips what it
- * holds, so a reaction can't reach the player. In the rail it has the room .chat-line
- * leaves, so it crosses no words.
- */
-
-.reaction-lane {
-  position: absolute;
-  z-index: 10;
-  top: 3.25rem;
-  right: 0;
-  bottom: 4.75rem;
-  width: var(--lane);
-  overflow: hidden;
-  pointer-events: none;
-  container-type: size;
-}
-
-.reaction {
-  position: absolute;
-  bottom: 0.5rem;
-  left: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-  width: 100%;
-  animation: rise 3s cubic-bezier(0.22, 0.7, 0.3, 1) both;
-}
-
-.reaction-emoji {
-  font-size: 1.75rem;
-  line-height: 1;
-  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.5));
-  animation: pop 450ms cubic-bezier(0.3, 1.7, 0.5, 1) both;
-}
-
-.reaction-name {
-  max-width: 100%;
-  padding-inline: 0.25rem;
-  overflow: hidden;
-  border-radius: 999px;
-  background: rgb(23 26 35 / 0.78);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1.125rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.reaction-spark {
-  position: absolute;
-  top: 0.5rem;
-  left: calc(50% - 0.4375rem);
-  font-size: 0.875rem;
-  line-height: 1;
-  animation: spark 700ms ease-out both;
-}
-
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: none;
-  }
-  6%,
-  78% {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-    transform: translate(calc(var(--sway) / 2), calc(3.5rem - 100cqh));
-  }
-}
-
-@keyframes pop {
-  from {
-    transform: scale(0.3);
-  }
-  to {
-    transform: none;
-  }
-}
-
-@keyframes spark {
-  from {
-    opacity: 1;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 0;
-    transform: translate(calc(var(--spread) * 1.75rem), calc((1.5 - var(--spread) * var(--spread)) * -1.5rem)) scale(1.1);
-  }
-}
-
 /* Runs down with the five seconds the Undo is offered for. */
 .undo-clock {
   animation: undo-clock 5s linear both;
@@ -1280,13 +1571,34 @@ body {
     transition-duration: 1ms !important;
   }
 
-  .reaction {
+  /* It can't drift, so it marks the playhead for a moment and goes. */
+  .wake-mark {
+    transform: translateX(var(--room-at));
     animation-name: fade;
     animation-duration: 3s !important;
   }
 
-  .reaction-spark {
-    display: none;
+  /* Still there to be read, with nothing moving: it has to last, so the rule above can't have it. */
+  .seat-said {
+    animation-name: fade;
+    animation-duration: 3s !important;
+  }
+
+  /* Nobody moves, so a seat has nothing to wait for. */
+  .seats[data-held='true'] .seat .seat-disc,
+  .seats[data-held='true'] .seat[data-acting='true'] .seat-disc,
+  .seats[data-held='true'] .seat .avatar-face {
+    transform: none;
+  }
+
+  .seat-disc,
+  .avatar-face {
+    transition-delay: 0s !important;
+    animation-delay: 0s !important;
+  }
+
+  .credits-roll {
+    animation: none;
   }
 
   .spinner,

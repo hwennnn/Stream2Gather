@@ -60,9 +60,9 @@ flow('races: a double click on Join joins once', async (t) => {
   await ui.joinName(b.page).fill('Ben');
   await ui.join(b.page).dblclick();
   await t.see('the room', ui.rail(b.page));
-  await t.see('Ana hears about it', ui.chatLog(a.page).getByText('Ben joined'));
+  await t.see('Ana hears about it', ui.arrival(a.page, 'Ben'));
   await t.sleep(1000);
-  t.eq('once', await ui.chatLog(a.page).getByText('Ben joined').count(), 1);
+  t.eq('once', await ui.arrival(a.page, 'Ben').count(), 1);
   await openTab(a.page, 'People');
   await t.expect('two people', ui.tab(a.page, 'People').getByText('2'));
 });

@@ -34,8 +34,9 @@ type MediaRefresher interface {
 
 // Activities are the steps that touch the outside world.
 type Activities struct {
-	Rooms RoomCloser
-	Media MediaRefresher
+	Rooms    RoomCloser
+	Media    MediaRefresher
+	Sessions SessionStore
 }
 
 // Summary reports what one maintenance run did.
@@ -75,15 +76,46 @@ func Maintenance(ctx workflow.Context) (Summary, error) {
 	return summary, errors.Join(closeErr, refreshErr)
 }
 
-// Run starts the worker and ensures the hourly schedule exists.
-func Run(ctx context.Context, address, namespace string, log *slog.Logger, activities *Activities) error {
+// Register adds workflows, activities and schedules before a worker starts.
+type Register func(ctx context.Context, c client.Client, w worker.Worker) error
+
+// Serve runs a worker on queue until ctx ends. The client stays open for as long,
+// so a registration can keep using it.
+func Serve(ctx context.Context, address, namespace, queue string, log *slog.Logger, register Register) error {
 	temporalClient, err := client.DialContext(ctx, client.Options{HostPort: address, Namespace: namespace})
 	if err != nil {
 		return fmt.Errorf("connect to temporal: %w", err)
 	}
 	defer temporalClient.Close()
 
-	_, err = temporalClient.ScheduleClient().Create(ctx, client.ScheduleOptions{
+	w := worker.New(temporalClient, queue, worker.Options{})
+	if err := register(ctx, temporalClient, w); err != nil {
+		return err
+	}
+
+	log.Info("worker started", "temporal", address, "namespace", namespace, "queue", queue)
+	stop := make(chan any)
+	go func() {
+		<-ctx.Done()
+		close(stop)
+	}()
+	return w.Run(stop)
+}
+
+// Run starts the maintenance worker and ensures its schedules exist.
+func Run(ctx context.Context, address, namespace string, log *slog.Logger, activities *Activities) error {
+	return Serve(ctx, address, namespace, taskQueue, log, func(ctx context.Context, c client.Client, w worker.Worker) error {
+		if err := ensureMaintenance(ctx, c); err != nil {
+			return err
+		}
+		w.RegisterWorkflow(Maintenance)
+		w.RegisterActivity(activities)
+		return registerSessions(ctx, c, w)
+	})
+}
+
+func ensureMaintenance(ctx context.Context, c client.Client) error {
+	_, err := c.ScheduleClient().Create(ctx, client.ScheduleOptions{
 		ID:   scheduleID,
 		Spec: client.ScheduleSpec{Intervals: []client.ScheduleIntervalSpec{{Every: time.Hour}}},
 		Action: &client.ScheduleWorkflowAction{
@@ -96,16 +128,5 @@ func Run(ctx context.Context, address, namespace string, log *slog.Logger, activ
 	if err != nil && !errors.As(err, &exists) && !errors.Is(err, temporal.ErrScheduleAlreadyRunning) {
 		return fmt.Errorf("create schedule: %w", err)
 	}
-
-	w := worker.New(temporalClient, taskQueue, worker.Options{})
-	w.RegisterWorkflow(Maintenance)
-	w.RegisterActivity(activities)
-
-	log.Info("worker started", "temporal", address, "namespace", namespace)
-	stop := make(chan any)
-	go func() {
-		<-ctx.Done()
-		close(stop)
-	}()
-	return w.Run(stop)
+	return nil
 }

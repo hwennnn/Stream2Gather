@@ -41,7 +41,7 @@ func sessionStack(t *testing.T) (*httptest.Server, *Server) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	pool, err := pgxpool.New(context.Background(), "postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable")
+	pool, err := pgxpool.New(context.Background(), testenv.PostgresURL())
 	if err != nil {
 		t.Skip(err)
 	}

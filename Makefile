@@ -1,10 +1,14 @@
-.PHONY: up down web serve worker temporal test sample e2e
+.PHONY: up down voice web serve worker notifier temporal test sample e2e
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
 
 down:
 	docker compose -f deploy/compose.yaml down
+
+# Needs LIVEKIT_KEYS="key: secret" in the environment, matching server/.env.local.
+voice:
+	docker compose -f deploy/compose.yaml --profile voice up -d livekit
 
 web:
 	cd web && npm ci && npm run build
@@ -18,6 +22,9 @@ temporal:
 
 worker:
 	cd server && go run ./cmd/s2g worker
+
+notifier:
+	cd server && go run ./cmd/s2g notifier
 
 test:
 	cd server && go test -race ./...

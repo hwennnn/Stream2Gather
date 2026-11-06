@@ -26,7 +26,7 @@ func TestWelcomeArrivesBeforeAnyPong(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, "postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable")
+	pool, err := pgxpool.New(ctx, testenv.PostgresURL())
 	if err != nil {
 		t.Skip(err)
 	}

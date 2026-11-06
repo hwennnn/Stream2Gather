@@ -701,6 +701,127 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('own chat lines', () => {
+    const sent = async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      const result = session.sendChat('hello');
+      return { session, socket, result, line: () => entries(session).find((entry) => entry.kind === 'chat') };
+    };
+    const echo = (id: number, body = 'hello', at = Date.now()) => ({
+      message: { id, userId: 'g_1', author: 'Ada', body, createdAt: new Date(at).toISOString() },
+    });
+
+    it('shows the line at once, marked as sending', async () => {
+      const { line } = await sent();
+      expect(line()).toMatchObject({ body: 'hello', author: 'Ada', delivery: 'sending' });
+    });
+
+    it('is one line once the server echoes it, whichever answer lands first', async () => {
+      const first = await sent();
+      first.socket.deliver('chat', echo(7));
+      first.socket.ack();
+      await first.result;
+      expect(chatIds(first.session)).toHaveLength(1);
+      expect(first.line()).toMatchObject({ serverId: 7, delivery: undefined });
+
+      const second = await sent();
+      second.socket.ack();
+      await second.result;
+      expect(second.line()).toMatchObject({ delivery: undefined });
+      second.socket.deliver('chat', echo(8));
+      expect(chatIds(second.session)).toHaveLength(1);
+    });
+
+    it('keeps its id when confirmed, so unread counts and scrolling see one line', async () => {
+      const { socket, line } = await sent();
+      const id = line()?.id;
+      socket.deliver('chat', echo(7));
+      expect(line()?.id).toBe(id);
+    });
+
+    it('says it was not sent after five seconds', async () => {
+      const { result, line } = await sent();
+      await vi.advanceTimersByTimeAsync(4900);
+      expect(line()).toMatchObject({ delivery: 'sending' });
+      await vi.advanceTimersByTimeAsync(200);
+      expect(line()).toMatchObject({ delivery: 'failed' });
+      expect((await result).limited).toBe(false);
+    });
+
+    it('fails the line when the socket drops under it', async () => {
+      const { socket, result, line } = await sent();
+      socket.onclose?.();
+      await result;
+      expect(line()).toMatchObject({ delivery: 'failed' });
+    });
+
+    it('recovers a line the server had all along', async () => {
+      const { socket, line } = await sent();
+      await vi.advanceTimersByTimeAsync(6000);
+      socket.deliver('chat', echo(7));
+      expect(line()).toMatchObject({ serverId: 7, delivery: undefined });
+    });
+
+    it('reports a rate limit, so the text can go back in the box', async () => {
+      const { socket, result } = await sent();
+      socket.deliver('error', { re: socket.sent.at(-1)?.id, code: 'rate_limited', message: 'Slow down a little.' });
+      expect((await result).limited).toBe(true);
+    });
+
+    it('retries from the end of the chat', async () => {
+      const { session, socket, result, line } = await sent();
+      socket.onclose?.();
+      const { id } = await result;
+      await vi.advanceTimersByTimeAsync(6000);
+      const next = FakeSocket.last;
+      next.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      next.deliver('chat', { message: chatLine(1) });
+
+      session.retryChat(id);
+      expect(next.ofType('chat.send').at(-1)?.d).toEqual({ text: 'hello' });
+      expect(entries(session).at(-1)).toMatchObject({ id, delivery: 'sending' });
+      next.ack();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(line()?.kind).toBe('chat');
+      expect(entries(session).at(-1)).toMatchObject({ id, delivery: undefined });
+    });
+
+    it('confirms a lost line from the history after a reconnect, without repeating it', async () => {
+      const { session, socket, result } = await sent();
+      const stored = echo(7).message;
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ticket: 't', items: [stored] })));
+      socket.onclose?.();
+      await result;
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toHaveLength(1);
+      expect(entries(session).at(-1)).toMatchObject({ serverId: 7, delivery: undefined });
+    });
+
+    it('does not mistake an old message for the one that was lost', async () => {
+      const { session, socket, result } = await sent();
+      const old = echo(3, 'hello', Date.now() - 60_000).message;
+      vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ticket: 't', items: [old] })));
+      socket.onclose?.();
+      await result;
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toHaveLength(2);
+      expect(entries(session).at(-1)).toMatchObject({ delivery: 'failed' });
+    });
+
+    it('takes a line away on request', async () => {
+      const { session, result } = await sent();
+      await vi.advanceTimersByTimeAsync(6000);
+      session.discardChat((await result).id);
+      expect(chatIds(session)).toEqual([]);
+    });
+  });
+
   describe('viewer health', () => {
     it('starts over when the video changes', async () => {
       const { session, socket } = await connected();

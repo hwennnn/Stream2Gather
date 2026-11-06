@@ -27,6 +27,7 @@ const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
       active
       inviteUrl="http://x/r/y"
       onCopyInvite={() => {}}
+      onInvite={() => {}}
       onToast={() => {}}
     />,
   );
@@ -37,6 +38,29 @@ const setup = (messages: ChatEntry[] = [], patch: Partial<RoomView> = {}) => {
   };
   return { session, box, send, answer: (result: ChatResult) => act(async () => finish(result)) };
 };
+
+describe('ChatPanel invitations', () => {
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('asks for company while the room is still picking', () => {
+    setup([], { alone: true });
+    expect(screen.getByText('Invite someone while you pick')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Invite' })).toBeTruthy();
+  });
+
+  it('offers the link once something is playing', () => {
+    setup([], { alone: true, queue: [{}] as RoomView['queue'] });
+    expect(screen.queryByText('Invite someone while you pick')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Copy link' })).toBeTruthy();
+  });
+});
 
 describe('ChatPanel sending', () => {
   beforeEach(() => {

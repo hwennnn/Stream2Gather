@@ -356,13 +356,14 @@ body {
 }
 
 @media (max-width: 1023px) {
-  /* On stacked layouts the rail's add box already sits right under the stage. */
-  .room-shell[data-tab='queue'] .stage-add {
+  .up-next {
     display: none;
   }
 
-  .up-next {
-    display: none;
+  /* The rail still needs room below, so long results scroll inside the stage. */
+  .stage-idle {
+    display: flex;
+    max-height: 66dvh;
   }
 }
 

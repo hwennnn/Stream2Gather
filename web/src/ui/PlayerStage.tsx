@@ -121,9 +121,7 @@ const IdleStage = ({ session, view, finished }: { session: RoomSession; view: Ro
 
       {editable && (
         <div className="mt-5 flex min-h-0 w-full max-w-xl flex-col land:mt-2">
-          <div className="stage-add">
-            <AddBox id="omnibox-stage" search={search} adder={adder} large />
-          </div>
+          <AddBox id="omnibox-stage" search={search} adder={adder} large />
           {searching ? (
             <div className="mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl bg-black/30 py-2 text-left">
               <SearchResults search={search} adder={adder} />
@@ -140,7 +138,7 @@ const IdleStage = ({ session, view, finished }: { session: RoomSession; view: Ro
 const Picks = ({ items, adder }: { items: Media[] | null; adder: Adder }) => {
   if (items?.length === 0) return null;
   return (
-    <ul aria-label="Trending" className="mt-4 grid grid-cols-4 gap-2 land:mt-2">
+    <ul aria-label="Trending" className="mt-4 grid grid-cols-4 gap-2 phone:grid-cols-2 land:mt-2">
       {items
         ? items.slice(0, PICKS).map((media) => (
             <li key={media.sourceId} className="min-w-0">
@@ -152,7 +150,7 @@ const Picks = ({ items, adder }: { items: Media[] | null; adder: Adder }) => {
                 className="group block w-full cursor-pointer text-left disabled:opacity-60"
               >
                 <Thumb src={media.thumbnailUrl} className="w-full rounded-lg ring-1 ring-line transition group-hover:brightness-110" />
-                <span className="mt-1.5 line-clamp-2 text-xs leading-snug text-muted transition-colors group-hover:text-text phone:hidden land:hidden">
+                <span className="mt-1.5 line-clamp-2 text-xs leading-snug text-muted transition-colors group-hover:text-text land:hidden">
                   {media.title}
                 </span>
               </button>

@@ -32,6 +32,8 @@ export interface PlayerAdapter {
   onState(listener: (state: PlayerState) => void): void;
   onError(listener: (error: PlayerError) => void): void;
   /** The browser refused to start it, which is the only sure sign of an autoplay block. */
+  /** Told to start and hasn't. A browser's refusal can look like this without ever saying so. */
+  unstarted?(): boolean;
   onBlocked(listener: () => void): void;
   destroy(): void;
 }

@@ -4,11 +4,12 @@ import type { PlayerAdapter, PlayerState } from './types';
 
 const CHECK_MS = 2500;
 
-const fakePlayer = (state: PlayerState) => {
+const fakePlayer = (state: PlayerState, unstarted = false) => {
   let muted = false;
   let blocked = () => {};
   const player = {
     state: () => state,
+    unstarted: () => unstarted,
     muted: () => muted,
     setMuted: vi.fn((next: boolean) => { muted = next; }),
     play: vi.fn(),
@@ -26,6 +27,8 @@ describe('watchAutoplay', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.stubGlobal('window', { setTimeout, clearTimeout });
+    vi.stubGlobal('document', { hidden: false });
+    vi.stubGlobal('navigator', { userActivation: { hasBeenActive: true } });
   });
 
   afterEach(() => {
@@ -43,7 +46,7 @@ describe('watchAutoplay', () => {
     expect(onMuted).toHaveBeenCalledWith(true);
   });
 
-  it.each<PlayerState>(['loading', 'buffering'])('does not mute a slow load that is %s', (state) => {
+  it.each<PlayerState>(['loading', 'buffering'])('does not mute a slow load that is %s after a gesture', (state) => {
     const fake = fakePlayer(state);
     watchAutoplay(() => true, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
@@ -109,6 +112,76 @@ describe('watchAutoplay', () => {
     watchAutoplay(() => true, () => false, fake.player, vi.fn());
     vi.advanceTimersByTime(CHECK_MS);
     fake.setState('paused');
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.setMuted).toHaveBeenCalledWith(true);
+  });
+
+  it('starts a player that sits unstarted for a viewer who made no gesture', () => {
+    vi.stubGlobal('navigator', {});
+    const fake = fakePlayer('loading', true);
+    const onMuted = vi.fn();
+    watchAutoplay(() => true, () => false, fake.player, onMuted);
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.setMuted).toHaveBeenCalledWith(true);
+    expect(fake.play).toHaveBeenCalled();
+    expect(onMuted).toHaveBeenCalledWith(true);
+  });
+
+  it('asks an unstarted player again with sound before giving a viewer who clicked silence', () => {
+    const fake = fakePlayer('loading', true);
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.play).toHaveBeenCalledOnce();
+    expect(fake.setMuted).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.setMuted).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps the sound of a player that only needed asking again', () => {
+    const fake = fakePlayer('loading', true);
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
+    vi.advanceTimersByTime(CHECK_MS);
+    fake.setState('playing');
+    vi.advanceTimersByTime(CHECK_MS * 3);
+    expect(fake.setMuted).not.toHaveBeenCalled();
+  });
+
+  it('still tries once when the player remembers being muted', () => {
+    vi.stubGlobal('navigator', {});
+    const fake = fakePlayer('loading', true);
+    fake.player.setMuted(true);
+    fake.setMuted.mockClear();
+    const onRefused = vi.fn();
+    watchAutoplay(() => true, () => false, fake.player, vi.fn(), onRefused);
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.play).toHaveBeenCalled();
+    expect(onRefused).not.toHaveBeenCalledWith(true);
+    vi.advanceTimersByTime(CHECK_MS * 2);
+    expect(onRefused).toHaveBeenCalledWith(true);
+  });
+
+  it('asks again when a refusal was answered too early for the player to hear', () => {
+    vi.stubGlobal('navigator', {});
+    const fake = fakePlayer('loading', true);
+    const onRefused = vi.fn();
+    watchAutoplay(() => true, () => false, fake.player, vi.fn(), onRefused);
+    fake.block();
+    expect(fake.play).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(CHECK_MS);
+    expect(fake.play).toHaveBeenCalledTimes(2);
+    expect(onRefused).not.toHaveBeenCalledWith(true);
+  });
+
+  it('holds off while the tab is hidden, where the browser holds every player', () => {
+    vi.stubGlobal('navigator', {});
+    const fake = fakePlayer('loading', true);
+    vi.stubGlobal('document', { hidden: true });
+    watchAutoplay(() => true, () => false, fake.player, vi.fn());
+    vi.advanceTimersByTime(CHECK_MS * 3);
+    expect(fake.setMuted).not.toHaveBeenCalled();
+
+    vi.stubGlobal('document', { hidden: false });
     vi.advanceTimersByTime(CHECK_MS);
     expect(fake.setMuted).toHaveBeenCalledWith(true);
   });

@@ -128,6 +128,31 @@ describe('volume', () => {
   });
 });
 
+describe('a player told to start', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('says it is unstarted until YouTube reports anything else', async () => {
+    let change: (event: { data: number }) => void = () => {};
+    class FakePlayer {
+      constructor(_target: unknown, options: { events: { onReady: () => void; onStateChange: typeof change } }) {
+        change = options.events.onStateChange;
+        queueMicrotask(() => options.events.onReady());
+      }
+    }
+    const YT = { Player: FakePlayer };
+    vi.stubGlobal('YT', YT);
+    vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
+    vi.stubGlobal('document', { createElement: () => ({}) });
+    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0, true);
+
+    expect(player.unstarted?.()).toBe(false);
+    change({ data: -1 });
+    expect(player.unstarted?.()).toBe(true);
+    change({ data: 3 });
+    expect(player.unstarted?.()).toBe(false);
+  });
+});
+
 describe('createErrorChannel', () => {
   it('passes errors straight through once someone listens', () => {
     const channel = createErrorChannel();

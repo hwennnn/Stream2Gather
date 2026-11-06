@@ -23,8 +23,13 @@ export const watchAutoplay = (
   let waited = 0;
   let stopped = false;
   let told = false;
+  let tried = false;
+  // With sound, asking again only helps a viewer who made a gesture. A muted start can go unheard, so it's always asked twice.
+  let asked = !navigator.userActivation?.hasBeenActive;
   const startMuted = () => {
-    if (stopped || !roomPlaying() || player.muted()) return;
+    if (stopped || !roomPlaying() || (tried && player.muted())) return;
+    tried = true;
+    asked = false;
     player.setMuted(true);
     player.play();
     onMuted(true);
@@ -36,14 +41,19 @@ export const watchAutoplay = (
       onRefused(false);
       return;
     }
-    waited += LOOK_EVERY_MS;
+    // A hidden tab holds every player back, and nothing can be learned until it's seen.
+    waited = document.hidden ? 0 : waited + LOOK_EVERY_MS;
     if (waited >= AUTOPLAY_CHECK_MS) {
       waited = 0;
       const playing = roomPlaying();
       if (!playing && !told) return;
-      if (playing && refused(state) && !stoppedOnPurpose()) {
-        // Still as well as muted, so only the viewer can start it.
-        if (player.muted()) {
+      const unstarted = player.unstarted?.() ?? false;
+      if (playing && (refused(state) || unstarted) && !stoppedOnPurpose()) {
+        if (unstarted && !asked) {
+          asked = true;
+          player.play();
+        } else if (tried && player.muted()) {
+          // Still as well as muted, so only the viewer can start it.
           told = true;
           onRefused(true);
         } else {

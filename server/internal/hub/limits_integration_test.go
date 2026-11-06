@@ -28,20 +28,43 @@ func count(c *client, kind string, d time.Duration) int {
 	}
 }
 
+// replies waits for an answer to each of n messages, and says how many were
+// accepted. It has no window of its own to miss, however slow the machine.
+func replies(t *testing.T, c *client, n int) int {
+	t.Helper()
+	accepted := 0
+	for answered := 0; answered < n; {
+		select {
+		case message := <-c.in:
+			switch message.T {
+			case "ack":
+				accepted++
+				answered++
+			case "error":
+				answered++
+			}
+		case <-time.After(waitFor):
+			t.Fatalf("%d of %d messages answered", answered, n)
+		}
+	}
+	return accepted
+}
+
 func TestTabsShareOnePersonsLimit(t *testing.T) {
 	r := newRig(t, testRedis)
 	id := r.newRoom(t, directVideo(t))
 	tabs := []*client{r.joined(t, id, "u", room.RoleMember), r.joined(t, id, "u", room.RoleMember), r.joined(t, id, "u", room.RoleMember)}
+	started := time.Now()
 	for _, tab := range tabs {
 		chats(t, tab, 5)
 	}
 	accepted := 0
 	for _, tab := range tabs {
-		accepted += count(tab, "ack", 300*time.Millisecond)
+		accepted += replies(t, tab, 5)
 	}
-	// A burst of five, and whatever the bucket refilled while the test ran.
-	if accepted > 7 {
-		t.Fatalf("%d of 15 messages accepted: more tabs bought more of the limit", accepted)
+	// A burst of five, and two a second refilled while the test ran.
+	if most := 5 + int(2*time.Since(started).Seconds()); accepted > most {
+		t.Fatalf("%d of 15 messages accepted, and the limit allows %d: more tabs bought more of it", accepted, most)
 	}
 }
 
@@ -49,6 +72,7 @@ func TestTabsShareOnePersonsVoiceLimit(t *testing.T) {
 	r := newRig(t, testRedis)
 	id := r.newRoom(t, directVideo(t))
 	tabs := []*client{r.joined(t, id, "u", room.RoleMember), r.joined(t, id, "u", room.RoleMember), r.joined(t, id, "u", room.RoleMember)}
+	started := time.Now()
 	for _, tab := range tabs {
 		for i := range 10 {
 			tab.sendWithID(t, fmt.Sprint("v", i), "voice", map[string]string{"state": "muted"})
@@ -56,14 +80,14 @@ func TestTabsShareOnePersonsVoiceLimit(t *testing.T) {
 	}
 	accepted := 0
 	for _, tab := range tabs {
-		accepted += count(tab, "ack", 300*time.Millisecond)
+		accepted += replies(t, tab, 10)
 	}
 	if accepted < 10 {
 		t.Fatalf("%d of 30 voice changes accepted: fewer than one burst", accepted)
 	}
-	// A burst of ten, and whatever the bucket refilled while the test ran.
-	if accepted > 14 {
-		t.Fatalf("%d of 30 voice changes accepted: more tabs bought more of the limit", accepted)
+	// A burst of ten, and five a second refilled while the test ran.
+	if most := 10 + int(5*time.Since(started).Seconds()); accepted > most {
+		t.Fatalf("%d of 30 voice changes accepted, and the limit allows %d: more tabs bought more of it", accepted, most)
 	}
 }
 
@@ -73,16 +97,19 @@ func TestReconnectingDoesNotRefillALimit(t *testing.T) {
 	r.joined(t, id, "other", room.RoleMember) // Keeps the room open here.
 
 	first := r.joined(t, id, "u", room.RoleMember)
+	started := time.Now()
 	chats(t, first, 5)
-	if got := count(first, "ack", 200*time.Millisecond); got != 5 {
-		t.Fatalf("%d acks", got)
-	}
+	accepted := replies(t, first, 5)
 	_ = first.ws.CloseNow()
 
 	second := r.joined(t, id, "u", room.RoleMember)
 	chats(t, second, 5)
-	if got := count(second, "ack", 200*time.Millisecond); got > 2 {
-		t.Fatalf("%d messages accepted straight after reconnecting", got)
+	accepted += replies(t, second, 5)
+
+	// The bucket holds five and refills at two a second, so this is a limit however
+	// long the test took. Fresh limits for the new socket would accept all ten.
+	if most := 5 + int(2*time.Since(started).Seconds()); accepted > most {
+		t.Fatalf("%d messages accepted, and the limit allows %d", accepted, most)
 	}
 }
 
@@ -111,11 +138,14 @@ func TestPingsCannotFloodRedis(t *testing.T) {
 	r := newRig(t, testRedis)
 	id := r.newRoom(t, directVideo(t))
 	c := r.joined(t, id, "u", room.RoleMember)
+	started := time.Now()
 	for range 200 {
 		c.send(t, "ping", map[string]any{"t0": 1})
 	}
-	if got := count(c, "pong", 300*time.Millisecond); got > 15 {
-		t.Fatalf("%d pongs for 200 pings", got)
+	got := count(c, "pong", 300*time.Millisecond)
+	// A burst of ten, and two a second refilled while the test ran.
+	if most := 10 + int(2*time.Since(started).Seconds()); got > most {
+		t.Fatalf("%d pongs for 200 pings, and the limit allows %d", got, most)
 	}
 }
 
@@ -126,7 +156,7 @@ func TestAClientsOpeningPingsAreAllAnswered(t *testing.T) {
 	for range 5 {
 		c.send(t, "ping", map[string]any{"t0": 1})
 	}
-	if got := count(c, "pong", 300*time.Millisecond); got != 5 {
-		t.Fatalf("%d pongs for the opening five", got)
+	for range 5 {
+		c.expect(t, "pong")
 	}
 }

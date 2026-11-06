@@ -388,6 +388,7 @@ body {
   position: relative;
   flex: none;
   width: min(100%, calc(56dvh * 16 / 9));
+  min-height: 200px; /* YouTube's minimum player size. Under 356px wide this wins over the ratio, and the player fills it. */
   aspect-ratio: 16 / 9;
   margin-inline: auto;
   overflow: hidden;
@@ -396,6 +397,7 @@ body {
 
 .stage-idle {
   width: 100%;
+  min-height: 0;
   aspect-ratio: auto;
   background: transparent;
 }

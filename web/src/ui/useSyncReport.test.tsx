@@ -75,7 +75,7 @@ describe('the room player', () => {
 
   it('still tells the status how the sync is going', async () => {
     const { result } = await mounted();
-    render(<RoomStatus view={view} player={result.current} act={null} offlineFor={null} onRetry={() => {}} />);
+    render(<RoomStatus view={view} player={{ ...result.current, started: true }} act={null} offlineFor={null} onRetry={() => {}} />);
     await seconds(2);
     expect(screen.getByText(/everyone together/)).toBeTruthy();
   });

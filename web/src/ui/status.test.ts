@@ -12,7 +12,7 @@ const say = (parts: Part[]) =>
   parts.map((part) => (typeof part === 'string' ? part : 'who' in part ? part.who : part.fig)).join('');
 
 const status = (patch: Partial<Parameters<typeof statusFor>[0]>) =>
-  statusFor({ view: view(), health: 'synced', failed: false, act: null, position: 200, ...patch });
+  statusFor({ view: view(), health: 'synced', failed: false, act: null, position: 200, started: true, ...patch });
 
 const line = (patch: Partial<Parameters<typeof statusFor>[0]>) => {
   const { parts, tail = '' } = status(patch);
@@ -46,12 +46,14 @@ describe('statusFor', () => {
     expect(line({ act: { by: 'Maya', text: 'took a seat' } })).toBe('Maya took a seat');
   });
 
-  it('names whoever is behind', () => {
-    expect(line({ view: view({ viewerStates: { m: 'buffering' } }) })).toBe('Maya is catching up');
+  it('names whoever is behind, once it has lasted', () => {
+    const lagging = view({ viewerStates: { m: 'buffering' } });
+    expect(line({ view: lagging, friendGap: true })).toBe('Maya is catching up');
+    expect(line({ view: lagging })).toBe('Playing at 3:20');
   });
 
   it('keeps the name of a friend at an ad', () => {
-    expect(line({ view: view({ viewerStates: { m: 'stalled' } }) })).toBe('Maya is at an ad');
+    expect(line({ view: view({ viewerStates: { m: 'stalled' } }), friendGap: true })).toBe('Maya is at an ad');
   });
 
   it('keeps the room’s time on show when the player failed for you', () => {
@@ -74,8 +76,20 @@ describe('statusFor', () => {
     expect(line({ view: view({ members: [me, { ...maya, name: 'Maya K' }], playback: paused('Maya', 'm') }) })).toBe('Paused by Maya K at 3:20');
   });
 
+  it('says Loading only before the first frame, and only once it has taken a while', () => {
+    expect(status({ started: false, health: 'waiting', slow: true }).parts).toEqual(['Loading…']);
+    expect(line({ started: false, health: 'waiting' })).toBe('Playing at 3:20');
+    expect(line({ started: true, health: 'buffering', slow: true })).toBe('Playing at 3:20');
+  });
+
   it('never says Loading in a paused room', () => {
-    expect(line({ health: 'buffering', view: view({ playback: paused('Maya', 'm') }) })).toBe('Paused by Maya at 3:20');
+    expect(line({ started: false, health: 'buffering', slow: true, view: view({ playback: paused('Maya', 'm') }) })).toBe('Paused by Maya at 3:20');
+  });
+
+  it('keeps amber for a real gap, not a blip', () => {
+    expect(status({ health: 'correcting' }).tone).toBe('plain');
+    expect(line({ health: 'correcting' })).toBe('Playing at 3:20');
+    expect(status({ health: 'correcting', gap: true })).toMatchObject({ state: 'behind', tone: 'warn', parts: ['You’re catching up'] });
   });
 
   it('calls an ad an ad', () => {
@@ -84,6 +98,8 @@ describe('statusFor', () => {
 
   it('claims everyone is together only when every seat is', () => {
     expect(line({ view: view({ viewerStates: { m: 'unavailable' } }) })).toBe('Playing at 3:20');
+    expect(line({ health: 'correcting' })).not.toMatch(/together/);
+    expect(line({ started: false })).not.toMatch(/together/);
   });
 
   describe('offline', () => {

@@ -39,6 +39,14 @@ type Input = {
   failed: boolean;
   act: Act | null;
   position: number;
+  /** This viewer's player has shown a frame of this video. */
+  started: boolean;
+  /** Nothing to show yet, for long enough to be worth saying. */
+  slow?: boolean;
+  /** This viewer has been off the room's time for long enough to be real. */
+  gap?: boolean;
+  /** A friend has been behind for long enough to be real. */
+  friendGap?: boolean;
   /** How long the connection has been gone, or null while it's fine. */
   offlineFor?: number | null;
   /** The browser won't start this player, so only the viewer can. */
@@ -81,7 +89,7 @@ const pausedLine = (view: RoomView, time: Part): Status => {
 };
 
 /** The one description of what the room is doing. Names a person whenever one did it. */
-export const statusFor = ({ view, health, failed, act, position, offlineFor = null, refused, live }: Input): Status => {
+export const statusFor = ({ view, health, failed, act, position, started, slow, gap, friendGap, offlineFor = null, refused, live }: Input): Status => {
   const time = { fig: formatTime(position) };
   const paused = view.playback.status === 'paused';
   if (offlineFor !== null) return offlineLine(view, failed, offlineFor);
@@ -90,15 +98,16 @@ export const statusFor = ({ view, health, failed, act, position, offlineFor = nu
   if (failed) return { state: 'failed', parts: [paused ? 'The room is paused at ' : 'The room is at ', time], tone: 'plain' };
   if (paused) return pausedLine(view, time);
   if (refused) return { state: 'refused', parts: ['Press play on the video to join in'], tone: 'warn' };
-  if (health === 'stalled') return { state: 'ad', parts: ['You’re at an ad'], tail: '. You’ll catch up after it.', tone: 'plain' };
-  if (health === 'correcting') return { state: 'behind', parts: ['You’re catching up'], tone: 'warn' };
+  if (!started && slow) return { state: 'loading', parts: ['Loading…'], tone: 'plain' };
+  if (started && health === 'stalled') return { state: 'ad', parts: ['You’re at an ad'], tail: '. You’ll catch up after it.', tone: 'plain' };
+  if (started && gap) return { state: 'behind', parts: ['You’re catching up'], tone: 'warn' };
   const friend = laggingFriend(view);
-  if (friend) {
+  if (friend && friendGap) {
     const doing = view.viewerStates[friend.userId] === 'stalled' ? ' is at an ad' : ' is catching up';
     return { state: 'friend', parts: [person(view, friend.name, true), doing], tone: 'plain' };
   }
-  if (health !== 'synced') return { state: 'loading', parts: ['Loading…'], tone: 'plain' };
-  const withThem = together(view);
+  // Below here nothing is wrong enough to mention, but only a viewer on the room's time is with it.
+  const withThem = started && health === 'synced' && together(view);
   if (live) return { state: 'playing', parts: ['Live'], tail: withThem ? ': everyone’s on the same channel' : undefined, tone: 'plain' };
   return { state: 'playing', parts: ['Playing at ', time], tail: withThem ? ', everyone together' : undefined, tone: 'plain' };
 };

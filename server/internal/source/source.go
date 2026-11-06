@@ -9,13 +9,14 @@ import (
 	"stream2gather/internal/room"
 )
 
-// Errors a source can return.
+// Errors a source can return. IsUserError lets these reach people as they are, so
+// each is a whole sentence. web/src matches "not supported" in the first.
 var (
-	ErrUnsupportedURL = errors.New("this link is not supported")
+	ErrUnsupportedURL = errors.New("That link is not supported yet.")
 	ErrUnavailable    = errors.New("This video can’t be played here. Try another.")
-	ErrNoSearch       = errors.New("this source has no search")
+	ErrNoSearch       = errors.New("Search isn’t available for this source.")
 	ErrNoEmbed        = errors.New("This video can’t be embedded here.")
-	ErrOverBudget     = errors.New("search is resting until tomorrow")
+	ErrOverBudget     = errors.New("Search is resting until tomorrow. Paste a link instead.")
 	ErrLive           = errors.New("Live streams aren’t supported yet.")
 	ErrTooManyLinks   = errors.New("Too many new links. Try again later.")
 	ErrLinksResting   = errors.New("New links are resting until tomorrow.")

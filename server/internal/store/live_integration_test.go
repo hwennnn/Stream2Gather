@@ -13,12 +13,13 @@ import (
 
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
+	"stream2gather/internal/testenv"
 )
 
 // These tests need the Redis from deploy/compose.yaml and skip without it.
 func liveStore(t *testing.T) *redis.Client {
 	t.Helper()
-	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:63809"})
+	rdb := redis.NewClient(&redis.Options{Addr: testenv.RedisAddr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -40,7 +41,7 @@ func noEvent(room.State) ([]byte, error) { return []byte("{}"), nil }
 // The legacy server kept 2 of 100 concurrent queue adds.
 func TestConcurrentQueueAddsAllSurviveAcrossServers(t *testing.T) {
 	rdb := liveStore(t)
-	servers := []*Live{NewLive(rdb), NewLive(redis.NewClient(&redis.Options{Addr: "127.0.0.1:63809"}))}
+	servers := []*Live{NewLive(rdb), NewLive(redis.NewClient(&redis.Options{Addr: testenv.RedisAddr()}))}
 
 	ctx := context.Background()
 	roomID := ids.New()

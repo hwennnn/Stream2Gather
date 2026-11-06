@@ -13,6 +13,7 @@ import (
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
 	"stream2gather/internal/store"
+	"stream2gather/internal/testenv"
 )
 
 // The room has to be busy when the last viewer goes. An idle one takes a queued
@@ -224,6 +225,7 @@ func TestPubsubGapResyncs(t *testing.T) {
 }
 
 func TestRedisStateLossRehydrates(t *testing.T) {
+	testenv.OwnRedis(t)
 	r := newRig(t, testRedis)
 	ctx := context.Background()
 	id := r.newRoom(t, directVideo(t))

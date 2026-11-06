@@ -488,6 +488,17 @@ body {
   }
 }
 
+/* Runs down with the five seconds the Undo is offered for. */
+.undo-clock {
+  animation: undo-clock 5s linear both;
+}
+
+@keyframes undo-clock {
+  to {
+    transform: scaleX(0);
+  }
+}
+
 @keyframes fade {
   from {
     opacity: 0;

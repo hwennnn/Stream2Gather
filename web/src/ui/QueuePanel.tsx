@@ -253,8 +253,9 @@ const QueueRow = (props: RowProps) => {
         dragging ? 'z-10 bg-raised shadow-2xl' : 'hover:bg-white/[0.04]'
       }`}
     >
-      {canPlay && (
-        <button type="button" aria-label={`Play ${item.title} now`} disabled={offline} onClick={onPlay} className="row-tap absolute inset-0 rounded-xl" />
+      {/* Touch only. Opens the same tray as the ⋯ button, which is the one a screen reader gets. */}
+      {(canPlay || editable) && (
+        <button type="button" aria-hidden="true" tabIndex={-1} onClick={() => setTray(!tray)} className="row-tap absolute inset-0 rounded-xl" />
       )}
       <div className="flex items-center gap-1.5">
         {editable ? (

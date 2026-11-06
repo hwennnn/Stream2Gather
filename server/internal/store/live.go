@@ -208,18 +208,31 @@ func (l *Live) Leave(ctx context.Context, roomID, connID string) error {
 }
 
 // Prune drops connections that stopped refreshing, such as those of a crashed
-// server, and reports how many went.
+// server, and reports how many went. If that leaves nobody, no leave ever ran, so
+// it marks the room empty as of the last sign of life.
 func (l *Live) Prune(ctx context.Context, roomID string) (int, error) {
 	cutoff := fmt.Sprint(time.Now().Add(-presenceTTL).UnixMilli())
-	stale, err := l.rdb.ZRangeByScore(ctx, presenceKey(roomID), &redis.ZRangeBy{Min: "-inf", Max: cutoff}).Result()
+	stale, err := l.rdb.ZRangeByScoreWithScores(ctx, presenceKey(roomID), &redis.ZRangeBy{Min: "-inf", Max: cutoff}).Result()
 	if err != nil || len(stale) == 0 {
 		return 0, err
 	}
+	ids := make([]string, len(stale))
+	var lastSeen float64
+	for i, entry := range stale {
+		ids[i] = entry.Member.(string)
+		lastSeen = max(lastSeen, entry.Score)
+	}
 	pipe := l.rdb.TxPipeline()
-	pipe.ZRem(ctx, presenceKey(roomID), toAny(stale)...)
-	pipe.HDel(ctx, peopleKey(roomID), stale...)
-	_, err = pipe.Exec(ctx)
-	return len(stale), err
+	pipe.ZRem(ctx, presenceKey(roomID), toAny(ids)...)
+	pipe.HDel(ctx, peopleKey(roomID), ids...)
+	remaining := pipe.ZCard(ctx, presenceKey(roomID))
+	if _, err := pipe.Exec(ctx); err != nil {
+		return 0, err
+	}
+	if remaining.Val() == 0 {
+		return len(stale), l.MarkEmpty(ctx, roomID, int64(lastSeen))
+	}
+	return len(stale), nil
 }
 
 func toAny(values []string) []any {

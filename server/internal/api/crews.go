@@ -22,6 +22,8 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /v1/crews/{slug}", s.closeCrew)
 	mux.HandleFunc("POST /v1/crews/{slug}/join", s.joinCrew)
 	mux.HandleFunc("POST /v1/crews/{slug}/invite", s.rotateInvite)
+	mux.HandleFunc("DELETE /v1/crews/{slug}/members/{userId}", s.removeMember)
+	mux.HandleFunc("GET /v1/me/crews", s.myCrews)
 	mux.HandleFunc("PATCH /v1/crews/{slug}/me", s.setCrewNotify)
 	mux.HandleFunc("POST /v1/rooms/{slug}/crew", s.promoteRoom)
 }
@@ -100,14 +102,26 @@ func (s *Server) findCrew(w http.ResponseWriter, r *http.Request) (store.Room, s
 	return record, crew, true
 }
 
-// publishCrew tells everyone in the room to fetch the crew again. The change has
-// already been made, so failing to say so is not worth failing the request.
-func (s *Server) publishCrew(ctx context.Context, roomID, changed string) {
-	event, _ := json.Marshal(map[string]any{"t": "crew", "d": map[string]string{"changed": changed}})
-	if err := s.Live.Publish(context.WithoutCancel(ctx), roomID, event); err != nil {
+// crewEvent says what changed about a room's crew. Clients refetch; the hub also
+// reads userId, to keep that person's presence true.
+type crewEvent struct {
+	Changed string `json:"changed"`
+	UserID  string `json:"userId,omitempty"`
+	Member  bool   `json:"member,omitempty"`
+	// Kick closes this person's sockets, for a room they can no longer enter.
+	Kick bool `json:"kick,omitempty"`
+}
+
+// publishCrew tells the room. The change has already been made, so failing to say
+// so is not worth failing the request.
+func (s *Server) publishCrew(ctx context.Context, roomID string, event crewEvent) {
+	body, _ := json.Marshal(map[string]any{"t": "crew", "d": event})
+	if err := s.Live.Publish(context.WithoutCancel(ctx), roomID, body); err != nil {
 		s.Log.Warn("crew event not sent", "room", roomID, "error", err)
 	}
 }
+
+var errOwnerStays = errors.New("the owner can't leave")
 
 func (s *Server) crewFailed(w http.ResponseWriter, err error) {
 	switch {
@@ -121,6 +135,8 @@ func (s *Server) crewFailed(w http.ResponseWriter, err error) {
 		writeProblem(w, http.StatusGone, "room_closed", "This room has closed.")
 	case errors.Is(err, store.ErrNotMember):
 		writeProblem(w, http.StatusConflict, "not_member", "That person isn't on this crew.")
+	case errors.Is(err, errOwnerStays):
+		writeProblem(w, http.StatusConflict, "owner_stays", "Hand the crew to someone else first.")
 	default:
 		s.internal(w, err)
 	}
@@ -212,7 +228,7 @@ func (s *Server) updateCrew(w http.ResponseWriter, r *http.Request) {
 		s.crewFailed(w, err)
 		return
 	}
-	s.publishCrew(r.Context(), crew.RoomID, "settings")
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings"})
 	writeJSON(w, http.StatusOK, map[string]bool{"saved": true})
 }
 
@@ -227,7 +243,7 @@ func (s *Server) closeCrew(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
-	s.publishCrew(r.Context(), crew.RoomID, "settings")
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings"})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -270,6 +286,76 @@ func (s *Server) setCrewNotify(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"notify": request.Notify})
 }
 
+// removeMember is leaving, or the owner removing someone. A removal retires the
+// invite too, and ends their call and, in a members-only room, their visit.
+func (s *Server) removeMember(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	_, crew, ok := s.findCrew(w, r)
+	if !ok {
+		return
+	}
+	target := r.PathValue("userId")
+	if target != claims.Subject && crew.OwnerID != claims.Subject {
+		writeProblem(w, http.StatusForbidden, "forbidden", "Only the crew's owner can do that.")
+		return
+	}
+	if target == crew.OwnerID {
+		s.crewFailed(w, errOwnerStays)
+		return
+	}
+	token := ""
+	if target != claims.Subject {
+		token = ids.New()
+	}
+	removed, err := s.DB.RemoveMember(r.Context(), crew.ID, target, token)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	if !removed {
+		s.crewFailed(w, store.ErrNotMember)
+		return
+	}
+	if token != "" {
+		if err := s.removeFromVoice(r.Context(), crew.RoomID, target); err != nil {
+			s.Log.Warn("voice removal failed", "room", crew.RoomID, "error", err)
+		}
+	}
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "members", UserID: target, Kick: !crew.GuestAccess})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// myCrews feeds the rail. Who is here comes live from each room, so one room's
+// Redis read failing costs its count and nothing else.
+func (s *Server) myCrews(w http.ResponseWriter, r *http.Request) {
+	claims, ok := s.account(w, r)
+	if !ok {
+		return
+	}
+	crews, err := s.DB.CrewsOf(r.Context(), claims.Subject)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
+	type line struct {
+		Slug string `json:"slug"`
+		Name string `json:"name"`
+		Here int    `json:"here"`
+	}
+	items := make([]line, len(crews))
+	for i, crew := range crews {
+		people, err := s.Live.People(r.Context(), crew.RoomID)
+		if err != nil {
+			s.Log.Warn("crew presence failed", "room", crew.RoomID, "error", err)
+		}
+		items[i] = line{Slug: crew.Slug, Name: crew.Name, Here: len(people)}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
 // promoteRoom is "Keep this room": the link and everyone's connection stay put.
 func (s *Server) promoteRoom(w http.ResponseWriter, r *http.Request) {
 	claims, ok := s.account(w, r)
@@ -294,7 +380,7 @@ func (s *Server) promoteRoom(w http.ResponseWriter, r *http.Request) {
 		s.internal(w, err)
 		return
 	}
-	s.publishCrew(r.Context(), record.ID, "settings")
+	s.publishCrew(r.Context(), record.ID, crewEvent{Changed: "settings", UserID: claims.Subject, Member: true})
 	writeJSON(w, http.StatusOK, map[string]string{"slug": record.Slug, "name": record.Name, "inviteToken": crew.InviteToken})
 }
 
@@ -317,7 +403,7 @@ func (s *Server) joinCrew(w http.ResponseWriter, r *http.Request) {
 		s.crewFailed(w, err)
 		return
 	}
-	s.publishCrew(r.Context(), record.ID, "members")
+	s.publishCrew(r.Context(), record.ID, crewEvent{Changed: "members", UserID: claims.Subject, Member: true})
 	writeJSON(w, http.StatusOK, map[string]bool{"joined": true})
 }
 

@@ -130,3 +130,55 @@ func TestNotifyIsPerMember(t *testing.T) {
 		t.Fatalf("stranger: %d", response.Code)
 	}
 }
+
+func TestLeavingAndRemoval(t *testing.T) {
+	s, _ := stackServer(t)
+	slug, token, friendID, owner, friend := crewWithFriend(t, s)
+	members := "/v1/crews/" + slug + "/members/"
+
+	_, home := serve(s, http.MethodGet, "/v1/crews/"+slug, "", owner)
+	ownerID := home["ownerId"].(string)
+	if response, body := serve(s, http.MethodDelete, members+ownerID, "", owner); response.Code != http.StatusConflict || body["code"] != "owner_stays" {
+		t.Fatalf("owner leaving: %d %s", response.Code, response.Body)
+	}
+	if response, _ := serve(s, http.MethodDelete, members+ownerID, "", friend); response.Code != http.StatusForbidden {
+		t.Fatalf("member removing the owner: %d", response.Code)
+	}
+	if response, _ := serve(s, http.MethodDelete, members+friendID, "", friend); response.Code != http.StatusNoContent {
+		t.Fatalf("leaving: %d %s", response.Code, response.Body)
+	}
+	if response, _ := serve(s, http.MethodDelete, members+friendID, "", friend); response.Code != http.StatusConflict {
+		t.Fatalf("leaving twice: %d", response.Code)
+	}
+	// Leaving keeps the invite, so a friend who left by mistake can come back.
+	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, friend); response.Code != http.StatusOK {
+		t.Fatalf("rejoin: %d %s", response.Code, response.Body)
+	}
+
+	if response, _ := serve(s, http.MethodDelete, members+friendID, "", owner); response.Code != http.StatusNoContent {
+		t.Fatalf("removal: %d %s", response.Code, response.Body)
+	}
+	response, body := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, friend)
+	if response.Code != http.StatusForbidden || body["code"] != "invalid_invite" {
+		t.Fatalf("a removal must retire the invite: %d %s", response.Code, response.Body)
+	}
+}
+
+func TestRailListsOnlyMyOpenCrews(t *testing.T) {
+	s, _ := stackServer(t)
+	_, as := signUp(t, s, "Hana")
+	kept, _ := newCrew(t, s, as)
+	closed, _ := newCrew(t, s, as)
+	if response, _ := serve(s, http.MethodDelete, "/v1/crews/"+closed, "", as); response.Code != http.StatusNoContent {
+		t.Fatalf("delete: %d", response.Code)
+	}
+	response, body := serve(s, http.MethodGet, "/v1/me/crews", "", as)
+	items := body["items"].([]any)
+	if response.Code != http.StatusOK || len(items) != 1 || items[0].(map[string]any)["slug"] != kept || items[0].(map[string]any)["here"] != 0.0 {
+		t.Fatalf("rail: %d %s", response.Code, response.Body)
+	}
+	guest := fresh()
+	if response, _ := serve(s, http.MethodGet, "/v1/me/crews", "", guest); response.Code != http.StatusUnauthorized {
+		t.Fatalf("guest: %d", response.Code)
+	}
+}

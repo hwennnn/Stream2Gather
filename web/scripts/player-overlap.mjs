@@ -297,6 +297,36 @@ for (const [layout, options] of LAYOUTS) {
   }
 }
 
+// Catch-up plays the same video on its own page, with reactions firing beside it.
+const mockCatchup = async (page, current) => {
+  const crew = `**/v1/crews/${SLUG}`;
+  const moments = Array.from({ length: 40 }, (_, index) => ({
+    id: index + 1, posMs: 500 + index * 100, kind: 'reaction', origin: 'live', author: 'Maya', emoji: '🔥',
+  }));
+  await page.route(`${crew}/items/1`, (route) => route.fulfill({ json: { source: current.source, sourceId: current.sourceId, crewName: 'Sundays', media: current } }));
+  await page.route(`${crew}/moments*`, (route) => route.fulfill(route.request().method() === 'GET' ? { json: { items: moments } } : { status: 201, json: { id: 99 } }));
+  await page.route('**/v1/telemetry', (route) => route.fulfill({ status: 204, body: '' }));
+};
+
+for (const [layout, options] of LAYOUTS) {
+  for (const [kind, current] of [['file', file()], ['youtube', video('aqz-KE-bpKQ', 'Big Buck Bunny')]]) {
+    const label = `${layout} ${kind} catch-up`;
+    const context = await browser.newContext(options);
+    const page = await context.newPage();
+    await page.addInitScript(installWatcher);
+    await mockCatchup(page, current);
+    await page.goto(`${BASE}/r/${SLUG}/catchup/1`);
+    await page.waitForSelector('[data-player] iframe, [data-player] video', { timeout: 20_000 });
+    await during(page, `${label} reacting`, async () => {
+      await page.evaluate(() => document.querySelector('[data-player] video')?.play());
+      await sleep(2500);
+      await page.getByRole('button', { name: 'React 🔥' }).click();
+      await sleep(300);
+    });
+    await context.close();
+  }
+}
+
 await browser.close();
 console.log(`\n${checks} checks, ${failures.length} problems`);
 for (const failure of failures) console.log(`  ${failure}`);

@@ -36,6 +36,10 @@ func (s *Server) voiceToken(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Presence lingers after a socket closes, so being listed doesn't mean being allowed.
+	if _, ok := s.crewEntry(w, r, record, claims); !ok {
+		return
+	}
 	allowed, err := s.Live.Limit(r.Context(), "voice:"+claims.Subject, voiceTokensPerMinute, time.Minute)
 	if err != nil {
 		s.internal(w, err)

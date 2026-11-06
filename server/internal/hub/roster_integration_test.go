@@ -60,3 +60,29 @@ func TestRemovalFromAMembersOnlyRoomClosesThatPersonsSockets(t *testing.T) {
 	default:
 	}
 }
+
+func TestLockingARoomSendsGuestsHomeAndKeepsTheCrew(t *testing.T) {
+	r := newRig(t, testRedis)
+	id, guest, member := r.newRoom(t, room.New()), "u_"+ids.New(), "u_"+ids.New()
+	out := r.joined(t, id, guest, room.RoleMember)
+	in := r.joined(t, id, member, room.RoleMember)
+	crewEvent(t, r, id, map[string]any{"changed": "members", "userId": member, "member": true})
+	in.expect(t, "crew")
+
+	crewEvent(t, r, id, map[string]any{"changed": "settings", "membersOnly": true})
+
+	select {
+	case code := <-out.closed:
+		if code != websocket.StatusPolicyViolation {
+			t.Fatalf("close code = %d", code)
+		}
+	case <-time.After(waitFor):
+		t.Fatal("a guest stayed in a room that was locked")
+	}
+	in.expect(t, "crew")
+	select {
+	case code := <-in.closed:
+		t.Fatalf("a member was sent home too: %d", code)
+	default:
+	}
+}

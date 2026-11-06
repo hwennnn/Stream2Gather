@@ -93,7 +93,7 @@ export const Landing = () => {
             <h1 className="mt-5 text-[clamp(1.75rem,8.8vw,3.75rem)] leading-[1.08] font-semibold tracking-tight lg:text-[clamp(3rem,4.7vw,3.4rem)] land:mt-0 land:text-[2.25rem]">
               Watch together,
               <br />
-              <span className="text-gradient">at the same moment.</span>
+              <span className="text-accent">at the same moment.</span>
             </h1>
             <p className="mt-5 max-w-lg text-lg leading-relaxed text-pretty text-muted phone:text-base land:hidden">
               Paste a YouTube link and send it to your friends. Your room comes with a shared queue and chat beside the video.

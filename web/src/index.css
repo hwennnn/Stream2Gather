@@ -69,12 +69,6 @@ body {
     radial-gradient(40rem 24rem at 90% 110%, rgb(125 211 252 / 0.08), transparent 70%);
 }
 
-.text-gradient {
-  background: linear-gradient(95deg, var(--color-sky), var(--color-accent) 45%, var(--color-violet));
-  background-clip: text;
-  color: transparent;
-}
-
 @layer components {
   .btn {
     display: inline-flex;
@@ -107,13 +101,13 @@ body {
   }
 
   .btn-primary {
-    background: linear-gradient(100deg, var(--color-sky), var(--color-accent) 55%, var(--color-violet));
-    color: var(--color-ink);
+    background: #4f5ff0;
+    color: #fff;
     font-weight: 600;
   }
 
   .btn-primary:hover:not(:disabled) {
-    filter: brightness(1.1);
+    background: #6271f5;
   }
 
   .btn-quiet {

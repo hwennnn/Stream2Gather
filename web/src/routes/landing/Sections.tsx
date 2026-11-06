@@ -13,7 +13,7 @@ const pickClass = (index: number) => (index < NARROW_PICKS ? 'min-w-0' : 'min-w-
 
 const Heading = ({ id, eyebrow, title, children }: { id: string; eyebrow: string; title: string; children?: ReactNode }) => (
   <div className="max-w-2xl">
-    <p className="text-gradient text-sm font-semibold">{eyebrow}</p>
+    <p className="text-accent text-sm font-semibold">{eyebrow}</p>
     <h2 id={id} className="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
       {title}
     </h2>

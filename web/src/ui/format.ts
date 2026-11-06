@@ -6,12 +6,12 @@ export const formatTime = (seconds: number): string => {
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
 };
 
-const COLORS = ['#ff5a36', '#ffb020', '#3ddc97', '#4cc9f0', '#a78bfa', '#f472b6'];
+const COLORS = ['#8fa8ff', '#7dd3fc', '#a78bfa', '#5eead4', '#f0abfc', '#fcd34d'];
 
 export const avatarColor = (id: string): string => {
   let hash = 0;
   for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return COLORS[hash % COLORS.length] ?? '#ff5a36';
+  return COLORS[hash % COLORS.length] ?? '#8fa8ff';
 };
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });

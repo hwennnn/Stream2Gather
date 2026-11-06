@@ -34,6 +34,9 @@ type Capture struct {
 	// Source and SourceID are what's on now, and empty when nothing is.
 	Source   string
 	SourceID string
+	// PressedPlay is who started it, named on the session if they're a member. Empty
+	// when nobody in this flush did, and then the session names nobody.
+	PressedPlay string
 	// Present is everyone here, seated when this flush opens the session.
 	Present []Person
 	Joined  []Person
@@ -90,6 +93,9 @@ func withoutDeleted(ctx context.Context, tx pgx.Tx, c Capture) (Capture, error) 
 	for _, moment := range c.Moments {
 		mentioned = append(mentioned, moment.UserID)
 	}
+	if c.PressedPlay != "" {
+		mentioned = append(mentioned, c.PressedPlay)
+	}
 	if len(mentioned) == 0 {
 		return c, nil
 	}
@@ -128,8 +134,8 @@ func currentSession(ctx context.Context, tx pgx.Tx, c Capture) (string, error) {
 	id = ids.New()
 	tag, err := tx.Exec(ctx, `
 		INSERT INTO crew_sessions (id, crew_id, started_by, started_at, last_activity_at)
-		VALUES ($1, $2, (SELECT m.user_id FROM crew_members m WHERE m.crew_id = $2 AND m.user_id = ANY($3) ORDER BY m.joined_at LIMIT 1), $4, $4)
-		ON CONFLICT (crew_id) WHERE ended_at IS NULL DO NOTHING`, id, c.CrewID, personIDs(c.Present), c.At)
+		VALUES ($1, $2, (SELECT m.user_id FROM crew_members m WHERE m.crew_id = $2 AND m.user_id = $3), $4, $4)
+		ON CONFLICT (crew_id) WHERE ended_at IS NULL DO NOTHING`, id, c.CrewID, c.PressedPlay, c.At)
 	if err != nil {
 		return "", err
 	}

@@ -30,7 +30,7 @@ func aSession(t *testing.T, db *Postgres) (sessionID string, notice SessionNotic
 		}
 	}
 	person := Person{UserID: hana, Name: "Hana", Member: true}
-	capture := Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: "a", Present: []Person{person}, Joined: []Person{person}}
+	capture := Capture{CrewID: crewID, At: time.Now(), Playing: true, Source: "youtube", SourceID: "a", Present: []Person{person}, Joined: []Person{person}, PressedPlay: hana}
 	if err := db.RecordCapture(ctx, capture); err != nil {
 		t.Fatal(err)
 	}

@@ -32,8 +32,9 @@ type Moment struct {
 type Recorder interface {
 	// Run does the recorder's work until ctx ends. Hub.Run starts it.
 	Run(ctx context.Context)
-	// Applied sees every state change, system commands included, and what it replaced.
-	Applied(roomID string, before, after room.State)
+	// Applied sees every state change and what it replaced. actorID is who did it,
+	// and empty for a system command.
+	Applied(roomID, actorID string, before, after room.State)
 	// Joined fires for each connection, so a second tab fires it again.
 	Joined(roomID string, p store.Person)
 	// Left fires once the person has no connection left, on any server.
@@ -79,6 +80,7 @@ type recorded struct {
 	roomID string
 	state  *room.State
 	before *room.State
+	actor  string
 	joined *store.Person
 	left   string
 	moment *Moment
@@ -118,8 +120,8 @@ func (c *capture) send(event recorded) {
 	}
 }
 
-func (c *capture) Applied(roomID string, before, after room.State) {
-	c.send(recorded{roomID: roomID, state: &after, before: &before})
+func (c *capture) Applied(roomID, actorID string, before, after room.State) {
+	c.send(recorded{roomID: roomID, state: &after, before: &before, actor: actorID})
 }
 func (c *capture) Joined(roomID string, p store.Person) { c.send(recorded{roomID: roomID, joined: &p}) }
 func (c *capture) Left(roomID, userID string)           { c.send(recorded{roomID: roomID, left: userID}) }
@@ -210,6 +212,9 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 		case event.state != nil:
 			placed = *event.state
 			batch.Active = true
+			if batch.PressedPlay == "" && pressedPlay(event) {
+				batch.PressedPlay = event.actor
+			}
 		case event.joined != nil:
 			batch.Joined = append(batch.Joined, *event.joined)
 			// A reload is a leave and a join, and the store seats before it unseats.
@@ -228,6 +233,12 @@ func (c *capture) write(ctx context.Context, roomID, crewID string, events []rec
 		batch.Playing = placed.Playback.Status == room.StatusPlaying
 	}
 	return c.db.RecordCapture(ctx, batch)
+}
+
+// pressedPlay is a person taking the room from stopped to playing, so a session
+// that opens for any other reason names nobody.
+func pressedPlay(event recorded) bool {
+	return event.before.Playback.Status != room.StatusPlaying && event.state.Playback.Status == room.StatusPlaying
 }
 
 func playingItem(s room.State) (room.Item, bool) {

@@ -164,3 +164,29 @@ func TestAMomentBelongsToTheVideoItHappenedIn(t *testing.T) {
 		t.Fatalf("placed in %q at %d ms, want the film at 130000", moment.SourceID, moment.PosMs)
 	}
 }
+
+func TestOnlyPressingPlayNamesSomeone(t *testing.T) {
+	playing := playingAt(0, time.Now())
+	paused := playing
+	paused.Playback.Status = room.StatusPaused
+	for name, tc := range map[string]struct {
+		events []recorded
+		want   string
+	}{
+		"a person pressing play":    {[]recorded{{state: &playing, before: &paused, actor: "bo"}}, "bo"},
+		"the room resuming itself":  {[]recorded{{state: &playing, before: &paused}}, ""},
+		"a change while it plays":   {[]recorded{{state: &playing, before: &playing, actor: "bo"}}, ""},
+		"someone pausing":           {[]recorded{{state: &paused, before: &playing, actor: "bo"}}, ""},
+		"someone arriving mid-film": {[]recorded{{left: "bo"}}, ""},
+		"the first of two presses":  {[]recorded{{state: &playing, before: &paused, actor: "bo"}, {state: &paused, before: &playing, actor: "cy"}, {state: &playing, before: &paused, actor: "cy"}}, "bo"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := &fakeCaptureStore{crew: "c"}
+			c := newCapture(db, fakeRoomReader{state: playing}, quiet())
+			c.flush(context.Background(), "r", tc.events)
+			if got := db.batches[0].PressedPlay; got != tc.want {
+				t.Fatalf("named %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

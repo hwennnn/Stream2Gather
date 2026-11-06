@@ -45,11 +45,16 @@ func (f *fakeRecorder) waitFor(t *testing.T, event string, want int) {
 	}
 }
 
-func (f *fakeRecorder) Run(context.Context)               {}
-func (f *fakeRecorder) Dropped() int64                    { return 0 }
-func (f *fakeRecorder) Applied(_ string, _, s room.State) { f.add("applied:" + s.Playback.Status) }
-func (f *fakeRecorder) Joined(_ string, p store.Person)   { f.add("joined:" + p.UserID) }
-func (f *fakeRecorder) Left(_, userID string)             { f.add("left:" + userID) }
+func (f *fakeRecorder) Run(context.Context) {}
+func (f *fakeRecorder) Dropped() int64      { return 0 }
+func (f *fakeRecorder) Applied(_, actorID string, _, s room.State) {
+	f.add("applied:" + s.Playback.Status)
+	if actorID != "" {
+		f.add("by:" + actorID)
+	}
+}
+func (f *fakeRecorder) Joined(_ string, p store.Person) { f.add("joined:" + p.UserID) }
+func (f *fakeRecorder) Left(_, userID string)           { f.add("left:" + userID) }
 func (f *fakeRecorder) Moment(_ string, m Moment) {
 	if m.Kind == MomentChat && m.MessageID == 0 {
 		f.add("chat without a message")
@@ -72,6 +77,7 @@ func TestRecorderHearsTheRoom(t *testing.T) {
 	recorder.waitFor(t, "moment:chat:u:", 1)
 	recorder.waitFor(t, "moment:reaction:u:🔥", 1)
 	recorder.waitFor(t, "applied:playing", 1)
+	recorder.waitFor(t, "by:u", 1)
 	if got := recorder.count("chat without a message"); got != 0 {
 		t.Fatal("a chat moment lost its message")
 	}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
@@ -9,6 +9,8 @@ import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
 import { CrewSettings, MemberRow } from './CrewSettings';
 import { Watchlist } from './Watchlist';
+
+const PushCard = lazy(() => import('../push/Card'));
 
 type Props = {
   slug: string;
@@ -114,6 +116,10 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
           {here > 0 ? `Join the room (${here} here)` : 'Join the room'}
         </button>
       </section>
+
+      <Suspense fallback={null}>
+        <PushCard slug={slug} />
+      </Suspense>
 
       <Invite slug={slug} home={home} />
 

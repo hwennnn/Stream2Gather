@@ -848,6 +848,11 @@ body {
     display: block;
   }
 
+  /* It is positioned, so it sits above the tap target, and a thumb on the words did nothing. */
+  .row div:has(> .row-meta) {
+    pointer-events: none;
+  }
+
   .row-more {
     display: inline-flex;
   }

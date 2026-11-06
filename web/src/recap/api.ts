@@ -24,9 +24,9 @@ export type PublicRecap = {
   startedAt: string;
   wallMs: number;
   people: string[];
-  videos: { title: string; url: string; thumbnailUrl?: string; reactions: number }[];
+  videos: { title: string; url: string; thumbnailUrl?: string; reactions: number; dots: { at: number; seat: number }[] }[];
   reactions: Record<string, number>;
-  biggest: { title: string; posMs: number; emojis: Record<string, number>; people: number } | null;
+  biggest: { title: string; posMs: number; emojis: Record<string, number>; people: number; video: number; at: number } | null;
 };
 
 const path = (slug: string, sessionId: string) =>

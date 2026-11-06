@@ -83,7 +83,7 @@ export const Landing = () => {
           <CrewRail except={recent?.slug} />
         </Slot>
 
-        <div className="grid grid-cols-[minmax(0,1fr)] items-end gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] items-center gap-x-16 gap-y-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
           <section aria-labelledby="landing-title">
             <h1 id="landing-title" className="text-4xl leading-10 font-semibold tracking-[-0.02em] text-balance phone:text-[30px] phone:leading-9">
               Save your friends a seat.
@@ -129,17 +129,21 @@ export const Landing = () => {
                   {emptyNote(kinds)}
                 </p>
               )}
-              <button type="button" hidden={!canStartRoom} disabled={working} onClick={() => void start('empty')} className="btn btn-quiet phone:w-full">
-                {busy === 'empty' ? 'Opening…' : 'Start an empty room'}
-              </button>
+              <p hidden={!canStartRoom} className="text-muted">
+                No video yet?{' '}
+                <button type="button" disabled={working} onClick={() => void start('empty')} className="text-link phone:min-h-11">
+                  {busy === 'empty' ? 'Opening…' : 'Start an empty room'}
+                </button>
+              </p>
             </div>
-
           </section>
 
-          <PictureScreen src={yours ? stillOf(yours) : (trending?.[0]?.thumbnailUrl ?? '/room-still.svg')} onBroken={() => setNoStill(pasted)} />
+          <div>
+            <PictureScreen src={yours ? stillOf(yours) : (trending?.[0]?.thumbnailUrl ?? '/room-still.svg')} onBroken={() => setNoStill(pasted)} />
+            <FrontRow ready={yours !== null} />
+            <p className="mt-1 text-[13px] text-dim">Your room: a seat for each friend.</p>
+          </div>
         </div>
-
-        <FrontRow ready={yours !== null} />
 
         <Popular items={trending} busy={busy} disabled={working} onPick={(media) => void start(media.sourceId, media.url)} />
       </main>

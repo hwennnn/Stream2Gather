@@ -108,40 +108,34 @@ export const PictureScreen = ({ src, onBroken }: { src: string; onBroken: () => 
 );
 
 /** Everyone in front of that screen, and a place for whoever you're about to send this to. */
-export const FrontRow = ({ ready }: { ready: boolean }) => {
-  const maya = CAST[0]?.userId;
-  return (
-    <div aria-hidden="true" data-ready={ready} className="picture-row">
-      <ul className="seats">
-        {CAST.map((person) => (
-          <Seat key={person.userId} person={person} />
-        ))}
-        <li className="seat picture-seat">
-          <span className="seat-empty picture-open" />
-          <span style={at('--at', MISSING_AT)} className="seat-name picture-missing">
-            Who’s missing?
-          </span>
-        </li>
-        <li className="seat picture-seat picture-spare">
-          <span className="seat-empty" />
-        </li>
-      </ul>
-      <p className="picture-status">
-        <span style={at('--at', PAUSED_AT)} className="picture-before">
-          Playing at <span className="tabular-nums">3:12</span>, everyone together
+export const FrontRow = ({ ready }: { ready: boolean }) => (
+  <div aria-hidden="true" data-ready={ready} className="picture-row">
+    <ul className="seats">
+      {CAST.map((person) => (
+        <Seat key={person.userId} person={person} />
+      ))}
+      <li className="seat picture-seat">
+        <span className="seat-empty picture-open" />
+        <span style={at('--at', MISSING_AT)} className="seat-name picture-missing">
+          Who’s missing?
         </span>
-        <span style={at('--at', PAUSED_AT)} className="picture-after">
-          Paused by{' '}
-          <span style={{ color: hueOf(maya) }} className="font-semibold">
-            Maya
-          </span>{' '}
-          at <span className="tabular-nums">3:20</span>
-        </span>
-        <span className="picture-ready">That’s your screen. Start the room, then send the link.</span>
-      </p>
-    </div>
-  );
-};
+      </li>
+    </ul>
+    <p className="picture-status">
+      <span style={at('--at', PAUSED_AT)} className="picture-before">
+        Playing at 3:12, everyone together
+      </span>
+      <span style={at('--at', PAUSED_AT)} className="picture-after">
+        Paused by{' '}
+        <span style={{ color: hueOf('picture-maya') }} className="font-semibold">
+          Maya
+        </span>{' '}
+        at 3:20
+      </span>
+      <span className="picture-ready">That’s your screen. Start the room, then send the link.</span>
+    </p>
+  </div>
+);
 
 export const Footer = () => (
   <footer className="border-t border-line">

@@ -6,7 +6,7 @@ import { nightOf } from '../recap/words';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
 import { WhereItIs } from '../ui/JoinGate';
-import { NARROW_COLUMN, SiteHeader } from '../ui/Page';
+import { NARROW_COLUMN, SiteHeader, WIDE_COLUMN } from '../ui/Page';
 import { firstName, listNames } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { inviteLink, type CrewDocument } from './api';
@@ -91,19 +91,19 @@ const CrewSeats = ({ home }: { home: CrewDocument }) => {
   );
 };
 
-/** Who's in now, or when the crew last sat down. */
-const whoIsIn = (home: CrewDocument, lastNight?: string): string => {
+/** Who's in now, or when the crew last sat down. An empty room is for the button to say. */
+const whoIsIn = (home: CrewDocument, lastNight?: string): string | null => {
   const names = home.members.map(({ name }) => firstName(name));
   if (names.length > 0) return `${listNames(names)} ${names.length > 1 ? 'are' : 'is'} in.`;
-  return lastNight ? `Nobody’s in. Last together ${nightOf(lastNight)}.` : 'Nobody’s in.';
+  return lastNight ? `Last together ${nightOf(lastNight)}.` : null;
 };
 
-const Frame = ({ children }: { children: ReactNode }) => (
+const Frame = ({ wide, children }: { wide?: boolean; children: ReactNode }) => (
   <div className="flex min-h-full flex-col">
     <SiteHeader>
       <AccountMenu />
     </SiteHeader>
-    <main className={`${NARROW_COLUMN} flex-1 pt-8 pb-10 phone:pt-6`}>{children}</main>
+    <main className={`${wide ? WIDE_COLUMN : NARROW_COLUMN} flex-1 pt-8 pb-10 phone:pt-6`}>{children}</main>
   </div>
 );
 
@@ -128,53 +128,63 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
     );
   }
 
+  const line = whoIsIn(home, latest?.startedAt);
+
   return (
-    <Frame>
-      <div className="flex items-center gap-3">
-        <h1 className="min-w-0 flex-1 truncate text-2xl leading-8 font-semibold tracking-[-0.015em]">{home.name}</h1>
-        <button type="button" aria-label="Members and settings" onClick={() => setAdmin(true)} className="btn btn-ghost btn-icon -mr-2 text-text">
-          <GearIcon />
-        </button>
-      </div>
-
-      {problem && (
-        <p role="status" className="mt-4 text-sm text-warn">
-          {problem}
-        </p>
-      )}
-
-      <CrewSeats home={home} />
-      <p className="mt-3 text-sm text-muted">{whoIsIn(home, latest?.startedAt)}</p>
-
-      <section aria-label="Now" className="mt-3">
-        {home.nowPlaying && (
-          <div className="mb-3 flex items-center gap-3">
-            <Thumb src={home.nowPlaying.thumbnailUrl} className="w-20 rounded-md" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{home.nowPlaying.title}</p>
-              <WhereItIs preview={home} />
+    <Frame wide>
+      <div className="crew-home">
+        <div className="crew-door">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] text-muted">Your crew</p>
+              <h1 className="truncate text-2xl leading-8 font-semibold tracking-[-0.015em]">{home.name}</h1>
             </div>
+            <button type="button" aria-label="Members and settings" onClick={() => setAdmin(true)} className="btn btn-ghost btn-icon -mr-2 text-text">
+              <GearIcon />
+            </button>
           </div>
-        )}
-        <button type="button" disabled={joining} onClick={enter} className="btn btn-primary h-12 w-full text-base">
-          Join the room
-        </button>
-      </section>
 
-      <Invite slug={slug} home={home} />
+          {problem && (
+            <p role="status" className="mt-4 text-sm text-warn">
+              {problem}
+            </p>
+          )}
 
-      <Suspense fallback={null}>
-        <PushCard />
-      </Suspense>
+          <CrewSeats home={home} />
+          {line && <p className="mt-3 text-sm text-muted">{line}</p>}
 
-      <Missed slug={slug} />
+          <section aria-label="Now" className="mt-3">
+            {home.nowPlaying && (
+              <div className="mb-3 flex items-center gap-3">
+                <Thumb src={home.nowPlaying.thumbnailUrl} className="w-20 rounded-md" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{home.nowPlaying.title}</p>
+                  <WhereItIs preview={home} />
+                </div>
+              </div>
+            )}
+            <button type="button" disabled={joining} onClick={enter} className="btn btn-primary h-12 w-full text-base">
+              {home.members.length > 0 ? 'Join the room' : 'Be the first in'}
+            </button>
+          </section>
 
-      {latest && <RecapCard key={latest.id} slug={slug} sessionId={latest.id} people={latest.people} />}
+          <Invite slug={slug} home={home} />
 
-      <Watchlist slug={slug} items={home.watchlist} selfId={user?.id} onChange={refresh} />
+          <Suspense fallback={null}>
+            <PushCard />
+          </Suspense>
+        </div>
 
-      <Sessions slug={slug} page={sessions} setPage={setSessions} />
+        <div className="crew-nights">
+          <Missed slug={slug} />
 
+          {latest && <RecapCard key={latest.id} slug={slug} sessionId={latest.id} people={latest.people} />}
+
+          <Watchlist slug={slug} items={home.watchlist} selfId={user?.id} onChange={refresh} />
+
+          <Sessions slug={slug} page={sessions} setPage={setSessions} />
+        </div>
+      </div>
     </Frame>
   );
 };

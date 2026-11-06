@@ -36,6 +36,13 @@ describe('DeadEnd', () => {
     expect(closedRoom([])).toBe(ENDINGS.closed);
   });
 
+  it('dims the lights when there is nothing on the screen', () => {
+    render(<DeadEnd {...ENDINGS.page} home />);
+
+    expect(document.querySelector('.door-screen .dark-room')).not.toBeNull();
+    expect(document.querySelector('.door-screen img')).toBeNull();
+  });
+
   it('offers only Try again when the room cannot be reached, and no seats', () => {
     render(<DeadEnd {...ENDINGS.unreachable} onRetry={() => {}} />);
     expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();

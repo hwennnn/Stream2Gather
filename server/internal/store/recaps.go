@@ -63,6 +63,21 @@ func recapInput(ctx context.Context, q querier, sessionID string) (recap.Input, 
 	return in, err
 }
 
+// SessionReactions reads where the room's reactions landed. A catch-up's aren't part of the night.
+func (p *Postgres) SessionReactions(ctx context.Context, sessionID string) ([]recap.Moment, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT source, source_id, pos_ms, coalesce(user_id, '')
+		FROM moments WHERE session_id = $1 AND origin = 'live' AND kind = 'reaction'
+		ORDER BY pos_ms, id`, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (recap.Moment, error) {
+		m := recap.Moment{Kind: recap.KindReaction}
+		return m, row.Scan(&m.Source, &m.SourceID, &m.PosMs, &m.UserID)
+	})
+}
+
 // BuildRecap writes a finished session's recap. Running it again replaces the doc
 // and tells nobody twice. A session of one tells nobody at all.
 func (p *Postgres) BuildRecap(ctx context.Context, sessionID string) error {

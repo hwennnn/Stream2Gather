@@ -285,6 +285,7 @@ for (const size of WIDTHS) {
 
     await a.page.goto(`${t.base}/no/such/page`);
     await t.see('the not-found page', a.page.getByRole('heading', { name: /nothing.s showing here/i }));
+    t.check(`${width} the lights are down`, await a.page.locator('.door-screen .dark-room').isVisible());
     await checkSpills(t, `${width} not found`, a.page, a.page.locator('body'));
     await checkPage(t, `${width} not found`, a.page);
     t.eq(`${width} not found keeps the landing's bar`, await shellBar(a.page), bar);

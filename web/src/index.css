@@ -1764,15 +1764,15 @@ body {
  */
 
 .picture-row {
-  margin-top: 1rem;
-  padding-top: 2.25rem;
+  padding-top: 2.5rem;
 }
 
+/* The room's row: close enough to read as seats next to each other. */
 .picture-row .seats {
-  justify-content: space-between;
+  gap: 1.25rem;
 }
 
-/* As wide as the disc, so the row starts and stops on the page's edges. Names may run past it. */
+/* As wide as the disc, so the row starts on the screen's edge. Names may run past it. */
 .picture-seat {
   flex: none;
   align-items: center;
@@ -1804,11 +1804,15 @@ body {
   animation-delay: var(--sat);
 }
 
+/* A line someone said, held to their seat by its tail. */
 .picture-say {
   position: absolute;
   bottom: 100%;
   left: 50%;
   margin-bottom: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--color-raised);
   color: var(--color-text);
   white-space: nowrap;
   opacity: 0;
@@ -1874,6 +1878,18 @@ body {
   visibility: hidden;
 }
 
+.picture-say::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0.5rem;
+  height: 0.25rem;
+  margin-left: -0.25rem;
+  background: var(--color-raised);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
 @keyframes picture-say {
   0% {
     opacity: 0;
@@ -1899,8 +1915,9 @@ body {
 
 /* A phone has the width for one line at a time and five places. */
 @media (max-width: 639px) {
-  .picture-spare {
-    display: none;
+  .picture-row .seats {
+    gap: 0;
+    justify-content: space-between;
   }
 
   .picture-seat .seat-disc,
@@ -1928,6 +1945,10 @@ body {
 .picture-seat:first-child .picture-say {
   left: 0;
   translate: 0 0;
+}
+
+.picture-seat:first-child .picture-say::after {
+  left: 1.75rem;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1962,9 +1983,24 @@ body {
 .night-track {
   display: flex;
   align-items: center;
+  gap: 0.5rem;
   height: 0.75rem;
   margin-top: 0.25rem;
   padding-inline: 3.5px;
+}
+
+.night-line {
+  display: block;
+  background: var(--color-line);
+}
+
+/* The same track, tall enough to press. */
+.night-seek {
+  display: flex;
+  align-items: center;
+  height: 2rem;
+  margin-top: 0.25rem;
+  cursor: pointer;
 }
 
 .night-moment {
@@ -1986,4 +2022,127 @@ body {
 
 .seats[data-kept='true'] .seat-disc span {
   font-size: 0.875rem;
+}
+
+/* ---- The shared picture -----------------------------------------------------
+ * What a stranger sees. The mark at full size: a row of seats on one bench, and
+ * one left free, under what was on.
+ */
+
+.reel {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.5rem;
+  margin-top: 1.25rem;
+}
+
+.reel-still {
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background: var(--color-stage);
+}
+
+.reel-still img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reel-name {
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+  padding: 0.5rem 0.625rem;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
+.reel-best {
+  position: absolute;
+  top: 0.3125rem;
+  font-size: 0.875rem;
+  line-height: 1;
+  translate: -50% 0;
+}
+
+.poster-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1.75rem;
+}
+
+.poster-seats {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.poster-seat {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 6.5rem;
+  aspect-ratio: 7 / 9;
+  border-radius: 999px 999px 0 0;
+  background: var(--hue);
+}
+
+.poster-seat[data-free='true'] {
+  background: none;
+  box-shadow: inset 0 0 0 clamp(0.3125rem, 1.4vw, 0.625rem) var(--color-text);
+}
+
+.poster-bench {
+  height: 0.625rem;
+  border-radius: 0.25rem;
+  background: var(--color-text);
+}
+
+/* ---- A crew's page -------------------------------------------------------- */
+
+/* The door on the left stays put. The nights run down beside it, and a phone reads them in turn. */
+@media (min-width: 1024px) {
+  .crew-home {
+    display: grid;
+    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+    gap: 4rem;
+    align-items: start;
+  }
+
+  .crew-door {
+    position: sticky;
+    top: 2rem;
+  }
+
+  .crew-nights > :first-child {
+    margin-top: 0;
+  }
+}
+
+/* ---- The lights are down ---------------------------------------------------
+ * A room with nothing on: flat fills only, the screen palest, the seats black against it.
+ */
+
+.dark-room {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--color-ink);
+}
+
+.dark-room-screen {
+  fill: var(--color-raised);
+}
+
+.dark-room-far {
+  fill: var(--color-stage);
+  opacity: 0.55;
+}
+
+.dark-room-near {
+  fill: var(--color-stage);
 }

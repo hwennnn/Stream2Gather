@@ -6,6 +6,7 @@ import { firstName, hueOf } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { recapApi, type Recap } from './api';
 import { dotsOf, wordsAround } from './night';
+import { Track } from './Track';
 import { EmojiCounts, nightOf, plural, position, together, totalOf, whoReacted } from './words';
 
 /** Starts ten seconds early, so the moment has its lead-in. */
@@ -90,16 +91,14 @@ const WhoCame = ({ people }: { people: NightPerson[] }) => (
   </ul>
 );
 
-const Track = ({ moments, lengthMs }: { moments: Moment[]; lengthMs: number }) => {
+/** A video's dots, with how long it ran at the end of the line. */
+const Line = ({ moments, lengthMs }: { moments: Moment[]; lengthMs: number }) => {
   const dots = dotsOf(moments, lengthMs);
   if (dots.length === 0) return null;
   return (
-    <span aria-hidden="true" className="night-track">
-      <span className="seat-track-line">
-        {dots.map(({ left, color }, index) => (
-          <span key={index} style={{ left: `${left}%`, backgroundColor: color }} className="seat-track-dot" />
-        ))}
-      </span>
+    <span className="night-track">
+      <Track dots={dots} />
+      <span className="fig w-14 shrink-0 text-right text-[11px] text-dim">{position(lengthMs)}</span>
     </span>
   );
 };
@@ -109,7 +108,7 @@ const Video = ({ video, moments }: { video: Recap['items'][number]; moments?: Mo
     <Thumb src={video.media?.thumbnailUrl ?? ''} className="w-20 rounded-md" />
     <span className="min-w-0 flex-1">
       <span className={`block truncate text-sm ${video.media ? '' : 'text-muted'}`}>{video.media?.title ?? 'Video unavailable'}</span>
-      {moments && <Track moments={moments} lengthMs={video.media?.durationMs ?? 0} />}
+      {moments && <Line moments={moments} lengthMs={video.media?.durationMs ?? 0} />}
     </span>
   </li>
 );
@@ -217,7 +216,8 @@ export const RecapCard = ({ slug, sessionId, people, titled = true }: Props) => 
         ))}
       </ol>
       <BestBit slug={slug} recap={recap} words={words} />
-      {reactions > 0 && <p className="mt-3 text-[13px] text-dim">{plural(reactions, 'reaction')}</p>}
+      {moments.size > 0 && reactions > 0 && <p className="mt-2 text-[13px] text-dim">Each dot is someone reacting, in their colour.</p>}
+      {reactions > 0 && <p className="mt-1 text-[13px] text-dim">{plural(reactions, 'reaction')}</p>}
       {recap.attended && <Share slug={slug} recap={recap} />}
     </section>
   );

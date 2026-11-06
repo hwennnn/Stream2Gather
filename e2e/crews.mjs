@@ -57,7 +57,7 @@ const startCrew = async (who, name) => {
 };
 
 const enter = async (who) => {
-  await button(who, /Join the room/).click();
+  await button(who, /Join the room|Be the first in/).click();
   await who.page.getByRole('tab', { name: 'People' }).waitFor();
 };
 
@@ -77,7 +77,16 @@ check('empty watchlist says so', await visible(hana.page.getByText('Add somethin
 const mika = await person('Mika');
 await mika.page.goto(invite);
 await button(mika, 'Join the crew').click();
-check('joining opens the home', await visible(button(mika, /Join the room/)));
+check('joining opens the home', await visible(button(mika, /Join the room|Be the first in/)));
+check('the crew reads as a crew', await visible(mika.page.getByText('Your crew')));
+check('an empty room asks for someone to go first', await visible(button(mika, 'Be the first in')) && !(await mika.page.locator('body').innerText()).includes('Nobody’s in'));
+await mika.page.setViewportSize({ width: 1440, height: 779 });
+const beside = await mika.page.evaluate(() => {
+  const [door, nights] = ['.crew-door', '.crew-nights'].map((part) => document.querySelector(part).getBoundingClientRect());
+  return nights.left - door.right;
+});
+check('a wide page puts the nights beside the door', beside > 0, String(beside));
+await mika.page.setViewportSize({ width: 1280, height: 800 });
 check('joining strips the token', !mika.page.url().includes('join='), mika.page.url());
 const crewSeats = mika.page.getByRole('list', { name: 'The crew' });
 check('everyone on the crew keeps a seat', (await crewSeats.innerText()).includes('Hana') && (await crewSeats.innerText()).includes('Mika'));
@@ -171,7 +180,7 @@ await sleep(300);
 await host.page.screenshot({ path: `${OUT}/crew-room-phone.png` });
 await friend.page.getByRole('link', { name: 'Crew home' }).click();
 await friend.page.setViewportSize({ width: 390, height: 844 });
-await button(friend, /Join the room/).waitFor();
+await button(friend, /Join the room|Be the first in/).waitFor();
 await friend.page.screenshot({ path: `${OUT}/crew-home-phone.png`, fullPage: true });
 
 await browser.close();

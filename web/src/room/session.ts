@@ -51,6 +51,8 @@ export type RoomView = {
   /** The latest thing a person did, for the room's status line. */
   lastAction: { by: string; cause: string } | null;
   queue: QueueItem[];
+  /** Everything queued was watched. A video the room gave up on, or one removed, wasn't. */
+  ranOut: boolean;
   settings: Settings;
   members: Person[];
   /** The user ids talking right now. Only this tab's call knows, and only while in it. */
@@ -85,6 +87,7 @@ const initialView: RoomView = {
   version: 0,
   playback: { item: '', status: 'idle', pos: 0, at: 0, rate: 1 },
   queue: [],
+  ranOut: false,
   settings: { controlMode: 'everyone', queueMode: 'everyone' },
   members: [],
   speaking: [],
@@ -116,6 +119,12 @@ const STAMP_SLACK_MS = 2000;
 /** How long a requested snapshot may take before pongs may force a reconnect. */
 const RESYNC_WAIT_MS = 5000;
 const LEAVE_PATIENCE_MS = 1000;
+
+const ranOut = ({ cause, by, queue }: StateMessage, before: boolean): boolean => {
+  if (queue === undefined) return before;
+  return queue.length === 0 && (cause === 'ended' || (cause === 'skip' && Boolean(by)));
+};
+
 const OFFLINE_COPY = 'You’re offline right now. Try again once you’re back.';
 const LOST_COPY = 'The connection dropped before that went through. Try again.';
 const TIMEOUT_COPY = 'That took too long. Try again.';
@@ -524,6 +533,7 @@ export class RoomSession {
       queue: message.queue ?? previous.queue,
       settings: message.settings ?? previous.settings,
       viewerStates: itemChanged ? {} : previous.viewerStates,
+      ranOut: ranOut(message, previous.ranOut),
       lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
     });
     if (itemChanged) this.noteJump(message);

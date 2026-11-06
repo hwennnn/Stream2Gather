@@ -176,7 +176,6 @@ type ShellProps = { slug: string; session: RoomSession; view: RoomView };
 const RoomShell = ({ slug, session, view }: ShellProps) => {
   const [tab, setTab] = useState<Tab>('chat');
   const [theatre, setTheatre] = useState(false);
-  const [finished, setFinished] = useState(false);
   const [changing, setChanging] = useState(false);
   const [inviting, setInviting] = useState(false);
   const row = useSeats(view);
@@ -203,7 +202,6 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
     const id = current?.id ?? null;
     if (seenItem.current && id !== seenItem.current) {
       setChanging(id !== null);
-      setFinished(true);
     }
     if (id) seenItem.current = id;
   }, [current?.id]);
@@ -323,7 +321,6 @@ const RoomShell = ({ slug, session, view }: ShellProps) => {
           session={session}
           view={view}
           player={player}
-          finished={finished}
           changing={changing}
           theatre={theatre}
           fullscreen={fullscreen.on}

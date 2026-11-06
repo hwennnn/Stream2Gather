@@ -40,3 +40,36 @@ func TestLiveKitOrigins(t *testing.T) {
 		}
 	}
 }
+
+// YouTube refuses many videos on a page whose address is an IP, with the same
+// error 150 an owner's own block gives, so a local server must use a name.
+func TestNamedOriginReplacesLoopbackIPs(t *testing.T) {
+	cases := map[string]string{
+		"http://127.0.0.1:18099":  "http://localhost:18099",
+		"http://[::1]:5273":       "http://localhost:5273",
+		"http://127.0.0.1":        "http://localhost",
+		"http://localhost:18099":  "http://localhost:18099",
+		"https://example.com":     "https://example.com",
+		"http://192.168.1.20:80":  "http://192.168.1.20:80",
+		"not a url at all % here": "not a url at all % here",
+	}
+	for origin, want := range cases {
+		if got := namedOrigin(origin); got != want {
+			t.Errorf("%s: got %s", origin, got)
+		}
+	}
+}
+
+func TestIPOrigin(t *testing.T) {
+	cases := map[string]bool{
+		"http://192.168.1.20:18080": true,
+		"http://[2001:db8::1]:80":   true,
+		"http://localhost:18080":    false,
+		"https://example.com":       false,
+	}
+	for origin, want := range cases {
+		if got := IPOrigin(origin); got != want {
+			t.Errorf("%s: got %v", origin, got)
+		}
+	}
+}

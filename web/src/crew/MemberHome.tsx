@@ -3,9 +3,9 @@ import { useAccount } from '../auth/account';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
 import { WhereItIs } from '../ui/JoinGate';
+import { NARROW_COLUMN, SiteHeader } from '../ui/Page';
 import { firstName } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
-import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
 import { CrewAdmin, GearIcon } from './CrewSettings';
 import { Sessions } from './Sessions';
@@ -60,15 +60,10 @@ const Invite = ({ slug, home }: Pick<Props, 'slug' | 'home'>) => {
 
 const Frame = ({ children }: { children: ReactNode }) => (
   <div className="flex min-h-full flex-col">
-    <header className="h-14 shrink-0 border-b border-line">
-      <div className="mx-auto flex h-full max-w-xl items-center justify-between px-6 phone:px-4">
-        <a href="/" aria-label="Stream2Gather home">
-          <Wordmark />
-        </a>
-        <AccountMenu />
-      </div>
-    </header>
-    <main className="mx-auto w-full max-w-xl flex-1 px-6 pt-8 pb-10 phone:px-4 phone:pt-6">{children}</main>
+    <SiteHeader>
+      <AccountMenu />
+    </SiteHeader>
+    <main className={`${NARROW_COLUMN} flex-1 pt-8 pb-10 phone:pt-6`}>{children}</main>
   </div>
 );
 

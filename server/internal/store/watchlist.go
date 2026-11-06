@@ -44,7 +44,8 @@ func (f freshMedia) media(source, sourceID string) *room.Media {
 	}
 }
 
-// AddWatch lines a video up. Adding one that's there already changes nothing.
+// AddWatch lines a video up. Adding one that's there already changes nothing, and
+// adding one the crew has watched puts it back.
 func (p *Postgres) AddWatch(ctx context.Context, crewID, source, sourceID, addedBy string) error {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -56,7 +57,7 @@ func (p *Postgres) AddWatch(ctx context.Context, crewID, source, sourceID, added
 		return err
 	}
 	var count int
-	err = tx.QueryRow(ctx, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND removed_at IS NULL`, crewID).Scan(&count)
+	err = tx.QueryRow(ctx, `SELECT count(*) FROM watchlist_items WHERE crew_id = $1 AND removed_at IS NULL AND watched_session_id IS NULL`, crewID).Scan(&count)
 	if err != nil {
 		return err
 	}
@@ -65,7 +66,8 @@ func (p *Postgres) AddWatch(ctx context.Context, crewID, source, sourceID, added
 	}
 	_, err = tx.Exec(ctx, `
 		INSERT INTO watchlist_items (crew_id, source, source_id, added_by) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (crew_id, source, source_id) WHERE removed_at IS NULL DO NOTHING`,
+		ON CONFLICT (crew_id, source, source_id) WHERE removed_at IS NULL
+		DO UPDATE SET watched_session_id = NULL WHERE watchlist_items.watched_session_id IS NOT NULL`,
 		crewID, source, sourceID, addedBy)
 	if err != nil {
 		return err

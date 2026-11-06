@@ -102,11 +102,14 @@ const pairwiseDrift = (samples) => {
 
 const measure = async (viewers, seconds) => {
   const drifts = [];
+  const trace = [];
   for (let i = 0; i < seconds; i += 1) {
     await sleep(1000);
     const samples = await sampleAll(viewers);
+    trace.push(samples.map((s) => s && `${s.state}/${s.health} ${(s.time - s.expected).toFixed(2)}`).join(' | '));
     if (samples.every((s) => s && s.state === 'playing')) drifts.push(pairwiseDrift(samples) * 1000);
   }
+  if (!drifts.length || Math.max(...drifts) >= 400) console.log(trace.join('\n'));
   return { n: drifts.length, p50: Math.round(percentile(drifts, 0.5)), p95: Math.round(percentile(drifts, 0.95)), max: Math.round(percentile(drifts, 1)) };
 };
 
@@ -434,6 +437,26 @@ const waitPlaying = async (viewers, timeout = 15000) => {
     await resume.click();
     check('youtube: resuming from there starts everyone', await waitPlaying([a, b, late], 20000), '');
     await late.context.close();
+
+    // A slow start holds this viewer back as it joins, so its first seek lands late.
+    // It must catch the room by itself, soon, and without dragging the room back.
+    const slow = await viewer('slow');
+    let delayed = 0;
+    await slow.context.route('**/videoplayback*', async (route) => {
+      delayed += 1;
+      if (delayed <= 4) await sleep(2500);
+      await route.continue().catch(() => {});
+    });
+    await sleep(3000);
+    await join(slow, room.url);
+    const slowPlays = await waitPlaying([slow], 30000);
+    check('youtube: a slow joiner plays', slowPlays, JSON.stringify(await sampleAll([slow])));
+    await sleep(2000);
+    report.youtubeSlowJoin = await measure([a, slow], 6);
+    // The median, because a viewer can stall again. It must not stay behind.
+    const { n, p50 } = report.youtubeSlowJoin;
+    check('youtube: a slow joiner is with the room within 2s', n > 0 && p50 < 400, JSON.stringify(report.youtubeSlowJoin));
+    await slow.context.close();
   }
   await a.page.screenshot({ path: `${OUT}/room-youtube.png` });
   report.youtubeErrors = [...new Set([...a.errors, ...b.errors])].slice(0, 5);

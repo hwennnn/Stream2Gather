@@ -34,8 +34,20 @@ const NUDGE_AHEAD_MAX_S = 2;
 const NUDGE_BEHIND_MAX_S = 3;
 const CATCH_UP_RATE = 1.25;
 const FINE_RATE_DELTA = 0.05;
-const SEEK_SETTLE_S = 0.25;
+/**
+ * How far past the room a seek aims, to land on it once it has taken its time.
+ * A file seeks at once. YouTube rebuffers. It then learns from where seeks land.
+ */
+const SEEK_LEAD_S = { fine: 0.05, discrete: 0.25, none: 0.25 };
+const SEEK_LEAD_MAX_S = 1.5;
+/** Between corrective seeks, so a slow connection doesn't seek forever. A room's command doesn't count. */
 const SEEK_COOLDOWN_MS = 10_000;
+/** A player back from buffering has already stopped, so a jump costs nothing a nudge would save. */
+const STALL_SEEK_S = 0.4;
+/** YouTube can only nudge at 1.25x, which takes four times the gap, so past this it jumps. */
+const JUMP_BEHIND_S = 1;
+/** A jump that lasted this long worked, so the next stall is a new problem, not the same one. */
+const SEEK_HELD_MS = 3000;
 /**
  * How long a player we just moved, or a viewer's command the room has not
  * answered, is left alone before being corrected. It only ever delays a
@@ -76,6 +88,11 @@ export class SyncController {
   private playback: Playback | null = null;
   private settleFrom = -Infinity;
   private lastSeekAt = -Infinity;
+  private learnedLead: number | null = null;
+  /** A corrective seek made while running, whose landing says how far off the lead was. */
+  private measuringSeek = false;
+  private onRoomSince: number | null = null;
+  private retriedJump = false;
   private lastTickAt = 0;
   /**
    * Where the player last was at a tick, running or resting on the room's paused
@@ -83,7 +100,9 @@ export class SyncController {
    * else is a jump. Buffering leaves it alone: a seek that passes through
    * buffering is still measured from where the player left.
    */
-  private anchor: { time: number; at: number; buffered: boolean } | null = null;
+  private anchor: { time: number; at: number } | null = null;
+  /** The player has not run since it last buffered, or at all. */
+  private wasBuffering = true;
   /** Where we sent the player, until it is seen arriving. Seeks can land late. */
   private pendingSeek: number | null = null;
   /**
@@ -122,6 +141,7 @@ export class SyncController {
     if (!resync && previous && samePlayback(previous, playback)) return;
     this.playback = playback;
     this.asked = null;
+    this.measuringSeek = false;
     if (this.held && playback.status === 'playing') {
       // Someone else moved the room first. This viewer's pause still stands.
       this.endHold();
@@ -208,7 +228,7 @@ export class SyncController {
     if (state === 'buffering' || state === 'loading') {
       this.report({ health: 'buffering', drift });
       this.lastTickAt = now;
-      if (this.anchor) this.anchor.buffered = true;
+      this.wasBuffering = true;
       return;
     }
 
@@ -225,6 +245,7 @@ export class SyncController {
     }
 
     if (!landed && state === 'playing') this.detectUserSeek(playback, time, now, expected);
+    if (state === 'playing') this.learnSeekLead(drift);
     this.correct(drift, expected, now);
     if (state === 'playing') this.remember(time, now);
     else this.lastTickAt = now;
@@ -248,7 +269,8 @@ export class SyncController {
 
   private remember(time: number, now: number): void {
     this.lastTickAt = now;
-    this.anchor = { time, at: now, buffered: false };
+    this.anchor = { time, at: now };
+    this.wasBuffering = false;
   }
 
   /**
@@ -260,6 +282,7 @@ export class SyncController {
   private detectUserSeek(playback: Playback, time: number, now: number, expected: number): void {
     if (!this.jumped(playback, time, now) || Math.abs(time - expected) <= USER_SEEK_THRESHOLD_S) return;
     this.pendingSeek = null;
+    this.measuringSeek = false;
     this.markAction();
     this.emit({ type: 'seek', pos: time, ct: now });
     this.remember(time, now);
@@ -268,7 +291,7 @@ export class SyncController {
   private jumped(playback: Playback, time: number, now: number): boolean {
     if (!this.anchor || now - this.lastTickAt > MAX_TICK_GAP_MS) return false;
     const elapsed = ((now - this.anchor.at) / 1000) * playback.rate;
-    const margin = this.anchor.buffered ? USER_SEEK_BUFFERED_S : USER_SEEK_THRESHOLD_S;
+    const margin = this.wasBuffering ? USER_SEEK_BUFFERED_S : USER_SEEK_THRESHOLD_S;
     return time < this.anchor.time - margin || time > this.anchor.time + elapsed + margin;
   }
 
@@ -301,18 +324,28 @@ export class SyncController {
 
   private correct(drift: number, expected: number, now: number): void {
     const size = Math.abs(drift);
+    this.noteHeld(size, now);
     if (size < DRIFT_OK_S) {
       this.report({ health: 'synced', drift });
       return;
     }
     this.report({ health: 'correcting', drift });
-    if (this.nudging || this.settling(now)) return;
-
     const ahead = drift > 0;
-    if (size > (ahead ? NUDGE_AHEAD_MAX_S : NUDGE_BEHIND_MAX_S)) {
-      if (now - this.lastSeekAt >= SEEK_COOLDOWN_MS) this.act(() => this.seekTo(expected));
+    const mayJump = !this.settling(now) && now - this.lastSeekAt >= SEEK_COOLDOWN_MS;
+    if (this.wasBuffering && !ahead && size >= STALL_SEEK_S && mayJump) {
+      this.cancelNudge();
+      this.jumpToRoom(expected, now);
       return;
     }
+    if (this.nudging || this.settling(now)) return;
+
+    const nudgeMax = ahead ? NUDGE_AHEAD_MAX_S : NUDGE_BEHIND_MAX_S;
+    const jumpFrom = !ahead && this.player.rates === 'discrete' ? JUMP_BEHIND_S : nudgeMax;
+    if (size > jumpFrom && mayJump) {
+      this.jumpToRoom(expected, now);
+      return;
+    }
+    if (size > nudgeMax) return;
 
     if (this.player.rates === 'fine') {
       const rate = this.playback?.rate ?? 1;
@@ -322,6 +355,17 @@ export class SyncController {
     } else {
       this.nudgeRate(CATCH_UP_RATE, size / (CATCH_UP_RATE - 1));
     }
+  }
+
+  private noteHeld(size: number, now: number): void {
+    if (size >= DRIFT_OK_S) {
+      this.onRoomSince = null;
+      return;
+    }
+    this.onRoomSince ??= now;
+    if (now - this.onRoomSince < SEEK_HELD_MS) return;
+    this.lastSeekAt = -Infinity;
+    this.retriedJump = false;
   }
 
   private nudgeRate(rate: number, seconds: number): void {
@@ -354,9 +398,30 @@ export class SyncController {
     this.startTimer = null;
   }
 
+  private jumpToRoom(expected: number, now: number): void {
+    this.lastSeekAt = now;
+    this.measuringSeek = this.player.state() === 'playing';
+    this.act(() => this.seekTo(expected));
+  }
+
   private seekTo(expected: number): void {
-    this.lastSeekAt = this.clock.now();
-    this.seekPlayer(expected + SEEK_SETTLE_S);
+    this.seekPlayer(expected + this.seekLead());
+  }
+
+  private seekLead(): number {
+    return this.learnedLead ?? SEEK_LEAD_S[this.player.rates];
+  }
+
+  /** Landing behind means the seek took longer than the lead allowed, and ahead the reverse. */
+  private learnSeekLead(drift: number): void {
+    if (!this.measuringSeek || this.pendingSeek !== null) return;
+    this.measuringSeek = false;
+    this.learnedLead = Math.min(SEEK_LEAD_MAX_S, Math.max(0, this.seekLead() - drift));
+    // It fell short for want of that lead, so it gets one more go with it.
+    if (drift <= -STALL_SEEK_S && !this.retriedJump) {
+      this.retriedJump = true;
+      this.lastSeekAt = -Infinity;
+    }
   }
 
   private seekPlayer(seconds: number): void {
@@ -429,6 +494,7 @@ export class SyncController {
       this.emit({ type: 'ended' });
       return;
     }
+    if (state === 'buffering' || state === 'loading') this.wasBuffering = true;
     if (state === 'buffering' && this.expecting === 'playing') {
       this.expecting = null; // It has left paused, so a pause from here is the viewer's.
       return;
@@ -452,7 +518,9 @@ export class SyncController {
       this.tellRoom('playing', { type: 'play', pos: time, ct: now });
     } else if (state === 'playing') {
       this.dropHold();
-      if (!this.noteLanding(time)) this.detectUserSeek(playback, time, now, expectedPosition(playback, now));
+      const expected = expectedPosition(playback, now);
+      if (!this.noteLanding(time)) this.detectUserSeek(playback, time, now, expected);
+      if (this.wasBuffering) this.correct(time - expected, expected, now);
     }
   }
 

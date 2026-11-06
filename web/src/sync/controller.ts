@@ -1,4 +1,4 @@
-import type { PlayerAdapter, PlayerState } from '../players/types';
+import { notStarted, type PlayerAdapter, type PlayerState } from '../players/types';
 
 export type Playback = {
   item: string;
@@ -134,6 +134,10 @@ export class SyncController {
 
     if (playback.status === 'paused') {
       this.act(() => {
+        if (notStarted(this.player.state())) {
+          this.player.cue(playback.pos);
+          return;
+        }
         this.pausePlayer();
         if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.seekPlayer(playback.pos);
       });
@@ -360,9 +364,10 @@ export class SyncController {
     this.player.seek(seconds);
   }
 
-  /** A paused player that is told to pause again says nothing, so nothing is expected. */
+  /** Only a running player answers a pause. Waiting on any other would swallow the viewer's next click. */
   private pausePlayer(): void {
-    if (this.player.state() !== 'paused' || this.expecting) this.expecting = 'paused';
+    const state = this.player.state();
+    if (state === 'playing' || state === 'buffering' || this.expecting) this.expecting = 'paused';
     this.player.pause();
   }
 

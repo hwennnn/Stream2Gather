@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { watchAutoplay } from '../players/autoplay';
 import { createPlayer } from '../players/registry';
-import type { PlayerAdapter, PlayerError } from '../players/types';
+import { notStarted, type PlayerAdapter, type PlayerError } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { expectedPosition, SyncController, type SyncReport } from '../sync/controller';
@@ -25,6 +25,7 @@ type Events = {
   onFailure: (error: PlayerError) => void;
   onReport: (report: SyncReport) => void;
   onMuted: (muted: boolean) => void;
+  onCold: (cold: boolean) => void;
 };
 
 type Cleanup = () => void;
@@ -99,9 +100,13 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
   session.onPlayback((playback, resync) => sync.apply(playback, resync));
   sync.apply(session.getView().playback);
 
+  const noteCold = () => events.onCold(session.getView().playback.status === 'paused' && notStarted(player.state()));
+  noteCold();
+
   const timer = window.setInterval(() => {
     sync.tick();
     events.onMuted(player.muted());
+    noteCold();
     const playback = session.getView().playback;
     if (playback.status === 'playing') {
       const drift = player.time() - expectedPosition(playback, session.clock.now());
@@ -149,8 +154,9 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
 
   const timeout = window.setTimeout(() => fail({ kind: 'network', code: 0 }), LOAD_TIMEOUT_MS);
 
-  const startAt = expectedPosition(session.getView().playback, session.clock.now());
-  createPlayer(mount, item, startAt).then(
+  const { playback } = session.getView();
+  const startAt = expectedPosition(playback, session.clock.now());
+  createPlayer(mount, item, startAt, playback.status === 'playing').then(
     (created) => {
       if (gone) {
         created.destroy();
@@ -181,6 +187,8 @@ export type RoomPlayer = {
   ready: boolean;
   failure: PlayerError | null;
   muted: boolean;
+  /** The room is paused and this player has not started, so it has no frame or controls yet. */
+  cold: boolean;
   unmute: () => void;
 };
 
@@ -191,6 +199,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   const [readyId, setReadyId] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ id: string; error: PlayerError } | null>(null);
   const [muted, setMuted] = useState(false);
+  const [cold, setCold] = useState(false);
   const player = useRef<PlayerAdapter | null>(null);
 
   const current = view.queue[0];
@@ -200,6 +209,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     if (!stage.current || !current || !currentId) return undefined;
     setReport({ health: 'waiting', drift: 0 });
     setMuted(false);
+    setCold(false);
     return mountPlayer(stage.current, session, current, {
       onPlayer: (next) => {
         player.current = next;
@@ -208,6 +218,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
       onFailure: (error) => setFailed({ id: currentId, error }),
       onReport: setReport,
       onMuted: setMuted,
+      onCold: setCold,
     });
     // A new queue item is the only thing that replaces the player.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,6 +231,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     ready: readyId === currentId,
     failure: failed && failed.id === currentId ? failed.error : null,
     muted,
+    cold,
     unmute: () => {
       player.current?.setMuted(false);
       setMuted(false);

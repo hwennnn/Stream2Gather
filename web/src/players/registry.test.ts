@@ -10,10 +10,10 @@ describe('createPlayer', () => {
   const element = {} as HTMLElement;
 
   it('gives YouTube the video id and everything else the url', () => {
-    void createPlayer(element, { source: 'youtube', sourceId: 'abc', url: 'https://youtu.be/abc' }, 5);
-    expect(createYouTubePlayer).toHaveBeenCalledWith(element, 'abc', 5);
+    void createPlayer(element, { source: 'youtube', sourceId: 'abc', url: 'https://youtu.be/abc' }, 5, false);
+    expect(createYouTubePlayer).toHaveBeenCalledWith(element, 'abc', 5, false);
 
-    void createPlayer(element, { source: 'direct', sourceId: 'x', url: 'https://a.test/a.mp4' }, 5);
+    void createPlayer(element, { source: 'direct', sourceId: 'x', url: 'https://a.test/a.mp4' }, 5, true);
     expect(createHtml5Player).toHaveBeenCalledWith(element, 'https://a.test/a.mp4', 5);
   });
 });

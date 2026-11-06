@@ -419,6 +419,21 @@ const waitPlaying = async (viewers, timeout = 15000) => {
     await sleep(5000);
     report.youtubeSteady = await measure([a, b], 20);
     check('youtube drift under 400ms p95', report.youtubeSteady.p95 < 400, JSON.stringify(report.youtubeSteady));
+
+    // Someone arriving in a paused room gets the video cued where the room stopped.
+    const box = await a.page.locator('[data-player] iframe').boundingBox();
+    await a.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    check('youtube: a click pauses everyone', await waitFor(() => allInState([a, b], 'paused'), 4000), '');
+    const late = await viewer('late');
+    await join(late, room.url);
+    const cued = await waitFor(() => allInState([late], 'ready'), 20000);
+    const [host, joined] = await sampleAll([a, late]);
+    check('youtube: a paused room is cued for a joiner', cued && Math.abs(joined.time - host.time) < 1.5, `${joined?.state} at ${joined?.time}, room at ${host.time}`);
+    const resume = late.page.getByRole('button', { name: 'Resume for everyone' });
+    check('youtube: the way out is in the bar, not on the player', await late.page.locator('section[aria-label="Player controls"]').getByRole('button', { name: 'Resume for everyone' }).count() === 1, '');
+    await resume.click();
+    check('youtube: resuming from there starts everyone', await waitPlaying([a, b, late], 20000), '');
+    await late.context.close();
   }
   await a.page.screenshot({ path: `${OUT}/room-youtube.png` });
   report.youtubeErrors = [...new Set([...a.errors, ...b.errors])].slice(0, 5);

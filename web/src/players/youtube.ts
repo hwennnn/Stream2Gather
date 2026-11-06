@@ -64,6 +64,7 @@ export const createYouTubePlayer = async (
   element: HTMLElement,
   videoId: string,
   startAt: number,
+  autoplay: boolean,
 ): Promise<PlayerAdapter> => {
   await loadApi();
 
@@ -81,7 +82,7 @@ export const createYouTubePlayer = async (
       videoId,
       host: 'https://www.youtube-nocookie.com',
       playerVars: {
-        autoplay: 1,
+        autoplay: autoplay ? 1 : 0,
         playsinline: 1,
         rel: 0,
         start: Math.floor(startAt),
@@ -108,6 +109,7 @@ export const createYouTubePlayer = async (
     play: () => player.playVideo?.(),
     pause: () => player.pauseVideo?.(),
     seek: (seconds) => player.seekTo?.(seconds, true),
+    cue: (seconds) => player.cueVideoById?.(videoId, seconds),
     setRate: (rate) => player.setPlaybackRate?.(rate),
     time: () => player.getCurrentTime?.() ?? 0,
     state: () => state,

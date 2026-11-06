@@ -62,7 +62,7 @@ describe('an error raised before ready', () => {
     vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
     vi.stubGlobal('document', { createElement: () => ({}) });
 
-    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0);
+    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0, true);
     const seen: PlayerError[] = [];
     player.onError((error) => seen.push(error));
     expect(seen).toEqual([{ kind: 'embed_blocked', code: 150 }]);
@@ -85,7 +85,7 @@ describe('volume', () => {
     vi.stubGlobal('YT', YT);
     vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
     vi.stubGlobal('document', { createElement: () => ({}) });
-    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0);
+    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0, true);
     return { player, setVolume };
   };
 
@@ -99,6 +99,63 @@ describe('volume', () => {
   it('says so when a player cannot report its volume', async () => {
     const { player } = await mount();
     expect(player.volume()).toBeNull();
+  });
+});
+
+describe('createErrorChannel', () => {
+  it('passes errors straight through once someone listens', () => {
+    const channel = createErrorChannel();
+    const seen: number[] = [];
+    channel.listen((error) => seen.push(error.code));
+    channel.report({ kind: 'network', code: 1 });
+    channel.report({ kind: 'network', code: 2 });
+    expect(seen).toEqual([1, 2]);
+  });
+
+  it('delivers an early error once', () => {
+    const channel = createErrorChannel();
+    channel.report({ kind: 'unknown', code: 5 });
+    const seen: number[] = [];
+    channel.listen((error) => seen.push(error.code));
+    channel.listen((error) => seen.push(error.code));
+    expect(seen).toEqual([5]);
+  });
+});
+
+describe('a player mounted in a paused room', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const mount = async (autoplay: boolean) => {
+    type Options = { playerVars: { autoplay: number; start: number }; events: { onReady: () => void } };
+    const cued: unknown[][] = [];
+    let vars: Options['playerVars'] | undefined;
+    class FakePlayer {
+      cueVideoById = (...args: unknown[]) => cued.push(args);
+      constructor(_target: unknown, options: Options) {
+        vars = options.playerVars;
+        queueMicrotask(() => options.events.onReady());
+      }
+    }
+    const YT = { Player: FakePlayer };
+    vi.stubGlobal('YT', YT);
+    vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
+    vi.stubGlobal('document', { createElement: () => ({}) });
+    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 724.6, autoplay);
+    return { player, cued, vars };
+  };
+
+  it('does not start by itself', async () => {
+    expect((await mount(false)).vars).toMatchObject({ autoplay: 0, start: 724 });
+  });
+
+  it('starts by itself in a playing room', async () => {
+    expect((await mount(true)).vars).toMatchObject({ autoplay: 1 });
+  });
+
+  it('cues the video at the exact position', async () => {
+    const { player, cued } = await mount(false);
+    player.cue(724.6);
+    expect(cued).toEqual([['abc', 724.6]]);
   });
 });
 

@@ -82,10 +82,26 @@ func TestMediaIsNotCompressed(t *testing.T) {
 	}
 }
 
-func TestUnknownPathsFallBackToTheApp(t *testing.T) {
-	response := get(staticServer(t), "/some/page", "")
-	if !strings.Contains(response.Body.String(), "app") {
-		t.Fatalf("body = %q", response.Body.String())
+func TestAppPathsFallBackToTheApp(t *testing.T) {
+	s := staticServer(t)
+	for _, path := range []string{"/", "/r/abc", "/r/abc/catchup/12", "/r/", "/s/token"} {
+		response := get(s, path, "")
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "app") {
+			t.Fatalf("%s: code = %d, body = %q", path, response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestUnknownPathsGetTheAppWithA404(t *testing.T) {
+	s := staticServer(t)
+	for _, path := range []string{"/no/such/page", "/about", "/assets/gone.js"} {
+		response := get(s, path, "gzip")
+		if response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), "app") {
+			t.Fatalf("%s: code = %d, body = %q", path, response.Code, response.Body.String())
+		}
+		if got := response.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/html") {
+			t.Fatalf("%s: type = %q", path, got)
+		}
 	}
 }
 

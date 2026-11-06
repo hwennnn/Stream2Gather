@@ -26,6 +26,7 @@ export const ENDINGS = {
   missing: { title: 'This room doesn’t exist.', body: 'The link may be wrong. Check it with whoever sent it.' },
   closed: { title: 'This room’s night is over.', body: 'Start a new one and send the link round.', past: true },
   unreachable: { title: 'Can’t reach this room.', body: 'Check your connection, then try again.' },
+  page: { title: 'This page doesn’t exist.', body: 'The link may be wrong. Check it, or start from the home page.' },
 } as const;
 
 export const closedRoom = (people: Seated[]): Ending => {
@@ -58,7 +59,7 @@ const SeatRow = ({ people, past }: { people: Seated[]; past?: boolean }) => (
 );
 
 /** Every way a room can be out of reach ends here, with a way forward. */
-export const DeadEnd = ({ title, body, people = [], past = false, full = false, onRetry }: Ending & { onRetry?: () => void }) => {
+export const DeadEnd = ({ title, body, people = [], past = false, full = false, home = false, onRetry }: Ending & { onRetry?: () => void; home?: boolean }) => {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -98,7 +99,12 @@ export const DeadEnd = ({ title, body, people = [], past = false, full = false, 
             Check for a seat
           </button>
         )}
-        {!onRetry && !full && (
+        {home && (
+          <a href="/" className="btn btn-primary">
+            Go home
+          </a>
+        )}
+        {!onRetry && !full && !home && (
           <button type="button" disabled={busy} onClick={() => void start()} className="btn btn-primary">
             {busy ? 'Opening…' : 'Start a new room'}
           </button>

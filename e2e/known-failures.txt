@@ -2,6 +2,6 @@
 # pattern is matched against "flow: failure". A known failure still prints and
 # still counts as failed. It only stops the run going red, so a new bug can't
 # hide among old ones. Fix the bug, delete its line.
+# P-01 stays on purpose: a seek before the controller's first tick is dropped, so a joiner's player reporting 0 can't move the room.
 P-01 | a seek in the first moment after joining
-P-02 | a page that does not exist
 L-09 | with the Undo notice: every control can be reached: Add to queue is under

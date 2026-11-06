@@ -36,7 +36,29 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Cache-Control", "no-cache")
+	if !appPath(clean) {
+		s.missingPage(w, index)
+		return
+	}
 	s.serveFile(w, r, index, info)
+}
+
+// appPath reports whether the app has a page at this path. It keeps to routeFor in web/src/routes/router.ts.
+func appPath(clean string) bool {
+	first, _, _ := strings.Cut(strings.TrimPrefix(clean, "/"), "/")
+	return first == "" || first == "r" || first == "s"
+}
+
+// missingPage is the app, which draws its own not-found page, under a status that says so.
+func (s *Server) missingPage(w http.ResponseWriter, index string) {
+	page, err := os.ReadFile(index)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	_, _ = w.Write(page)
 }
 
 var compressible = map[string]bool{".html": true, ".js": true, ".css": true, ".svg": true}

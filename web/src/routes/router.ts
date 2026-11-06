@@ -9,14 +9,18 @@ export const loadRoomPage = () => import('./RoomPage');
 
 export type Route =
   | { page: 'landing' }
+  | { page: 'missing' }
   | { page: 'room'; slug: string }
   | { page: 'catchup'; slug: string; itemId: string }
   | { page: 'recap'; token: string };
 
+/** A cut-off room or recap link still lands somewhere useful. The server's appPath keeps to this. */
+const LANDING = new Set(['', 'r', 's', 'index.html']);
+
 export const routeFor = (path: string): Route => {
-  const [, kind, id, section, itemId] = path.split('/');
+  const [, kind = '', id, section, itemId] = path.split('/');
   if (kind === 's' && id) return { page: 'recap', token: id };
-  if (kind !== 'r' || !id) return { page: 'landing' };
+  if (kind !== 'r' || !id) return LANDING.has(kind) ? { page: 'landing' } : { page: 'missing' };
   return section === 'catchup' && itemId ? { page: 'catchup', slug: id, itemId } : { page: 'room', slug: id };
 };
 

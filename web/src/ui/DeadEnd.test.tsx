@@ -10,6 +10,12 @@ afterEach(cleanup);
 const member = (index: number) => ({ userId: `u${index}`, name: `Person ${index}`, role: 'member' as const });
 
 describe('DeadEnd', () => {
+  it('sends someone on a page that doesn’t exist home, and nowhere else', () => {
+    render(<DeadEnd {...ENDINGS.page} home />);
+    expect(screen.getByRole('link', { name: 'Go home' }).getAttribute('href')).toBe('/');
+    expect(screen.queryByRole('button', { name: 'Start a new room' })).toBeNull();
+  });
+
   it('shows a full room its seats, names the host, and offers no new room', () => {
     const people = [{ userId: 'h', name: 'Maya Lin', role: 'host' as const }, ...Array.from({ length: 49 }, (_, index) => member(index))];
     render(<DeadEnd {...fullRoom(people)} />);

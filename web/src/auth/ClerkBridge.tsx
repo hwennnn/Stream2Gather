@@ -5,14 +5,14 @@ import { account } from './account';
 // Matches the tokens in index.css.
 const appearance = {
   variables: {
-    colorPrimary: '#8fa8ff',
-    colorPrimaryForeground: '#0b0f1e',
-    colorBackground: '#121730',
-    colorForeground: '#eef1fb',
-    colorMutedForeground: '#a5aecb',
-    colorInput: '#1b2240',
-    colorInputForeground: '#eef1fb',
-    colorNeutral: '#eef1fb',
+    colorPrimary: '#90cef3',
+    colorPrimaryForeground: '#121929',
+    colorBackground: '#191f2b',
+    colorForeground: '#eef1f6',
+    colorMutedForeground: '#a7b0c0',
+    colorInput: '#2a3241',
+    colorInputForeground: '#eef1f6',
+    colorNeutral: '#eef1f6',
     fontFamily: "'Geist Variable', ui-sans-serif, system-ui, sans-serif",
     borderRadius: '0.75rem',
   },

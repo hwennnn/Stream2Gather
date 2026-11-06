@@ -687,7 +687,7 @@ body {
 }
 
 .seat-empty {
-  border: 1px dashed #55534f;
+  border: 1px dashed var(--color-dim);
   color: var(--color-muted);
 }
 
@@ -1075,7 +1075,7 @@ body {
   padding-inline: 0.375rem;
   overflow: hidden;
   border-radius: 999px;
-  background: rgb(11 15 30 / 0.78);
+  background: rgb(23 26 35 / 0.78);
   font-size: 0.6875rem;
   font-weight: 600;
   line-height: 1.125rem;

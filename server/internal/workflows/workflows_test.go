@@ -56,6 +56,8 @@ type fakeSessions struct {
 	cohort, returned int64
 }
 
+func (f *fakeSessions) CatchupPerSession(context.Context) (float64, error) { return 1.5, nil }
+
 func (f *fakeSessions) UnbuiltSessions(context.Context, int) ([]string, error) {
 	unbuilt := []string{}
 	for id := range f.ended {
@@ -158,7 +160,7 @@ func TestMaintenanceReportsTheBacklogAndPurgesSearches(t *testing.T) {
 	if summary.Backlog != 12 || summary.SearchesPurged != 7 {
 		t.Fatalf("summary = %+v", summary)
 	}
-	if len(metrics.events) != 1 || metrics.events[0].Name != "media_stale_backlog" || metrics.events[0].Value != 12 {
+	if metrics.events[0].Name != "media_stale_backlog" || metrics.events[0].Value != 12 {
 		t.Fatalf("metrics = %+v", metrics.events)
 	}
 }
@@ -248,15 +250,18 @@ func TestTheHeadlineMetricIsAShareAndStaysQuietWithNoCohort(t *testing.T) {
 	metrics := &fakeMetrics{}
 	sessions := &fakeSessions{}
 	activities := &Activities{Sessions: sessions, Metrics: metrics}
-	if err := activities.MeasureCrews(context.Background()); err != nil || len(metrics.events) != 0 {
+	if err := activities.MeasureCrews(context.Background()); err != nil || len(metrics.events) != 1 {
 		t.Fatalf("no cohort: %v %v", err, metrics.events)
+	}
+	if metrics.events[0].Name != "moments_catchup_per_session" || metrics.events[0].Value != 1.5 {
+		t.Fatalf("%+v", metrics.events)
 	}
 
 	sessions.cohort, sessions.returned = 4, 1
 	if err := activities.MeasureCrews(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(metrics.events) != 1 || metrics.events[0].Name != "crew_second_session_14d" || metrics.events[0].Value != 0.25 {
+	if last := metrics.events[len(metrics.events)-1]; last.Name != "crew_second_session_14d" || last.Value != 0.25 {
 		t.Fatalf("%+v", metrics.events)
 	}
 }

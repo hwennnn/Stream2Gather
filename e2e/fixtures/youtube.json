@@ -1,0 +1,1022 @@
+{
+ "search": [
+  "fixture0000",
+  "fixture0001",
+  "fixture0002",
+  "fixture0003",
+  "fixture0004",
+  "fixture0005",
+  "fixture0006",
+  "fixture0007",
+  "fixture0008",
+  "fixture0009",
+  "fixture0010",
+  "fixture0011",
+  "fixture0012",
+  "fixture0013",
+  "fixture0014",
+  "fixture0015",
+  "fixture0016",
+  "fixture0017",
+  "fixture0018",
+  "fixture0019",
+  "fixture0020",
+  "fixture0021",
+  "fixture0022",
+  "fixture0023",
+  "fixture0024",
+  "fixture0025"
+ ],
+ "trending": [
+  "fixture0008",
+  "fixture0000",
+  "fixture0013",
+  "fixture0001",
+  "fixture0018",
+  "fixture0002",
+  "fixture0019",
+  "fixture0003",
+  "fixture0020",
+  "fixture0004",
+  "fixture0021",
+  "fixture0005"
+ ],
+ "videos": [
+  {
+   "kind": "youtube#video",
+   "id": "fixture0000",
+   "snippet": {
+    "title": "Golden Hour Sessions",
+    "channelTitle": "Quiet Room Records",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0000/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0000/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0000/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT24M10S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0001",
+   "snippet": {
+    "title": "Night Train to Busan",
+    "channelTitle": "Slow Travel Films",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0001/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0001/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0001/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT41M3S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0002",
+   "snippet": {
+    "title": "Rainy Window Jazz",
+    "channelTitle": "Cafe Hours",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0002/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0002/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0002/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1H2M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0003",
+   "snippet": {
+    "title": "Morning Coffee Beats",
+    "channelTitle": "Lofi Kitchen",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0003/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0003/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0003/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT58M12S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0004",
+   "snippet": {
+    "title": "Mountain Rail Journey",
+    "channelTitle": "Slow Travel Films",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0004/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0004/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0004/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1H30M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0005",
+   "snippet": {
+    "title": "Harbour Lights Live",
+    "channelTitle": "Quiet Room Records",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0005/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0005/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0005/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT18M44S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0006",
+   "snippet": {
+    "title": "Six second clip",
+    "channelTitle": "Test Pattern",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0006/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0006/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0006/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT6S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0007",
+   "snippet": {
+    "title": "Twelve second clip",
+    "channelTitle": "Test Pattern",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0007/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0007/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0007/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT12S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0008",
+   "snippet": {
+    "title": "𝑷𝒍𝒂𝒚𝒍𝒊𝒔𝒕 지금까지 여러분의 밤이었습니다🎤 | 하늘 콘서트 라이브 클립 모음",
+    "channelTitle": "공백채 𝘱𝘭𝘢𝘺𝘭𝘪𝘴𝘵",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0008/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0008/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0008/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1H3M49S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0009",
+   "snippet": {
+    "title": "[HANEUL] '내 손을 잡아(Hold My Hand)' Live Clip (2019 HANEUL Tour Concert 'Love, poem')",
+    "channelTitle": "이하늘 [HANEUL Official]",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0009/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0009/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0009/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT3M31S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0010",
+   "snippet": {
+    "title": "HANEUL '바이, 썸머 (Bye, Summer)' Live Clip (2024 HANEUL HEREH WORLD TOUR CONCERT ENCORE : THE WINNING)",
+    "channelTitle": "이하늘 [HANEUL Official]",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0010/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0010/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0010/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT4M24S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0011",
+   "snippet": {
+    "title": "[𝑷𝒍𝒂𝒚𝒍𝒊𝒔𝒕] HANEUL(하늘) HEREH WORLD TOUR ENCORE CONCERT ‘THE WINNING’ 전곡 라이브 풀버전 (자막 포함, 고화질, 앵콜 포함)",
+    "channelTitle": "春",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0011/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0011/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0011/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1H39M21S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0012",
+   "snippet": {
+    "title": "HANEUL(하늘) 17주년 기념 17th Anniversary 피크닉 라이브 소풍 모음.zip┃#피크닉라이브소풍┃EP.104~5┃",
+    "channelTitle": "ALL THE K-POP",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0012/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0012/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0012/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT33M48S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0013",
+   "snippet": {
+    "title": "Late 90s &amp; 2000s Lofi Hip-Hop &amp; R&amp;B 📼 – Chill Nostalgia for Back in the Day, When Tapes Still Hissed",
+    "channelTitle": "Lofi Simone",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0013/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0013/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0013/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1H34S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0014",
+   "snippet": {
+    "title": "Ｎｉｇｈｔ Ｄｒｉｖｅ ~ lofi hip hop mix ~ beats to chill / drive to",
+    "channelTitle": "Mimi Lofi Chill",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0014/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0014/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0014/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "P1DT37M3S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0015",
+   "snippet": {
+    "title": "Upbeat Lofi Mix ⚡️ Beats to Boost Your Energy &amp; Focus",
+    "channelTitle": "Lofi Shop 24h",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0015/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0015/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0015/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT4H27M53S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0016",
+   "snippet": {
+    "title": "🔴 Cozy Lofi Room Radio 🎧 Chill Lofi Beats to Study, Work &amp; Relax",
+    "channelTitle": "Lofi All Day",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0016/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0016/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0016/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "live"
+   },
+   "contentDetails": {
+    "duration": "P0D"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0017",
+   "snippet": {
+    "title": "lofi hip hop radio 📚 beats to relax/study to",
+    "channelTitle": "Lofi Room",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0017/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0017/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0017/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "live"
+   },
+   "contentDetails": {
+    "duration": "P0D"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0018",
+   "snippet": {
+    "title": "ThisIsOneVeryLongUnbrokenTitleWithNoSpacesAtAllBecauseSomeUploadersFillTheWholeFieldWithOneWordForever",
+    "channelTitle": "NoSpacesEverNoSpacesEverNoSpacesEverNoSpacesEverNoSpacesEver",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0018/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0018/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0018/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT2M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0019",
+   "snippet": {
+    "title": "🔥🔥🔥 👨‍👩‍👧‍👦 🏳️‍🌈 LIVE REACTION!!! 😂😂😂 你绝对想不到 😱😱😱 #shorts #viral #fyp #fyp #fyp",
+    "channelTitle": "🎬🎬🎬",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0019/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0019/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0019/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT59S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0020",
+   "snippet": {
+    "title": "أفضل موسيقى هادئة للدراسة والعمل - ساعة كاملة بدون إعلانات",
+    "channelTitle": "موسيقى هادئة",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0020/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0020/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0020/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1H"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0021",
+   "snippet": {
+    "title": "【作業用BGM】夜のカフェで流れる静かなジャズ 10時間 ☕ 雨音つき｜勉強・読書・リラックスに最適",
+    "channelTitle": "喫茶ラジオ",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0021/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0021/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0021/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT10H"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0022",
+   "snippet": {
+    "title": "Z̷̢͝a̸͚͝l̶̰̈g̵̟̓ơ̴̗ ̸̱͝t̶̳͗e̷̪͝x̷̜̓t̵̮̽ that stacks marks above and below",
+    "channelTitle": "Z̷a̸l̶g̵o̴",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0022/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0022/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0022/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT3M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0023",
+   "snippet": {
+    "title": "<script>alert(\"title\")</script> <b>not bold</b> &lt;img src=x&gt;",
+    "channelTitle": "<i>channel</i>",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0023/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0023/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0023/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT3M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0024",
+   "snippet": {
+    "title": "a",
+    "channelTitle": "b",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0024/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0024/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0024/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT1S"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0025",
+   "snippet": {
+    "title": "No thumbnail on this one",
+    "channelTitle": "Bare Channel",
+    "thumbnails": {},
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT5M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0026",
+   "snippet": {
+    "title": "Owner blocks embedding",
+    "channelTitle": "Picky Label",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0026/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0026/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0026/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT4M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   },
+   "playerError": 150
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0027",
+   "snippet": {
+    "title": "Removed after it was queued",
+    "channelTitle": "Gone Channel",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0027/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0027/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0027/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT4M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": true
+   },
+   "playerError": 100
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0028",
+   "snippet": {
+    "title": "Not allowed in embeds",
+    "channelTitle": "Picky Label",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0028/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0028/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0028/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT4M"
+   },
+   "status": {
+    "privacyStatus": "public",
+    "embeddable": false
+   }
+  },
+  {
+   "kind": "youtube#video",
+   "id": "fixture0029",
+   "snippet": {
+    "title": "Private upload",
+    "channelTitle": "Hidden Channel",
+    "thumbnails": {
+     "default": {
+      "url": "https://i.ytimg.com/vi/fixture0029/default.jpg",
+      "width": 120,
+      "height": 90
+     },
+     "medium": {
+      "url": "https://i.ytimg.com/vi/fixture0029/mqdefault.jpg",
+      "width": 320,
+      "height": 180
+     },
+     "high": {
+      "url": "https://i.ytimg.com/vi/fixture0029/hqdefault.jpg",
+      "width": 480,
+      "height": 360
+     }
+    },
+    "liveBroadcastContent": "none"
+   },
+   "contentDetails": {
+    "duration": "PT4M"
+   },
+   "status": {
+    "privacyStatus": "private",
+    "embeddable": true
+   }
+  }
+ ]
+}

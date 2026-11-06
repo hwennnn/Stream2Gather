@@ -436,9 +436,9 @@ describe('RoomSession', () => {
   });
 
   describe('connection state', () => {
-    const refusing = (status: number, headers: Record<string, string> = {}) => {
+    const refusing = (status: number, headers: Record<string, string> = {}, code = 'rate_limited') => {
       const replies = [
-        new Response(JSON.stringify({ code: 'rate_limited', message: 'Wait.' }), { status, headers }),
+        new Response(JSON.stringify({ code, message: 'Wait.' }), { status, headers }),
       ];
       vi.stubGlobal('fetch', async () => replies.shift() ?? new Response(JSON.stringify({ ticket: 't', items: [] })));
     };
@@ -453,6 +453,15 @@ describe('RoomSession', () => {
       expect(FakeSocket.opened).toBe(0);
       await vi.advanceTimersByTimeAsync(2700);
       expect(FakeSocket.opened).toBe(1);
+      session.close();
+    });
+
+    it('tells someone the session limit stopped them, since waiting a moment will not help', async () => {
+      refusing(429, {}, 'session_limit');
+      const session = new RoomSession('slug');
+      await session.connect();
+      expect(session.getView().connection).toBe('failed');
+      expect(session.getView().failure).toBe('Wait.');
       session.close();
     });
 

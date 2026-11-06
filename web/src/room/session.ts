@@ -598,7 +598,9 @@ export class RoomSession {
     );
   }
 
-  private notice(data: { text: string; url?: string }): void {
+  private notice(data: { kind?: string; text: string; url?: string }): void {
+    // These change the room, so the chat keeps the same words the toast shows.
+    if (data.kind === 'host' || data.kind === 'skipped') this.say(data.text);
     const id = this.nextId++;
     this.update({ notices: [...this.view.notices, { id, ...data }] });
     window.setTimeout(

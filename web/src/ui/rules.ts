@@ -29,6 +29,16 @@ export const chatScroll = (stuck: boolean, fresh: boolean, mine: boolean): 'bott
   return fresh ? 'flag' : 'stay';
 };
 
+/** Mirrors the server, which moves the room on once most viewers can't play the video. */
+export const failureNote = (view: RoomView): string => {
+  const selfId = view.self?.userId;
+  const failing = view.members.filter(
+    ({ userId }) => userId === selfId || view.viewerStates[userId] === 'unavailable',
+  ).length;
+  if (failing * 2 > view.members.length) return 'Skipping.';
+  return view.alone ? '' : 'Others are still watching.';
+};
+
 export type Pill = { text: string; tone: 'good' | 'calm' | 'warn' | 'bad' };
 
 /** What the sync pill says. Only the room's own words: no milliseconds, no jargon. */

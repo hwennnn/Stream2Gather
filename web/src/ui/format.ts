@@ -1,21 +1,18 @@
+/** One muted hue per person, the same in every room. Light enough to read as a name, and to carry dark initials. */
+export const AVATAR_COLORS = ['#e0a884', '#d8bb6c', '#a9c47c', '#79c4a6', '#72bdd0', '#93b1e6', '#c0a6e2', '#e2a2bb', '#e8908a', '#c8c864', '#8fce8f', '#d6a2dc'];
+
+export const avatarColor = (id: string): string => {
+  let hash = 0;
+  for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? '#93b1e6';
+};
+
 export const formatTime = (seconds: number): string => {
   const total = Math.max(0, Math.floor(seconds));
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const rest = String(total % 60).padStart(2, '0');
   return hours > 0 ? `${hours}:${String(minutes).padStart(2, '0')}:${rest}` : `${minutes}:${rest}`;
-};
-
-/** Bright enough to read as a name on the panel, and to carry dark initials. */
-export const AVATAR_COLORS = [
-  '#8fa8ff', '#7dd3fc', '#a78bfa', '#5eead4', '#f0abfc', '#fcd34d',
-  '#fb7185', '#86efac', '#fdba74', '#bef264', '#f9a8d4', '#a0f08c',
-];
-
-export const avatarColor = (id: string): string => {
-  let hash = 0;
-  for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? '#8fa8ff';
 };
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });

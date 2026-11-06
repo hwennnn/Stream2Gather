@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"sync"
 	"testing"
@@ -93,6 +94,61 @@ func TestOwnerLimitHoldsUnderParallelCreates(t *testing.T) {
 	}
 	if counts[http.StatusCreated] != store.MaxOwnedCrews || counts[http.StatusConflict] != 6 {
 		t.Fatalf("codes = %v", counts)
+	}
+}
+
+func TestPromotionKeepsTheAddressAndOnlyTheOwnerCanDoIt(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	owner, as := signUp(t, s, "Hana")
+	record := store.Room{ID: ids.New(), Slug: ids.Slug(), Name: "Room", OwnerID: owner.Subject}
+	if err := s.DB.CreateRoom(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	path := "/v1/rooms/" + record.Slug + "/crew"
+
+	_, stranger := signUp(t, s, "Stranger")
+	if response, _ := serve(s, http.MethodPost, path, "", stranger); response.Code != http.StatusForbidden {
+		t.Fatalf("stranger: %d", response.Code)
+	}
+	first, body := serve(s, http.MethodPost, path, "", as)
+	if first.Code != http.StatusOK || body["slug"] != record.Slug {
+		t.Fatalf("promote: %d %s", first.Code, first.Body)
+	}
+	again, repeat := serve(s, http.MethodPost, path, "", as)
+	if again.Code != http.StatusOK || repeat["inviteToken"] != body["inviteToken"] {
+		t.Fatalf("promoting twice must be harmless: %d %s", again.Code, again.Body)
+	}
+	var temporary, expires bool
+	err := pool.QueryRow(ctx, `SELECT is_temporary, expires_at IS NOT NULL FROM rooms WHERE id = $1`, record.ID).Scan(&temporary, &expires)
+	if err != nil || temporary || expires {
+		t.Fatalf("temporary = %v, expires = %v, err = %v", temporary, expires, err)
+	}
+	if err := s.DB.SaveSnapshot(ctx, record.ID, room.New()); err != nil {
+		t.Fatal(err)
+	}
+	err = pool.QueryRow(ctx, `SELECT expires_at IS NOT NULL FROM rooms WHERE id = $1`, record.ID).Scan(&expires)
+	if err != nil || expires {
+		t.Fatalf("a snapshot gave the kept room an expiry again: %v, %v", expires, err)
+	}
+}
+
+func TestPromotionLosesToAClosedRoom(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	owner, as := signUp(t, s, "Hana")
+	record := store.Room{ID: ids.New(), Slug: ids.Slug(), Name: "Room", OwnerID: owner.Subject}
+	if err := s.DB.CreateRoom(ctx, record); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `UPDATE rooms SET closed_at = now() WHERE id = $1`, record.ID); err != nil {
+		t.Fatal(err)
+	}
+	if response, _ := serve(s, http.MethodPost, "/v1/rooms/"+record.Slug+"/crew", "", as); response.Code != http.StatusGone {
+		t.Fatalf("closed room: %d", response.Code)
+	}
+	if err := s.DB.PromoteRoom(ctx, record, store.Crew{ID: ids.New(), InviteToken: ids.New()}); !errors.Is(err, store.ErrRoomClosed) {
+		t.Fatalf("losing the race to expiry: %v", err)
 	}
 }
 

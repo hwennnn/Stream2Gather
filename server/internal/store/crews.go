@@ -22,6 +22,7 @@ var (
 	ErrCrewLimit     = errors.New("too many crews")
 	ErrCrewFull      = errors.New("crew is full")
 	ErrInvalidInvite = errors.New("invalid invite")
+	ErrRoomClosed    = errors.New("room closed")
 )
 
 // Crew is a group's permanent home. Its room holds the name and the owner.
@@ -95,6 +96,37 @@ func (p *Postgres) CreateCrew(ctx context.Context, r Room, crew Crew) error {
 		return ErrSlugTaken
 	}
 	if err != nil {
+		return err
+	}
+	crew.RoomID, crew.OwnerID = r.ID, r.OwnerID
+	if err := addCrew(ctx, tx, crew); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// PromoteRoom makes a temporary room permanent and gives it a crew, keeping its
+// address. Promoting a room that already has a crew changes nothing.
+func (p *Postgres) PromoteRoom(ctx context.Context, r Room, crew Crew) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := reserveCrew(ctx, tx, r.OwnerID); err != nil {
+		return err
+	}
+	// One statement decides this against the room's expiry: the loser gets no row.
+	tag, err := tx.Exec(ctx, `
+		UPDATE rooms SET is_temporary = false, expires_at = NULL WHERE id = $1 AND closed_at IS NULL`, r.ID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrRoomClosed
+	}
+	var exists bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM crews WHERE room_id = $1)`, r.ID).Scan(&exists); err != nil || exists {
 		return err
 	}
 	crew.RoomID, crew.OwnerID = r.ID, r.OwnerID

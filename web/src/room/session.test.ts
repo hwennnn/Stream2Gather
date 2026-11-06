@@ -138,6 +138,56 @@ describe('RoomSession', () => {
     expect(socket.closed).toBe(0);
   });
 
+  describe('reactions', () => {
+    const live = async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      return { session, socket };
+    };
+
+    it('shows this viewer’s own reaction before the server answers', async () => {
+      const { session, socket } = await live();
+      session.react('🔥');
+      expect(session.getView().reactions).toMatchObject([{ emoji: '🔥', name: 'Ada' }]);
+      expect(socket.ofType('react')).toMatchObject([{ d: { emoji: '🔥' } }]);
+    });
+
+    it('draws it once when the echo comes back', async () => {
+      const { session, socket } = await live();
+      session.react('🔥');
+      socket.deliver('react', { emoji: '🔥', name: 'Ada', userId: 'g_1' });
+      expect(session.getView().reactions).toHaveLength(1);
+    });
+
+    it('still shows the same reaction from someone else', async () => {
+      const { session, socket } = await live();
+      session.react('🔥');
+      socket.deliver('react', { emoji: '🔥', name: 'Maya', userId: 'g_2' });
+      expect(session.getView().reactions).toHaveLength(2);
+    });
+
+    it('shows another tab’s reaction, which this one never drew', async () => {
+      const { session, socket } = await live();
+      socket.deliver('react', { emoji: '🔥', name: 'Ada', userId: 'g_1' });
+      expect(session.getView().reactions).toHaveLength(1);
+    });
+
+    it('stops waiting for an echo that was never coming', async () => {
+      const { session, socket } = await live();
+      session.react('🔥');
+      vi.advanceTimersByTime(4000);
+      socket.deliver('react', { emoji: '🔥', name: 'Ada', userId: 'g_1' });
+      expect(session.getView().reactions).toHaveLength(1);
+    });
+
+    it('draws nothing when the reaction can’t be sent', async () => {
+      const { session, socket } = await live();
+      socket.readyState = 3;
+      session.react('🔥');
+      expect(session.getView().reactions).toHaveLength(0);
+    });
+  });
+
   describe('version gaps', () => {
     it('asks for a snapshot instead of jumping forward', async () => {
       const { session, socket } = await connected();

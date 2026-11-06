@@ -426,7 +426,7 @@ func (r *liveRoom) react(c *conn, message Message) {
 	defer cancel()
 	person := c.who()
 	err := r.hub.live.Publish(ctx, r.id, encode("react", map[string]string{
-		"emoji": request.Emoji, "name": person.Name,
+		"emoji": request.Emoji, "name": person.Name, "userId": person.UserID,
 	}))
 	if err == nil {
 		r.hub.recorder.Moment(r.id, Moment{

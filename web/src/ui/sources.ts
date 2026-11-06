@@ -20,11 +20,18 @@ export const openLabel = (url: string): string => {
   return name ? `Open on ${name}` : 'Open the link';
 };
 
-/** Why a video won't play, naming the source only where it means something. */
+/**
+ * Why a video won't play, naming the source only where it means something. It says
+ * what happened, not why: a refusal's code has more than one cause, and the owner
+ * is rarely the one who can be blamed for sure.
+ */
 export const failureReason = (source: string, kind: string): string => {
   const named = source !== 'direct';
+  if (kind === 'ip_origin') return 'YouTube refuses many videos on an address made of numbers. Open this room at its site name instead.';
+  if (kind === 'no_referrer') return 'YouTube couldn’t tell which site this is. A privacy extension may be hiding it.';
   if (kind === 'embed_blocked') {
-    return named ? `Its owner only allows it on ${sourceName(source)}.` : 'This stream doesn’t allow playback here.';
+    const name = sourceName(source);
+    return named ? `${name} wouldn’t play it here. It may still play on ${name}.` : 'This stream doesn’t allow playback here.';
   }
   if (kind === 'network') {
     const blocker = named ? `, or anything blocking ${sourceName(source)}` : '';

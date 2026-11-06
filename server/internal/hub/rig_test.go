@@ -41,6 +41,8 @@ type rig struct {
 	pool   *pgxpool.Pool
 	rdb    *redis.Client
 	server *httptest.Server
+	// origin is the page address clients claim, as a browser would.
+	origin string
 }
 
 func newRig(t *testing.T, redisAddr string, tune ...func(*Hub)) *rig {
@@ -74,6 +76,7 @@ func newRig(t *testing.T, redisAddr string, tune ...func(*Hub)) *rig {
 			return
 		}
 		defer ws.CloseNow()
+		ticket.IPPage = PageOnIP(req)
 		h.Serve(context.WithoutCancel(req.Context()), ws, ticket)
 	}))
 	t.Cleanup(func() {
@@ -170,7 +173,9 @@ func (r *rig) dialTicket(t *testing.T, details store.Ticket) *client {
 	}
 	ticket, _ := json.Marshal(details)
 	address := "ws" + strings.TrimPrefix(r.server.URL, "http") + "?ticket=" + url.QueryEscape(string(ticket))
-	ws, _, err := websocket.Dial(context.Background(), address, nil)
+	ws, _, err := websocket.Dial(context.Background(), address, &websocket.DialOptions{
+		HTTPHeader: http.Header{"Origin": {r.origin}},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

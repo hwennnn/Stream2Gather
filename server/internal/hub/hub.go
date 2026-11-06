@@ -409,6 +409,9 @@ type conn struct {
 	*limits
 	// pings is per tab, because each tab has its own clock to keep.
 	pings *rate.Limiter
+	// ipPage says the viewer's page has an IP address, where YouTube refuses videos
+	// that are fine, so a refusal says nothing about the video.
+	ipPage bool
 
 	mu     sync.RWMutex
 	person store.Person

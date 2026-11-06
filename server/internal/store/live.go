@@ -425,6 +425,9 @@ type Ticket struct {
 	// Address is who to charge for what this connection spends.
 	Address string `json:"address,omitempty"`
 	Person  Person `json:"person"`
+	// IPPage says the socket came from a page whose address is an IP. The ticket's
+	// holder never sets it: the socket handler reads it from the request.
+	IPPage bool `json:"-"`
 }
 
 // PutTicket stores a single-use ticket.

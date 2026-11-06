@@ -522,6 +522,57 @@ func TestOneReportCannotBlacklistAVideo(t *testing.T) {
 	}
 }
 
+// On a page whose address is an IP, YouTube refuses videos that are fine. The
+// server's own address doesn't settle it: a same-host page passes the socket's
+// origin check, so each connection is judged by the page it came from.
+func TestAPageOnAnIPTeachesNothing(t *testing.T) {
+	for _, origin := range []string{"http://127.0.0.1:18099", "http://[::1]:18099", "http://192.168.1.20:18099"} {
+		r := newRig(t, testRedis)
+		r.origin = origin
+		ctx := context.Background()
+		sourceID := "t" + ids.New()
+
+		for _, name := range []string{"first", "second"} {
+			c := r.joined(t, r.newRoom(t, youtubeVideo(t, r, sourceID)), name, room.RoleMember)
+			c.send(t, "media_error", map[string]any{"item": "item1", "code": 150})
+			// One reader handles a socket in order, so the report is finished by the pong.
+			c.send(t, "ping", map[string]any{"t0": 1})
+			c.expect(t, "pong")
+		}
+		if blocked, _ := r.db.EmbedBlocked(ctx, "youtube", []string{sourceID}); blocked[sourceID] {
+			t.Fatalf("%s: reports from an IP address blocked a video for everyone", origin)
+		}
+	}
+}
+
+// That refusal is the page's fault, so it must not move the room along either.
+func TestAPageOnAnIPSkipsNothing(t *testing.T) {
+	r := newRig(t, testRedis)
+	r.origin = "http://127.0.0.1:18099"
+	c := r.joined(t, r.newRoom(t, youtubeVideo(t, r, "t"+ids.New())), "viewer", room.RoleMember)
+	c.send(t, "media_error", map[string]any{"item": "item1", "code": 150})
+	c.expect(t, "member.status")
+	if notice, skipped := c.next("notice", 300*time.Millisecond); skipped {
+		t.Fatalf("a page on an IP skipped the video: %s", notice.D)
+	}
+}
+
+// 153 is the page failing to identify itself, which says nothing about the video.
+func TestAMissingReferrerTeachesNothing(t *testing.T) {
+	r := newRig(t, testRedis)
+	ctx := context.Background()
+	sourceID := "t" + ids.New()
+
+	for _, name := range []string{"first", "second"} {
+		c := r.joined(t, r.newRoom(t, youtubeVideo(t, r, sourceID)), name, room.RoleMember)
+		c.send(t, "media_error", map[string]any{"item": "item1", "code": 153})
+		c.expect(t, "notice")
+	}
+	if blocked, _ := r.db.EmbedBlocked(ctx, "youtube", []string{sourceID}); blocked[sourceID] {
+		t.Fatal("a missing referrer blocked a video")
+	}
+}
+
 func TestEmbedBlockExpires(t *testing.T) {
 	r := newRig(t, testRedis)
 	ctx := context.Background()

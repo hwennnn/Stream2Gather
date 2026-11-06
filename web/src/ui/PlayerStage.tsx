@@ -57,7 +57,7 @@ export const PlayerStage = (props: StageProps) => {
       <div className={current ? 'stage aspect-video' : 'stage stage-idle'}>
         <div ref={player.stage} data-player className={current ? 'absolute inset-0' : 'hidden'} />
         {!current && <IdleStage session={session} view={view} />}
-        {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} />}
+        {current && player.failure && <FailurePanel item={current} error={player.failure} view={view} onPickAnother={onPickAnother} onRetry={player.retry} />}
         {current && !player.failure && !player.ready && <Poster item={current} changing={changing} />}
       </div>
 
@@ -91,8 +91,12 @@ const Poster = ({ item, changing }: { item: QueueItem; changing: boolean }) => (
   </div>
 );
 
-const FailurePanel = ({ item, error, view, onPickAnother }: { item: QueueItem; error: PlayerError; view: RoomView; onPickAnother: () => void }) => {
+type FailureProps = { item: QueueItem; error: PlayerError; view: RoomView; onPickAnother: () => void; onRetry: () => void };
+
+export const FailurePanel = ({ item, error, view, onPickAnother, onRetry }: FailureProps) => {
   const reason = failureReason(item.source, error.kind);
+  // A refusal of this page's address moves nobody along, so nothing is skipping.
+  const note = error.kind === 'ip_origin' ? '' : failureNote(view);
   const watching = view.members.filter(({ userId }) => userId !== view.self?.userId && view.viewerStates[userId] !== 'unavailable');
   const justYou = watching.length > 0;
   return (
@@ -102,20 +106,17 @@ const FailurePanel = ({ item, error, view, onPickAnother }: { item: QueueItem; e
         <div className="enter mx-auto w-full max-w-md">
           <h2 className="text-xl leading-7 font-semibold tracking-[-0.01em] phone:text-[17px] phone:leading-6">{justYou ? 'It’s just you.' : 'This video won’t play here.'}</h2>
           <p className="mt-1 text-text phone:text-[13px] phone:leading-[18px]">
-            {justYou ? `${listNames(watching.map(({ name }) => firstName(name)))} ${watching.length > 1 ? 'are' : 'is'} still watching. ${reason}` : `${reason} ${failureNote(view)}`}
+            {justYou ? `${listNames(watching.map(({ name }) => firstName(name)))} ${watching.length > 1 ? 'are' : 'is'} still watching. ${reason}` : `${reason} ${note}`}
           </p>
           <div className="mt-4 flex flex-wrap gap-2 phone:mt-3">
-            {justYou ? (
-              <button type="button" onClick={() => window.location.reload()} className="btn btn-primary">
-                Try again
+            {!justYou && canQueue(view) && (
+              <button type="button" onClick={onPickAnother} className="btn btn-primary">
+                Pick another
               </button>
-            ) : (
-              canQueue(view) && (
-                <button type="button" onClick={onPickAnother} className="btn btn-primary">
-                  Pick another
-                </button>
-              )
             )}
+            <button type="button" onClick={onRetry} className={justYou ? 'btn btn-primary' : 'btn btn-quiet bg-ink'}>
+              Try again
+            </button>
             {item.source !== 'direct' && (
               <a href={item.url} target="_blank" rel="noreferrer noopener" className="btn btn-quiet bg-ink">
                 {openLabel(item.url)}

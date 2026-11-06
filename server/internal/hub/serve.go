@@ -4,17 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"time"
 	"unicode/utf8"
 
 	"github.com/coder/websocket"
 	"golang.org/x/time/rate"
 
+	"stream2gather/internal/config"
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
 	"stream2gather/internal/source"
 	"stream2gather/internal/store"
 )
+
+// PageOnIP reports whether a socket came from a page whose address is an IP. The
+// browser sets Origin, so it can be trusted more than anything the page says.
+func PageOnIP(r *http.Request) bool {
+	return config.IPOrigin(r.Header.Get("Origin"))
+}
 
 // Serve runs one connection until it closes.
 func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket) {
@@ -42,6 +50,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 		id:      ids.New(),
 		address: ticket.Address,
 		version: ticket.SessionVersion,
+		ipPage:  ticket.IPPage,
 		person:  ticket.Person,
 		out:     make(chan []byte, sendBuffer),
 		closed:  make(chan struct{}),
@@ -470,6 +479,14 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 	item := state.Queue[0]
 	userID := c.who().UserID
 	refused := item.Source == "youtube" && embedRefused[report.Code]
+	r.hub.log.Info("player error", "room", r.id, "source", item.Source, "video", item.SourceID, "code", report.Code)
+	_ = r.hub.live.Publish(ctx, r.id, encode("member.status", map[string]any{
+		"userId": userID, "state": "unavailable", "item": report.Item,
+	}))
+	// The refusal was about this page, so it decides nothing for anyone else.
+	if refused && c.ipPage {
+		return
+	}
 	if refused {
 		r.noteEmbedBlock(ctx, item, userID)
 	}
@@ -485,9 +502,6 @@ func (r *liveRoom) mediaError(c *conn, message Message) {
 	if err != nil {
 		return
 	}
-	_ = r.hub.live.Publish(ctx, r.id, encode("member.status", map[string]any{
-		"userId": userID, "state": "unavailable", "item": report.Item,
-	}))
 	if !mostAreFailing(people, failing) {
 		return
 	}

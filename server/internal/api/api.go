@@ -811,6 +811,7 @@ func (s *Server) socket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer ws.CloseNow()
+	ticket.IPPage = hub.PageOnIP(r)
 	s.Hub.Serve(context.WithoutCancel(r.Context()), ws, ticket)
 }
 

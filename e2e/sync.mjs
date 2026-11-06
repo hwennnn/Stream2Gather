@@ -475,7 +475,7 @@ for (const [path, hlsJs] of [['native', false], ['hls.js', true]]) {
   const room = await createRoom(a, YOUTUBE_OK);
   await join(b, room.url);
   const started = await waitPlaying([a, b], 25000);
-  check('youtube plays for both', started, '');
+  check('youtube plays for both', started, started ? '' : JSON.stringify(await sampleAll([a, b])));
   if (started) {
     await sleep(5000);
     report.youtubeSteady = await measure([a, b], 20);

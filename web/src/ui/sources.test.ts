@@ -22,14 +22,28 @@ describe('sourceName', () => {
 
 describe('failureReason', () => {
   it('names the source that refused', () => {
-    expect(failureReason('youtube', 'embed_blocked')).toBe('Its owner only allows it on YouTube.');
-    expect(failureReason('vimeo', 'embed_blocked')).toBe('Its owner only allows it on Vimeo.');
+    expect(failureReason('youtube', 'embed_blocked')).toBe('YouTube wouldn’t play it here. It may still play on YouTube.');
+    expect(failureReason('vimeo', 'embed_blocked')).toBe('Vimeo wouldn’t play it here. It may still play on Vimeo.');
     expect(failureReason('twitch', 'network')).toContain('blocking Twitch');
   });
 
   it('blames the stream, not a source, for a file', () => {
     expect(failureReason('direct', 'embed_blocked')).toBe('This stream doesn’t allow playback here.');
     expect(failureReason('direct', 'network')).toBe('The player couldn’t load. Check your connection.');
+  });
+
+  // Error 150 also appears for reasons that have nothing to do with the owner, so
+  // the panel must not claim to know what the owner chose.
+  it('never blames the owner for a refusal', () => {
+    expect(failureReason('youtube', 'embed_blocked')).not.toMatch(/owner/i);
+  });
+
+  it('points at the address when that is what YouTube refused', () => {
+    expect(failureReason('youtube', 'ip_origin')).toMatch(/site name/);
+  });
+
+  it('points at the browser when YouTube can’t see the site', () => {
+    expect(failureReason('youtube', 'no_referrer')).toMatch(/privacy extension/);
   });
 
   it('falls back for anything else', () => {

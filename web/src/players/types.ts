@@ -1,6 +1,6 @@
 export type PlayerState = 'loading' | 'ready' | 'playing' | 'paused' | 'buffering' | 'ended';
 
-export type PlayerErrorKind = 'unavailable' | 'embed_blocked' | 'network' | 'unknown';
+export type PlayerErrorKind = 'unavailable' | 'embed_blocked' | 'ip_origin' | 'no_referrer' | 'network' | 'unknown';
 
 export type PlayerError = { kind: PlayerErrorKind; code: number };
 

@@ -106,6 +106,25 @@ func writeRecap(ctx context.Context, tx pgx.Tx, sessionID string) (people int, e
 	return len(in.People), err
 }
 
+// rebuildRecaps rewrites recaps that already exist, after what they were built
+// from has been taken away.
+func rebuildRecaps(ctx context.Context, tx pgx.Tx, sessionIDs []string) error {
+	rows, err := tx.Query(ctx, `SELECT session_id FROM session_recaps WHERE session_id = ANY($1)`, sessionIDs)
+	if err != nil {
+		return err
+	}
+	built, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
+	for _, sessionID := range built {
+		if _, err := writeRecap(ctx, tx, sessionID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // UnbuiltSessions finds finished sessions with no recap yet, oldest first.
 func (p *Postgres) UnbuiltSessions(ctx context.Context, limit int) ([]string, error) {
 	rows, err := p.pool.Query(ctx, `

@@ -352,6 +352,14 @@ func (p *Postgres) DeleteAccount(ctx context.Context, userID string) ([]string, 
 	if err != nil {
 		return nil, err
 	}
+	rows, err = tx.Query(ctx, `SELECT session_id FROM session_people WHERE user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+	sessionIDs, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, err
+	}
 	for _, statement := range []string{
 		`DELETE FROM rooms WHERE owner_id = $1`,
 		`DELETE FROM moments WHERE user_id = $1`,
@@ -362,6 +370,9 @@ func (p *Postgres) DeleteAccount(ctx context.Context, userID string) ([]string, 
 		if _, err := tx.Exec(ctx, statement, userID); err != nil {
 			return nil, err
 		}
+	}
+	if err := rebuildRecaps(ctx, tx, sessionIDs); err != nil {
+		return nil, err
 	}
 	return rooms, tx.Commit(ctx)
 }

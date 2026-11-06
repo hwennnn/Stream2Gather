@@ -10,6 +10,7 @@ import { HostChip } from './RoomHeader';
 import { RoomStatus } from './RoomStatus';
 import { canControl, canQueue, failureNote, isLocked, isOffline, pillFor } from './rules';
 import { Seats } from './Seats';
+import { failureReason, openLabel } from './sources';
 import type { Row } from './seatRow';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
@@ -90,13 +91,8 @@ const Poster = ({ item, changing }: { item: QueueItem; changing: boolean }) => (
   </div>
 );
 
-const REASONS = new Map<PlayerError['kind'], string>([
-  ['embed_blocked', 'Its owner only allows it on YouTube.'],
-  ['network', 'The player couldn’t load. Check your connection, or anything blocking YouTube.'],
-]);
-
 const FailurePanel = ({ item, error, view, onPickAnother }: { item: QueueItem; error: PlayerError; view: RoomView; onPickAnother: () => void }) => {
-  const reason = REASONS.get(error.kind) ?? 'It may have been removed, or it isn’t available where you are.';
+  const reason = failureReason(item.source, error.kind);
   const watching = view.members.filter(({ userId }) => userId !== view.self?.userId && view.viewerStates[userId] !== 'unavailable');
   const justYou = watching.length > 0;
   return (
@@ -120,9 +116,9 @@ const FailurePanel = ({ item, error, view, onPickAnother }: { item: QueueItem; e
                 </button>
               )
             )}
-            {item.source === 'youtube' && (
+            {item.source !== 'direct' && (
               <a href={item.url} target="_blank" rel="noreferrer noopener" className="btn btn-quiet bg-ink">
-                Open on YouTube
+                {openLabel(item.url)}
               </a>
             )}
           </div>

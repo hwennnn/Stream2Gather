@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createHtml5Player } from './html5';
+import { createHtml5Player, hlsError } from './html5';
 
 class FakeVideo extends EventTarget {
   ended = false;
@@ -67,5 +67,23 @@ describe('createHtml5Player', () => {
     const { player } = await mount();
     player.setVolume(0.3);
     expect(player.volume()).toBe(0.3);
+  });
+});
+
+describe('hlsError', () => {
+  it('reads a request with no status as a host that refused us', () => {
+    expect(hlsError(true, 0, true)).toEqual({ kind: 'embed_blocked', code: 0 });
+  });
+
+  it('does not blame the host when this viewer is offline', () => {
+    expect(hlsError(true, 0, false)).toEqual({ kind: 'network', code: 0 });
+  });
+
+  it('keeps a real status as a network error', () => {
+    expect(hlsError(true, 404, true)).toEqual({ kind: 'network', code: 404 });
+  });
+
+  it('calls anything else unavailable', () => {
+    expect(hlsError(false, 0, true)).toEqual({ kind: 'unavailable', code: 0 });
   });
 });

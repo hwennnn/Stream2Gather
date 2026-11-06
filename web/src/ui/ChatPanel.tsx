@@ -43,10 +43,11 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
 
 export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onToast }: Props) => {
   const [text, setText] = useState('');
+  const [slow, setSlow] = useState(false);
   const [missed, setMissed] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
-  const sending = useRef(false);
+  const draft = useRef('');
   const offline = isOffline(view);
   const entries = view.messages;
   const empty = text.trim().length === 0;
@@ -82,20 +83,23 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
     if (stuck.current) setMissed(false);
   };
 
-  /** The draft stays until the server has the message, so a refusal loses nothing. */
+  const write = (value: string) => {
+    draft.current = value;
+    setText(value);
+    setSlow(false);
+  };
+
+  /** The line in the chat now holds the text, so a refusal can only lose it if that goes too. */
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const body = text.trim();
-    if (!body || offline || sending.current) return;
-    sending.current = true;
-    try {
-      await session.request('chat.send', { text: body });
-      setText((draft) => (draft.trim() === body ? '' : draft));
-    } catch (error) {
-      toastError(onToast)(error);
-    } finally {
-      sending.current = false;
-    }
+    if (!body || offline) return;
+    write('');
+    const { id, limited } = await session.sendChat(body);
+    if (!limited || draft.current.trim()) return; // Their next message has the box.
+    session.discardChat(id);
+    write(body);
+    setSlow(true);
   };
 
   return (
@@ -152,7 +156,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
             id="chat"
             value={text}
             maxLength={MAX_LENGTH}
-            onChange={(event) => setText(event.target.value)}
+            onChange={(event) => write(event.target.value)}
             placeholder={offline ? 'Reconnecting…' : 'Message the room'}
             autoComplete="off"
             enterKeyHint="send"
@@ -167,6 +171,11 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
             <Icon name="send" className="size-[18px]" />
           </button>
         </div>
+        {slow && (
+          <p role="status" className="mt-1.5 text-xs text-warn">
+            Slow down a little. Your message is still here.
+          </p>
+        )}
         {text.length >= COUNT_FROM && <p className="mt-1.5 text-right text-xs text-muted">{MAX_LENGTH - text.length} left</p>}
       </form>
     </div>
@@ -233,7 +242,10 @@ const Message = ({ session, view, message, onToast }: MessageProps) => {
 
   return (
     <div className="group/message relative pr-14">
-      <p className="text-sm leading-[1.45] [overflow-wrap:anywhere]">
+      <p
+        data-delivery={message.delivery}
+        className={`text-sm leading-[1.45] transition-opacity duration-200 [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}
+      >
         {parts.map((part, index) =>
           part.kind === 'link' ? (
             <a key={index} href={part.href} target="_blank" rel="noreferrer noopener" className="text-accent underline underline-offset-2 hover:brightness-125">
@@ -244,7 +256,8 @@ const Message = ({ session, view, message, onToast }: MessageProps) => {
           ),
         )}
       </p>
-      {video?.kind === 'link' && canQueue(view) && (
+      {message.delivery === 'failed' && <NotSent session={session} id={String(message.id)} offline={isOffline(view)} />}
+      {video?.kind === 'link' && canQueue(view) && !message.delivery && (
         <button type="button" disabled={busy || isOffline(view)} onClick={() => void add(video.href)} className="btn btn-quiet btn-sm mt-1 mb-0.5">
           {busy ? <span className="spinner size-3" /> : <Icon name="film" className="size-3.5" />}
           Add to queue
@@ -259,6 +272,18 @@ const Message = ({ session, view, message, onToast }: MessageProps) => {
     </div>
   );
 };
+
+const NotSent = ({ session, id, offline }: { session: RoomSession; id: string; offline: boolean }) => (
+  <p className="mt-1 flex items-center gap-1.5 text-xs text-warn">
+    Not sent.
+    <button type="button" disabled={offline} onClick={() => session.retryChat(id)} className="btn btn-quiet btn-sm">
+      Retry
+    </button>
+    <button type="button" aria-label="Remove this message" onClick={() => session.discardChat(id)} className="btn btn-ghost btn-sm">
+      Remove
+    </button>
+  </p>
+);
 
 /** Unread chat from other people, counted from the last line this viewer saw. */
 export const useUnread = (entries: ChatEntry[], selfId: string | undefined, seeing: boolean): number => {

@@ -511,6 +511,26 @@ func TestReleaseLeavesAnOpenRoomAlone(t *testing.T) {
 	}
 }
 
+func TestCleanChat(t *testing.T) {
+	for raw, want := range map[string]string{
+		"  hello  ":   "hello",
+		"two\nlines":  "two\nlines",
+		"tab\there":   "tab\there",
+		"하늘 🌸":        "하늘 🌸",
+		"nul\x00byte": "",
+		"bell\x07":    "",
+		"esc\x1b[31m": "",
+		"del\x7fhere": "",
+		"a\u0085next": "",
+		"   ":         "",
+	} {
+		got, ok := CleanChat(raw)
+		if got != want || ok != (want != "") {
+			t.Errorf("CleanChat(%q) = %q, %v, wanted %q", raw, got, ok, want)
+		}
+	}
+}
+
 func TestCleanName(t *testing.T) {
 	for raw, want := range map[string]string{"  Maya ": "Maya", "Zoë 🎬": "Zoë 🎬"} {
 		if got, ok := CleanName(raw); !ok || got != want {

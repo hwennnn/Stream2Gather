@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -292,8 +291,12 @@ func (r *liveRoom) chat(c *conn, message Message) {
 		c.fail(message.ID, "bad_message", "That message could not be read.")
 		return
 	}
-	text := strings.TrimSpace(request.Text)
-	if text == "" || utf8.RuneCountInString(text) > maxChatRunes {
+	text, ok := room.CleanChat(request.Text)
+	if !ok {
+		c.fail(message.ID, "invalid", "That message could not be read.")
+		return
+	}
+	if utf8.RuneCountInString(text) > maxChatRunes {
 		c.fail(message.ID, "invalid", "Messages can be up to 500 characters.")
 		return
 	}

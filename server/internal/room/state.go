@@ -171,6 +171,18 @@ func CleanName(raw string) (string, bool) {
 	return name, true
 }
 
+// CleanChat returns a chat line fit to store, or false if it is not one. Line
+// breaks and tabs are text. Other control characters are not, and Postgres would
+// answer a NUL with an error the sender could only read as a server fault.
+func CleanChat(raw string) (string, bool) {
+	text := strings.TrimSpace(raw)
+	unprintable := func(r rune) bool { return unicode.IsControl(r) && r != '\n' && r != '\t' }
+	if text == "" || strings.ContainsFunc(text, unprintable) {
+		return "", false
+	}
+	return text, true
+}
+
 // Actor is who issued a command.
 type Actor struct {
 	ID   string `json:"id"`

@@ -63,6 +63,15 @@ export const account = {
     });
   },
 
+  /** The server ended this session. Failing to ask costs nothing: a reload will. */
+  async refresh(): Promise<void> {
+    try {
+      setUser((await api.me()).user);
+    } catch {
+      // Still whoever we thought, until the server can say otherwise.
+    }
+  },
+
   /** A rename is the only way a first-time guest gets a session before joining. */
   async rename(name: string): Promise<void> {
     update({ user: (await api.rename(name)).user });

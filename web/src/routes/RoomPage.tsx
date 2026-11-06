@@ -110,7 +110,8 @@ const Room = ({ slug }: { slug: string }) => {
     };
   }, [session]);
 
-  useEffect(() => account.onIdentityChange(() => session.retry()), [session]);
+  useEffect(() => account.onIdentityChange(() => session.identityChanged(account.current().user?.id)), [session]);
+  useEffect(() => session.onSignedOut(() => void account.refresh()), [session]);
 
   useEffect(() => {
     if (view.connection === 'live' && session.marks.joinMs !== undefined) {

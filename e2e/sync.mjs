@@ -169,7 +169,7 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   const room = await createRoom(a, `${BASE}/sample.mp4`);
   report.createRoomMs = room.createMs;
   const copied = await a.page.evaluate(() => navigator.clipboard.readText());
-  check('link copied on create', copied === room.url, copied);
+  check('starting a room leaves the clipboard alone', copied !== room.url, copied);
 
   await join(b, room.url);
   check('both start', await waitPlaying([a, b]), '');
@@ -492,6 +492,9 @@ const waitPlaying = async (viewers, timeout = 15000) => {
     // The median, because a viewer can stall again. It must not stay behind.
     const { n, p50 } = report.youtubeSlowJoin;
     check('youtube: a slow joiner is with the room within 2s', n > 0 && p50 < 400, JSON.stringify(report.youtubeSlowJoin));
+    // Pulling the room back to it would look just as good to the check above.
+    const pulled = await slow.page.evaluate(() => window.__sent.filter((type) => type === 'seek').length);
+    check('youtube: a slow joiner does not move the room', pulled === 0, `${pulled} seeks`);
     await slow.context.close();
   }
   await a.page.screenshot({ path: `${OUT}/room-youtube.png` });

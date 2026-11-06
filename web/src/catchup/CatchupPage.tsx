@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiError, type Media } from '../api/http';
+import { useAccount } from '../auth/account';
 import { createPlayer } from '../players/registry';
 import type { PlayerAdapter } from '../players/types';
 import { Wordmark } from '../ui/Wordmark';
 import { catchupApi, type CrewVideo, type Moment } from './api';
+import { Compose } from './Compose';
+import { Density } from './Density';
 import { createFiring } from './firing';
 import { Rail } from './Rail';
 
@@ -68,16 +71,24 @@ const useMoments = (slug: string, video: CrewVideo) => {
     [fired],
   );
 
-  return { all, failed, passed, fired, load, tick };
+  const add = useCallback((moment: Moment) => {
+    firing.current.add(moment);
+    setAll([...firing.current.all()]);
+    setPassed(firing.current.passed());
+  }, []);
+
+  return { all, failed, passed, fired, load, tick, add };
 };
 
 const openLabel = (media: Media) => (media.source === 'youtube' ? 'Open on YouTube' : 'Open the video');
 
 const Watch = ({ slug, video, media }: { slug: string; video: CrewVideo; media: Media }) => {
+  const { user } = useAccount();
   const host = useRef<HTMLDivElement>(null);
   const adapter = useRef<PlayerAdapter | null>(null);
   const [blocked, setBlocked] = useState(false);
-  const { all, failed, passed, fired, load, tick } = useMoments(slug, video);
+  const [problem, setProblem] = useState(false);
+  const { all, failed, passed, fired, load, tick, add } = useMoments(slug, video);
 
   useEffect(() => {
     let live = true;
@@ -99,6 +110,18 @@ const Watch = ({ slug, video, media }: { slug: string; video: CrewVideo; media: 
     };
   }, [media, tick]);
 
+  const send = async (part: { emoji?: string; body?: string }) => {
+    const posMs = Math.round((adapter.current?.time() ?? 0) * 1000);
+    const moment = { source: video.source, id: video.sourceId, posMs, ...part };
+    setProblem(false);
+    try {
+      const { id } = await catchupApi.add(slug, moment).catch(() => catchupApi.add(slug, moment));
+      add({ id, posMs, kind: part.body ? 'chat' : 'reaction', origin: 'catchup', author: user?.name ?? '', ...part });
+    } catch {
+      setProblem(true);
+    }
+  };
+
   const shown = blocked ? (all ?? []) : passed;
 
   return (
@@ -113,7 +136,10 @@ const Watch = ({ slug, video, media }: { slug: string; video: CrewVideo; media: 
             </a>
           </p>
         ) : (
-          <div ref={host} data-player className="aspect-video w-full overflow-hidden rounded-md bg-stage" />
+          <>
+            <div ref={host} data-player className="aspect-video w-full overflow-hidden rounded-md bg-stage" />
+            <Density moments={all ?? []} lengthMs={media.durationMs} onSeek={(ms) => adapter.current?.seek(ms / 1000)} />
+          </>
         )}
       </div>
       <section aria-label="Catch up" className="flex min-h-0 flex-col lg:h-[min(70dvh,560px)]">
@@ -128,6 +154,7 @@ const Watch = ({ slug, video, media }: { slug: string; video: CrewVideo; media: 
         {all?.length === 0 && <p className="text-sm text-muted">{NOBODY}</p>}
         {all && all.length > 0 && shown.length === 0 && <p className="text-sm text-muted">{WAITING}</p>}
         <Rail moments={shown} fired={fired} className="max-h-72 flex-1 lg:max-h-none" />
+        {!blocked && <Compose onSend={(part) => void send(part)} problem={problem} />}
         <p className="mt-3 text-xs text-dim">Reactions and watch stats come from Stream2Gather, not YouTube.</p>
       </section>
     </div>

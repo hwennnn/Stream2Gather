@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
-import { Avatar } from './Avatar';
-import { avatarColor, formatClock, isYouTubeUrl, splitLinks } from './format';
+import { formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
+import { InviteSheet } from './InviteSheet';
+import { firstName, hueOf } from './people';
 import { ReactionPicker } from './Reactions';
 import { canQueue, chatScroll, countUnread, isOffline } from './rules';
 import { toastError } from './Toasts';
@@ -22,21 +23,22 @@ type Props = {
   onToast: (text: string) => void;
 };
 
-type Block = { kind: 'system'; entry: Extract<ChatEntry, { kind: 'system' }> } | { kind: 'chat'; messages: ChatLine[] };
+type Block = { kind: 'system'; entry: Extract<ChatEntry, { kind: 'system' }> } | { kind: 'chat'; messages: ChatLine[] } | { kind: 'time'; at: string };
 
 const toBlocks = (entries: ChatEntry[]): Block[] => {
   const blocks: Block[] = [];
+  let spoken: ChatLine | undefined;
   for (const entry of entries) {
     if (entry.kind === 'system') {
-      blocks.push({ kind: 'system', entry });
+      if (!entry.quiet) blocks.push({ kind: 'system', entry });
       continue;
     }
+    const gap = spoken ? Date.parse(entry.createdAt) - Date.parse(spoken.createdAt) : Infinity;
+    if (gap >= GROUP_GAP_MS) blocks.push({ kind: 'time', at: entry.createdAt });
     const last = blocks.at(-1);
-    const previous = last?.kind === 'chat' ? last.messages.at(-1) : undefined;
-    const sameRun =
-      previous?.userId === entry.userId && Date.parse(entry.createdAt) - Date.parse(previous.createdAt) < GROUP_GAP_MS;
-    if (sameRun && last?.kind === 'chat') last.messages.push(entry);
+    if (last?.kind === 'chat' && spoken?.userId === entry.userId) last.messages.push(entry);
     else blocks.push({ kind: 'chat', messages: [entry] });
+    spoken = entry;
   }
   return blocks;
 };
@@ -110,33 +112,44 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
           role="log"
           aria-label="Chat messages"
           tabIndex={0}
-          className="rail-scroll h-full py-3 outline-offset-[-2px]"
+          className="rail-scroll flex h-full flex-col py-3 outline-offset-[-2px]"
         >
           {!hasChat &&
             (view.alone ? (
               view.queue.length === 0 ? (
                 <PickingCard onInvite={onInvite} />
               ) : (
-                <InviteCard url={inviteUrl} onCopy={onCopyInvite} />
+                <div className="mt-auto">
+                  <p className="mb-3 font-semibold">Only you so far.</p>
+                  <InviteSheet view={view} url={inviteUrl} onCopy={onCopyInvite} />
+                </div>
               )
             ) : (
-              <p className="py-6 text-center text-sm text-muted">Say hi. Everyone in the room sees it.</p>
+              <p className="mt-auto text-muted">Nothing said yet.</p>
             ))}
-          {blocks.map((block) =>
-            block.kind === 'system' ? (
-              <p key={block.entry.id} className="my-2 px-14 text-center text-xs leading-snug text-muted">
-                {block.entry.text}
-              </p>
-            ) : (
-              <MessageGroup key={block.messages[0]?.id} session={session} view={view} messages={block.messages} onToast={onToast} />
-            ),
-          )}
+          {blocks.map((block) => {
+            if (block.kind === 'time') {
+              return (
+                <time key={block.at} dateTime={block.at} className="fig mt-4 text-dim first:mt-auto">
+                  {formatClock(block.at)}
+                </time>
+              );
+            }
+            if (block.kind === 'system') {
+              return (
+                <p key={block.entry.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+                  {block.entry.text}
+                </p>
+              );
+            }
+            return <MessageGroup key={block.messages[0]?.id} session={session} view={view} messages={block.messages} onToast={onToast} />;
+          })}
         </div>
         {missed && (
           <button
             type="button"
             onClick={toBottom}
-            className="btn btn-sm enter absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full bg-text font-semibold text-ink shadow-xl"
+            className="btn btn-sm enter float absolute bottom-2 left-1/2 -translate-x-1/2 text-text"
           >
             <Icon name="down" className="size-3.5" />
             New messages
@@ -155,7 +168,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
             value={text}
             maxLength={MAX_LENGTH}
             onChange={(event) => write(event.target.value)}
-            placeholder={offline ? 'Reconnecting…' : 'Message the room'}
+            placeholder={offline ? 'Reconnecting…' : 'Message'}
             autoComplete="off"
             enterKeyHint="send"
             className="field min-w-0 flex-1"
@@ -164,7 +177,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
             type="submit"
             aria-label="Send"
             disabled={offline || empty}
-            className={`btn btn-icon size-11 rounded-xl disabled:opacity-100 ${empty || offline ? 'bg-white/[0.06] text-muted' : 'btn-primary'}`}
+            className={`btn btn-icon disabled:opacity-100 ${empty || offline ? 'text-dim' : 'btn-primary'}`}
           >
             <Icon name="send" className="size-[18px]" />
           </button>
@@ -174,7 +187,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
             Slow down a little. Your message is still here.
           </p>
         )}
-        {text.length >= COUNT_FROM && <p className="mt-1.5 text-right text-xs text-muted">{MAX_LENGTH - text.length} left</p>}
+        {text.length >= COUNT_FROM && <p className="mt-1.5 text-right fig text-dim">{MAX_LENGTH - text.length} left</p>}
       </form>
     </div>
   );
@@ -182,22 +195,11 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
 
 /** Search and trending belong to the stage here, so this side only has to get people in. */
 const PickingCard = ({ onInvite }: { onInvite: () => void }) => (
-  <div className="enter my-1 rounded-2xl border border-line bg-white/[0.03] p-4">
-    <p className="text-[15px] leading-snug font-semibold text-balance">Invite someone while you pick</p>
-    <button type="button" onClick={onInvite} className="btn btn-primary mt-3 w-full">
+  <div className="enter mt-auto">
+    <p className="font-semibold">Invite someone while you pick</p>
+    <button type="button" onClick={onInvite} className="btn btn-quiet mt-3 w-full">
       <Icon name="link" />
       Invite
-    </button>
-  </div>
-);
-
-const InviteCard = ({ url, onCopy }: { url: string; onCopy: () => void }) => (
-  <div className="enter my-1 rounded-2xl border border-line bg-white/[0.03] p-4">
-    <p className="text-[15px] leading-snug font-semibold text-balance">Just you so far. Send this link to watch together.</p>
-    <p className="mt-3 truncate rounded-lg bg-black/30 px-3 py-2 font-mono text-xs text-muted">{url}</p>
-    <button type="button" onClick={onCopy} className="btn btn-primary mt-3 w-full">
-      <Icon name="link" />
-      Copy link
     </button>
   </div>
 );
@@ -208,31 +210,25 @@ const MessageGroup = ({ session, view, messages, onToast }: GroupProps) => {
   const first = messages[0];
   if (!first) return null;
   const own = first.userId === view.self?.userId;
-  const member = view.members.find((person) => person.userId === first.userId);
   return (
-    <div className="mt-3 flex gap-2.5 first:mt-0">
-      <Avatar person={{ userId: first.userId, name: first.author, avatarUrl: member?.avatarUrl }} className="mt-0.5 size-7 text-[11px] ring-panel!" />
-      <div className="min-w-0 flex-1">
-        <p className="flex items-baseline gap-1.5 text-[13px] leading-5">
-          <span style={{ color: avatarColor(first.userId) }} className="min-w-0 truncate font-semibold">
-            {first.author}
-          </span>
-          {own && <span className="shrink-0 text-xs text-muted">(you)</span>}
-          <time dateTime={first.createdAt} className="hidden shrink-0 text-[11px] text-muted [@media(hover:none)]:inline">
-            {formatClock(first.createdAt)}
-          </time>
-        </p>
-        {messages.map((message) => (
-          <Message key={message.id} session={session} view={view} message={message} onToast={onToast} />
-        ))}
-      </div>
+    <div className="mt-2.5 first:mt-auto">
+      {messages.map((message, index) => (
+        <Message
+          key={message.id}
+          session={session}
+          view={view}
+          message={message}
+          name={index === 0 ? (own ? 'You' : firstName(first.author)) : undefined}
+          onToast={onToast}
+        />
+      ))}
     </div>
   );
 };
 
-type MessageProps = { session: RoomSession; view: RoomView; message: ChatLine; onToast: (text: string) => void };
+type MessageProps = { session: RoomSession; view: RoomView; message: ChatLine; name?: string; onToast: (text: string) => void };
 
-const Message = ({ session, view, message, onToast }: MessageProps) => {
+const Message = ({ session, view, message, name, onToast }: MessageProps) => {
   const parts = splitLinks(message.body);
   const video = parts.find((part) => part.kind === 'link' && isYouTubeUrl(part.href));
   const [busy, setBusy] = useState(false);
@@ -250,14 +246,16 @@ const Message = ({ session, view, message, onToast }: MessageProps) => {
   };
 
   return (
-    <div className="group/message relative pr-14">
-      <p
-        data-delivery={message.delivery}
-        className={`text-sm leading-[1.45] transition-opacity duration-200 [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}
-      >
+    <div title={formatClock(message.createdAt)}>
+      <p data-delivery={message.delivery} className={`leading-5 transition-opacity [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}>
+        {name && (
+          <span style={{ color: hueOf(message.userId) }} className="mr-1.5 font-semibold">
+            {name}
+          </span>
+        )}
         {parts.map((part, index) =>
           part.kind === 'link' ? (
-            <a key={index} href={part.href} target="_blank" rel="noreferrer noopener" className="text-accent underline underline-offset-2 hover:brightness-125">
+            <a key={index} href={part.href} target="_blank" rel="noreferrer noopener" className="text-link underline underline-offset-2">
               {part.text}
             </a>
           ) : (
@@ -272,12 +270,6 @@ const Message = ({ session, view, message, onToast }: MessageProps) => {
           Add to queue
         </button>
       )}
-      <time
-        dateTime={message.createdAt}
-        className="absolute top-0.5 right-0 text-[11px] text-muted opacity-0 transition-opacity group-hover/message:opacity-100"
-      >
-        {formatClock(message.createdAt)}
-      </time>
     </div>
   );
 };

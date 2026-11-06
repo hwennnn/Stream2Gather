@@ -234,8 +234,8 @@ const ResumeButton = ({ session, view, onToast }: { session: RoomSession; view: 
   const { item, pos } = view.playback;
   const resume = () => void session.request('play', { item, pos, ct: session.clock.now() }).catch(toastError(onToast));
   return (
-    <button type="button" disabled={isOffline(view)} onClick={resume} className="btn btn-primary">
-      Resume for everyone
+    <button type="button" aria-label="Resume for everyone" disabled={isOffline(view)} onClick={resume} className="btn btn-primary">
+      Resume<span className="phone:hidden"> for everyone</span>
     </button>
   );
 };

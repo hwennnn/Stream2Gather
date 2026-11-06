@@ -103,10 +103,10 @@ await hana.page.getByRole('region', { name: 'Your watchlist' }).getByRole('butto
 check('the watchlist plays through the queue', await visible(hana.page.locator('video')));
 await hana.page.getByRole('link', { name: 'Crew home' }).click();
 await button(hana, 'Members and settings').click();
-check('crew home leaves the room', await visible(hana.page.getByRole('switch', { name: 'Guests can enter the room' })));
+check('crew home leaves the room', await visible(hana.page.getByRole('switch', { name: 'Anyone with the link can come in' })));
 
 // Members only: the owner shuts the door, and a guest can't get in.
-await button(hana, 'Guests can enter the room').or(hana.page.getByRole('switch', { name: 'Guests can enter the room' })).first().click();
+await button(hana, 'Anyone with the link can come in').or(hana.page.getByRole('switch', { name: 'Anyone with the link can come in' })).first().click();
 await sleep(300);
 const shut = await person(null);
 await shut.page.goto(hana.page.url());

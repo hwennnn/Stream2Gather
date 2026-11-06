@@ -135,7 +135,7 @@ const CrewSettings = ({ slug, home, onChange }: Props) => {
           </div>
         )}
         <div className="flex min-h-11 items-center justify-between gap-4 py-1">
-          <span id="crew-guests">Guests can enter the room</span>
+          <span id="crew-guests">Anyone with the link can come in</span>
           <button
             type="button"
             role="switch"

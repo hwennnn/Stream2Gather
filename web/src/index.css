@@ -343,6 +343,11 @@ body {
   display: none;
 }
 
+/* A clamp only finds its ellipsis at a line break, so a title with no spaces has to be able to break. */
+.line-clamp-2 {
+  overflow-wrap: anywhere;
+}
+
 /* The rail's one margin, left and right, for every tab. Nothing here sets its own:
  * a fixed block sits on .rail-edge, a scrolling list on .rail-scroll, and rows, rules
  * and headings inside inherit it. Rules stop at it too, so no line touches the panel. */

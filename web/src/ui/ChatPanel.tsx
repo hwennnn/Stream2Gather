@@ -140,6 +140,14 @@ export const ChatPanel = ({ session, view, active, inviteUrl, inviteCopied, onCo
               return (
                 <p key={block.entry.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
                   {block.entry.text}
+                  {block.entry.url && (
+                    <>
+                      {' '}
+                      <a href={block.entry.url} target="_blank" rel="noreferrer noopener" className="underline">
+                        Open on YouTube
+                      </a>
+                    </>
+                  )}
                 </p>
               );
             }

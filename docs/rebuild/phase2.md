@@ -243,3 +243,255 @@ CREATE INDEX ON outbox (id) WHERE done_at IS NULL;
 - Entry JS stays at or below 79.4 kB gz, enforced by `web/scripts/bundle-budget.mjs`.
 - `crew_second_session_14d` is reported in ClickHouse telemetry. This is the phase's headline metric. It has no target until real usage exists.
 
+## 4. Voice
+
+**Decision: self-hosted LiveKit.** It is Apache-2.0, works at the 50-person cap, and needs no vendor key. Peer-to-peer is rejected: a mesh does not scale to 50, and without an SFU we would still need TURN. LiveKit Cloud stays available as an escape hatch through the same `LIVEKIT_URL`.
+
+**Versions and sizes [V]:**
+
+| Item | Value |
+|---|---|
+| Server | `livekit/livekit-server:v1.13.11`, 2026-10-25, 41 MB compressed amd64, 125 MB local |
+| JS | `livekit-client` 2.23.0: **149.5 kB gz**, 124.6 kB brotli, measured with esbuild for the APIs we use |
+| Components | `@livekit/components-react` is not needed |
+| Go | `server-sdk-go/v2` v2.19.0 and `protocol` v1.53.2: importing only `protocol/auth` takes `s2g` from 36.09 to 46.78 MB (+30%, pulls pion) |
+
+**Do not add the Go SDK.** Sign the HS256 JWT with the standard library, about 40 lines, and call Twirp over plain JSON HTTP.
+
+**Local spike, 2026-11-05 [V]:** two headless Chrome pages with a fake mic, against the real server in Docker on ports 17880-17882.
+
+- A hand-signed token was accepted. `RoomService/ListRooms` returned 200 with a hand-signed admin token.
+- Audio flowed on the UDP mux port: selected pair `udp 17882`, listener received 59 kB in 6 seconds.
+- Listen-only join needed no mic.
+- `ActiveSpeakersChanged` fired.
+- A second tab with the same identity disconnected the first with `DUPLICATE_IDENTITY`.
+- Join took 77-350 ms. This is loopback, so it says nothing about real networks.
+
+`RemoveParticipant` over Twirp was not exercised **[U]**. If the hand-signed path ever drifts, the fallback is `protocol/auth`, at the binary cost above.
+
+### User flow
+
+- **First 10 seconds.** A "Join voice" button sits in the room header, or in a bar under the player on phones. Hovering preloads the chunk. Clicking fetches a token, connects listen-only, and calls `room.startAudio()` inside the gesture. There is no mic prompt. The user sees "You're listening" and a muted mic button. The first unmute triggers the browser prompt.
+- **Empty states.** Alone: "You're the first one here. Others will see you in voice." When someone else is in voice: "Hana is in voice. Join".
+- **Talking.** Default is toggle mute, with `M` as the shortcut. Push-to-talk is an option in voice settings: an on-page hold button, plus hold `V`. Key events do not reach us when focus is inside a cross-origin player iframe **[V]**, so the hold button is the reliable path and the UI says so. PTT releases on `blur`, `visibilitychange` and `pointercancel`. The track stays published and toggles mute, so PTT has no republish delay.
+- **Ducking.** While a remote participant speaks (`ActiveSpeakersChanged`), the player volume drops to 30% in steps over about 150 ms and returns after a 600 ms hold. It uses documented `setVolume`, reads the user's level first, leaves a muted player alone, and does not fight manual changes. It is a user toggle. It is **off for YouTube by default until the owner decides** (section 12). It does nothing on iPhone, where JS can't change media volume **[V]**.
+- **Phones and blocked mics.** `NotAllowedError`: stay listening and show how to re-enable the mic for this site. `NotFoundError`: "No microphone found. You can still listen." A headphones hint appears on first unmute.
+- **Reload.** Voice never rejoins by itself, because audio needs a fresh gesture.
+
+### Data model
+
+No tables. Voice state is ephemeral: `Person` gains `voice` (`""|listening|muted|live`). `People` must prefer a non-empty value across tabs, because today the first tab wins **[V]**. No audio is ever recorded, and we do not run Egress.
+
+### API and WebSocket
+
+- `POST /v1/rooms/{slug}/voice-token` returns `{url, token, expiresAt}`. It requires a session and presence in `Live.People`, and 503 `voice_unavailable` when unconfigured. It is limited through the existing `Limit`.
+- Token: `iss` key, `sub` user id, `name`, `nbf`, `exp` at 10 minutes. Grant: `roomJoin`, `room: s2g-{rooms.id}`, `canPublish`, `canPublishSources: ["microphone"]`, `canSubscribe`, no data channel.
+- LiveKit refreshes tokens for connected participants every 5 minutes **[V docs]**; a long-session test confirms this.
+- `GET /v1/config` gains `voice: bool`.
+- Client to server: `{type:"voice", state:"listening"|"muted"|"live"|"off"}`. The hub sets `Person.Voice` and calls `publishMembers`. Speaking indicators stay client side, from LiveKit events.
+- `PlayerAdapter` gains `setVolume(0..1)` and `volume(): number | null`.
+
+### Service boundaries
+
+- LiveKit is the only media path, and it knows nothing about crews.
+- `serve` mints tokens and calls `RemoveParticipant` when a crew member is removed. Revocation is Cloud-only **[V]**, so removal is that call plus the short TTL.
+- `web/src/voice/` is a lazy chunk that nothing on the entry path imports.
+- CSP adds `connect-src` for the LiveKit origin. New header: `Permissions-Policy: microphone=(self)`.
+- Audio is encrypted in transit, but the server can technically hear it. E2EE needs key distribution and is out of v1.
+
+**Local.** Compose service `livekit`, loopback only: signal **17880**, ICE/TCP **17881**, ICE/UDP mux **17882**, `node_ip: 127.0.0.1` **[V by spike]**. `LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` (at least 32 characters) live in `server/.env.local` and are passed through `LIVEKIT_KEYS`, never in the compose file.
+
+### Failure behavior
+
+| Failure | Behavior |
+|---|---|
+| LiveKit down or unconfigured | Button reads "Voice unavailable"; the room is unaffected |
+| Chunk load fails | Same message, retry on next click |
+| Network drop | LiveKit reconnects; "Reconnecting voice"; after failure, back to "Join voice" |
+| Second tab | Old tab: "Voice moved to another tab" (`DUPLICATE_IDENTITY`) |
+| UDP blocked | Falls back to ICE/TCP 17881; without TURN/TLS some strict networks fail, shown as "Voice can't connect on this network" |
+| Audio autoplay refused | `AudioPlaybackStatusChanged` shows "Tap to hear voice" |
+
+### Tests
+
+- **Go:** token claims and TTL against a golden JWT; presence requirement; 503 path. Integration against compose LiveKit: token accepted, `RemoveParticipant` works.
+- **Vitest:** ducking state machine with fake timers (attack, hold, user override, muted), PTT release on all three events.
+- **e2e:** Chrome with `--use-fake-device-for-media-stream --use-fake-ui-for-media-stream`: two users hear each other (`bytesReceived` rising), mic denied stays listening, LiveKit stopped leaves playback green, 15-minute soak past token expiry.
+- **`player-overlap.mjs`:** passes at all 6 layouts with voice open.
+- **Real devices, once:** iPhone Safari, Android Chrome, Mac Safari, Chrome with AirPods.
+
+### Exit
+
+- Click to listening: p95 under 1.5 seconds across two real networks.
+- Unmute to audible: under 500 ms.
+- Playback sync p95 unchanged from `measurements.md` with 6 people talking.
+- Entry JS unchanged; `RoomPage` chunk grows by at most 3 kB gz; voice chunk at most 155 kB gz.
+- With LiveKit stopped, `make e2e` passes.
+- The real-device matrix is recorded in `measurements.md`.
+
+## 5. Presence and notifications
+
+**Decision.** Web push first. It needs no provider key: only VAPID keys we generate, and no Apple Developer account **[V]**. Email stays behind a `Channel` interface with no implementation until there is a provider key.
+
+**Who does what:**
+
+- **Temporal** owns timing, dedupe and retries. It answers "should this person hear about this, and when".
+- **`s2g notifier`** owns delivery. It is the only holder of the VAPID private key, pumps the outbox, runs the `notify` task queue, sends pushes and prunes dead subscriptions.
+- **`serve`** only reads the public key and writes subscription rows. It never touches Temporal.
+
+**Presence means crew presence:** who is in the room, in voice and what is playing, from `Live.People` and room state, shown on the crew home and rail. There is no app-wide "online" indicator, which would need a socket on every page and first-load JS.
+
+### User flow
+
+- **First 10 seconds.** Never on page load. A crew home card reads "Get a ping when your crew starts watching." with an "Allow" button. The click requests permission and subscribes in the same handler, as Safari requires **[V]**. It then shows "You're on. We'll ping this device."
+- **iPhone.** Web push works only from a Home Screen web app, iOS 16.4 or later **[V]**. In a Safari tab the card reads "Add Stream2Gather to your Home Screen to get pings", with the steps.
+- **Receive.** "Hana started watching in Movie Night" / "Join in". Tapping opens or focuses `/r/{slug}`. The video title is left out, which avoids spoilers and sending API data to push services.
+- **Settings.** Per crew on or off (`crew_members.notify`), plus a device list in account settings. Empty state: "No devices yet."
+- **Denied.** "Notifications are blocked for this site" with browser instructions; we never ask again.
+
+### Data model
+
+Migration `*_push.sql`:
+
+```sql
+CREATE TABLE push_subscriptions (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint text NOT NULL UNIQUE, p256dh text NOT NULL, auth text NOT NULL,
+  user_agent text, created_at timestamptz NOT NULL DEFAULT now(), last_ok_at timestamptz);
+CREATE INDEX ON push_subscriptions (user_id);
+
+CREATE TABLE notification_log (
+  user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  crew_id text NOT NULL REFERENCES crews(id) ON DELETE CASCADE,
+  kind text NOT NULL, ref text NOT NULL,
+  sent_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, kind, ref));
+CREATE INDEX ON notification_log (user_id, crew_id, sent_at DESC);
+```
+
+### API and WebSocket
+
+- `GET /v1/config` gains `vapidPublicKey`.
+- `POST /v1/push/subscriptions {endpoint, keys}` upserts by endpoint and requires an account.
+- `DELETE /v1/push/subscriptions/{id}`.
+- `GET /v1/me/notifications` returns devices and per-crew settings.
+- No WebSocket changes.
+- Push payload, under 4 KB and in Declarative Web Push format **[V]**, which older browsers handle in `sw.js`:
+
+  ```json
+  {"web_push":8030,"notification":{"title":"...","body":"...","navigate":"/r/slug"}}
+  ```
+
+- Headers: `TTL: 300`, `Topic: crew id` (within the 32-character limit, hashed), `Urgency: high`.
+- Every push shows a visible notification, because silent pushes get permission revoked **[V]**.
+- `web/public` gains `manifest.webmanifest`, `sw.js` and icons. The service worker registers only after the user opts in, so first load does not change. `static.go` serves `sw.js` with `Cache-Control: no-cache`. CSP gains `worker-src 'self'`.
+
+### Service boundaries and flow
+
+```
+hub recorder ──tx──► crew_sessions + outbox ──NOTIFY──┐
+worker sweeper ─tx─► session_recaps + outbox ─────────┤
+                                                      ▼
+                    s2g notifier: pump (LISTEN + 30s poll)
+                        ExecuteWorkflow id=notify-{kind}-{ref}, queue=notify
+                                                      ▼
+                    NotifySession: sleep 30-45s
+                        session still open? else stop
+                        audience = members, notify=all, not present, not the starter,
+                                   not notified for this crew in the last 30 min
+                        activity: send, log, prune on 404/410, honor Retry-After on 429
+```
+
+The durable timer stops a false start from pinging anyone. The workflow ID dedupes. `NotifyRecap` has the same shape without the timer, and goes only to members in `session_people` with at least 2 people present.
+
+### Failure behavior
+
+| Failure | Behavior |
+|---|---|
+| Notifier or Temporal down | Outbox grows, product unaffected. `session.started` rows older than 5 minutes are marked done unsent. `recap.ready` rows are kept 24 hours |
+| Notifier restarts mid-timer | Temporal resumes the workflow; no double send |
+| Push service 404/410 | Delete the subscription |
+| 429 or 5xx | Activity retry with backoff, up to the 300s TTL |
+| Session ends before the timer | Nothing sent |
+| Duplicate activity retry | `notification_log` primary key prevents a second send |
+
+### Tests
+
+- **Go:** Temporal test environment drives `NotifySession` through the timer: session ended, cap hit, present user skipped, starter skipped.
+- **Delivery:** fake push endpoint in `httptest`, checking 410 pruning, 429 retry, headers, and VAPID JWT reuse (Apple asks for at most one refresh an hour **[V]**).
+- **Pump:** crash between start and mark-done sends once.
+- **Static:** `sw.js` caching header.
+- **e2e:** Chrome subscribes against the fake endpoint; `notificationclick` routing with a stubbed payload.
+- **Real devices, once:** iPhone Home Screen, Android Chrome, Mac Safari.
+
+### Exit
+
+- Absent members get the push within 60 seconds of session start at p95, in the fake-endpoint run.
+- Killing the notifier during the timer gives exactly one notification.
+- `serve` passes `make e2e` with Temporal and the notifier both stopped.
+- First-load JS is unchanged.
+- The real-device pass is recorded.
+
+## 6. Session recaps
+
+**Decision: Postgres.** A recap is a product read and must not be lossy, and a session is a few hundred rows. ClickHouse here is a best-effort telemetry sink with a 30-day TTL, and `plan.md` keeps it out of product reads **[V]**. Funnels may still go to ClickHouse.
+
+### User flow
+
+- **First 10 seconds.** A member opens the crew home after a session, or taps "Your recap from Movie Night is ready". The card at the top shows: who came, time together, videos in order, total reactions, and the biggest moment with its emoji counts and a "Relive it" link.
+- **Biggest moment.** The densest 20-second window of moments, needing at least 3 events from at least 2 people. Ties go to the earliest.
+- **Empty states.** A session without a qualifying moment gets a quiet card: "A quiet one. 2 videos, 1 h 10 min together." A solo session is listed but sends no notification. A video gone from `media` reads "Video unavailable".
+- **Share.** Off by default. "Share this recap" creates a revocable link, `/s/{token}`. The public page shows names, videos, reaction counts and the biggest moment, never chat text. It has a link to the video on its source site, no embed, and a "Start your own room" button. Turning sharing off gives a 404.
+- **Ephemeral rooms** get no recap. The host sees "Keep this room" instead.
+
+### Data model
+
+Migration `*_recaps.sql`:
+
+```sql
+CREATE TABLE session_recaps (
+  session_id text PRIMARY KEY REFERENCES crew_sessions(id) ON DELETE CASCADE,
+  doc jsonb NOT NULL,                 -- no title, thumbnail, author or duration from any source
+  share_token text UNIQUE,            -- NULL when not shared
+  built_at timestamptz NOT NULL DEFAULT now());
+```
+
+`doc`: `{wallMs, people:[{name,isGuest}], items:[{source,sourceId,reactions,messages}], reactions:{emoji:n}, biggest:{source,sourceId,posMs,emojis,people}|null}`. Titles and thumbnails are joined at read time (section 2).
+
+### API and WebSocket
+
+- `GET /v1/crews/{slug}/sessions/{id}/recap` (member).
+- `POST /v1/crews/{slug}/sessions/{id}/recap/share {public}` (any member who attended) returns `{url}`, or removes the token.
+- `GET /v1/recaps/{token}` (public).
+- `GET /s/{token}` serves the SPA with OG tags and `X-Robots-Tag: noindex`, in the style of `roomPage`.
+- No WebSocket changes.
+
+### Service boundaries
+
+`SweepSessions` ends a session and runs `BuildRecap` as an idempotent activity in `s2g worker` (`INSERT ... ON CONFLICT DO UPDATE`). It writes the `recap.ready` outbox row in the same transaction. `serve` only reads.
+
+### Failure behavior
+
+| Failure | Behavior |
+|---|---|
+| Build fails | Temporal retries; card reads "Your recap is on its way." |
+| Recorder dropped events | Recap is built from what exists; the biggest moment may be smaller |
+| Member deleted | Name becomes "Former member" in new reads; `doc` is rewritten by `DELETE /v1/me` |
+| Video purged | "Video unavailable"; `biggest` link is removed |
+
+### Tests
+
+- **Go:** pure `recap.Build` table tests for window edges, the 2-person rule, ties, quiet sessions, no items. Rebuild is idempotent.
+- **Compliance test:** seed `media` with marker strings and assert none appear in `doc`.
+- **Read path:** stale `media` gives "Video unavailable". Share on, off and revoked. Disclosure line is present.
+- **Public JSON:** contains no chat text.
+- **e2e:** two users, reactions, forced sweep, recap renders, share link opens signed out.
+
+### Exit
+
+- Recap is readable within 2 minutes of session end.
+- The compliance test passes on every CI run.
+- A 4-person, 2-hour simulated session builds in under 1 second.
+- A shared link renders for a signed-out visitor, and stops within one request of revocation.
+

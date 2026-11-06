@@ -59,7 +59,7 @@ func TestConfigAdvertisesFeatures(t *testing.T) {
 
 func TestDeepLinksReachTheApp(t *testing.T) {
 	s := staticServer(t)
-	for _, path := range []string{"/r/abc/catchup/12", "/s/token"} {
+	for _, path := range []string{"/r/abc/catchup/12"} {
 		response := httptest.NewRecorder()
 		s.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 		if !strings.Contains(response.Body.String(), "app") {

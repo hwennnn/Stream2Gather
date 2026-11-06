@@ -290,6 +290,7 @@ const causeSync = "sync"
 // conn is one browser tab.
 type conn struct {
 	id      string
+	address string
 	out     chan []byte
 	closed  chan struct{}
 	once    sync.Once

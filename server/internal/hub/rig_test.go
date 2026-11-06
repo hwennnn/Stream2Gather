@@ -157,13 +157,18 @@ type client struct {
 
 func (r *rig) dial(t *testing.T, roomID, userID, role string) *client {
 	t.Helper()
-	if err := r.db.EnsureUser(context.Background(), userID, userID); err != nil {
-		t.Fatal(err)
-	}
-	ticket, _ := json.Marshal(store.Ticket{
+	return r.dialTicket(t, store.Ticket{
 		RoomID: roomID, RoomSlug: roomID, RoomName: "Room",
 		Person: store.Person{UserID: userID, Name: userID, Role: role},
 	})
+}
+
+func (r *rig) dialTicket(t *testing.T, details store.Ticket) *client {
+	t.Helper()
+	if err := r.db.EnsureUser(context.Background(), details.Person.UserID, details.Person.Name); err != nil {
+		t.Fatal(err)
+	}
+	ticket, _ := json.Marshal(details)
 	address := "ws" + strings.TrimPrefix(r.server.URL, "http") + "?ticket=" + url.QueryEscape(string(ticket))
 	ws, _, err := websocket.Dial(context.Background(), address, nil)
 	if err != nil {

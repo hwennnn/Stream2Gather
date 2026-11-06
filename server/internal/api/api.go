@@ -42,7 +42,8 @@ const (
 	searchesPerHour = 20
 	// Tabs flush every ten seconds. This leaves room for a shared address.
 	telemetryPerMinute = 240
-	// Counts rooms that exist, so a mistyped link costs nothing.
+	// Counts rooms that exist, so a mistyped link costs nothing here. What a link
+	// costs to look up is charged separately, by source.LookupCharge.
 	roomsPerHour = 120
 	slugAttempts = 5
 )
@@ -503,7 +504,7 @@ func (s *Server) createRoom(w http.ResponseWriter, r *http.Request) {
 
 	state := room.New()
 	if request.URL != "" {
-		media, err := s.Catalog.Resolve(r.Context(), request.URL)
+		media, err := s.Catalog.Resolve(r.Context(), request.URL, source.LookupCharge(s.Live.Limit, s.clientIP(r)))
 		if err != nil {
 			s.mediaFailed(w, err)
 			return
@@ -552,6 +553,10 @@ func claimSlug(next func() string, create func(slug string) error) (string, erro
 }
 
 func (s *Server) mediaFailed(w http.ResponseWriter, err error) {
+	if errors.Is(err, source.ErrTooManyLinks) {
+		writeProblem(w, http.StatusTooManyRequests, "rate_limited", err.Error())
+		return
+	}
 	if source.IsUserError(err) {
 		writeProblem(w, http.StatusUnprocessableEntity, "media", err.Error())
 		return
@@ -691,6 +696,7 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		RoomID:   record.ID,
 		RoomSlug: record.Slug,
 		RoomName: record.Name,
+		Address:  s.clientIP(r),
 		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar, Member: member},
 	})
 	if err != nil {

@@ -27,6 +27,7 @@ type Config struct {
 	ClerkPublishable  string
 	ClerkSecret       string
 	SearchDailyBudget int
+	LookupDailyBudget int
 	LiveKit           LiveKit
 	VAPID             VAPID
 	EnableVimeo       bool
@@ -96,6 +97,8 @@ func Load() (Config, error) {
 		ClerkPublishable:  os.Getenv("CLERK_PUBLISHABLE_KEY"),
 		ClerkSecret:       os.Getenv("CLERK_SECRET_KEY"),
 		SearchDailyBudget: 90,
+		// A search costs 101 of the key's 10,000 units, so 90 of them leave about 900.
+		LookupDailyBudget: 800,
 		LiveKit: LiveKit{
 			URL:       os.Getenv("LIVEKIT_URL"),
 			APIKey:    os.Getenv("LIVEKIT_API_KEY"),

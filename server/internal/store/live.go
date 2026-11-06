@@ -306,7 +306,9 @@ type Ticket struct {
 	RoomID   string `json:"roomId"`
 	RoomSlug string `json:"roomSlug"`
 	RoomName string `json:"roomName"`
-	Person   Person `json:"person"`
+	// Address is who to charge for what this connection spends.
+	Address string `json:"address,omitempty"`
+	Person  Person `json:"person"`
 }
 
 // PutTicket stores a single-use ticket.

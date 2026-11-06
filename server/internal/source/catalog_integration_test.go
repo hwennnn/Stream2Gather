@@ -58,14 +58,14 @@ func TestCachedLiveVideoIsAskedAboutAgain(t *testing.T) {
 	}
 
 	still := &fakeSource{resolve: func() (room.Media, error) { return room.Media{}, ErrLive }}
-	if _, err := NewCatalog(db, 1, quiet(), still).Resolve(ctx, "https://x.test/"+id); !errors.Is(err, ErrLive) {
+	if _, err := NewCatalog(db, 1, quiet(), still).Resolve(ctx, "https://x.test/"+id, nil); !errors.Is(err, ErrLive) {
 		t.Fatalf("err = %v", err)
 	}
 
 	finished := &fakeSource{resolve: func() (room.Media, error) {
 		return room.Media{Source: "fake", SourceID: id, Title: "Replay"}, nil
 	}}
-	media, err := NewCatalog(db, 1, quiet(), finished).Resolve(ctx, "https://x.test/"+id)
+	media, err := NewCatalog(db, 1, quiet(), finished).Resolve(ctx, "https://x.test/"+id, nil)
 	if err != nil || media.Title != "Replay" {
 		t.Fatalf("media %+v, err %v", media, err)
 	}
@@ -94,5 +94,83 @@ func TestLiveVideosStayOutOfResults(t *testing.T) {
 		if len(items) != 1 || items[0].SourceID != video {
 			t.Fatalf("%s: %+v", name, items)
 		}
+	}
+}
+
+// metered costs quota, under a name no other test run shares.
+type metered struct {
+	fakeSource
+	name  string
+	calls int
+}
+
+func (m *metered) Metered()     {}
+func (m *metered) Name() string { return m.name }
+func (m *metered) Resolve(ctx context.Context, ref Ref) (room.Media, error) {
+	m.calls++
+	return m.fakeSource.Resolve(ctx, ref)
+}
+
+func deadLinks() *metered {
+	return &metered{name: "metered" + ids.New(), fakeSource: fakeSource{
+		resolve: func() (room.Media, error) { return room.Media{}, ErrUnavailable },
+	}}
+}
+
+func TestLookupBudgetStopsPayingForDeadLinks(t *testing.T) {
+	ctx := context.Background()
+	source := deadLinks()
+	catalog := NewCatalog(catalogDB(t), 0, quiet(), source)
+	catalog.LookupBudget = 2
+
+	for range 2 {
+		if _, err := catalog.Resolve(ctx, "https://x.test/"+ids.New(), nil); !errors.Is(err, ErrUnavailable) {
+			t.Fatalf("err = %v", err)
+		}
+	}
+	_, err := catalog.Resolve(ctx, "https://x.test/"+ids.New(), nil)
+	if !errors.Is(err, ErrLinksResting) || !IsUserError(err) {
+		t.Fatalf("err = %v", err)
+	}
+	if source.calls != 2 {
+		t.Fatalf("%d calls to the source, want 2", source.calls)
+	}
+}
+
+func TestOnlyLookupsTheCacheCannotAnswerAreCharged(t *testing.T) {
+	db := catalogDB(t)
+	ctx := context.Background()
+	id := ids.New()
+	if err := db.PutMedia(ctx, []room.Media{{Source: "fake", SourceID: id}}); err != nil {
+		t.Fatal(err)
+	}
+	source := deadLinks()
+	catalog := NewCatalog(db, 0, quiet(), source)
+	charged := 0
+	charge := func(context.Context) error {
+		charged++
+		return ErrTooManyLinks
+	}
+
+	if _, err := catalog.Resolve(ctx, "https://x.test/"+id, charge); err != nil {
+		t.Fatal(err)
+	}
+	if charged != 0 {
+		t.Fatalf("a cached link cost %d", charged)
+	}
+	if _, err := catalog.Resolve(ctx, "https://x.test/"+ids.New(), charge); !errors.Is(err, ErrTooManyLinks) {
+		t.Fatalf("err = %v", err)
+	}
+	if charged != 1 || source.calls != 0 {
+		t.Fatalf("charged %d, source called %d times: a refused charge must stop the call", charged, source.calls)
+	}
+}
+
+func TestSourcesThatCostNothingAreNotCharged(t *testing.T) {
+	ctx := context.Background()
+	catalog := NewCatalog(catalogDB(t), 0, quiet(), Direct{})
+	refuse := func(context.Context) error { return ErrTooManyLinks }
+	if _, err := catalog.Resolve(ctx, "https://x.test/"+ids.New()+".mp4", refuse); err != nil {
+		t.Fatal(err)
 	}
 }

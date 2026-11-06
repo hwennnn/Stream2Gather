@@ -35,6 +35,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 
 	c := &conn{
 		id:        ids.New(),
+		address:   ticket.Address,
 		person:    ticket.Person,
 		out:       make(chan []byte, sendBuffer),
 		closed:    make(chan struct{}),
@@ -263,7 +264,7 @@ func (r *liveRoom) queueAdd(ctx context.Context, c *conn, message Message) {
 	}
 
 	// Metadata always comes from the source, never from the client.
-	media, err := r.hub.catalog.Resolve(ctx, request.URL)
+	media, err := r.hub.catalog.Resolve(ctx, request.URL, source.LookupCharge(r.hub.live.Limit, c.address))
 	if err != nil {
 		if source.IsUserError(err) {
 			c.fail(message.ID, "media", err.Error())

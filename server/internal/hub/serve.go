@@ -122,7 +122,7 @@ func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 	case "media_error":
 		r.mediaError(c, message)
 	case room.CmdPlay, room.CmdPause, room.CmdSeek, room.CmdEnded, room.CmdSkip,
-		room.CmdQueueRemove, room.CmdQueueMove, room.CmdQueuePlay, room.CmdSettings:
+		room.CmdQueueRemove, room.CmdQueueMove, room.CmdQueuePlay, room.CmdQueueUndo, room.CmdSettings:
 		r.command(c, message)
 	default:
 		c.fail(message.ID, "unknown", "Unknown message.")

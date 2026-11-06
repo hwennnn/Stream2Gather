@@ -283,7 +283,7 @@ const Message = memo(({ session, canAdd, offline, message, name, onToast }: Mess
         )}
         {parts.map((part, index) =>
           part.kind === 'link' ? (
-            <a key={index} href={part.href} target="_blank" rel="noreferrer noopener" className="text-link underline underline-offset-2">
+            <a key={index} href={part.href} target="_blank" rel="noreferrer noopener" className="text-text underline underline-offset-2">
               {part.text}
             </a>
           ) : (

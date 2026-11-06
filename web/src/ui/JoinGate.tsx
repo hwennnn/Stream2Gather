@@ -4,7 +4,7 @@ import { useAccount } from '../auth/account';
 import { Avatar } from './Avatar';
 import { formatTime, suggestName } from './format';
 import { Page } from './Page';
-import { firstName, seatHues } from './people';
+import { firstName } from './people';
 import { Thumb } from './Thumb';
 
 type JoinGateProps = {
@@ -57,7 +57,6 @@ export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', 
   };
 
   const others = preview?.members ?? [];
-  seatHues(others.map((person) => person.userId));
   const extra = others.length - SHOWN;
   const inviter = others.find((person) => person.role === 'host') ?? others[0];
   // A crew's gate counts its members, so seats nobody took would say something else.

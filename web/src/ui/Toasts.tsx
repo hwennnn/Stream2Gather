@@ -71,7 +71,7 @@ export const ToastStack = ({ toasts, notices, limit = MAX_SHOWN, className, chil
           {url && (
             <>
               {' '}
-              <a href={url} target="_blank" rel="noreferrer noopener" className="text-link underline underline-offset-2">
+              <a href={url} target="_blank" rel="noreferrer noopener" className="text-text underline underline-offset-2">
                 {openLabel(url)}
               </a>
             </>

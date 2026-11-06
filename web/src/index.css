@@ -44,8 +44,6 @@
 
   /* One job: the action that matters, and what's selected. */
   --color-primary: #4f57ee;
-  /* Links are links. People have their own hues, in ui/people.ts. */
-  --color-link: #93bbe8;
 
   /* Each has one job, and always comes with a word. */
   --color-good: #6fbf94;

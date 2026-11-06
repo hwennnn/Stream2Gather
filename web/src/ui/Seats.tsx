@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { RoomView } from '../room/session';
 import { Avatar } from './Avatar';
 import { Icon } from './Icon';
-import { firstName, hueOf, seatHues } from './people';
+import { firstName, hueOf } from './people';
 import { MAX_SEATS, placeSeats, rowLength, standing, type Row } from './seatRow';
 
 const STATES = new Map([
@@ -15,7 +15,6 @@ const STATES = new Map([
 export const useSeats = (view: RoomView): Row => {
   const row = useRef<Row>([]);
   row.current = placeSeats(row.current, view.members, MAX_SEATS, view.vacated);
-  seatHues(view.members.map((person) => person.userId));
   return row.current;
 };
 

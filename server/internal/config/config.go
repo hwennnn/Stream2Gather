@@ -4,6 +4,8 @@ package config
 import (
 	"bufio"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -88,7 +90,7 @@ func Load() (Config, error) {
 		TemporalAddr:      env("TEMPORAL_ADDR", "127.0.0.1:7235"),
 		TemporalNamespace: env("TEMPORAL_NAMESPACE", "s2g"),
 		WebDir:            env("WEB_DIR", "../web/dist"),
-		PublicOrigin:      env("PUBLIC_ORIGIN", "http://127.0.0.1:5273"),
+		PublicOrigin:      namedOrigin(env("PUBLIC_ORIGIN", "http://localhost:5273")),
 		SessionKey:        os.Getenv("SESSION_KEY"),
 		YouTubeAPIKey:     os.Getenv("YOUTUBE_API_KEY"),
 		YouTubeBaseURL:    env("YOUTUBE_BASE_URL", "https://www.googleapis.com/youtube/v3"),
@@ -117,6 +119,33 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("SESSION_KEY is required outside dev")
 	}
 	return cfg, nil
+}
+
+// namedOrigin gives a loopback address its name. On a page whose address is an
+// IP, YouTube refuses many videos with error 150, the code an owner's own embed
+// block gives, while the same videos play on localhost.
+func namedOrigin(origin string) string {
+	link, err := url.Parse(origin)
+	if err != nil {
+		return origin
+	}
+	ip := net.ParseIP(link.Hostname())
+	if ip == nil || !ip.IsLoopback() {
+		return origin
+	}
+	port := link.Port()
+	link.Host = "localhost"
+	if port != "" {
+		link.Host += ":" + port
+	}
+	return link.String()
+}
+
+// IPOrigin reports whether a site's address is an IP, so YouTube's refusals there
+// say nothing about the video.
+func IPOrigin(origin string) bool {
+	link, err := url.Parse(origin)
+	return err == nil && net.ParseIP(link.Hostname()) != nil
 }
 
 func env(key, fallback string) string {

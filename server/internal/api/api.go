@@ -118,7 +118,7 @@ func (s *Server) Handler() http.Handler {
 	if timeout == 0 {
 		timeout = requestTimeout
 	}
-	return securityHeaders(withDeadline(mux, timeout), contentPolicy(policy{
+	return securityHeaders(namedHost(s.PublicOrigin, withDeadline(mux, timeout)), contentPolicy(policy{
 		ClerkHost:   auth.ClerkHost(s.ClerkPublishableKey),
 		Socket:      socketOrigin(s.PublicOrigin),
 		DirectMedia: s.DirectMedia,
@@ -199,6 +199,28 @@ func withDeadline(next http.Handler, timeout time.Duration) http.Handler {
 		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// namedHost sends a page opened at a loopback IP to the site's named address,
+// because YouTube refuses many videos on a page whose address is an IP. Only
+// browser navigation moves: scripts and health checks can use either address.
+func namedHost(public string, next http.Handler) http.Handler {
+	origin, err := url.Parse(public)
+	if err != nil || net.ParseIP(origin.Hostname()) != nil {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if name, _, err := net.SplitHostPort(r.Host); err == nil {
+			host = name
+		}
+		ip := net.ParseIP(strings.Trim(host, "[]"))
+		if ip != nil && ip.IsLoopback() && r.Method == http.MethodGet && r.Header.Get("Sec-Fetch-Mode") == "navigate" {
+			http.Redirect(w, r, public+r.URL.RequestURI(), http.StatusTemporaryRedirect)
+			return
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

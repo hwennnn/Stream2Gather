@@ -20,7 +20,7 @@ web:
 	cd web && npm ci && npm run build
 
 serve:
-	cd server && PUBLIC_ORIGIN=http://127.0.0.1:18080 go run ./cmd/s2g serve
+	cd server && PUBLIC_ORIGIN=http://localhost:18080 go run ./cmd/s2g serve
 
 temporal:
 	mkdir -p server/.data

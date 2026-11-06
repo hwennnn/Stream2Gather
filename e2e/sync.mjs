@@ -1,11 +1,11 @@
 // Puts real browsers in one room and measures how far apart their videos are.
 // `make e2e` builds what this needs and runs it against a private server. To run
 // it by hand, point BASE at a server with ALLOW_DIRECT_MEDIA=true and sample.mp4
-// in its web build: BASE=http://127.0.0.1:18082 node sync.mjs [output-dir]
+// in its web build: BASE=http://localhost:18082 node sync.mjs [output-dir]
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
 
-const BASE = process.env.BASE ?? 'http://127.0.0.1:18082';
+const BASE = process.env.BASE ?? 'http://localhost:18082';
 const OUT = process.argv[2] ?? '.';
 const YOUTUBE_OK = process.env.YOUTUBE_OK ?? 'https://www.youtube.com/watch?v=aqz-KE-bpKQ';
 const YOUTUBE_BLOCKED = process.env.YOUTUBE_BLOCKED ?? '';

@@ -13,7 +13,7 @@ sample=${E2E_SAMPLE:-$root/.data/sample.mp4}
 work=$(mktemp -d)
 web=$work/web
 out=${E2E_OUT:-$work}
-base=http://127.0.0.1:$port
+base=http://localhost:$port
 
 server=
 stop() {

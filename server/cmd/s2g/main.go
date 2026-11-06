@@ -141,6 +141,10 @@ func serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	}
 	go sink.Run(ctx)
 
+	if config.IPOrigin(cfg.PublicOrigin) {
+		log.Warn("PUBLIC_ORIGIN is an IP address: YouTube will refuse many videos here, so use a hostname", "origin", cfg.PublicOrigin)
+	}
+
 	db := store.NewPostgres(pool)
 	live := store.NewLive(rdb)
 

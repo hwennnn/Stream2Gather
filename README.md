@@ -13,7 +13,7 @@
 
 > **Rebuild in progress.** `server/` (Go) and `web/` (Vite, React) replace `backend/` and `frontend/`. See [the plan](docs/rebuild/plan.md) and [the measurements](docs/rebuild/measurements.md).
 >
-> To run it, add `YOUTUBE_API_KEY` to `server/.env.local`, then run `make up web serve` and open <http://127.0.0.1:18080>. Background jobs need `make temporal` and `make worker`.
+> To run it, add `YOUTUBE_API_KEY` to `server/.env.local`, then run `make up web serve` and open <http://localhost:18080>. Background jobs need `make temporal` and `make worker`.
 >
 > `make test` runs the unit tests. `make e2e` runs real browsers against a private server on port 18082; it needs `make up`, Google Chrome and ffmpeg, and builds everything else itself.
 

@@ -387,3 +387,54 @@ func TestANewRoomsVideoSurvivesLosingRedis(t *testing.T) {
 		t.Fatalf("saved queue = %+v: Redis held the only copy of the video", state.Queue)
 	}
 }
+
+func TestLoopbackPageMovesToTheNamedOrigin(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	handler := namedHost("http://localhost:18099", next)
+
+	cases := []struct {
+		name, method, host, target, mode string
+		want                             int
+	}{
+		{"a page at the IP moves", http.MethodGet, "127.0.0.1:18099", "/r/calm-sofa?x=1", "navigate", http.StatusTemporaryRedirect},
+		{"ipv6 loopback moves", http.MethodGet, "[::1]:18099", "/", "navigate", http.StatusTemporaryRedirect},
+		{"the named page stays", http.MethodGet, "localhost:18099", "/", "navigate", http.StatusOK},
+		{"scripts keep working", http.MethodGet, "127.0.0.1:18099", "/readyz", "", http.StatusOK},
+		{"page fetches keep working", http.MethodGet, "127.0.0.1:18099", "/v1/session", "cors", http.StatusOK},
+		{"a post is never moved", http.MethodPost, "127.0.0.1:18099", "/", "navigate", http.StatusOK},
+		{"a LAN address has nowhere to go", http.MethodGet, "192.168.1.20:18099", "/", "navigate", http.StatusOK},
+	}
+	for _, c := range cases {
+		request := httptest.NewRequest(c.method, c.target, nil)
+		request.Host = c.host
+		if c.mode != "" {
+			request.Header.Set("Sec-Fetch-Mode", c.mode)
+		}
+		recorder := httptest.NewRecorder()
+		handler.ServeHTTP(recorder, request)
+		if recorder.Code != c.want {
+			t.Errorf("%s: status %d", c.name, recorder.Code)
+		}
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/r/calm-sofa?x=1", nil)
+	request.Host = "127.0.0.1:18099"
+	request.Header.Set("Sec-Fetch-Mode", "navigate")
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, request)
+	if got := recorder.Header().Get("Location"); got != "http://localhost:18099/r/calm-sofa?x=1" {
+		t.Errorf("location = %q", got)
+	}
+}
+
+func TestAnIPOriginHasNothingToMoveTo(t *testing.T) {
+	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	request.Host = "127.0.0.1:18099"
+	request.Header.Set("Sec-Fetch-Mode", "navigate")
+	recorder := httptest.NewRecorder()
+	namedHost("http://192.168.1.20:18099", next).ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status %d", recorder.Code)
+	}
+}

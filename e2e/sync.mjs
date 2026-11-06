@@ -39,6 +39,7 @@ const viewer = async (name, { latencyMs = 0 } = {}) => {
     const Native = window.WebSocket;
     window.__sockets = [];
     window.__roomEvents = 0;
+    window.__sent = [];
     window.WebSocket = class extends Native {
       #onmessage = null;
       constructor(...args) {
@@ -57,6 +58,7 @@ const viewer = async (name, { latencyMs = 0 } = {}) => {
         this.#onmessage = handler;
       }
       send(data) {
+        window.__sent.push(JSON.parse(data).t);
         if (delay === 0) super.send(data);
         else setTimeout(() => this.readyState === Native.OPEN && super.send(data), delay);
       }
@@ -262,6 +264,61 @@ const waitPlaying = async (viewers, timeout = 15000) => {
     sendOnSocket(host, 'queue.add', { url: `${BASE}/sample.mp4?video=next`, mode: 'end' }));
 
   report.pauseAfterEventErrors = [...new Set([...host.errors, ...guest.errors])].slice(0, 5);
+  await Promise.all([host, guest].map((v) => v.context.close()));
+}
+
+// Chrome's own controls pause on the way to something else. A double-click pauses
+// and plays, and the timeline pauses, seeks and plays. None of that is a pause.
+{
+  const [host, guest] = await Promise.all(['host', 'guest'].map(viewer));
+  const room = await createRoom(host, `${BASE}/sample.mp4`);
+  await join(guest, room.url);
+  check('native controls: both play', await waitPlaying([host, guest]), '');
+  await sleep(3000);
+  const box = await host.page.locator('video').boundingBox();
+  const barY = box.y + box.height - 22;
+  const barX = (share) => box.x + box.width * share;
+  await host.page.mouse.move(barX(0.5), barY);
+  await sleep(600);
+
+  const sentFrom = (types) => host.page.evaluate((list) => {
+    const seen = window.__sent.filter((type) => list.includes(type));
+    window.__sent.length = 0;
+    return seen;
+  }, types);
+  const roomMoved = async (share) => {
+    const target = 300 * share;
+    const landed = await waitFor(async () => {
+      const samples = await sampleAll([host, guest]);
+      return samples.every((s) => s.state === 'playing' && Math.abs(s.time - target) < 5) && pairwiseDrift(samples) < 0.3;
+    }, 4000);
+    return { landed, sent: await sentFrom(['play', 'pause', 'seek']) };
+  };
+
+  await sentFrom([]);
+  await host.page.mouse.click(barX(0.55), barY);
+  const click = await roomMoved(0.55);
+  check('native controls: a timeline click is one seek', click.landed && click.sent.join() === 'seek', JSON.stringify(click));
+
+  await sleep(2000);
+  await host.page.mouse.move(barX(0.3), barY);
+  await host.page.mouse.down();
+  for (const share of [0.35, 0.4, 0.45, 0.5]) {
+    await host.page.mouse.move(barX(share), barY);
+    await sleep(300);
+  }
+  await host.page.mouse.up();
+  const drag = await roomMoved(0.5);
+  check('native controls: a timeline drag is one seek', drag.landed && drag.sent.join() === 'seek', JSON.stringify(drag));
+
+  await sleep(2000);
+  await host.page.mouse.dblclick(barX(0.5), box.y + box.height / 2);
+  await sleep(1500);
+  const states = (await sampleAll([host, guest])).map((s) => s?.state);
+  const clicked = await sentFrom(['play', 'pause', 'seek']);
+  check('native controls: a double-click leaves the room alone', states.every((s) => s === 'playing') && clicked.length === 0, `${states} ${clicked}`);
+
+  report.nativeControlErrors = [...new Set([...host.errors, ...guest.errors])].slice(0, 5);
   await Promise.all([host, guest].map((v) => v.context.close()));
 }
 

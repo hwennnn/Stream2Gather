@@ -47,6 +47,14 @@ const USER_SEEK_THRESHOLD_S = 1;
 const USER_SEEK_BUFFERED_S = 3;
 /** A jump to within this of where we last sent the player is that seek landing. */
 const OWN_SEEK_WINDOW_S = 2;
+/**
+ * How long a pause waits before it goes to the room. A double-click pauses and
+ * plays, and a click on the timeline pauses, seeks and plays. Neither is a pause.
+ */
+const PAUSE_HOLD_MS = 300;
+/** Dragging the timeline keeps the player paused. It is over once it rests this long. */
+const SCRUB_REST_MS = 1000;
+const SCRUB_MOVED_S = 0.5;
 /** Beyond this, a throttled tab makes the time between ticks meaningless. */
 const MAX_TICK_GAP_MS = 2500;
 const STALL_TICKS = 3;
@@ -85,6 +93,8 @@ export class SyncController {
   private expecting: 'paused' | 'playing' | null = null;
   /** What this viewer last told the room, until the room answers. */
   private asked: 'paused' | 'playing' | null = null;
+  /** A pause the viewer made that the room has not been told about yet. */
+  private held: { timer: number; time: number } | null = null;
   private stalledTicks = 0;
   /** The player has been seen resting on the room's paused position. */
   private settled = false;
@@ -112,6 +122,12 @@ export class SyncController {
     if (!resync && previous && samePlayback(previous, playback)) return;
     this.playback = playback;
     this.asked = null;
+    if (this.held && playback.status === 'playing') {
+      // Someone else moved the room first. This viewer's pause still stands.
+      this.endHold();
+      if (this.held || this.asked) return;
+    }
+    this.dropHold();
     this.settled &&= previous?.item === playback.item && previous.pos === playback.pos;
     this.cancelNudge();
     this.clearStart();
@@ -238,15 +254,18 @@ export class SyncController {
    * a tab the browser put to sleep between ticks.
    */
   private detectUserSeek(playback: Playback, time: number, now: number, expected: number): void {
-    if (!this.anchor || now - this.lastTickAt > MAX_TICK_GAP_MS) return;
+    if (!this.jumped(playback, time, now) || Math.abs(time - expected) <= USER_SEEK_THRESHOLD_S) return;
+    this.pendingSeek = null;
+    this.markAction();
+    this.emit({ type: 'seek', pos: time, ct: now });
+    this.remember(time, now);
+  }
+
+  private jumped(playback: Playback, time: number, now: number): boolean {
+    if (!this.anchor || now - this.lastTickAt > MAX_TICK_GAP_MS) return false;
     const elapsed = ((now - this.anchor.at) / 1000) * playback.rate;
     const margin = this.anchor.buffered ? USER_SEEK_BUFFERED_S : USER_SEEK_THRESHOLD_S;
-    const jumped = time < this.anchor.time - margin || time > this.anchor.time + elapsed + margin;
-    if (jumped && Math.abs(time - expected) > USER_SEEK_THRESHOLD_S) {
-      this.pendingSeek = null;
-      this.markAction();
-      this.emit({ type: 'seek', pos: time, ct: now });
-    }
+    return time < this.anchor.time - margin || time > this.anchor.time + elapsed + margin;
   }
 
   /**
@@ -366,7 +385,30 @@ export class SyncController {
   }
 
   private settling(now: number): boolean {
-    return now - this.settleFrom < SETTLE_MS;
+    return this.held !== null || now - this.settleFrom < SETTLE_MS;
+  }
+
+  private holdPause(time: number, ms: number): void {
+    this.dropHold();
+    this.held = { time, timer: this.timers.setTimeout(() => this.endHold(), ms) };
+  }
+
+  private dropHold(): void {
+    if (this.held) this.timers.clearTimeout(this.held.timer);
+    this.held = null;
+  }
+
+  /** The player kept going, so the viewer never paused. Otherwise the room needs to know. */
+  private endHold(): void {
+    const from = this.held?.time;
+    this.dropHold();
+    if (from === undefined || this.player.state() !== 'paused') return;
+    const time = this.player.time();
+    if (Math.abs(time - from) > SCRUB_MOVED_S) {
+      this.holdPause(time, SCRUB_REST_MS);
+      return;
+    }
+    this.tellRoom('paused', { type: 'pause', pos: time, ct: this.clock.now() });
   }
 
   /**
@@ -394,12 +436,18 @@ export class SyncController {
 
     const now = this.clock.now();
     if (now < playback.at) return;
+    const time = this.player.time();
     // Until the room answers, its status is older than what this viewer just did.
     const status = this.asked ?? playback.status;
     if (state === 'paused' && status === 'playing') {
-      this.tellRoom('paused', { type: 'pause', pos: this.player.time(), ct: now });
+      this.markAction();
+      // A pause that lands away from the player is the timeline being grabbed.
+      this.holdPause(time, this.jumped(playback, time, now) ? SCRUB_REST_MS : PAUSE_HOLD_MS);
     } else if (state === 'playing' && status === 'paused') {
-      this.tellRoom('playing', { type: 'play', pos: this.player.time(), ct: now });
+      this.tellRoom('playing', { type: 'play', pos: time, ct: now });
+    } else if (state === 'playing') {
+      this.dropHold();
+      if (!this.noteLanding(time)) this.detectUserSeek(playback, time, now, expectedPosition(playback, now));
     }
   }
 
@@ -412,5 +460,6 @@ export class SyncController {
   destroy(): void {
     this.cancelNudge();
     this.clearStart();
+    this.dropHold();
   }
 }

@@ -685,6 +685,34 @@ func nextInLine(people []store.Person) store.Person {
 	})
 }
 
+// settleFailures moves on from a video the people still here can't play. Reports
+// decide this as they arrive, but someone leaving can tip it with no report at all.
+func (r *liveRoom) settleFailures(ctx context.Context, people []store.Person) {
+	state, found, err := r.hub.live.Load(ctx, r.id)
+	if err != nil || !found || state.Playback.ItemID == "" || len(state.Queue) == 0 {
+		return
+	}
+	item := state.Queue[0]
+	failing, err := r.hub.live.Failing(ctx, r.id, item.ID)
+	if err != nil || !mostAreFailing(people, failing) {
+		return
+	}
+	if r.applySystem(ctx, room.Command{Type: room.CmdSkip, Item: item.ID}) {
+		r.publishNotice(ctx, skippedNotice(item, false))
+	}
+}
+
+// mostAreFailing counts only those still here. Someone who left isn't watching.
+func mostAreFailing(people []store.Person, failing []string) bool {
+	here := 0
+	for _, person := range people {
+		if slices.Contains(failing, person.UserID) {
+			here++
+		}
+	}
+	return here*2 > len(people)
+}
+
 func (r *liveRoom) publishNotice(ctx context.Context, notice map[string]string) {
 	if err := r.hub.live.Publish(ctx, r.id, encode("notice", notice)); err != nil {
 		r.hub.log.Warn("notice publish failed", "room", r.id, "error", err)
@@ -973,6 +1001,7 @@ func (r *liveRoom) leave(c *conn, said bool) {
 	}
 	if err == nil && len(people) > 0 {
 		r.settleHost(ctx)
+		r.settleFailures(ctx, people)
 	}
 	if err == nil && len(people) == 0 {
 		if err := r.hub.live.MarkEmpty(ctx, r.id, time.Now().UnixMilli()); err != nil {

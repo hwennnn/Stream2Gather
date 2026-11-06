@@ -68,3 +68,36 @@ Real browsers, from `e2e/sync.mjs`:
 Telemetry from those runs put join at about 310 ms and first frame at 1.2 s p50, 4.7 s p95, mixing MP4 and YouTube and including the 1.5 s shared start. The 310 ms is far above the 10 ms the load test sees for the same join, and the cause is not known yet.
 
 Not tested: real networks, Safari, physical phones, ads, and a server dying while viewers are connected.
+
+## Phase 2: voice and sources
+
+Everything here ran on one loaded development machine, load average 25 to 200. Voice used fake microphones and a real LiveKit on loopback. There are no real networks in these numbers, and they are best cases.
+
+| Measure | Result | Target |
+|---|---|---|
+| Click to listening, p95 | 212-854 ms over five runs, three near 220 ms | Under 1.5 s across two real networks, not yet run |
+| Unmute to audible, p95 | 203-222 ms, one run at 792 ms at load above 100 | Under 500 ms |
+| Six people talking, video drift p95 | 46-91 ms, against 24-50 ms for the same six quiet | Unchanged |
+| Past token expiry | Still talking after 16 minutes | 15 minutes |
+| `RoomPage` with voice | +0.20 kB gz | At most +3 kB |
+| Voice chunk | 154.26 kB gz | At most 155 kB |
+| Entry JS | Unchanged | Unchanged |
+| `player-overlap.mjs` with voice open | 136 checks, 0 problems, all 6 layouts | Pass |
+| `make e2e` with LiveKit stopped | No voice failure | Pass |
+
+Six people talking does not meet "unchanged". Talking read 19-41 ms above the quiet control in all three runs, each 20 samples, though under the 80 ms MP4 line in two of them. The third, at 91 ms, was on a loaded machine. Rerun on a quiet machine before calling this settled.
+
+Drift between two viewers, by source:
+
+| Source | p95 | Target | How |
+|---|---|---|---|
+| HLS, played by the browser | 2 ms, up to 248 ms at high load | As html5 | `e2e/sync.mjs` |
+| HLS, through hls.js | 3-6 ms, one run at 917 ms from a single 0.9 s jump | As html5 | `e2e/sync.mjs`, native HLS hidden |
+| Vimeo | About 23 ms apart, 22 ms p95 in a single tab | At most 500 ms | Two real Chrome tabs, by hand |
+| Twitch VOD | 574 ms, 976 ms in a shorter run | At most 1.5 s | Two headless viewers, autoplay policy off |
+
+Chrome 156 plays HLS itself, so hls.js only runs in browsers that can't. `e2e/sync.mjs` covers both paths and proves which one ran.
+
+Drift checks are sensitive to load. On one day, plain MP4 read 185 ms p95 in `make e2e` at load 120. Alternating master with an older commit at load 34 to 88 then read 1-2 ms and 0-2 ms, so that was not a regression.
+
+Not tested: real networks, real devices, Safari, Firefox, Twitch ads, and a real `https` host refusing CORS. The real-device matrix for voice and push has not been run.

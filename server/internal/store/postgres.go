@@ -101,6 +101,25 @@ func (p *Postgres) SessionVersion(ctx context.Context, id string) (int64, error)
 	return version, err
 }
 
+// SessionVersions returns the versions of the users that still exist.
+func (p *Postgres) SessionVersions(ctx context.Context, ids []string) (map[string]int64, error) {
+	rows, err := p.pool.Query(ctx, `SELECT id, session_version FROM users WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	versions := make(map[string]int64, len(ids))
+	for rows.Next() {
+		var id string
+		var version int64
+		if err := rows.Scan(&id, &version); err != nil {
+			return nil, err
+		}
+		versions[id] = version
+	}
+	return versions, rows.Err()
+}
+
 // BumpSessionVersion turns away every cookie issued to this user so far.
 func (p *Postgres) BumpSessionVersion(ctx context.Context, id string) error {
 	_, err := p.pool.Exec(ctx, `UPDATE users SET session_version = session_version + 1 WHERE id = $1`, id)

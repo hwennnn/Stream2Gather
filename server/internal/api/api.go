@@ -716,12 +716,14 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 	}
 	id := ids.New()
 	err = s.Live.PutTicket(r.Context(), id, store.Ticket{
-		RoomID:     record.ID,
-		RoomSlug:   record.Slug,
-		RoomName:   record.Name,
-		MaxMembers: record.MaxMembers,
-		Address:    s.clientIP(r),
-		Person:     store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar, Member: member},
+		RoomID:         record.ID,
+		RoomSlug:       record.Slug,
+		RoomName:       record.Name,
+		MaxMembers:     record.MaxMembers,
+		Account:        claims.Account,
+		SessionVersion: claims.Version,
+		Address:        s.clientIP(r),
+		Person:         store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar, Member: member},
 	})
 	if err != nil {
 		s.internal(w, err)

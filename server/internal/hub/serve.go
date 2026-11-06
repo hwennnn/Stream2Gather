@@ -35,6 +35,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	c := &conn{
 		id:        ids.New(),
 		address:   ticket.Address,
+		version:   ticket.SessionVersion,
 		person:    ticket.Person,
 		out:       make(chan []byte, sendBuffer),
 		closed:    make(chan struct{}),
@@ -45,6 +46,10 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 		voiceRate: rate.NewLimiter(5, 10),
 	}
 	defer c.close()
+	if ticket.Account {
+		h.accounts.Store(c, struct{}{})
+		defer h.accounts.Delete(c)
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

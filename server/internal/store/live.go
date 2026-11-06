@@ -308,6 +308,10 @@ type Ticket struct {
 	RoomName string `json:"roomName"`
 	// MaxMembers is the room's cap, for the check that races can't get past.
 	MaxMembers int `json:"maxMembers,omitempty"`
+	// Account marks a signed-in person, and SessionVersion is what their cookie
+	// carried. Sign-out moves the version on, which ends the connection.
+	Account        bool  `json:"account,omitempty"`
+	SessionVersion int64 `json:"sessionVersion,omitempty"`
 	// Address is who to charge for what this connection spends.
 	Address string `json:"address,omitempty"`
 	Person  Person `json:"person"`

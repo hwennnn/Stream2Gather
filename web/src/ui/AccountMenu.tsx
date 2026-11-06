@@ -6,7 +6,7 @@ const ITEM = 'block w-full cursor-pointer rounded-md px-3 py-2 text-left text-[1
 
 /** `onOpen` lets the room make space first: the menu must not open over the player. */
 export const AccountMenu = ({ onOpen }: { onOpen?: () => void }) => {
-  const { user, publishableKey, problem, startFailed } = useAccount();
+  const { user, publishableKey, problem, othersMayRemain, startFailed } = useAccount();
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
 
@@ -36,14 +36,21 @@ export const AccountMenu = ({ onOpen }: { onOpen?: () => void }) => {
 
   if (!user?.signedIn) {
     return (
-      <button
-        type="button"
-        onClick={() => account.signIn()}
-        title={problem ?? undefined}
-        className="btn btn-ghost"
-      >
-        {problem ? 'Sign-in unavailable' : 'Sign in'}
-      </button>
+      <div className="flex items-center gap-3">
+        {othersMayRemain && (
+          <p role="status" className="text-[13px] text-bad">
+            Your other devices may still be signed in.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => account.signIn()}
+          title={problem ?? undefined}
+          className="btn btn-ghost"
+        >
+          {problem ? 'Sign-in unavailable' : 'Sign in'}
+        </button>
+      </div>
     );
   }
 

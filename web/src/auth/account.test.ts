@@ -25,7 +25,7 @@ const load = async (me: Account | null = guest) => {
 };
 
 let storage: Map<string, string>;
-const responses: { me: Account | null; session: Account | null; meDown?: boolean; configDown?: boolean } = { me: null, session: null };
+const responses: { me: Account | null; session: Account | null; meDown?: boolean; configDown?: boolean; signOutDown?: boolean } = { me: null, session: null };
 const signedOutCalls = vi.fn();
 const exchanges = vi.fn();
 
@@ -37,6 +37,7 @@ describe('account sign-in', () => {
     responses.session = ada;
     responses.meDown = false;
     responses.configDown = false;
+    responses.signOutDown = false;
     vi.stubGlobal('sessionStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => storage.set(key, value),
@@ -55,7 +56,7 @@ describe('account sign-in', () => {
       }
       if (path === '/v1/session' && init?.method === 'DELETE') {
         signedOutCalls();
-        return body({ user: null });
+        return responses.signOutDown ? new Response('{}', { status: 500 }) : body({ user: null });
       }
       throw new Error(`unexpected ${path}`);
     });
@@ -212,6 +213,18 @@ describe('account sign-in', () => {
 
       expect(exchanges).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('says so when the server could not reach the viewer’s other devices', async () => {
+    const { account, clerkReports } = await load(ada);
+    await clerkReports(true);
+    responses.me = null;
+    responses.signOutDown = true;
+
+    await account.signOut();
+
+    expect(account.current().user).toBeNull();
+    expect(account.current().othersMayRemain).toBe(true);
   });
 
   it('signs out of this app when Clerk no longer knows the viewer', async () => {

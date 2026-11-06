@@ -23,7 +23,11 @@ func (s *Server) voiceToken(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusServiceUnavailable, "voice_unavailable", "Voice isn't available.")
 		return
 	}
-	claims, ok := s.session(r)
+	claims, ok, err := s.session(r)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
 	if !ok {
 		writeProblem(w, http.StatusUnauthorized, "unauthorized", "Join the room to use voice.")
 		return

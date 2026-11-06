@@ -37,7 +37,7 @@ mkdir -p "$web/hls"
 ffmpeg -loglevel error -y -i "$sample" -t 60 -c copy -hls_time 4 -hls_playlist_type vod \
   -hls_segment_filename "$web/hls/%03d.ts" "$web/hls/index.m3u8"
 [ -d "$root/e2e/node_modules" ] || (cd "$root/e2e" && npm ci)
-(cd "$root/server" && go build -o "$work/s2g" ./cmd/s2g)
+(cd "$root/server" && go build -o "$work/s2g" ./cmd/s2g && go build -o "$work/mint-account" ./cmd/mint-account)
 
 # It runs from server/ so that a YOUTUBE_API_KEY in .env.local applies, as with `make serve`.
 # Clerk stays off, because it would sign out the accounts crews.mjs makes.
@@ -54,5 +54,5 @@ done
 
 cd "$root/e2e"
 for script in $scripts; do
-  BASE=$base node "$script" "$out"
+  BASE=$base E2E_NOTIFIER=$work/s2g E2E_MINT=$work/mint-account E2E_SERVER_DIR=$root/server node "$script" "$out"
 done

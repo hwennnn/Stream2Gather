@@ -1,4 +1,4 @@
-.PHONY: up down voice voice-keys push-keys web serve worker notifier temporal test sample e2e e2e-voice flows
+.PHONY: up down voice voice-keys push-keys web serve worker notifier temporal test sample e2e e2e-voice e2e-push flows
 
 up:
 	docker compose -f deploy/compose.yaml up -d --wait
@@ -54,6 +54,10 @@ e2e:
 
 e2e-voice:
 	E2E_SCRIPT=voice.mjs ./e2e/run.sh
+
+# Needs `make temporal` and `make push-keys`. Runs the notifier itself, and sends only to a fake push service.
+e2e-push:
+	E2E_SCRIPT=push.mjs ./e2e/run.sh
 
 # Every user flow against a real server, Postgres and Redis. GREP narrows it.
 flows:

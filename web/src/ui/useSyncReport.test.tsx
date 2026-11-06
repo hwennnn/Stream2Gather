@@ -3,7 +3,7 @@ import { act, cleanup, render, renderHook, screen } from '@testing-library/react
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerAdapter } from '../players/types';
 import type { RoomSession, RoomView } from '../room/session';
-import { SyncPill } from './PlayerStage';
+import { RoomStatus } from './RoomStatus';
 import { useRoomPlayer } from './useRoomPlayer';
 
 const adapter = {
@@ -73,10 +73,10 @@ describe('the room player', () => {
     expect(renders()).toBe(settled);
   });
 
-  it('still tells the pill how the sync is going', async () => {
+  it('still tells the status how the sync is going', async () => {
     const { result } = await mounted();
-    render(<SyncPill view={view} player={result.current} />);
+    render(<RoomStatus view={view} player={result.current} act={null} offlineFor={null} onRetry={() => {}} />);
     await seconds(2);
-    expect(screen.getByText('In sync')).toBeTruthy();
+    expect(screen.getByText(/everyone together/)).toBeTruthy();
   });
 });

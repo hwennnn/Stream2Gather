@@ -1,6 +1,5 @@
 import type { Media, Person } from '../api/http';
 import type { ChatEntry, RoomView } from '../room/session';
-import type { SyncHealth } from '../sync/controller';
 
 export const isHost = (view: RoomView): boolean => view.self?.role === 'host';
 
@@ -60,18 +59,3 @@ const CHAT_NOTICES = new Set(['host', 'skipped']);
 
 export const noticesToShow = <T extends { kind?: string; url?: string }>(notices: T[], tab: string, railHidden: boolean): T[] =>
   tab === 'chat' && !railHidden ? notices.filter(({ kind, url }) => url || !CHAT_NOTICES.has(kind ?? '')) : notices;
-
-export type Pill = { text: string; tone: 'good' | 'paused' | 'warn' | 'bad' };
-
-/** What the sync pill says. Only the room's own words: no milliseconds, no jargon. */
-export const pillFor = (view: RoomView, health: SyncHealth): Pill => {
-  if (isOffline(view)) return { text: 'Offline', tone: 'bad' };
-  const { status, pausedBy, pausedById } = view.playback;
-  if (status === 'paused') {
-    if (!pausedBy) return { text: 'Paused when everyone left', tone: 'paused' };
-    return { text: `Paused by ${pausedById === view.self?.userId ? 'you' : pausedBy}`, tone: 'paused' };
-  }
-  if (health === 'synced') return { text: 'In sync', tone: 'good' };
-  if (health === 'correcting') return { text: 'Catching up', tone: 'warn' };
-  return { text: 'Loading', tone: 'warn' };
-};

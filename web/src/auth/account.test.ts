@@ -25,7 +25,7 @@ const load = async (me: Account | null = guest) => {
 };
 
 let storage: Map<string, string>;
-const responses: { me: Account | null; session: Account | null } = { me: null, session: null };
+const responses: { me: Account | null; session: Account | null; meDown?: boolean; configDown?: boolean } = { me: null, session: null };
 const signedOutCalls = vi.fn();
 
 describe('account sign-in', () => {
@@ -33,6 +33,8 @@ describe('account sign-in', () => {
     storage = new Map();
     signedOutCalls.mockReset();
     responses.session = ada;
+    responses.meDown = false;
+    responses.configDown = false;
     vi.stubGlobal('sessionStorage', {
       getItem: (key: string) => storage.get(key) ?? null,
       setItem: (key: string, value: string) => storage.set(key, value),
@@ -41,8 +43,10 @@ describe('account sign-in', () => {
     vi.stubGlobal('window', { location: { href: 'http://test/r/room' } });
     vi.stubGlobal('fetch', async (path: string, init?: RequestInit) => {
       const body = (value: unknown) => new Response(JSON.stringify(value));
-      if (path === '/v1/config') return body({ clerkPublishableKey: 'pk_test_x' });
-      if (path === '/v1/me') return body({ user: responses.me });
+      if (path === '/v1/config') {
+        return responses.configDown ? new Response('{}', { status: 500 }) : body({ clerkPublishableKey: 'pk_test_x' });
+      }
+      if (path === '/v1/me') return responses.meDown ? new Response('{}', { status: 500 }) : body({ user: responses.me });
       if (path === '/v1/session/clerk') return body({ user: responses.session });
       if (path === '/v1/session' && init?.method === 'DELETE') {
         signedOutCalls();
@@ -54,6 +58,29 @@ describe('account sign-in', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('still offers sign-in when the server can’t say who this is', async () => {
+    responses.meDown = true;
+    const { account } = await load();
+    expect(account.current()).toMatchObject({ user: null, publishableKey: 'pk_test_x', startFailed: false });
+  });
+
+  it('keeps wanting Clerk through that failure if a sign-in was under way', async () => {
+    storage.set(FLAG, '1');
+    responses.meDown = true;
+    const { account } = await load();
+    expect(account.current().clerkWanted).toBe(true);
+  });
+
+  it('says so when it can’t even learn how to sign in, and can try again', async () => {
+    responses.configDown = true;
+    const { account } = await load();
+    expect(account.current()).toMatchObject({ publishableKey: '', startFailed: true });
+
+    responses.configDown = false;
+    await account.start();
+    expect(account.current()).toMatchObject({ publishableKey: 'pk_test_x', startFailed: false, user: guest });
   });
 
   it('keeps the flag through the first click, when Clerk loads and reports signed out', async () => {

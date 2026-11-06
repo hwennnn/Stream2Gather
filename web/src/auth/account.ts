@@ -16,12 +16,14 @@ type AccountView = {
   /** Clerk's script only loads for people who are signing in or signed in. */
   clerkWanted: boolean;
   problem: string | null;
+  /** The server couldn't say how to sign in. A failed `/v1/me` isn't this: sign-in still works. */
+  startFailed: boolean;
 };
 
 // Survives the redirect back from Google, which reloads the page.
 const SIGNING_IN = 's2g:signing-in';
 
-let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null };
+let view: AccountView = { user: null, publishableKey: '', config: null, clerkWanted: false, problem: null, startFailed: false };
 let clerk: ClerkControls | null = null;
 let openWhenReady = false;
 /** The sign-in was opened by this page, so it may still be showing. */
@@ -49,18 +51,16 @@ const open = () => {
 export const account = {
   current: () => view,
 
+  /** One failure mustn't cost the other's answer: guests can watch either way. */
   async start(): Promise<void> {
-    try {
-      const [config, me] = await Promise.all([api.config(), api.me()]);
-      update({
-        user: me.user,
-        publishableKey: config.clerkPublishableKey,
-        config,
-        clerkWanted: Boolean(me.user?.signedIn) || sessionStorage.getItem(SIGNING_IN) !== null,
-      });
-    } catch {
-      // Guests can still watch; only the sign-in button stays hidden.
-    }
+    const [config, me] = await Promise.allSettled([api.config(), api.me()]);
+    const user = me.status === 'fulfilled' ? me.value.user : view.user;
+    update({
+      user,
+      clerkWanted: Boolean(user?.signedIn) || sessionStorage.getItem(SIGNING_IN) !== null,
+      startFailed: config.status === 'rejected',
+      ...(config.status === 'fulfilled' ? { publishableKey: config.value.clerkPublishableKey, config: config.value } : {}),
+    });
   },
 
   /** A rename is the only way a first-time guest gets a session before joining. */

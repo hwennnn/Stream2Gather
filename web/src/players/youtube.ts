@@ -76,6 +76,7 @@ export const createYouTubePlayer = async (
   await loadApi();
 
   let state: PlayerState = 'loading';
+  let unstarted = false;
   let stateListener: (state: PlayerState) => void = () => {};
   const errors = createErrorChannel();
   const blocked = createBlockedChannel();
@@ -100,6 +101,7 @@ export const createYouTubePlayer = async (
         onReady: () => resolve(instance),
         onStateChange: (event) => {
           state = STATE_NAMES[event.data] ?? state;
+          unstarted = event.data === -1;
           stateListener(state);
         },
         onAutoplayBlocked: blocked.report,
@@ -124,6 +126,7 @@ export const createYouTubePlayer = async (
     setRate: (rate) => player.setPlaybackRate?.(rate),
     time: () => player.getCurrentTime?.() ?? 0,
     state: () => state,
+    unstarted: () => unstarted,
     setMuted: (muted) => (muted ? player.mute?.() : player.unMute?.()),
     muted: () => player.isMuted?.() ?? false,
     duration: () => player.getDuration?.() || null,

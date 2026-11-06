@@ -147,6 +147,11 @@ describe('noticesToShow', () => {
     expect(noticesToShow(notices, 'chat', false)).toEqual([other]);
   });
 
+  it('keeps a notice whose link the chat line does not have', () => {
+    const wayOut = { id: 'd', kind: 'skipped', text: 'Skipped it.', url: 'https://youtu.be/x' };
+    expect(noticesToShow([wayOut], 'chat', false)).toEqual([wayOut]);
+  });
+
   it('shows everything when the chat is not on screen', () => {
     expect(noticesToShow(notices, 'queue', false)).toEqual(notices);
     expect(noticesToShow(notices, 'chat', true)).toEqual(notices);

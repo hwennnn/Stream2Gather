@@ -36,7 +36,7 @@ const person = async (name) => {
 
 const button = ({ page }, name) => page.getByRole('button', { name });
 const enter = async (who) => {
-  await button(who, /Join the room/).click();
+  await button(who, /Join the room|Be the first in/).click();
   await who.page.getByRole('tab', { name: 'People' }).waitFor();
 };
 const react = async (who, emoji, times) => {
@@ -60,7 +60,7 @@ const invite = await hana.page.evaluate(() => navigator.clipboard.readText());
 const mika = await person('Mika');
 await mika.page.goto(invite);
 await button(mika, 'Join the crew').click();
-await button(mika, /Join the room/).waitFor();
+await button(mika, /Join the room|Be the first in/).waitFor();
 
 await hana.page.fill('#crew-watchlist', `${BASE}/sample.mp4`);
 await hana.page.keyboard.press('Enter');
@@ -115,6 +115,7 @@ check('it names the night', /\w+day (night|morning|afternoon)/.test(text), text.
 const dots = card.locator('.seat-track-dot');
 await dots.first().waitFor({ timeout: 5000 }).catch(() => {});
 check('each reaction sits on the track in its person\'s colour', (await dots.count()) > 0 && (await dots.evaluateAll((all) => all.map((dot) => dot.style.backgroundColor))).every(Boolean));
+check('the dots are explained', await visible(card.getByText('Each dot is someone reacting')));
 check('it can be relived', (await card.getByRole('link', { name: 'Relive it' }).getAttribute('href'))?.includes('/catchup/'));
 check('the page says where the numbers come from', await visible(hana.page.getByText('come from Stream2Gather, not YouTube')));
 const faces = hana.page.getByRole('list', { name: 'Past nights' }).locator('[title]');
@@ -150,6 +151,11 @@ const token = shared.split('/s/')[1];
 const json = await fetch(`${BASE}/v1/recaps/${token}`).then((reply) => reply.text());
 check('neither does its data', !json.includes(CHAT) && json.includes('Sundays'));
 check('it embeds nothing', (await stranger.page.locator('iframe, video').count()) === 0);
+check('its dots name nobody', !json.includes('"userId"') && !/"seat":\d+[^}]*"name"/.test(json));
+check('the night is drawn in seats', (await stranger.page.getByRole('img', { name: /2 seats taken, and one free/ }).locator('.poster-seat').count()) === 3);
+check('and in dots', (await stranger.page.locator('.reel .seat-track-dot').count()) > 0);
+check('a video with no picture keeps its name', await visible(stranger.page.locator('.reel-name').getByText('sample')));
+check('the shared page says where the numbers come from', await visible(stranger.page.getByText('come from Stream2Gather, not YouTube')));
 await stranger.page.screenshot({ path: `${OUT}/recap-shared.png`, fullPage: true });
 await stranger.page.setViewportSize({ width: 390, height: 844 });
 await stranger.page.screenshot({ path: `${OUT}/recap-shared-phone.png` });

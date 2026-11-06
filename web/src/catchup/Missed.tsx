@@ -29,7 +29,7 @@ export const Missed = ({ slug }: { slug: string }) => {
               <Thumb src={item.media.thumbnailUrl} className="w-20 rounded-md" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm">{item.media.title}</span>
-                <span className="block truncate text-[13px] text-muted">
+                <span className="block text-[13px] text-muted">
                   {nightOf(item.startedAt)}, without you.{item.moments > 0 && ` They left ${plural(item.moments, 'moment')}.`}
                 </span>
               </span>

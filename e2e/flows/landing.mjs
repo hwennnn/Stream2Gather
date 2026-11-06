@@ -42,6 +42,30 @@ flow('landing: the picture plays through once and stops on the empty seat', asyn
   t.eq('one line left', await page.locator('.picture-say').evaluateAll((all) => all.filter((line) => getComputedStyle(line).opacity !== '0').length), 1);
 });
 
+flow('landing: the row reads as seats in a room, and says what it is', async (t) => {
+  const { page } = await t.person('a', { viewport: { width: 1440, height: 779 } });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(t.base);
+  await t.see('the seat nobody is in', page.getByText('Who’s missing?'));
+  await t.see('what the row is', page.getByText(/a seat for each friend/));
+  const row = await page.evaluate(() => {
+    const seats = [...document.querySelectorAll('.picture-row .seat')];
+    const discs = seats.map((seat) => seat.querySelector('.seat-disc, .seat-empty').getBoundingClientRect());
+    const said = document.querySelector('.picture-say[data-stays="true"]').getBoundingClientRect();
+    const disc = document.querySelector('.picture-say[data-stays="true"]').closest('.seat').querySelector('.seat-disc').getBoundingClientRect();
+    return {
+      widest: Math.max(...discs.slice(1).map((one, index) => one.left - discs[index].right)),
+      unnamed: seats.filter((seat) => !seat.querySelector('.seat-name')?.textContent.trim()).length,
+      fromTheSeat: disc.top - said.bottom,
+      offCentre: Math.abs(said.left + said.width / 2 - (disc.left + disc.width / 2)),
+    };
+  });
+  t.check('the seats sit together', row.widest <= 24, String(row.widest));
+  t.eq('every seat has a name', row.unnamed, 0);
+  t.check('what was said sits on its seat', row.fromTheSeat >= 0 && row.fromTheSeat <= 12 && row.offCentre <= 1, JSON.stringify(row));
+  t.check('an empty room is offered in a sentence', /No video yet\?/.test(await page.getByRole('button', { name: 'Start an empty room' }).locator('xpath=..').innerText()));
+});
+
 flow('landing: reduced motion gets the last frame at once', async (t) => {
   const { page } = await t.person('a');
   await page.emulateMedia({ reducedMotion: 'reduce' });

@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import type { Media, Person } from '../api/http';
 import { Avatar } from './Avatar';
+import { DarkRoom } from './DarkRoom';
 import { SiteHeader } from './Page';
 import { firstName, hueOf } from './people';
 
@@ -15,7 +16,7 @@ export const Door = ({ media, seats, children }: { media?: Media | null; seats?:
     <SiteHeader />
     <main className="door">
       <div className="door-stage">
-        <div className="door-screen">{media && <img key={media.sourceId} src={media.thumbnailUrl} alt="" />}</div>
+        <div className="door-screen">{media?.thumbnailUrl ? <img key={media.sourceId} src={media.thumbnailUrl} alt="" /> : <DarkRoom />}</div>
         {seats}
       </div>
       <div className="door-rail">{children}</div>

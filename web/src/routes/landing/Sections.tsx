@@ -122,9 +122,6 @@ export const FrontRow = ({ ready }: { ready: boolean }) => {
             Who’s missing?
           </span>
         </li>
-        <li className="seat picture-seat picture-spare">
-          <span className="seat-empty" />
-        </li>
       </ul>
       <p className="picture-status">
         <span style={at('--at', PAUSED_AT)} className="picture-before">

@@ -58,7 +58,7 @@ describe('CrewHome', () => {
     vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana, mika]));
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 2, isMember: true, guestAccess: true })} onJoin={onJoin} />);
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Join the room' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Be the first in' }));
     expect(onJoin).toHaveBeenCalled();
     expect((screen.getByLabelText('Invite link') as HTMLInputElement).value).toContain('/r/movie-night?join=tok');
     expect(screen.queryByText('It’s just you. Copy the invite.')).toBeNull();
@@ -95,7 +95,7 @@ describe('CrewHome', () => {
     home.mockResolvedValue(document([hana, mika]));
     fireEvent.click(await screen.findByRole('button', { name: 'Join the crew' }));
 
-    await screen.findByRole('button', { name: 'Join the room' });
+    await screen.findByRole('button', { name: 'Be the first in' });
     expect(join).toHaveBeenCalledWith('movie-night', 'tok');
     expect(window.location.search).toBe('');
   });

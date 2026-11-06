@@ -59,12 +59,12 @@ const invite = await hana.page.evaluate(() => navigator.clipboard.readText());
 const mika = await person('Mika');
 await mika.page.goto(invite);
 await button(mika, 'Join the crew').click();
-await button(mika, /Join the room/).waitFor();
+await button(mika, /Join the room|Be the first in/).waitFor();
 
 await hana.page.fill('#crew-watchlist', `${BASE}/sample.mp4`);
 await hana.page.keyboard.press('Enter');
 await hana.page.getByRole('button', { name: 'Remove sample' }).waitFor();
-await button(hana, /Join the room/).click();
+await button(hana, /Join the room|Be the first in/).click();
 await hana.page.getByRole('tab', { name: 'People' }).waitFor();
 await hana.page.getByRole('region', { name: 'Your watchlist' }).getByRole('listitem').first().hover();
 await hana.page.getByRole('region', { name: 'Your watchlist' }).getByRole('button', { name: 'Add: sample' }).click();
@@ -95,6 +95,9 @@ for (let i = 0; i < SWEEP_TRIES && !ended; i += 1) {
 }
 check('the session ended', ended);
 
+// The server only knows a YouTube video's length, and the track needs one.
+await db.query(`UPDATE media SET duration_ms = 60000 WHERE url = $1`, [`${BASE}/sample.mp4`]);
+
 // From the home: one click to the page, one on Play.
 await mika.page.reload();
 const offer = mika.page.getByRole('link', { name: /^Catch up on/ });
@@ -108,6 +111,9 @@ await video.waitFor();
 await sleep(500);
 check('nothing plays until asked', await video.evaluate((element) => element.paused));
 await mika.page.screenshot({ path: `${OUT}/catchup-before.png` });
+const trackDots = (who) => who.page.locator('[aria-label="Where the reactions are"] .seat-track-dot').evaluateAll((all) => all.map((dot) => dot.getBoundingClientRect().width));
+const wideDots = await trackDots(mika);
+check('reactions sit on the track, as in a recap', wideDots.length > 0 && wideDots.every((width) => width === 7), String(wideDots));
 
 await video.evaluate((element) => element.play());
 const fired = mika.page.locator('[data-fired]');
@@ -164,7 +170,7 @@ const rail = await hana.page.getByRole('list', { name: 'Reactions' }).innerText(
 check('the next person sees it', rail.includes('😂') && rail.includes('caught up'), rail.split('\n').at(-1));
 
 await hana.page.goto(home);
-await button(hana, /Join the room/).click();
+await button(hana, /Join the room|Be the first in/).click();
 await hana.page.getByRole('tab', { name: 'People' }).waitFor();
 await sleep(500);
 check('what she said stays out of the room', !(await hana.page.locator('body').innerText()).includes('caught up'));
@@ -173,12 +179,16 @@ check('what she said stays out of the room', !(await hana.page.locator('body').i
 const phone = await person('Ren', { width: 390, height: 844 });
 await phone.page.goto(invite);
 await button(phone, 'Join the crew').click();
-await button(phone, /Join the room/).waitFor();
+await button(phone, /Join the room|Be the first in/).waitFor();
+const why = phone.page.getByRole('link', { name: /^Catch up on/ }).getByText('without you');
+check('a phone keeps the whole reason to catch up', await why.evaluate((note) => note.scrollWidth <= note.clientWidth && getComputedStyle(note).textOverflow !== 'ellipsis'));
 await phone.page.getByRole('link', { name: /^Catch up on/ }).click();
 const small = phone.page.locator('video');
 await small.waitFor();
 await small.evaluate((element) => element.play());
 await phone.page.locator('[data-fired]').nth(2).waitFor({ timeout: 15_000 });
+const phoneDots = await trackDots(phone);
+check('and the same on a phone', phoneDots.length > 0 && phoneDots.every((width) => width === 7), String(phoneDots));
 await phone.page.screenshot({ path: `${OUT}/catchup-phone.png`, fullPage: true });
 
 await browser.close();

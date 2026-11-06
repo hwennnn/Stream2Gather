@@ -34,7 +34,9 @@ export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
   const name = edited ?? user?.name ?? suggested;
 
   useEffect(() => {
-    if (preview && window.matchMedia('(hover: hover)').matches) button.current?.focus();
+    // On a slow load they can already be typing, and focus moving would eat the rest of their name.
+    const free = document.activeElement === document.body;
+    if (preview && free && window.matchMedia('(hover: hover)').matches) button.current?.focus();
   }, [preview]);
 
   const submit = async (event: FormEvent) => {

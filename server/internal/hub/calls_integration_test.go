@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"stream2gather/internal/ids"
+	"stream2gather/internal/room"
 )
 
 // calls stands in for the voice server.
@@ -104,5 +105,29 @@ func TestSomeoneBackInKeepsTheirCall(t *testing.T) {
 	}
 	if removed := voice.seen(); len(removed) != 0 {
 		t.Fatalf("removed from the call they came back to: %+v", removed)
+	}
+}
+
+func TestLockingARoomEndsGuestsCallsAndNotTheHosts(t *testing.T) {
+	voice := &calls{}
+	r := newRig(t, testRedis, fastSessionChecks, func(h *Hub) { h.LeaveCall = voice.leave })
+	id, guest, host := r.newRoom(t, room.New()), "u_"+ids.New(), "u_"+ids.New()
+	out := r.joined(t, id, guest, room.RoleMember)
+	stays := r.joined(t, id, host, room.RoleHost)
+
+	crewEvent(t, r, id, map[string]any{"changed": "settings", "membersOnly": true})
+
+	eventually(t, "the guest leaves the call", func() bool { return len(voice.seen()) > 0 })
+	<-out.closed
+	for _, removed := range voice.seen() {
+		if removed != (seat{id, guest}) {
+			t.Fatalf("removed %+v", removed)
+		}
+	}
+	stays.expect(t, "crew")
+	select {
+	case code := <-stays.closed:
+		t.Fatalf("the host was sent home from their own room: %d", code)
+	default:
 	}
 }

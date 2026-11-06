@@ -123,6 +123,8 @@ type crewEvent struct {
 	Member  bool   `json:"member,omitempty"`
 	// Kick closes this person's sockets, for a room they can no longer enter.
 	Kick bool `json:"kick,omitempty"`
+	// MembersOnly closes the room to the guests already in it.
+	MembersOnly bool `json:"membersOnly,omitempty"`
 }
 
 // publishCrew tells the room. The change has already been made, so failing to say
@@ -243,7 +245,8 @@ func (s *Server) updateCrew(w http.ResponseWriter, r *http.Request) {
 		s.crewFailed(w, err)
 		return
 	}
-	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings"})
+	locked := request.GuestAccess != nil && !*request.GuestAccess
+	s.publishCrew(r.Context(), crew.RoomID, crewEvent{Changed: "settings", MembersOnly: locked})
 	writeJSON(w, http.StatusOK, map[string]bool{"saved": true})
 }
 

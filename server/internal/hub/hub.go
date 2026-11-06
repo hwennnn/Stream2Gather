@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -99,8 +100,9 @@ type Hub struct {
 	// LeaveCall takes someone out of a room's voice call, which outlives their
 	// socket because tokens can't be revoked. Nil means no voice. Set it before Run.
 	LeaveCall func(ctx context.Context, roomID, userID string) error
-	// leavers is who still has to leave a call. Only the session check touches it.
-	leavers map[seat]struct{}
+	// leavers is who still has to leave a call. The session check clears it.
+	leaversMu sync.Mutex
+	leavers   map[seat]struct{}
 	// addresses counts open sockets per address, on this server.
 	addressMu     sync.Mutex
 	addresses     map[string]int
@@ -218,29 +220,43 @@ func (h *Hub) closeSignedOut(ctx context.Context) {
 		here := seat{roomID, c.who().UserID}
 		if version, found := versions[here.user]; !found || version != c.version {
 			c.shut(statusSignedOut, "signed out")
-			h.leavers[here] = struct{}{}
+			h.owesCall(here)
 		} else {
 			staying[here] = true
 		}
 	}
 	// A call belongs to the person, so one who signed back in keeps it.
+	h.leaversMu.Lock()
+	defer h.leaversMu.Unlock()
 	for here := range staying {
 		delete(h.leavers, here)
 	}
+}
+
+// owesCall notes that someone must leave a call, for the next session check.
+func (h *Hub) owesCall(here seat) {
+	h.leaversMu.Lock()
+	defer h.leaversMu.Unlock()
+	h.leavers[here] = struct{}{}
 }
 
 // clearCalls runs after the sockets close, so a slow voice server delays nobody's
 // disconnect. A removal that fails waits for the next check: nothing else would
 // try again once the socket has gone.
 func (h *Hub) clearCalls(ctx context.Context) {
-	for here := range h.leavers {
+	h.leaversMu.Lock()
+	owed := slices.Collect(maps.Keys(h.leavers))
+	h.leaversMu.Unlock()
+	for _, here := range owed {
 		if h.LeaveCall != nil {
 			if err := h.LeaveCall(ctx, here.room, here.user); err != nil {
-				h.log.Warn("removing a signed-out person from a call failed", "room", here.room, "error", err)
+				h.log.Warn("removing someone from a call failed", "room", here.room, "error", err)
 				continue
 			}
 		}
+		h.leaversMu.Lock()
 		delete(h.leavers, here)
+		h.leaversMu.Unlock()
 	}
 }
 
@@ -679,6 +695,8 @@ func (r *liveRoom) deliver(payload []byte) {
 			Name    string `json:"name"`
 			Member  bool   `json:"member"`
 			Kick    bool   `json:"kick"`
+			// MembersOnly means the room has just closed to guests.
+			MembersOnly bool `json:"membersOnly"`
 		} `json:"d"`
 	}
 	if err := json.Unmarshal(payload, &head); err == nil {
@@ -690,6 +708,9 @@ func (r *liveRoom) deliver(payload []byte) {
 		}
 		if head.Type == "crew" && head.Data.UserID != "" {
 			r.rosterChanged(head.Data.UserID, head.Data.Member, head.Data.Kick)
+		}
+		if head.Type == "crew" && head.Data.MembersOnly {
+			r.closeToGuests()
 		}
 	}
 	for c := range r.conns {
@@ -740,6 +761,20 @@ func (r *liveRoom) rosterChanged(userID string, member, kick bool) {
 	}
 	if changed {
 		r.publishMembers(ctx)
+	}
+}
+
+// closeToGuests ends the visit of everyone off the roster, and their call, which
+// would outlive the socket. The host stays regardless: the event that put them on
+// the roster can be lost, and locking a room must not lock out the one locking it.
+func (r *liveRoom) closeToGuests() {
+	for c := range r.conns {
+		person := c.who()
+		if person.Member || person.Role == room.RoleHost {
+			continue
+		}
+		c.shut(websocket.StatusPolicyViolation, "members only")
+		r.hub.owesCall(seat{r.id, person.UserID})
 	}
 }
 

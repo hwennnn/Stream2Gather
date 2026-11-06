@@ -3,10 +3,9 @@ import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session
 import { Avatar } from './Avatar';
 import { avatarColor, formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
-import { ReactionLane, ReactionPicker } from './Reactions';
+import { ReactionPicker } from './Reactions';
 import { canQueue, chatScroll, countUnread, isOffline } from './rules';
 import { toastError } from './Toasts';
-import { PHONE_LANDSCAPE, useMediaQuery } from './useMediaQuery';
 
 const STICK_PX = 80;
 const GROUP_GAP_MS = 5 * 60_000;
@@ -52,7 +51,6 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
   const offline = isOffline(view);
   const entries = view.messages;
   const empty = text.trim().length === 0;
-  const sideways = useMediaQuery(PHONE_LANDSCAPE); // There's no bar under the player then.
 
   const blocks = useMemo(() => toBlocks(entries), [entries]);
   const last = entries.at(-1);
@@ -126,7 +124,7 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
             ))}
           {blocks.map((block) =>
             block.kind === 'system' ? (
-              <p key={block.entry.id} className="my-2 px-2 text-center text-xs leading-snug text-muted">
+              <p key={block.entry.id} className="my-2 px-14 text-center text-xs leading-snug text-muted">
                 {block.entry.text}
               </p>
             ) : (
@@ -147,11 +145,6 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onIn
       </div>
 
       <form onSubmit={(event) => void submit(event)} className="relative border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {sideways && (
-          <div className="absolute inset-x-0 bottom-full h-14">
-            <ReactionLane reactions={view.reactions} />
-          </div>
-        )}
         <label htmlFor="chat" className="sr-only">
           Message
         </label>

@@ -88,7 +88,7 @@ const initialView: RoomView = {
 };
 
 const MAX_BACKOFF_MS = 5000;
-const REACTION_LIFE_MS = 2600;
+const REACTION_LIFE_MS = 3000;
 const NOTICE_LIFE_MS = 8000;
 const UNDO_LIFE_MS = 5000;
 const MAX_ENTRIES = 300;

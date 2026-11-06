@@ -4,14 +4,13 @@ import type { PlayerError } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { Icon } from './Icon';
 import { AddBox, SearchResults, useSearch } from './Omnibox';
-import { ReactionBar, ReactionLane } from './Reactions';
+import { ReactionBar, ReactionTicker } from './Reactions';
 import { HostChip } from './RoomHeader';
 import { canControl, canQueue, failureNote, isLocked, isOffline, pillFor } from './rules';
 import { Thumb } from './Thumb';
 import { toastError } from './Toasts';
 import { UpNext } from './UpNext';
 import { useAdder, type Adder } from './useAdder';
-import { PHONE_LANDSCAPE, useMediaQuery } from './useMediaQuery';
 import type { RoomPlayer } from './useRoomPlayer';
 import { useTrending } from './useTrending';
 
@@ -31,6 +30,8 @@ type StageProps = {
   onPickAnother: () => void;
   onShowQueue: () => void;
   onToast: (text: string) => void;
+  /** Theatre mode has hidden the rail, so what lives there has to show here. */
+  railHidden: boolean;
   /** Toasts in theatre mode, when there's no rail to hold them. */
   toastSlot: ReactNode;
 };
@@ -213,9 +214,7 @@ export const UnmuteButton = ({ player, className = '' }: { player: RoomPlayer; c
   );
 };
 
-const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, onTheatre, onFullscreen, onToast, toastSlot }: StageProps & { item: QueueItem }) => {
-  const sideways = useMediaQuery(PHONE_LANDSCAPE); // The chat box hosts reactions then.
-  return (
+const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: StageProps & { item: QueueItem }) => (
   <section aria-label="Player controls" className="player-bar relative flex items-center gap-4 px-4 phone:flex-col phone:items-stretch phone:gap-1 phone:py-2 sm:max-lg:py-2.5">
     <div className="min-w-28 flex-1">
       <h2 title={item.title} className="truncate text-[15px] leading-tight font-semibold">
@@ -224,13 +223,15 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
       {item.author && <p className="mt-0.5 truncate text-[13px] text-muted phone:hidden">{item.author}</p>}
     </div>
 
+    {railHidden && <ReactionTicker reactions={view.reactions} />}
+
     <div className="flex min-w-0 items-center gap-2">
       {!player.failure && <SyncPill view={view} player={player} />}
       {isLocked(view) && <HostChip className="hidden phone:inline-flex" />}
       <UnmuteButton player={player} />
       <span className="flex-1" />
       {canControl(view) && <SkipButton session={session} view={view} onToast={onToast} />}
-      <ReactionBar session={session} disabled={isOffline(view)} />
+      <ReactionBar session={session} disabled={isOffline(view)} className={railHidden ? 'flex' : 'hidden xl:flex'} />
       <div className="hidden items-center lg:flex">
         {!fullscreen && (
           <button type="button" aria-label="Theatre" title="Theatre (T)" aria-pressed={theatre} onClick={onTheatre} className="btn btn-ghost btn-icon">
@@ -252,8 +253,6 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
       </div>
     </div>
 
-    {!sideways && <ReactionLane reactions={view.reactions} />}
     {toastSlot}
   </section>
-  );
-};
+);

@@ -453,12 +453,17 @@ body {
 }
 
 /* ---- Reactions ------------------------------------------------------------
- * The lane is clipped, so a reaction can never reach the player above it.
+ * The lane sits in the rail and clips what it holds, so a reaction can't reach
+ * the player, and in the gutter chat lines keep clear, so it crosses no words.
  */
 
 .reaction-lane {
   position: absolute;
-  inset: 0;
+  z-index: 10;
+  top: 3.25rem;
+  right: 0;
+  bottom: 4.75rem;
+  width: 4rem;
   overflow: hidden;
   pointer-events: none;
   container-type: size;
@@ -466,24 +471,77 @@ body {
 
 .reaction {
   position: absolute;
-  bottom: 0.25rem;
-  font-size: 1.375rem;
+  bottom: 0.5rem;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  animation: rise 3s cubic-bezier(0.22, 0.7, 0.3, 1) both;
+}
+
+.reaction-emoji {
+  font-size: 2rem;
   line-height: 1;
-  animation: rise 2.6s ease-out forwards;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.5));
+  animation: pop 450ms cubic-bezier(0.3, 1.7, 0.5, 1) both;
+}
+
+.reaction-name {
+  max-width: 100%;
+  padding-inline: 0.375rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(11 15 30 / 0.78);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reaction-spark {
+  position: absolute;
+  top: 0.5rem;
+  left: calc(50% - 0.4375rem);
+  font-size: 0.875rem;
+  line-height: 1;
+  animation: spark 700ms ease-out both;
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(0) scale(0.7);
+    transform: none;
   }
-  15% {
+  6%,
+  78% {
     opacity: 1;
-    transform: translateY(-6px) scale(1.15);
   }
   to {
     opacity: 0;
-    transform: translateY(calc(0.5rem + 1.375rem - 100cqh)) scale(1);
+    transform: translate(var(--sway), calc(3.5rem - 100cqh));
+  }
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.3);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes spark {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: translate(calc(var(--spread) * 1.75rem), calc((1.5 - var(--spread) * var(--spread)) * -1.5rem)) scale(1.1);
   }
 }
 
@@ -521,7 +579,11 @@ body {
 
   .reaction {
     animation-name: fade;
-    animation-duration: 2.6s !important;
+    animation-duration: 3s !important;
+  }
+
+  .reaction-spark {
+    display: none;
   }
 
   .spinner,

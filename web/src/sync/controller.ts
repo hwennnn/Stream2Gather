@@ -266,6 +266,8 @@ export class SyncController {
   private noteLanding(time: number): boolean {
     if (this.pendingSeek === null || Math.abs(time - this.pendingSeek) > OWN_SEEK_WINDOW_S) return false;
     this.pendingSeek = null;
+    // Measured from the old spot, this seek would read as the viewer's once buffering ends.
+    this.anchor = { time, at: this.clock.now() };
     return true;
   }
 

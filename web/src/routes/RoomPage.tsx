@@ -175,7 +175,7 @@ const OfflineBar = ({ elapsed, onRetry }: { elapsed: number; onRetry: () => void
 type ShellProps = { slug: string; session: RoomSession; view: RoomView; copied: boolean };
 
 const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
-  const [tab, setTab] = useState<Tab>(view.queue.length === 0 ? 'queue' : 'chat');
+  const [tab, setTab] = useState<Tab>('chat');
   const [theatre, setTheatre] = useState(false);
   const [finished, setFinished] = useState(false);
   const [changing, setChanging] = useState(false);
@@ -218,11 +218,13 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
     };
   }, [unread, view.name]);
 
+  /** The stage owns finding a video until something is playing, and the rail after that. */
+  const idle = current === undefined;
   const openQueue = useCallback(() => {
-    setTab('queue');
+    if (!idle) setTab('queue');
     setTheatre(false);
-    window.requestAnimationFrame(() => document.getElementById('omnibox')?.focus());
-  }, []);
+    window.requestAnimationFrame(() => document.getElementById(idle ? 'omnibox-stage' : 'omnibox')?.focus());
+  }, [idle]);
 
   const toggleFullscreen = fullscreen.toggle;
 
@@ -284,7 +286,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
   );
 
   return (
-    <div data-tab={tab} data-fullscreen={fullscreen.on} className="room-shell flex h-dvh flex-col bg-ink">
+    <div data-fullscreen={fullscreen.on} className="room-shell flex h-dvh flex-col bg-ink">
       {!fullscreen.on && (
         <RoomHeader
           view={view}
@@ -361,6 +363,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
               active={tab === 'chat'}
               inviteUrl={inviteUrl}
               onCopyInvite={() => void copyInvite()}
+              onInvite={() => void invite()}
               onToast={toast}
             />
           </div>

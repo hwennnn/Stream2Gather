@@ -23,6 +23,29 @@ const setup = (patch?: Partial<RoomView>) => {
   return { session, rowTap: () => container.querySelector('.row-tap') };
 };
 
+describe('an empty room', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ items: [] })));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('leaves search and trending to the stage', () => {
+    setup({ queue: [] });
+    expect(screen.queryByLabelText('Add a video')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Trending' })).toBeNull();
+    expect(screen.getByText(/queue is empty/)).toBeTruthy();
+  });
+
+  it('keeps the add box once something is playing', () => {
+    setup();
+    expect(screen.getByLabelText('Add a video')).toBeTruthy();
+  });
+});
+
 describe('tapping a queue row', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ items: [] })));

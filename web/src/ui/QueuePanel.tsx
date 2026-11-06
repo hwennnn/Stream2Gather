@@ -27,6 +27,15 @@ export const QueuePanel = ({ session, view, onToast }: Props) => {
   const current = view.queue[0];
   const upcoming = view.queue.slice(1);
 
+  // The stage is showing search and trending, so saying them twice helps nobody.
+  if (!current) {
+    return (
+      <p className="flex h-full items-center justify-center px-6 text-center text-sm text-balance text-muted">
+        {editable ? 'The queue is empty. Pick something to start it.' : 'The queue is empty. The host picks what’s next.'}
+      </p>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       {editable ? (
@@ -45,7 +54,7 @@ export const QueuePanel = ({ session, view, onToast }: Props) => {
           <SearchResults search={search} adder={adder} />
         ) : (
           <>
-            {current && <NowPlaying item={current} paused={view.playback.status === 'paused'} />}
+            <NowPlaying item={current} paused={view.playback.status === 'paused'} />
 
             <section aria-label="Up next" className="mt-2">
               <h3 className="px-4 py-1.5 text-[13px] font-semibold">

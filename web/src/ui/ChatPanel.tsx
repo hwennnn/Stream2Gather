@@ -19,6 +19,7 @@ type Props = {
   active: boolean;
   inviteUrl: string;
   onCopyInvite: () => void;
+  onInvite: () => void;
   onToast: (text: string) => void;
 };
 
@@ -41,7 +42,7 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   return blocks;
 };
 
-export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onToast }: Props) => {
+export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onInvite, onToast }: Props) => {
   const [text, setText] = useState('');
   const [slow, setSlow] = useState(false);
   const [missed, setMissed] = useState(false);
@@ -115,7 +116,11 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
         >
           {!hasChat &&
             (view.alone ? (
-              <InviteCard url={inviteUrl} onCopy={onCopyInvite} />
+              view.queue.length === 0 ? (
+                <PickingCard onInvite={onInvite} />
+              ) : (
+                <InviteCard url={inviteUrl} onCopy={onCopyInvite} />
+              )
             ) : (
               <p className="py-6 text-center text-sm text-muted">Say hi. Everyone in the room sees it.</p>
             ))}
@@ -181,6 +186,17 @@ export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onTo
     </div>
   );
 };
+
+/** Search and trending belong to the stage here, so this side only has to get people in. */
+const PickingCard = ({ onInvite }: { onInvite: () => void }) => (
+  <div className="enter m-1 rounded-2xl border border-line bg-white/[0.03] p-4">
+    <p className="text-[15px] leading-snug font-semibold text-balance">Invite someone while you pick</p>
+    <button type="button" onClick={onInvite} className="btn btn-primary mt-3 w-full">
+      <Icon name="link" />
+      Invite
+    </button>
+  </div>
+);
 
 const InviteCard = ({ url, onCopy }: { url: string; onCopy: () => void }) => (
   <div className="enter m-1 rounded-2xl border border-line bg-white/[0.03] p-4">

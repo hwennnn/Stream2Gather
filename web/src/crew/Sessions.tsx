@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
+import { RecapCard } from '../recap/RecapCard';
+import { DISCLOSURE, together } from '../recap/words';
 import { initials } from '../ui/format';
 import { crewApi, type PastSession, type SessionPage } from './api';
 
 const DAY = new Intl.DateTimeFormat(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 
 /** Measured on our own clock, never from a video's length. */
-const lasted = (session: PastSession): string => {
-  const minutes = Math.round((Date.parse(session.endedAt) - Date.parse(session.startedAt)) / 60_000);
-  if (minutes < 60) return `${Math.max(minutes, 1)} min`;
-  return `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
-};
+const lasted = (session: PastSession): string => together(Date.parse(session.endedAt) - Date.parse(session.startedAt));
 
 const FACES = 3;
 
@@ -22,28 +20,39 @@ const watched = ({ videos }: PastSession): string => {
 };
 
 /** Discs stay neutral: a session carries names, not ids, and a person's hue comes from their id. */
-const SessionRow = ({ session }: { session: PastSession }) => (
-  <li className="flex min-h-11 items-center gap-3 py-1 text-sm">
-    <span aria-hidden="true" className="flex w-[60px] shrink-0 -space-x-1.5">
-      {session.people.slice(0, FACES).map((person, index) => (
-        <span key={index} title={person.name} className="inline-flex size-7 items-center justify-center rounded-full bg-raised text-[11px] font-semibold text-muted ring-2 ring-ink">
-          {initials(person.name)}
+const SessionRow = ({ slug, session, hasRecap }: { slug: string; session: PastSession; hasRecap: boolean }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="py-1 text-sm">
+      <div className="flex min-h-11 items-center gap-3">
+        <span aria-hidden="true" className="flex w-[60px] shrink-0 -space-x-1.5">
+          {session.people.slice(0, FACES).map((person, index) => (
+            <span key={index} title={person.name} className="inline-flex size-7 items-center justify-center rounded-full bg-raised text-[11px] font-semibold text-muted ring-2 ring-ink">
+              {initials(person.name)}
+            </span>
+          ))}
         </span>
-      ))}
-    </span>
-    <span className="relative min-w-0 flex-1 truncate">
-      {watched(session)}
-      <span className="sr-only">, with {session.people.map((person) => person.name).join(', ')}</span>
-    </span>
-    <span className="shrink-0 text-[13px] text-dim tabular-nums">
-      {DAY.format(Date.parse(session.startedAt))}
-      <span className="phone:hidden">, {lasted(session)}</span>
-    </span>
-  </li>
-);
+        <span className="relative min-w-0 flex-1 truncate">
+          {watched(session)}
+          <span className="sr-only">, with {session.people.map((person) => person.name).join(', ')}</span>
+        </span>
+        <span className="shrink-0 text-[13px] text-dim tabular-nums">
+          {DAY.format(Date.parse(session.startedAt))}
+          <span className="phone:hidden">, {lasted(session)}</span>
+        </span>
+        {hasRecap && (
+          <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="btn btn-ghost btn-sm -mr-2.5 shrink-0">
+            {open ? 'Hide recap' : 'Recap'}
+          </button>
+        )}
+      </div>
+      {open && <RecapCard slug={slug} sessionId={session.id} />}
+    </li>
+  );
+};
 
-/** Past watch parties, newest first. */
-export const Sessions = ({ slug }: { slug: string }) => {
+/** The crew's past sessions, loaded once for the card and the list. */
+export const useSessions = (slug: string) => {
   const [page, setPage] = useState<SessionPage | null>(null);
 
   useEffect(() => {
@@ -57,6 +66,11 @@ export const Sessions = ({ slug }: { slug: string }) => {
     };
   }, [slug]);
 
+  return [page, setPage] as const;
+};
+
+/** Past watch parties, newest first. The newest has its recap at the top of the page. */
+export const Sessions = ({ slug, page, setPage }: { slug: string; page: SessionPage | null; setPage: (page: SessionPage) => void }) => {
   const more = () => {
     if (!page?.next) return;
     crewApi.sessions(slug, page.next).then(
@@ -75,8 +89,8 @@ export const Sessions = ({ slug }: { slug: string }) => {
       ) : (
         <>
           <ul aria-label="Past sessions" className="mt-2 divide-y divide-line border-y border-line">
-            {page.items.map((session) => (
-              <SessionRow key={session.id} session={session} />
+            {page.items.map((session, index) => (
+              <SessionRow key={session.id} slug={slug} session={session} hasRecap={index > 0} />
             ))}
           </ul>
           {page.next && (
@@ -84,6 +98,7 @@ export const Sessions = ({ slug }: { slug: string }) => {
               Older
             </button>
           )}
+          <p className="mt-2 text-xs text-dim">{DISCLOSURE}</p>
         </>
       )}
     </section>

@@ -17,6 +17,7 @@ const (
 	CmdQueueRemove = "queue.remove"
 	CmdQueueMove   = "queue.move"
 	CmdQueuePlay   = "queue.play"
+	CmdQueueUndo   = "queue.undo"
 	CmdSettings    = "settings"
 	// Issued only by the server, when the host goes away and comes back.
 	CmdRelease = "settings.release"
@@ -103,6 +104,9 @@ func Apply(s State, actor Actor, cmd Command, now int64) (State, Change, error) 
 	case CmdQueuePlay:
 		change.Queue = true
 		err = applyQueuePlay(&s, actor, cmd, now)
+	case CmdQueueUndo:
+		change.Queue = true
+		err = applyQueueUndo(&s, actor, cmd, now)
 	case CmdSettings:
 		change.Settings = true
 		err = applySettings(&s, actor, cmd)
@@ -260,12 +264,46 @@ func applyQueuePlay(s *State, actor Actor, cmd Command, now int64) error {
 		return ErrStale
 	}
 	item := s.Queue[index]
+	var jump *Jump
+	if index > 0 {
+		back := s.Playback
+		back.Pos = s.PositionAt(now)
+		jump = &Jump{To: item.ID, Index: index, Replaced: s.Queue[0], Playback: back, At: now}
+	}
 	s.Queue = slices.Delete(s.Queue, index, index+1)
 	if index > 0 && len(s.Queue) > 0 {
 		s.Queue = s.Queue[1:] // The video that was playing is finished with.
 	}
 	s.Queue = slices.Insert(s.Queue, 0, item)
 	start(s, now)
+	s.Jump = jump
+	return nil
+}
+
+// applyQueueUndo puts back the video a jump replaced, where it had got to, and
+// returns the video jumped to its place in the queue. Starting any other video
+// clears the jump, so an Undo can't land on something newer.
+func applyQueueUndo(s *State, actor Actor, cmd Command, now int64) error {
+	if !allowed(s.Settings.ControlMode, actor) {
+		return ErrForbidden
+	}
+	jump := s.Jump
+	if jump == nil || jump.To != cmd.Target || now-jump.At > undoWindowMS {
+		return ErrStale
+	}
+	if len(s.Queue) >= maxQueue {
+		return ErrQueueFull
+	}
+	jumped := s.Queue[0]
+	rest := s.Queue[1:]
+	rest = slices.Insert(rest, min(jump.Index-1, len(rest)), jumped)
+	s.Queue = slices.Insert(rest, 0, jump.Replaced)
+	s.Playback = jump.Playback
+	s.Playback.At = now
+	if s.Playback.Status == StatusPlaying {
+		s.Playback.At += StartLeadMS
+	}
+	s.Jump = nil
 	return nil
 }
 
@@ -324,6 +362,7 @@ func advance(s *State, now int64) {
 
 // start plays Queue[0] from the beginning, or idles when the queue is empty.
 func start(s *State, now int64) {
+	s.Jump = nil
 	rate := s.Playback.Rate
 	if len(s.Queue) == 0 {
 		s.Playback = Playback{Status: StatusIdle, At: now, Rate: rate}

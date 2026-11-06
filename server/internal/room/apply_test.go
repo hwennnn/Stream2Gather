@@ -154,6 +154,112 @@ func TestQueueOperationsUseItemIDs(t *testing.T) {
 	}
 }
 
+func jumped(t *testing.T) State {
+	t.Helper()
+	s := add(t, add(t, add(t, add(t, New(), "a", 0), "b", 0), "c", 0), "d", 0)
+	s, _, err := Apply(s, member, Command{Type: CmdPause, Item: "a", Pos: 42, CT: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err = Apply(s, member, Command{Type: CmdPlay, Item: "a", Pos: 42, CT: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err = Apply(s, member, Command{Type: CmdQueuePlay, Target: "c"}, now+10_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestUndoPutsTheRoomBackAsItWas(t *testing.T) {
+	s := jumped(t)
+	if got := ids(s); got != "c b d" {
+		t.Fatalf("after jump = %s", got)
+	}
+	back, change, err := Apply(s, member, Command{Type: CmdQueueUndo, Target: "c"}, now+12_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(back); got != "a b c d" {
+		t.Fatalf("after undo = %s", got)
+	}
+	if !change.Queue || change.By != member.Name {
+		t.Fatalf("change = %+v", change)
+	}
+	p := back.Playback
+	if p.ItemID != "a" || p.Status != StatusPlaying || p.Pos != 52 || p.At != now+12_000+StartLeadMS {
+		t.Fatalf("playback = %+v, want a resuming at 52 after the start lead", p)
+	}
+	if back.Jump != nil {
+		t.Fatal("a jump can only be undone once")
+	}
+}
+
+func TestUndoKeepsAPausedVideoPaused(t *testing.T) {
+	s := add(t, add(t, New(), "a", 0), "b", 0)
+	s, _, err := Apply(s, member, Command{Type: CmdPause, Item: "a", Pos: 42, CT: now}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err = Apply(s, member, Command{Type: CmdQueuePlay, Target: "b"}, now+60_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _, err := Apply(s, member, Command{Type: CmdQueueUndo, Target: "b"}, now+61_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := back.Playback; p.Status != StatusPaused || p.Pos != 42 {
+		t.Fatalf("playback = %+v", p)
+	}
+}
+
+func TestUndoIsRefusedOnceTheMomentHasPassed(t *testing.T) {
+	s := jumped(t)
+	late := Command{Type: CmdQueueUndo, Target: "c"}
+	if _, _, err := Apply(s, member, late, now+10_000+undoWindowMS+1); !errors.Is(err, ErrStale) {
+		t.Fatalf("late undo err = %v", err)
+	}
+	if _, _, err := Apply(s, member, Command{Type: CmdQueueUndo, Target: "b"}, now+11_000); !errors.Is(err, ErrStale) {
+		t.Fatalf("undo of another video err = %v", err)
+	}
+	skipped, _, err := Apply(s, member, Command{Type: CmdSkip, Item: "c"}, now+11_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := Apply(skipped, member, late, now+11_000); !errors.Is(err, ErrStale) {
+		t.Fatalf("undo after a skip err = %v", err)
+	}
+}
+
+func TestUndoSurvivesTheQueueChangingUnderIt(t *testing.T) {
+	s := jumped(t)
+	s, _, err := Apply(s, member, Command{Type: CmdQueueRemove, Target: "d"}, now+11_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, _, err = Apply(s, member, Command{Type: CmdQueueRemove, Target: "b"}, now+11_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, _, err := Apply(s, member, Command{Type: CmdQueueUndo, Target: "c"}, now+12_000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(back); got != "a c" {
+		t.Fatalf("after undo = %s", got)
+	}
+}
+
+func TestUndoNeedsTheRightToControlPlayback(t *testing.T) {
+	s := jumped(t)
+	s.Settings.ControlMode = ModeHosts
+	if _, _, err := Apply(s, member, Command{Type: CmdQueueUndo, Target: "c"}, now+11_000); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestRemovingCurrentVideoAdvances(t *testing.T) {
 	s := add(t, add(t, New(), "a", 0), "b", 0)
 	next, change, err := Apply(s, member, Command{Type: CmdQueueRemove, Target: "a"}, now)

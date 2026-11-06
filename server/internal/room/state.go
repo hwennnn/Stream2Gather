@@ -35,7 +35,10 @@ const (
 	maxClientSkewMS = 2000
 	// endToleranceMS is how early an "ended" report is believed.
 	endToleranceMS = 5000
-	maxQueue       = 200
+	// undoWindowMS is how long a jump can be undone. Clients offer it for less,
+	// so an Undo pressed at the last moment still lands.
+	undoWindowMS = 8000
+	maxQueue     = 200
 	// MaxNameRunes is the longest display name.
 	MaxNameRunes = 32
 )
@@ -89,6 +92,17 @@ type Settings struct {
 // Locked reports whether anything is limited to the host.
 func (s Settings) Locked() bool { return s.ControlMode == ModeHosts || s.QueueMode == ModeHosts }
 
+// Jump remembers what queue.play replaced, so the room can go back to it.
+type Jump struct {
+	// To is the video jumped to, and Index where it sat in the queue.
+	To    string `json:"to"`
+	Index int    `json:"index"`
+	// Replaced was playing, and Playback is where it had got to.
+	Replaced Item     `json:"replaced"`
+	Playback Playback `json:"playback"`
+	At       int64    `json:"at"`
+}
+
 // State is the whole live room. Queue[0] is the current video when one is set.
 type State struct {
 	Version  int64    `json:"version"`
@@ -97,6 +111,8 @@ type State struct {
 	Settings Settings `json:"settings"`
 	// Held keeps the host's lock while it is released for an absent host.
 	Held *Settings `json:"held,omitempty"`
+	// Jump is set while the latest video change can still be undone.
+	Jump *Jump `json:"jump,omitempty"`
 }
 
 // New returns an empty room.

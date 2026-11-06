@@ -328,7 +328,7 @@ describe('RoomSession', () => {
       const { session, socket } = await connected();
       socket.deliver('welcome', welcome(1));
       vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
-      await expect(session.rename('Maya')).rejects.toThrow('Could not reach the server. Try again.');
+      await expect(session.rename('Maya')).rejects.toThrow('You’re offline right now. Try again once you’re back.');
     });
 
     it('reconnects if the socket cannot take the new name', async () => {

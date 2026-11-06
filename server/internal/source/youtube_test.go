@@ -99,8 +99,11 @@ func TestResolveRejectsWhatCannotBeEmbedded(t *testing.T) {
 			}))
 			defer server.Close()
 			_, err := NewYouTube("k", server.URL).Resolve(context.Background(), Ref{ID: "x"})
-			if !errors.Is(err, ErrUnavailable) {
+			if !errors.Is(err, ErrUnavailable) || !IsUserError(err) {
 				t.Fatalf("err = %v", err)
+			}
+			if got, want := err.Error(), "This video can’t be played here. Try another."; got != want {
+				t.Fatalf("copy = %q, want the sentence viewers see", got)
 			}
 		})
 	}

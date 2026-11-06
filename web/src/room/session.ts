@@ -108,8 +108,10 @@ const OFFLINE_COPY = 'You’re offline right now. Try again once you’re back.'
 const LOST_COPY = 'The connection dropped before that went through. Try again.';
 const TIMEOUT_COPY = 'That took too long. Try again.';
 
-const copyFor = (error: unknown): string =>
-  error instanceof ApiError ? error.message : 'Something went wrong. Try again.';
+const copyFor = (error: unknown): string => {
+  if (!(error instanceof ApiError)) return 'Something went wrong. Try again.';
+  return error.code === 'network' ? OFFLINE_COPY : error.message;
+};
 
 /** A refusal from the server, with the copy to show and the code to act on. */
 class Refused extends Error {

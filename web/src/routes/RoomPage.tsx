@@ -104,7 +104,11 @@ const Room = ({ slug, copied }: { slug: string; copied: boolean }) => {
 
   useEffect(() => {
     void session.connect();
-    return () => session.close();
+    const stopFollowing = session.followPage();
+    return () => {
+      stopFollowing();
+      session.close();
+    };
   }, [session]);
 
   useEffect(() => account.onIdentityChange(() => session.retry()), [session]);

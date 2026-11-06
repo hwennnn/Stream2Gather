@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -60,6 +61,11 @@ func (p *Postgres) RecordCapture(ctx context.Context, c Capture) error {
 	}
 	defer tx.Rollback(ctx)
 
+	// Users before sessions, as in DeleteAccount, so the two can't deadlock.
+	c, err = withoutDeleted(ctx, tx, c)
+	if err != nil {
+		return err
+	}
 	sessionID, err := currentSession(ctx, tx, c)
 	if err != nil {
 		return err
@@ -75,11 +81,40 @@ func (p *Postgres) RecordCapture(ctx context.Context, c Capture) error {
 	return tx.Commit(ctx)
 }
 
+// withoutDeleted drops anyone whose account has gone. A socket outlives its
+// account by up to one session check, and their name mustn't return with it. The
+// lock makes a deletion wait for this flush, so it can clean up after it too.
+func withoutDeleted(ctx context.Context, tx pgx.Tx, c Capture) (Capture, error) {
+	mentioned := append(personIDs(c.Present), personIDs(c.Joined)...)
+	for _, moment := range c.Moments {
+		mentioned = append(mentioned, moment.UserID)
+	}
+	if len(mentioned) == 0 {
+		return c, nil
+	}
+	rows, err := tx.Query(ctx, `SELECT id FROM users WHERE id = ANY($1) FOR KEY SHARE`, mentioned)
+	if err != nil {
+		return c, err
+	}
+	found, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return c, err
+	}
+	gone := func(id string) bool { return !slices.Contains(found, id) }
+	personGone := func(p Person) bool { return gone(p.UserID) }
+	c.Present = slices.DeleteFunc(slices.Clone(c.Present), personGone)
+	c.Joined = slices.DeleteFunc(slices.Clone(c.Joined), personGone)
+	c.Moments = slices.DeleteFunc(slices.Clone(c.Moments), func(m CapturedMoment) bool { return gone(m.UserID) })
+	return c, nil
+}
+
 // currentSession finds the open session, opening one if the room is playing.
-// The unique index settles two servers opening at once: the loser finds the winner's.
+// The unique index settles two servers opening at once: the loser finds the
+// winner's. The lock keeps the sweeper from ending a session mid-flush, which
+// would leave what this flush opens running in it for good.
 func currentSession(ctx context.Context, tx pgx.Tx, c Capture) (string, error) {
 	var id string
-	err := tx.QueryRow(ctx, `SELECT id FROM crew_sessions WHERE crew_id = $1 AND ended_at IS NULL`, c.CrewID).Scan(&id)
+	err := tx.QueryRow(ctx, `SELECT id FROM crew_sessions WHERE crew_id = $1 AND ended_at IS NULL FOR UPDATE`, c.CrewID).Scan(&id)
 	if err == nil {
 		return id, nil
 	}

@@ -392,3 +392,33 @@ func TestCleanName(t *testing.T) {
 		}
 	}
 }
+
+func TestPositionAtStopsAtTheEnd(t *testing.T) {
+	state := New()
+	state.Playback = Playback{ItemID: "a", Status: StatusPlaying, At: 0, Rate: 1}
+	state.Queue = []Item{{ID: "a", Media: Media{DurationMS: 600_000}}}
+	if pos := state.PositionAt(100_000); pos != 100 {
+		t.Fatalf("pos = %v", pos)
+	}
+	if pos := state.PositionAt(3_700_000); pos != 600 {
+		t.Fatalf("pos = %v, want the end of the video", pos)
+	}
+	state.Queue[0].DurationMS = 0
+	if pos := state.PositionAt(3_700_000); pos != 3700 {
+		t.Fatalf("unknown length: pos = %v", pos)
+	}
+}
+
+func TestRestedStopsAtTheSaveTime(t *testing.T) {
+	state := New()
+	state.Playback = Playback{ItemID: "a", Status: StatusPlaying, At: 0, Rate: 1}
+	rested := state.Rested(50_000, 900_000)
+	if rested.Playback.Status != StatusPaused || rested.Playback.Pos != 50 || rested.Playback.At != 900_000 {
+		t.Fatalf("playback = %+v", rested.Playback)
+	}
+	state.Playback.Status = StatusPaused
+	state.Playback.Pos = 12
+	if rested := state.Rested(50_000, 900_000); rested.Playback != state.Playback {
+		t.Fatalf("a paused room moved: %+v", rested.Playback)
+	}
+}

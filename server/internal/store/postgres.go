@@ -130,18 +130,20 @@ func (p *Postgres) SaveSnapshot(ctx context.Context, roomID string, state room.S
 	return err
 }
 
-// LoadSnapshot returns the last saved state, or an empty room.
-func (p *Postgres) LoadSnapshot(ctx context.Context, roomID string) (room.State, error) {
+// LoadSnapshot returns the last saved state and when it was saved, or an empty
+// room. Only SaveSnapshot writes updated_at.
+func (p *Postgres) LoadSnapshot(ctx context.Context, roomID string) (room.State, time.Time, error) {
 	var doc []byte
-	err := p.pool.QueryRow(ctx, `SELECT snapshot FROM rooms WHERE id = $1`, roomID).Scan(&doc)
+	var savedAt time.Time
+	err := p.pool.QueryRow(ctx, `SELECT snapshot, updated_at FROM rooms WHERE id = $1`, roomID).Scan(&doc, &savedAt)
 	if err != nil {
-		return room.State{}, fmt.Errorf("load snapshot: %w", err)
+		return room.State{}, time.Time{}, fmt.Errorf("load snapshot: %w", err)
 	}
 	if doc == nil {
-		return room.New(), nil
+		return room.New(), savedAt, nil
 	}
 	var state room.State
-	return state, json.Unmarshal(doc, &state)
+	return state, savedAt, json.Unmarshal(doc, &state)
 }
 
 // Message is one chat line.

@@ -6,7 +6,7 @@ const ITEM = 'block w-full cursor-pointer rounded-md px-3 py-2 text-left text-[1
 
 /** `onOpen` lets the room make space first: the menu must not open over the player. */
 export const AccountMenu = ({ onOpen }: { onOpen?: () => void }) => {
-  const { user, publishableKey, problem } = useAccount();
+  const { user, publishableKey, problem, startFailed } = useAccount();
   const [open, setOpen] = useState(false);
   const menu = useRef<HTMLDivElement>(null);
 
@@ -23,6 +23,14 @@ export const AccountMenu = ({ onOpen }: { onOpen?: () => void }) => {
       document.removeEventListener('keydown', close);
     };
   }, [open]);
+
+  if (startFailed) {
+    return (
+      <button type="button" onClick={() => void account.start()} className="btn btn-ghost">
+        Retry sign-in
+      </button>
+    );
+  }
 
   if (!publishableKey) return null;
 

@@ -10,7 +10,7 @@ class FakeSocket {
   sent: { t: string; id?: string; d?: Record<string, unknown> }[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event?: { code: number }) => void) | null = null;
   constructor() {
     FakeSocket.last = this;
     FakeSocket.opened += 1;
@@ -500,6 +500,82 @@ describe('RoomSession', () => {
       expect(session.getView().offlineSince).toBe(5000);
       FakeSocket.last.deliver('welcome', welcome(1));
       expect(session.getView().offlineSince).toBeNull();
+    });
+
+    describe('a session the server ended', () => {
+      const SIGNED_OUT = { code: 4401 };
+
+      it('says so once the room has said who this browser is now, and not before', async () => {
+        const { session, socket } = await connected();
+        const heard = vi.fn();
+        session.onSignedOut(heard);
+        socket.deliver('welcome', welcome(1));
+
+        socket.onclose?.(SIGNED_OUT);
+        await vi.advanceTimersByTimeAsync(6000);
+        // The ticket swaps the cookie, so asking any sooner gets the wrong answer.
+        expect(heard).not.toHaveBeenCalled();
+
+        FakeSocket.last.deliver('welcome', welcome(1));
+        expect(heard).toHaveBeenCalledTimes(1);
+
+        FakeSocket.last.deliver('welcome', welcome(1));
+        expect(heard).toHaveBeenCalledTimes(1);
+      });
+
+      it('stays quiet about a dropped connection', async () => {
+        const { session, socket } = await connected();
+        const heard = vi.fn();
+        session.onSignedOut(heard);
+        socket.deliver('welcome', welcome(1));
+
+        socket.onclose?.({ code: 1006 });
+        await vi.advanceTimersByTimeAsync(6000);
+        FakeSocket.last.deliver('welcome', welcome(1));
+
+        expect(heard).not.toHaveBeenCalled();
+      });
+
+      it('says so when the door then turns them away, as a locked room does', async () => {
+        const { session, socket } = await connected();
+        const heard = vi.fn();
+        session.onSignedOut(heard);
+        socket.deliver('welcome', welcome(1));
+        vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ code: 'members_only', title: 'For its crew' }), { status: 403 }));
+
+        socket.onclose?.(SIGNED_OUT);
+        await vi.advanceTimersByTimeAsync(6000);
+
+        expect(session.getView().connection).toBe('failed');
+        expect(heard).toHaveBeenCalledTimes(1);
+      });
+
+      it('stops telling a listener that has gone', async () => {
+        const { session, socket } = await connected();
+        const heard = vi.fn();
+        session.onSignedOut(heard)();
+        socket.deliver('welcome', welcome(1));
+
+        socket.onclose?.(SIGNED_OUT);
+        await vi.advanceTimersByTimeAsync(6000);
+        FakeSocket.last.deliver('welcome', welcome(1));
+
+        expect(heard).not.toHaveBeenCalled();
+      });
+    });
+
+    it('reconnects when the browser becomes someone else, and not when the room already knows them', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      const before = FakeSocket.opened;
+
+      session.identityChanged('g_1');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(FakeSocket.opened).toBe(before);
+
+      session.identityChanged('u_9');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(FakeSocket.opened).toBe(before + 1);
     });
 
     it('retry reconnects now and resets the backoff', async () => {

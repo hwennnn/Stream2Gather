@@ -110,6 +110,8 @@ const initialView: RoomView = {
 };
 
 const MAX_BACKOFF_MS = 5000;
+/** The socket's close code for a session the server has ended. */
+const SIGNED_OUT = 4401;
 /** Push-to-talk flips fast, and only where it ended up matters to the room. */
 const VOICE_REPORT_MS = 200;
 const REACTION_LIFE_MS = 3000;
@@ -198,6 +200,8 @@ export class RoomSession {
   private pinger: number | null = null;
   private reconnectTimer: number | null = null;
   private attempts = 0;
+  private signedOut = false;
+  private readonly signedOutListeners = new Set<() => void>();
   /** Bumped by every connect and close, so an older attempt can tell it lost. */
   private generation = 0;
   private nextId = 1;
@@ -255,7 +259,10 @@ export class RoomSession {
       this.socket = socket;
       socket.onopen = () => this.startClock();
       socket.onmessage = (event) => this.receive(String(event.data));
-      socket.onclose = () => this.handleClose();
+      socket.onclose = (event?: CloseEvent) => {
+        this.signedOut ||= event?.code === SIGNED_OUT;
+        this.handleClose();
+      };
     } catch (error) {
       if (generation !== this.generation) return;
       // Too many at once is a wait, not a refusal: a whole party can hit it together.
@@ -266,10 +273,32 @@ export class RoomSession {
       }
       if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
         this.update({ connection: 'failed', failure: error.message });
+        this.settleSignedOut();
         return;
       }
       this.handleClose();
     }
+  }
+
+  /**
+   * The ticket swaps a dead cookie for a guest's, so who this browser is only
+   * settles once the room has answered. Asking any sooner races that.
+   */
+  private settleSignedOut(): void {
+    if (!this.signedOut) return;
+    this.signedOut = false;
+    for (const listener of this.signedOutListeners) listener();
+  }
+
+  /** Runs after the server has ended this session and the room has answered since. */
+  onSignedOut(listener: () => void): () => void {
+    this.signedOutListeners.add(listener);
+    return () => this.signedOutListeners.delete(listener);
+  }
+
+  /** Reconnects as whoever this browser now is, unless the room already knows them. */
+  identityChanged(userId: string | undefined): void {
+    if (userId !== this.view.self?.userId) this.retry();
   }
 
   private handleClose(notBeforeMs = 0): void {
@@ -489,6 +518,7 @@ export class RoomSession {
     // A call outlives the socket, but the server forgets it with the old connection.
     if (this.voice !== 'off') this.send('voice', { state: this.voice });
     void this.loadHistory();
+    this.settleSignedOut();
   }
 
   private async loadHistory(): Promise<void> {

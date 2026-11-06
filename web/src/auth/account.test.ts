@@ -195,4 +195,33 @@ describe('account sign-in', () => {
     expect(signedOutCalls).toHaveBeenCalledTimes(1);
     expect(identityChanges).toHaveBeenCalledTimes(1);
   });
+
+  describe('after the server ends a session', () => {
+    it('shows who this browser is now, and says it changed', async () => {
+      const { account, identityChanges } = await load(ada);
+      responses.me = guest;
+
+      await account.refresh();
+
+      expect(account.current().user).toEqual(guest);
+      expect(identityChanges).toHaveBeenCalledTimes(1);
+    });
+
+    it('says nothing when it is the same person', async () => {
+      const { account, identityChanges } = await load(ada);
+
+      await account.refresh();
+
+      expect(identityChanges).not.toHaveBeenCalled();
+    });
+
+    it('keeps what it knows when the server cannot say', async () => {
+      const { account } = await load(ada);
+      responses.meDown = true;
+
+      await expect(account.refresh()).resolves.toBeUndefined();
+
+      expect(account.current().user).toEqual(ada);
+    });
+  });
 });

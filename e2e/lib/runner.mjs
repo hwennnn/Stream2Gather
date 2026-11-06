@@ -68,24 +68,43 @@ const pool = async (entries, width, work) => {
   }));
 };
 
-export const runAll = async ({ grep, concurrency, out, makeContext, label }) => {
+/** "2/3" is the second of three shards, taking every third flow so the slow files spread out. */
+const inShard = (shard) => {
+  if (!shard) return () => true;
+  const [index, total] = shard.split('/').map(Number);
+  return (_, position) => position % total === index - 1;
+};
+
+export const runAll = async ({ grep, shard, retries = 0, concurrency, out, makeContext, label }) => {
   await mkdir(out, { recursive: true });
-  const chosen = flows.filter(({ name }) => !grep || grep.test(name));
+  const known = await readKnown();
+  const chosen = flows.filter(({ name }) => !grep || grep.test(name)).filter(inShard(shard));
   const results = [];
   const once = async (entry) => results.push(await runOne(entry, makeContext, out));
   const started = Date.now();
   await pool(chosen.filter((entry) => !entry.options.serial), concurrency, once);
   await pool(chosen.filter((entry) => entry.options.serial), 1, once);
 
+  // A loaded machine can miss a timing. A regression fails again, alone, so it stays red;
+  // a flow that recovers is named as flaky, because it can still be a real intermittent bug.
+  const isNew = (result) => result.failures.some((failure) => !knownFor(known, `${result.name}: ${failure}`));
+  const flaky = [];
+  for (let round = 0; round < retries; round += 1) {
+    for (const first of results.filter(isNew)) {
+      const again = await runOne(chosen.find(({ name }) => name === first.name), makeContext, out);
+      results[results.indexOf(first)] = again;
+      if (!isNew(again)) flaky.push({ name: first.name, failures: first.failures });
+    }
+  }
+
   const failed = results.filter((result) => result.failures.length);
   const checks = results.reduce((sum, result) => sum + result.checks, 0);
   const failedChecks = results.reduce((sum, result) => sum + result.failures.length, 0);
   const seconds = Math.round((Date.now() - started) / 1000);
-  const summary = { label, flows: results.length, flowsFailed: failed.length, checks, checksFailed: failedChecks, seconds };
-  await writeFile(path.join(out, 'report.json'), JSON.stringify({ summary, results }, null, 1));
+  const summary = { label, flows: results.length, flowsFailed: failed.length, flaky: flaky.length, checks, checksFailed: failedChecks, seconds };
+  await writeFile(path.join(out, 'report.json'), JSON.stringify({ summary, results, flaky }, null, 1));
   console.log(`\n${label}: ${results.length - failed.length} of ${results.length} flows passed, ` +
     `${checks} checks, ${failedChecks} failures, ${seconds}s`);
-  const known = await readKnown();
   let fresh = 0;
   for (const result of failed) {
     for (const failure of result.failures) {
@@ -94,7 +113,11 @@ export const runAll = async ({ grep, concurrency, out, makeContext, label }) => 
       console.log(`  ${id ?? 'NEW'}  ${result.name}: ${failure.slice(0, 160)}`);
     }
   }
-  if (!grep) for (const { id, used } of known) if (!used) console.log(`  STALE ${id}: nothing failed this way, remove its line`);
+  for (const { name, failures } of flaky) {
+    console.log(`  FLAKY  ${name}: ${failures[0].slice(0, 160)}`);
+    if (process.env.GITHUB_ACTIONS) console.log(`::warning title=Flaky flow::${name}: ${failures[0].slice(0, 160)}`);
+  }
+  if (!grep && !shard) for (const { id, used } of known) if (!used) console.log(`  STALE ${id}: nothing failed this way, remove its line`);
   console.log(`${fresh} new failures\nreport: ${path.join(out, 'report.json')}`);
   return fresh === 0;
 };

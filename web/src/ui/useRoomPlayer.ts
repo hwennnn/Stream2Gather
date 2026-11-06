@@ -114,7 +114,7 @@ const startSync = (session: RoomSession, player: PlayerAdapter, item: QueueItem,
     },
   );
 
-  session.onPlayback((playback) => sync.apply(playback));
+  session.onPlayback((playback, resync) => sync.apply(playback, resync));
   sync.apply(session.getView().playback);
 
   const timer = window.setInterval(() => {

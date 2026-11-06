@@ -36,19 +36,21 @@ const CATCH_UP_RATE = 1.25;
 const FINE_RATE_DELTA = 0.05;
 const SEEK_SETTLE_S = 0.25;
 const SEEK_COOLDOWN_MS = 10_000;
-/** Player events this soon after our own action are echoes, not the viewer. */
-const ECHO_WINDOW_MS = 1500;
 /**
- * A player that starts while the room is paused is almost certainly the viewer
- * pressing play, so that direction only ignores a sliver of time.
+ * How long a player we just moved, or a viewer's command the room has not
+ * answered, is left alone before being corrected. It only ever delays a
+ * correction: what the viewer does is told from an echo by `expecting`.
  */
-const RESUME_ECHO_WINDOW_MS = 300;
+const SETTLE_MS = 1500;
 const USER_SEEK_THRESHOLD_S = 1;
 /** A jump to within this of where we last sent the player is that seek landing. */
 const OWN_SEEK_WINDOW_S = 2;
 /** Beyond this, a throttled tab makes the time between ticks meaningless. */
 const MAX_TICK_GAP_MS = 2500;
 const STALL_TICKS = 3;
+
+const samePlayback = (a: Playback, b: Playback): boolean =>
+  a.item === b.item && a.status === b.status && a.pos === b.pos && a.at === b.at && a.rate === b.rate;
 
 export const expectedPosition = (playback: Playback, serverNow: number): number => {
   if (playback.status !== 'playing' || serverNow <= playback.at) return playback.pos;
@@ -62,13 +64,20 @@ export const expectedPosition = (playback: Playback, serverNow: number): number 
  */
 export class SyncController {
   private playback: Playback | null = null;
-  private lastActionAt = -Infinity;
+  private settleFrom = -Infinity;
   private lastSeekAt = -Infinity;
   private lastTime = 0;
   private lastTickAt = 0;
   private lastState: PlayerState | null = null;
   /** Where we sent the player, until it is seen arriving. Seeks can land late. */
   private pendingSeek: number | null = null;
+  /**
+   * What we last told the player to do, until it says it has. Set only by our
+   * own pause() and play(), and only when the player will report a change.
+   */
+  private expecting: 'paused' | 'playing' | null = null;
+  /** What this viewer last told the room, until the room answers. */
+  private asked: 'paused' | 'playing' | null = null;
   private stalledTicks = 0;
   /** The player has been seen resting on the room's paused position. */
   private settled = false;
@@ -86,19 +95,24 @@ export class SyncController {
     player.onState((state) => this.handlePlayerState(state));
   }
 
-  /** Applies the room's latest playback. */
-  apply(playback: Playback): void {
+  /**
+   * Applies the room's latest playback. Most events repeat it, such as a queue
+   * add or a lock toggle, and those leave the player alone. A resync is the room
+   * insisting, as when it refused a command, so it always goes through.
+   */
+  apply(playback: Playback, resync = false): void {
     const previous = this.playback;
+    if (!resync && previous && samePlayback(previous, playback)) return;
     this.playback = playback;
+    this.asked = null;
     this.settled &&= previous?.item === playback.item && previous.pos === playback.pos;
-    this.pendingSeek = null;
     this.cancelNudge();
     this.clearStart();
 
     if (playback.status === 'paused') {
       this.act(() => {
-        this.player.pause();
-        if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.player.seek(playback.pos);
+        this.pausePlayer();
+        if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.seekPlayer(playback.pos);
       });
       this.noteSettled(playback);
       return;
@@ -119,20 +133,20 @@ export class SyncController {
         if (Math.abs(this.player.time() - expected) > DRIFT_OK_S) this.seekTo(expected);
       }
       this.player.setRate(playback.rate);
-      this.player.play();
+      this.playPlayer();
     });
   }
 
   private holdUntilStart(playback: Playback, now: number): void {
     this.act(() => {
-      this.player.pause();
-      if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.player.seek(playback.pos);
+      this.pausePlayer();
+      if (Math.abs(this.player.time() - playback.pos) > DRIFT_OK_S) this.seekPlayer(playback.pos);
     });
     this.startTimer = this.timers.setTimeout(() => {
       this.startTimer = null;
       this.act(() => {
         this.player.setRate(playback.rate);
-        this.player.play();
+        this.playPlayer();
       });
     }, playback.at - now);
     this.report({ health: 'waiting', drift: 0 });
@@ -146,8 +160,13 @@ export class SyncController {
 
     const state = this.player.state();
     const time = this.player.time();
+    // Some commands change nothing the player would report, so no echo comes.
+    if (state === this.expecting) this.expecting = null;
+    const landed = this.noteLanding(time);
 
     if (playback.status === 'paused') {
+      // Either the room refused this viewer's play, or it never heard about it.
+      if (state === 'playing' && !this.settling(now)) this.act(() => this.pausePlayer());
       this.detectPausedSeek(playback, state, time, now);
       this.remember(time, now, state);
       return;
@@ -171,11 +190,11 @@ export class SyncController {
       return;
     }
 
-    if (state === 'paused' && !this.recentlyActed(now)) {
-      this.act(() => this.player.play());
+    if (state === 'paused' && !this.nudging && !this.settling(now)) {
+      this.act(() => this.playPlayer());
     }
 
-    this.detectUserSeek(playback, state, time, now, expected);
+    if (!landed) this.detectUserSeek(playback, state, time, now, expected);
     this.correct(drift, expected, now);
     this.remember(time, now, state);
   }
@@ -187,6 +206,13 @@ export class SyncController {
     }
     this.stalledTicks += 1;
     return this.stalledTicks >= STALL_TICKS;
+  }
+
+  /** Reports whether our own seek has just arrived, so the jump is not the viewer's. */
+  private noteLanding(time: number): boolean {
+    if (this.pendingSeek === null || Math.abs(time - this.pendingSeek) > OWN_SEEK_WINDOW_S) return false;
+    this.pendingSeek = null;
+    return true;
   }
 
   private remember(time: number, now: number, state: PlayerState): void {
@@ -208,36 +234,34 @@ export class SyncController {
     now: number,
     expected: number,
   ): void {
-    if (this.recentlyActed(now) || this.nudging) return;
     if (state !== 'playing' || this.lastState !== 'playing') return;
     if (now - this.lastTickAt > MAX_TICK_GAP_MS) return;
     if (Math.abs(time - this.lastTime) <= USER_SEEK_THRESHOLD_S) return;
-    if (this.pendingSeek !== null && Math.abs(time - this.pendingSeek) <= OWN_SEEK_WINDOW_S) {
-      this.pendingSeek = null;
-      return;
-    }
 
     const elapsed = ((now - this.lastTickAt) / 1000) * playback.rate;
     const jump = time - (this.lastTime + elapsed);
     if (Math.abs(jump) > USER_SEEK_THRESHOLD_S && Math.abs(time - expected) > USER_SEEK_THRESHOLD_S) {
+      this.pendingSeek = null;
+      this.markAction();
       this.emit({ type: 'seek', pos: time, ct: now });
-      this.lastActionAt = now;
     }
   }
 
   /**
    * A paused player only counts once it has been seen on the room's position.
    * Until then, being elsewhere means it has not arrived, like a joiner's player
-   * still reporting 0, and that must not drag the room back with it.
+   * still reporting 0, and that must not drag the room back with it. Being off
+   * position is a lasting condition, so waiting to settle delays a viewer's seek
+   * by a tick at most and cannot lose it.
    */
   private detectPausedSeek(playback: Playback, state: PlayerState, time: number, now: number): void {
     if (state !== 'paused' || this.noteSettled(playback)) return;
-    if (this.recentlyActed(now)) return;
+    if (this.settling(now)) return;
     if (this.settled) {
-      this.lastActionAt = now;
+      this.markAction();
       this.emit({ type: 'seek', pos: time, ct: now });
     } else {
-      this.act(() => this.player.seek(playback.pos));
+      this.act(() => this.seekPlayer(playback.pos));
     }
   }
 
@@ -257,7 +281,7 @@ export class SyncController {
       return;
     }
     this.report({ health: 'correcting', drift });
-    if (this.nudging || this.recentlyActed(now)) return;
+    if (this.nudging || this.settling(now)) return;
 
     const ahead = drift > 0;
     if (size > (ahead ? NUDGE_AHEAD_MAX_S : NUDGE_BEHIND_MAX_S)) {
@@ -286,11 +310,10 @@ export class SyncController {
 
   private nudgePause(seconds: number): void {
     this.nudging = true;
-    this.markAction();
-    this.player.pause();
+    this.act(() => this.pausePlayer());
     this.nudgeTimer = this.timers.setTimeout(() => {
       this.nudging = false;
-      this.act(() => this.player.play());
+      this.act(() => this.playPlayer());
     }, seconds * 1000);
   }
 
@@ -308,46 +331,80 @@ export class SyncController {
 
   private seekTo(expected: number): void {
     this.lastSeekAt = this.clock.now();
-    this.pendingSeek = expected + SEEK_SETTLE_S;
-    this.player.seek(this.pendingSeek);
+    this.seekPlayer(expected + SEEK_SETTLE_S);
   }
 
+  private seekPlayer(seconds: number): void {
+    this.pendingSeek = seconds;
+    this.player.seek(seconds);
+  }
+
+  /** A paused player that is told to pause again says nothing, so nothing is expected. */
+  private pausePlayer(): void {
+    if (this.player.state() !== 'paused' || this.expecting) this.expecting = 'paused';
+    this.player.pause();
+  }
+
+  /** So does a running one told to play, buffering included. */
+  private playPlayer(): void {
+    const state = this.player.state();
+    if (state === 'paused' || state === 'ready' || this.expecting) this.expecting = 'playing';
+    this.player.play();
+  }
+
+  /** Moving the player puts it back on the room's view, so nothing is outstanding. */
   private act(work: () => void): void {
+    this.asked = null;
     this.markAction();
     work();
   }
 
   private markAction(): void {
-    this.lastActionAt = this.clock.now();
+    this.settleFrom = this.clock.now();
   }
 
-  private recentlyActed(now: number): boolean {
-    return now - this.lastActionAt < ECHO_WINDOW_MS;
+  private settling(now: number): boolean {
+    return now - this.settleFrom < SETTLE_MS;
   }
 
-  /** Turns the viewer's own use of the native controls into room commands. */
+  /**
+   * Turns the viewer's own use of the native controls into room commands. While
+   * an echo is due, the opposite report is older news: a pause landing behind our
+   * play, or a player that was already starting when we paused it.
+   */
   private handlePlayerState(state: PlayerState): void {
     const playback = this.playback;
     if (!playback) return;
-    const now = this.clock.now();
 
     if (state === 'ended') {
       this.emit({ type: 'ended' });
       return;
     }
-    if (this.nudging || now < playback.at) return;
-
-    if (state === 'paused' && playback.status === 'playing' && !this.recentlyActed(now)) {
-      this.lastActionAt = now;
-      this.emit({ type: 'pause', pos: this.player.time(), ct: now });
-    } else if (
-      state === 'playing' &&
-      playback.status === 'paused' &&
-      now - this.lastActionAt >= RESUME_ECHO_WINDOW_MS
-    ) {
-      this.lastActionAt = now;
-      this.emit({ type: 'play', pos: this.player.time(), ct: now });
+    if (state === 'buffering' && this.expecting === 'playing') {
+      this.expecting = null; // It has left paused, so a pause from here is the viewer's.
+      return;
     }
+    if (state !== 'paused' && state !== 'playing') return;
+    if (this.expecting) {
+      if (this.expecting === state) this.expecting = null;
+      return;
+    }
+
+    const now = this.clock.now();
+    if (now < playback.at) return;
+    // Until the room answers, its status is older than what this viewer just did.
+    const status = this.asked ?? playback.status;
+    if (state === 'paused' && status === 'playing') {
+      this.tellRoom('paused', { type: 'pause', pos: this.player.time(), ct: now });
+    } else if (state === 'playing' && status === 'paused') {
+      this.tellRoom('playing', { type: 'play', pos: this.player.time(), ct: now });
+    }
+  }
+
+  private tellRoom(asked: 'paused' | 'playing', command: LocalCommand): void {
+    this.asked = asked;
+    this.markAction();
+    this.emit(command);
   }
 
   destroy(): void {

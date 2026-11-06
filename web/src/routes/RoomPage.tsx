@@ -77,6 +77,9 @@ export const RoomPage = ({ slug }: { slug: string }) => {
   const join = async (name: string, changed: boolean) => {
     // A failed rename only costs the name, so it shouldn't stop anyone joining.
     if (changed) await account.rename(name).catch(() => {});
+    // A reload then goes straight back in. Without the gate's click the video starts
+    // muted, and Tap to unmute is there for that.
+    window.history.replaceState({ ...arrival(), joined: true }, '');
     setJoined(true);
   };
 

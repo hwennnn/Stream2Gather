@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RoomPage } from './RoomPage';
 
@@ -28,6 +28,12 @@ vi.mock('../room/session', () => ({
 describe('RoomPage', () => {
   beforeEach(() => window.history.replaceState(null, ''));
   afterEach(cleanup);
+
+  it('remembers a guest has joined, so a reload goes straight back in', async () => {
+    render(<RoomPage slug="room" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Join' }));
+    expect(window.history.state).toMatchObject({ joined: true });
+  });
 
   it('shows the gate to someone who has not joined', async () => {
     render(<RoomPage slug="room" />);

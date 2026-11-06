@@ -14,7 +14,8 @@ const MOVE_SECONDS = 1.5;
 
 /** The chat as the narrator sees it. */
 type Lines = {
-  say(text: string): string;
+  /** A quiet line stays in the record but isn't shown: the status line already says it. */
+  say(text: string, quiet?: boolean): string;
   rewrite(lineId: string, text: string): boolean;
   remove(lineId: string): void;
   now(): number;
@@ -68,7 +69,7 @@ export class Narrator {
       this.seek(by, pos, playback); // A player pauses on its way to a seek.
       return;
     }
-    this.pauses.push({ by, lineId: this.lines.say(`${by} paused at ${formatTime(pos)}`), pos, at: now });
+    this.pauses.push({ by, lineId: this.lines.say(`${by} paused at ${formatTime(pos)}`, true), pos, at: now });
   }
 
   /** A pause that was over at once never happened. If the picture moved, that's the news. */

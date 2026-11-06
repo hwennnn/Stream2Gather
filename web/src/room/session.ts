@@ -19,7 +19,7 @@ export type ChatLine = Omit<ChatMessage, 'id'> & {
   serverId?: number;
 };
 
-export type ChatEntry = ChatLine | { kind: 'system'; id: string; text: string; createdAt: string };
+export type ChatEntry = ChatLine | { kind: 'system'; id: string; text: string; createdAt: string; quiet?: boolean };
 
 /** Limited means the server refused it for speed, so the text is still worth keeping. */
 export type ChatResult = { id: string; limited: boolean };
@@ -48,6 +48,8 @@ export type RoomView = {
   name: string;
   version: number;
   playback: RoomPlayback;
+  /** The latest thing a person did, for the room's status line. */
+  lastAction: { by: string; cause: string } | null;
   queue: QueueItem[];
   settings: Settings;
   members: Person[];
@@ -75,6 +77,7 @@ const initialView: RoomView = {
   connection: 'connecting',
   failure: null,
   offlineSince: null,
+  lastAction: null,
   self: null,
   name: '',
   version: 0,
@@ -170,7 +173,7 @@ export class RoomSession {
   private historyLoaded = false;
   private jumpTimer: number | null = null;
   private narrator = new Narrator({
-    say: (text) => this.say(text),
+    say: (text, quiet) => this.say(text, quiet),
     rewrite: (lineId, text) => this.rewrite(lineId, text),
     remove: (lineId) => this.update({ messages: this.view.messages.filter((entry) => entry.id !== lineId) }),
     now: () => this.clock.now(),
@@ -510,6 +513,7 @@ export class RoomSession {
       queue: message.queue ?? previous.queue,
       settings: message.settings ?? previous.settings,
       viewerStates: itemChanged ? {} : previous.viewerStates,
+      lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
     });
     if (itemChanged) this.noteJump(message);
     if (!snapshot) this.narrator.stateChanged(message, previous);
@@ -539,10 +543,10 @@ export class RoomSession {
     return found;
   }
 
-  private say(text: string): string {
+  private say(text: string, quiet?: boolean): string {
     const id = `s${this.nextId++}`;
     const createdAt = new Date(this.clock.now()).toISOString();
-    this.append({ kind: 'system', id, text, createdAt });
+    this.append({ kind: 'system', id, text, createdAt, ...(quiet ? { quiet } : {}) });
     return id;
   }
 

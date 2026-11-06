@@ -51,6 +51,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	go writeLoop(ctx, ws, c, cancel)
+	go keepAlive(ctx, ws, h.pingEvery, cancel)
 
 	// Reading starts only after the welcome is queued. A pong that overtakes it
 	// tells the client it is behind a room it has not been shown yet.
@@ -80,6 +81,27 @@ func readMessage(ctx context.Context, ws *websocket.Conn, idle time.Duration) ([
 	defer cancel()
 	_, payload, err := ws.Read(ctx)
 	return payload, err
+}
+
+// keepAlive ends a connection whose peer no longer answers at all. A ping waits
+// up to one interval for its reply, and the read loop is what receives it.
+func keepAlive(ctx context.Context, ws *websocket.Conn, every time.Duration, cancel context.CancelFunc) {
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			waiting, done := context.WithTimeout(ctx, every)
+			err := ws.Ping(waiting)
+			done()
+			if err != nil {
+				cancel()
+				return
+			}
+		}
+	}
 }
 
 func writeLoop(ctx context.Context, ws *websocket.Conn, c *conn, cancel context.CancelFunc) {

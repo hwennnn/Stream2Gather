@@ -39,6 +39,9 @@ const (
 	// Chrome runs a hidden tab's timers once a minute, so a healthy viewer can
 	// go that long between pings. Anything shorter drops people who tabbed away.
 	idleTimeout = 90 * time.Second
+	// The browser itself answers these, whatever a hidden tab's timers are doing,
+	// so someone whose machine slept is gone in seconds rather than idleTimeout.
+	pingEvery = 15 * time.Second
 	// A host who reloads or loses signal for a moment stays the host. One who
 	// says they're leaving doesn't get this.
 	hostGrace = 30 * time.Second
@@ -72,6 +75,7 @@ type Hub struct {
 	snapshots       time.Duration
 	keepAlive       time.Duration
 	sessionCheck    time.Duration
+	pingEvery       time.Duration
 	commandPatience time.Duration
 
 	// mu is held across Redis subscribes, which keeps them in order. Delivery
@@ -101,6 +105,7 @@ func New(db *store.Postgres, live *store.Live, rdb *redis.Client, catalog *sourc
 		snapshots:       snapshotEvery,
 		keepAlive:       keepAliveEvery,
 		sessionCheck:    sessionCheckEvery,
+		pingEvery:       pingEvery,
 		commandPatience: opTimeout,
 
 		rooms: make(map[string]*liveRoom),

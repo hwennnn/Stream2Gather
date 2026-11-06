@@ -532,12 +532,24 @@ func (s *Server) deleteMe(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Read first: the row that says who this is at Clerk is about to go.
+	clerkID, err := s.DB.ClerkID(r.Context(), claims.Subject)
+	if err != nil {
+		s.internal(w, err)
+		return
+	}
 	rooms, err := s.DB.DeleteAccount(r.Context(), claims.Subject)
 	if err != nil {
 		s.internal(w, err)
 		return
 	}
 	s.versions.forget(claims.Subject)
+	// The account is gone, so a failure here is for the log, not the person.
+	if s.Clerk != nil && clerkID != "" {
+		if err := s.Clerk.EndSessions(r.Context(), clerkID); err != nil {
+			s.Log.Warn("clerk sessions outlived an account", "error", err)
+		}
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Path: "/", MaxAge: -1, HttpOnly: true, Secure: s.Secure, SameSite: http.SameSiteLaxMode,
 	})

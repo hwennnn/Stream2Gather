@@ -3,6 +3,8 @@ import type { RoomPreview } from '../api/http';
 import { useAccount } from '../auth/account';
 import { Avatar } from './Avatar';
 import { formatTime, suggestName } from './format';
+import { Page } from './Page';
+import { firstName, seatHues } from './people';
 import { Thumb } from './Thumb';
 
 type JoinGateProps = {
@@ -11,13 +13,15 @@ type JoinGateProps = {
 };
 
 const MAX_NAME = 32;
-const SHOWN = 5;
+const SHOWN = 4;
+/** A room you arrive at early still has places in it. */
+const MIN_EMPTY = 2;
 
-const statusLine = (preview: RoomPreview): string => {
+const WhereItIs = ({ preview }: { preview: RoomPreview }) => {
   const { playback, nowPlaying } = preview;
-  if (!nowPlaying || !playback || playback.status === 'idle') return 'Nothing playing yet';
-  const time = formatTime(playback.pos);
-  return playback.status === 'paused' ? `Paused at ${time}` : `Playing now · ${time}`;
+  if (!nowPlaying || !playback || playback.status === 'idle') return null;
+  const time = <span className="fig text-[13px]">{formatTime(playback.pos)}</span>;
+  return <p className="mt-0.5 text-[13px] text-muted">{playback.status === 'paused' ? <>Paused at {time}</> : <>{time} in</>}</p>;
 };
 
 /** The Join click is also the gesture that lets the video start with sound. */
@@ -41,61 +45,68 @@ export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
     await onJoin(clean, clean !== user?.name);
   };
 
-  const count = preview?.members.length ?? 0;
-  const title = preview?.nowPlaying?.title ?? 'Join the watch party';
+  const others = preview?.members ?? [];
+  seatHues(others.map((person) => person.userId));
+  const extra = others.length - SHOWN;
+  const inviter = others.find((person) => person.role === 'host') ?? others[0];
+  const empties = Math.max(0, MIN_EMPTY - others.length);
 
   return (
-    <main className="glow flex min-h-full items-center justify-center p-4 sm:p-6 land:p-3">
-      <form
-        onSubmit={(event) => void submit(event)}
-        className="enter w-full max-w-md rounded-3xl border border-line bg-panel p-5 sm:p-6 land:grid land:max-w-3xl land:grid-cols-2 land:items-center land:gap-5 land:p-4"
-      >
+    <Page>
+      <form onSubmit={(event) => void submit(event)} className="enter land:grid land:grid-cols-2 land:items-start land:gap-6">
         {preview ? (
-          <div>
-            {preview.nowPlaying ? (
-              <Thumb src={preview.nowPlaying.thumbnailUrl} className="w-full rounded-2xl" />
-            ) : (
-              <div className="glow flex aspect-video items-center justify-center rounded-2xl bg-raised">
-                <img src="/favicon.svg" alt="" className="size-10 opacity-90" />
-              </div>
-            )}
-          </div>
+          preview.nowPlaying && <Thumb src={preview.nowPlaying.thumbnailUrl} className="mb-5 w-full rounded-lg land:mb-0" />
         ) : (
-          <div aria-hidden="true" className="skeleton aspect-video rounded-2xl" />
+          <div aria-hidden="true" className="skeleton mb-5 aspect-video rounded-lg land:mb-0" />
         )}
 
         <div>
           {preview ? (
             <>
-              <p className="mt-5 text-sm text-muted land:mt-0">{statusLine(preview)}</p>
-              <h1 className="mt-1 line-clamp-2 text-xl leading-snug font-semibold tracking-tight text-balance land:text-[17px]">{title}</h1>
-              <div className="mt-3 flex min-h-7 items-center gap-2.5 text-sm text-muted">
-                {count > 0 && (
-                  <span className="flex -space-x-0.5">
-                    {preview.members.slice(0, SHOWN).map((person) => (
-                      <Avatar key={person.userId} person={person} />
-                    ))}
-                  </span>
-                )}
-                <span className="min-w-0 truncate">
-                  {count === 0 && `${preview.name}. Nobody’s here yet.`}
-                  {count === 1 && `${preview.members[0]?.name} is in ${preview.name}`}
-                  {count > 1 && `${count} people in ${preview.name}`}
-                </span>
-              </div>
+              <h1 className="text-2xl leading-8 font-semibold tracking-[-0.015em] text-balance">{inviter ? `${firstName(inviter.name)} saved you a seat` : preview.name}</h1>
+              {inviter ? (
+                <p className="mt-1 line-clamp-2 text-muted">{preview.nowPlaying ? `${preview.name}, watching ${preview.nowPlaying.title}` : preview.name}</p>
+              ) : (
+                <p className="mt-1 text-muted">You’re first in. Friends with the link will sit down next to you.</p>
+              )}
+              <WhereItIs preview={preview} />
             </>
           ) : (
-            <div aria-hidden="true" className="land:mt-0">
-              <div className="skeleton mt-5 h-3.5 w-28 rounded land:mt-0" />
-              <div className="skeleton mt-3 h-6 w-4/5 rounded" />
-              <div className="skeleton mt-3 h-7 w-44 rounded-full" />
+            <div aria-hidden="true">
+              <div className="skeleton h-7 w-4/5 rounded" />
+              <div className="skeleton mt-2 h-4 w-3/5 rounded" />
             </div>
           )}
 
-          <div className="mt-5 flex items-center gap-2.5 land:mt-3">
-            <label htmlFor="join-name" className="shrink-0 text-sm text-muted">
-              Joining as
-            </label>
+          <ul aria-label="In the room" data-gate="true" className="seats mt-6">
+            {others.slice(0, SHOWN).map((person) => (
+              <li key={person.userId} className="seat">
+                <span className="seat-disc">
+                  <Avatar person={person} labelled={false} className="size-full text-[13px]" />
+                </span>
+                <span className="seat-name">{firstName(person.name)}</span>
+              </li>
+            ))}
+            {extra > 0 && (
+              <li className="seat">
+                <span className="seat-more">+{extra}</span>
+              </li>
+            )}
+            <li className="seat seat-you">
+              <span className="seat-empty" />
+              <span className="seat-name">{name.trim() || suggested}</span>
+            </li>
+            {Array.from({ length: empties }, (_, index) => (
+              <li key={index} aria-hidden="true" className="seat">
+                <span className="seat-empty" />
+              </li>
+            ))}
+          </ul>
+
+          <label htmlFor="join-name" className="mt-6 block text-[13px] text-muted">
+            Your name
+          </label>
+          <div className="mt-1.5 flex gap-2">
             <input
               id="join-name"
               value={name}
@@ -103,15 +114,14 @@ export const JoinGate = ({ preview, onJoin }: JoinGateProps) => {
               onChange={(event) => setEdited(event.target.value)}
               autoComplete="off"
               spellCheck={false}
-              className="field h-10 min-w-0 flex-1 font-medium"
+              className="field min-w-0 flex-1"
             />
+            <button ref={button} type="submit" disabled={!preview || busy} className="btn btn-primary">
+              Join
+            </button>
           </div>
-
-          <button ref={button} type="submit" disabled={!preview || busy} className="btn btn-primary mt-3 h-12 w-full rounded-xl text-base">
-            Join
-          </button>
         </div>
       </form>
-    </main>
+    </Page>
   );
 };

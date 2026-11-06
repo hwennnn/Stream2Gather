@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -14,6 +15,7 @@ import (
 	"github.com/clerk/clerk-sdk-go/v2"
 	"github.com/clerk/clerk-sdk-go/v2/jwks"
 	"github.com/clerk/clerk-sdk-go/v2/jwt"
+	"github.com/clerk/clerk-sdk-go/v2/session"
 	"github.com/clerk/clerk-sdk-go/v2/user"
 
 	"stream2gather/internal/room"
@@ -21,6 +23,12 @@ import (
 
 // keyTTL bounds how long a signing key Clerk has retired stays trusted.
 const keyTTL = time.Hour
+
+const (
+	sessionActive = "active"
+	// maxSessionPage is the most Clerk lists at once.
+	maxSessionPage = 500
+)
 
 // Identity is the person behind a verified Clerk session.
 type Identity struct {
@@ -31,9 +39,10 @@ type Identity struct {
 
 // Clerk verifies session tokens against one Clerk application.
 type Clerk struct {
-	keys   *jwks.Client
-	users  *user.Client
-	origin string
+	keys     *jwks.Client
+	users    *user.Client
+	sessions *session.Client
+	origin   string
 
 	now func() time.Time
 
@@ -53,11 +62,12 @@ func NewClerk(secretKey, origin string) *Clerk {
 
 func newClerk(config *clerk.ClientConfig, origin string) *Clerk {
 	return &Clerk{
-		keys:   jwks.NewClient(config),
-		users:  user.NewClient(config),
-		origin: origin,
-		now:    time.Now,
-		cache:  map[string]cachedKey{},
+		keys:     jwks.NewClient(config),
+		users:    user.NewClient(config),
+		sessions: session.NewClient(config),
+		origin:   origin,
+		now:      time.Now,
+		cache:    map[string]cachedKey{},
 	}
 }
 
@@ -80,6 +90,11 @@ func (c *Clerk) Verify(ctx context.Context, token string) (Identity, error) {
 		return Identity{}, ErrInvalidToken
 	}
 
+	// A token outlives its session by up to a minute, and a signature can't say so.
+	if err := c.sessionLive(ctx, claims.SessionID); err != nil {
+		return Identity{}, err
+	}
+
 	profile, err := c.users.Get(ctx, claims.Subject)
 	if err != nil {
 		return Identity{}, fmt.Errorf("load clerk user: %w", err)
@@ -89,6 +104,42 @@ func (c *Clerk) Verify(ctx context.Context, token string) (Identity, error) {
 		identity.AvatarURL = *profile.ImageURL
 	}
 	return identity, nil
+}
+
+func (c *Clerk) sessionLive(ctx context.Context, id string) error {
+	current, err := c.sessions.Get(ctx, id)
+	var refused *clerk.APIErrorResponse
+	if errors.As(err, &refused) && refused.HTTPStatusCode == http.StatusNotFound {
+		return ErrInvalidToken
+	}
+	if err != nil {
+		return fmt.Errorf("load clerk session: %w", err)
+	}
+	if current.Status != sessionActive {
+		return ErrInvalidToken
+	}
+	return nil
+}
+
+// EndSessions signs a person out of Clerk on every device. Without this a device
+// whose cookie died stays signed in to Clerk, one click from a fresh cookie.
+func (c *Clerk) EndSessions(ctx context.Context, clerkID string) error {
+	params := &session.ListParams{UserID: clerk.String(clerkID), Status: clerk.String(sessionActive)}
+	params.Limit = clerk.Int64(maxSessionPage)
+	list, err := c.sessions.List(ctx, params)
+	if err != nil {
+		return fmt.Errorf("list clerk sessions: %w", err)
+	}
+	var failed []error
+	for _, active := range list.Sessions {
+		if _, err := c.sessions.Revoke(ctx, &session.RevokeParams{ID: active.ID}); err != nil {
+			failed = append(failed, fmt.Errorf("revoke clerk session: %w", err))
+		}
+	}
+	if list.TotalCount > int64(len(list.Sessions)) {
+		failed = append(failed, fmt.Errorf("%d clerk sessions, only %d listed", list.TotalCount, len(list.Sessions)))
+	}
+	return errors.Join(failed...)
 }
 
 func (c *Clerk) key(ctx context.Context, id string) (*clerk.JSONWebKey, error) {

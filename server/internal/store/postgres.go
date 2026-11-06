@@ -91,6 +91,16 @@ func (p *Postgres) LinkClerkUser(ctx context.Context, clerkID, guestID, newID, n
 	return account, tx.Commit(ctx)
 }
 
+// ClerkID returns the Clerk account behind a user, or "" if there is none.
+func (p *Postgres) ClerkID(ctx context.Context, id string) (string, error) {
+	var clerkID *string
+	err := p.pool.QueryRow(ctx, `SELECT clerk_id FROM users WHERE id = $1`, id).Scan(&clerkID)
+	if errors.Is(err, pgx.ErrNoRows) || clerkID == nil {
+		return "", nil
+	}
+	return *clerkID, err
+}
+
 // SessionVersion returns the version a user's cookie must carry.
 func (p *Postgres) SessionVersion(ctx context.Context, id string) (int64, error) {
 	var version int64

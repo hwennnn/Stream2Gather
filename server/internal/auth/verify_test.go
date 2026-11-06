@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,11 @@ type world struct {
 	served  []map[string]string
 	clerk   *Clerk
 	jwksHit int
+	// sessions holds each session's status. Clerk answers 404 for any other.
+	sessions map[string]string
+	broken   bool
+	// stuck is a session Clerk lists but won't revoke.
+	stuck string
 }
 
 func jwk(k *rsa.PublicKey, kid string) map[string]string {
@@ -37,7 +43,7 @@ func jwk(k *rsa.PublicKey, kid string) map[string]string {
 func newWorld(t *testing.T) *world {
 	t.Helper()
 	key, _ := rsa.GenerateKey(rand.Reader, 2048)
-	w := &world{key: key, kid: "ins_1"}
+	w := &world{key: key, kid: "ins_1", sessions: map[string]string{"sess_1": sessionActive}}
 	w.served = []map[string]string{jwk(&key.PublicKey, w.kid)}
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.Header().Set("Content-Type", "application/json")
@@ -46,12 +52,52 @@ func newWorld(t *testing.T) *world {
 			_ = json.NewEncoder(rw).Encode(map[string]any{"keys": w.served})
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/sessions") {
+			w.serveSessions(rw, r)
+			return
+		}
 		_ = json.NewEncoder(rw).Encode(map[string]any{"id": strings.TrimPrefix(r.URL.Path, "/users/"), "object": "user", "first_name": "Ada"})
 	}))
 	t.Cleanup(server.Close)
 	config := &clerk.ClientConfig{BackendConfig: clerk.BackendConfig{Key: clerk.String("sk_test"), URL: clerk.String(server.URL)}}
 	w.clerk = newClerk(config, origin)
 	return w
+}
+
+func (w *world) serveSessions(rw http.ResponseWriter, r *http.Request) {
+	if w.broken {
+		rw.WriteHeader(http.StatusBadGateway)
+		_ = json.NewEncoder(rw).Encode(map[string]any{"errors": []any{}})
+		return
+	}
+	if r.URL.Path == "/sessions" {
+		listed := []map[string]string{}
+		for id, status := range w.sessions {
+			if status == r.URL.Query().Get("status") && r.URL.Query().Get("user_id") == "user_1" {
+				listed = append(listed, map[string]string{"id": id, "status": status})
+			}
+		}
+		sort.Slice(listed, func(i, j int) bool { return listed[i]["id"] < listed[j]["id"] })
+		_ = json.NewEncoder(rw).Encode(map[string]any{"data": listed, "total_count": len(listed)})
+		return
+	}
+	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/sessions/"), "/revoke")
+	status, found := w.sessions[id]
+	if !found {
+		rw.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(rw).Encode(map[string]any{"errors": []any{map[string]string{"code": "resource_not_found"}}})
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/revoke") {
+		if id == w.stuck {
+			rw.WriteHeader(http.StatusBadGateway)
+			_ = json.NewEncoder(rw).Encode(map[string]any{"errors": []any{}})
+			return
+		}
+		status = "revoked"
+		w.sessions[id] = status
+	}
+	_ = json.NewEncoder(rw).Encode(map[string]string{"id": id, "status": status})
 }
 
 func sign(t *testing.T, key any, alg jose.SignatureAlgorithm, kid string, claims map[string]any) string {
@@ -132,5 +178,69 @@ func TestRetiredKeyIsNotTrustedForever(t *testing.T) {
 	now = now.Add(2 * time.Minute)
 	if _, err := w.clerk.Verify(context.Background(), token()); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("a key no longer in the JWKS still verifies: %v", err)
+	}
+}
+
+func TestEndSessionsReachesEveryDeviceOfThatPersonOnly(t *testing.T) {
+	w := newWorld(t)
+	w.sessions["sess_2"] = sessionActive
+	if err := w.clerk.EndSessions(context.Background(), "user_1"); err != nil {
+		t.Fatal(err)
+	}
+	if w.sessions["sess_1"] != "revoked" || w.sessions["sess_2"] != "revoked" {
+		t.Fatalf("sessions = %v", w.sessions)
+	}
+
+	w.sessions["sess_3"] = sessionActive
+	if err := w.clerk.EndSessions(context.Background(), "user_other"); err != nil {
+		t.Fatal(err)
+	}
+	if w.sessions["sess_3"] != sessionActive {
+		t.Fatalf("someone else's session ended: %v", w.sessions)
+	}
+}
+
+func TestOneStuckSessionNeitherHidesNorBlocksTheRest(t *testing.T) {
+	w := newWorld(t)
+	w.sessions["sess_0"] = sessionActive // Listed first, so giving up here would spare sess_1.
+	w.stuck = "sess_0"
+	if err := w.clerk.EndSessions(context.Background(), "user_1"); err == nil {
+		t.Fatal("a device stayed signed in and nobody heard")
+	}
+	if w.sessions["sess_1"] != "revoked" {
+		t.Fatalf("the failure stopped the others: %v", w.sessions)
+	}
+}
+
+// A token signed before the sign-out still has a good signature for its last minute.
+func TestATokenDiesWithItsSession(t *testing.T) {
+	w := newWorld(t)
+	token := sign(t, w.key, jose.RS256, w.kid, good())
+	if _, err := w.clerk.Verify(context.Background(), token); err != nil {
+		t.Fatal(err)
+	}
+	if err := w.clerk.EndSessions(context.Background(), "user_1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.clerk.Verify(context.Background(), token); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("a token outlived its session: %v", err)
+	}
+
+	delete(w.sessions, "sess_1")
+	if _, err := w.clerk.Verify(context.Background(), token); !errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("a session Clerk has forgotten: %v", err)
+	}
+}
+
+// An outage says nothing about the person, so it mustn't look like a bad token.
+func TestAClerkOutageIsNotABadToken(t *testing.T) {
+	w := newWorld(t)
+	w.broken = true
+	_, err := w.clerk.Verify(context.Background(), sign(t, w.key, jose.RS256, w.kid, good()))
+	if err == nil || errors.Is(err, ErrInvalidToken) {
+		t.Fatalf("Verify = %v", err)
+	}
+	if err := w.clerk.EndSessions(context.Background(), "user_1"); err == nil {
+		t.Fatal("EndSessions hid an outage")
 	}
 }

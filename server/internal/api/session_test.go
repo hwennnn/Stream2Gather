@@ -30,6 +30,8 @@ func (f fakeClerk) Verify(_ context.Context, token string) (auth.Identity, error
 	return auth.Identity{}, auth.ErrInvalidToken
 }
 
+func (fakeClerk) EndSessions(context.Context, string) error { return nil }
+
 // This test needs the stack from deploy/compose.yaml and skips without it.
 func sessionServer(t *testing.T) *httptest.Server {
 	t.Helper()

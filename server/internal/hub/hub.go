@@ -431,6 +431,12 @@ func (c *conn) rename(name string) {
 	c.person.Name = name
 }
 
+func (c *conn) setMember(member bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.person.Member = member
+}
+
 // shut asks the write loop to close the socket with this code.
 func (c *conn) shut(code websocket.StatusCode, reason string) {
 	c.once.Do(func() {
@@ -576,6 +582,8 @@ func (r *liveRoom) deliver(payload []byte) {
 			Version int64  `json:"version"`
 			UserID  string `json:"userId"`
 			Name    string `json:"name"`
+			Member  bool   `json:"member"`
+			Kick    bool   `json:"kick"`
 		} `json:"d"`
 	}
 	if err := json.Unmarshal(payload, &head); err == nil {
@@ -584,6 +592,9 @@ func (r *liveRoom) deliver(payload []byte) {
 		}
 		if head.Type == "member.rename" {
 			r.renamed(head.Data.UserID, head.Data.Name)
+		}
+		if head.Type == "crew" && head.Data.UserID != "" {
+			r.rosterChanged(head.Data.UserID, head.Data.Member, head.Data.Kick)
 		}
 	}
 	for c := range r.conns {
@@ -602,6 +613,32 @@ func (r *liveRoom) renamed(userID, name string) {
 		}
 		c.rename(name)
 		changed = true
+		if err := r.hub.live.Touch(ctx, r.id, c.id, c.who()); err != nil {
+			r.hub.log.Warn("presence write failed", "room", r.id, "error", err)
+		}
+	}
+	if changed {
+		r.publishMembers(ctx)
+	}
+}
+
+// rosterChanged keeps this person's local tabs true to the roster, wherever the
+// change came from. Closing a socket sends them back through the ticket, which
+// says why they can't come in.
+func (r *liveRoom) rosterChanged(userID string, member, kick bool) {
+	ctx, cancel := opContext()
+	defer cancel()
+	changed := false
+	for c := range r.conns {
+		if c.who().UserID != userID {
+			continue
+		}
+		c.setMember(member)
+		changed = true
+		if kick {
+			c.shut(websocket.StatusPolicyViolation, "removed from the crew")
+			continue
+		}
 		if err := r.hub.live.Touch(ctx, r.id, c.id, c.who()); err != nil {
 			r.hub.log.Warn("presence write failed", "room", r.id, "error", err)
 		}

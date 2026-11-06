@@ -244,6 +244,50 @@ func (p *Postgres) UpdateCrew(ctx context.Context, crew Crew, change CrewChange)
 	return tx.Commit(ctx)
 }
 
+// RemoveMember takes someone off the roster, and reports false if they weren't on
+// it. A non-empty token replaces the invite in the same step, so the person who
+// was removed can't simply use the link again.
+func (p *Postgres) RemoveMember(ctx context.Context, crewID, userID, token string) (bool, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+	tag, err := tx.Exec(ctx, `DELETE FROM crew_members WHERE crew_id = $1 AND user_id = $2`, crewID, userID)
+	if err != nil || tag.RowsAffected() == 0 {
+		return false, err
+	}
+	if token != "" {
+		if _, err := tx.Exec(ctx, `UPDATE crews SET invite_token = $2 WHERE id = $1`, crewID, token); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
+}
+
+// MyCrew is one line of the crew rail.
+type MyCrew struct {
+	ID     string
+	RoomID string
+	Slug   string
+	Name   string
+}
+
+// CrewsOf lists the crews someone is on, most recently used room first.
+func (p *Postgres) CrewsOf(ctx context.Context, userID string) ([]MyCrew, error) {
+	rows, err := p.pool.Query(ctx, `
+		SELECT c.id, r.id, r.slug, r.name
+		FROM crew_members m JOIN crews c ON c.id = m.crew_id JOIN rooms r ON r.id = c.room_id
+		WHERE m.user_id = $1 AND r.closed_at IS NULL ORDER BY r.updated_at DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (MyCrew, error) {
+		var crew MyCrew
+		return crew, row.Scan(&crew.ID, &crew.RoomID, &crew.Slug, &crew.Name)
+	})
+}
+
 // RotateInvite retires the current link.
 func (p *Postgres) RotateInvite(ctx context.Context, crewID, token string) error {
 	_, err := p.pool.Exec(ctx, `UPDATE crews SET invite_token = $2 WHERE id = $1`, crewID, token)

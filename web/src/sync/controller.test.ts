@@ -741,7 +741,7 @@ describe('SyncController', () => {
       expect(commands).toEqual([]);
     });
 
-    it('needs two playing ticks in a row', () => {
+    it('hears a seek that lands as it comes out of buffering', () => {
       sync.apply(roomAt(timers.now));
       jittered(5);
       commands = [];
@@ -749,10 +749,41 @@ describe('SyncController', () => {
       timers.advance(1010);
       sync.tick();
       player.status = 'playing';
-      player.current += 30; // Lands as it comes out of buffering.
+      player.current += 30;
       timers.advance(1010);
       sync.tick();
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: player.current })]);
+      expect(player.seeks).toEqual([]);
+    });
+
+    it('does not take the time lost to buffering for a seek', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      player.status = 'buffering';
+      for (let i = 0; i < 2; i += 1) {
+        timers.advance(1010);
+        sync.tick();
+      }
+      player.status = 'playing';
+      jittered(1.1);
       expect(commands).toEqual([]);
+    });
+
+    it('leaves a viewer seeking through a long buffer alone, then moves the room', () => {
+      sync.apply(roomAt(timers.now));
+      jittered(5);
+      commands = [];
+      player.current = 317;
+      player.status = 'buffering';
+      for (let i = 0; i < 6; i += 1) {
+        timers.advance(1010);
+        sync.tick();
+      }
+      player.status = 'playing';
+      jittered(1.1);
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek' })]);
+      expect(player.seeks).toEqual([]);
     });
 
     it('ignores the gap a throttled tab leaves', () => {
@@ -779,6 +810,76 @@ describe('SyncController', () => {
       timers.advance(1000);
       sync.tick();
       expect(commands).toEqual([]);
+    });
+  });
+
+  describe('just after the room resumes', () => {
+    const restAt50 = () => {
+      sync.apply({ item: 'a', status: 'paused', pos: 50, at: timers.now, rate: 1 });
+      timers.advance(1000);
+      sync.tick();
+      timers.advance(1000);
+      sync.tick();
+      player.seeks = [];
+    };
+    const resumed = () => {
+      restAt50();
+      sync.apply(playing(50, timers.now));
+    };
+
+    it('hears a seek made before the next tick', () => {
+      resumed();
+      timers.advance(500);
+      player.current = 110;
+      run(1);
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek' })]);
+      expect(player.seeks).toEqual([]);
+    });
+
+    it('does not move the room when nobody touched anything', () => {
+      resumed();
+      run(4);
+      expect(commands).toEqual([]);
+    });
+
+    it('does not take its own jump to the room for a viewer seek', () => {
+      restAt50();
+      sync.apply(playing(120, timers.now)); // Someone moved it as it resumed.
+      run(4);
+      expect(commands).toEqual([]);
+    });
+
+    it('does not take a joiner landing on the room for a viewer seek', () => {
+      const landed: number[] = [];
+      player.seek = (seconds) => { landed.push(seconds); };
+      sync.apply({ item: 'a', status: 'paused', pos: 600, at: timers.now, rate: 1 });
+      timers.advance(1000);
+      sync.tick(); // Still reporting 0, so never seen on the room's position.
+      sync.apply(playing(600, timers.now));
+      player.status = 'playing';
+      timers.advance(1000);
+      player.current = 601;
+      sync.tick();
+      expect(commands).toEqual([]);
+    });
+  });
+
+  describe('a seek by someone else', () => {
+    it('reaches a viewer at once, however short the move', () => {
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(5);
+      sync.apply(playing(7.5, timers.now));
+      expect(player.seeks.at(-1)).toBeCloseTo(7.75);
+      expect(player.rate).toBe(1);
+      expect(commands).toEqual([]);
+    });
+
+    it('leaves a viewer already there alone', () => {
+      sync.apply(playing(0, timers.now));
+      run(5);
+      sync.apply(playing(5.05, timers.now));
+      expect(player.seeks).toEqual([]);
     });
   });
 

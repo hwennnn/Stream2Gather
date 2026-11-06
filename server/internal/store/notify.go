@@ -20,6 +20,8 @@ type SessionNotice struct {
 	// Starter is empty when a guest started it or the account has gone.
 	Starter string
 	Open    bool
+	// Attended is whether anyone is still in it.
+	Attended bool
 }
 
 // PushTarget is one browser to reach.
@@ -34,12 +36,13 @@ type PushTarget struct {
 func (p *Postgres) SessionNotice(ctx context.Context, sessionID string) (SessionNotice, error) {
 	var notice SessionNotice
 	err := p.pool.QueryRow(ctx, `
-		SELECT s.crew_id, r.slug, r.name, COALESCE(s.started_by, ''), COALESCE(u.display_name, ''), s.ended_at IS NULL
+		SELECT s.crew_id, r.slug, r.name, COALESCE(s.started_by, ''), COALESCE(u.display_name, ''), s.ended_at IS NULL,
+		       EXISTS (SELECT 1 FROM session_people h WHERE h.session_id = s.id AND h.left_at IS NULL)
 		FROM crew_sessions s
 		JOIN crews c ON c.id = s.crew_id JOIN rooms r ON r.id = c.room_id
 		LEFT JOIN users u ON u.id = s.started_by
 		WHERE s.id = $1`, sessionID,
-	).Scan(&notice.CrewID, &notice.Slug, &notice.CrewName, &notice.StarterID, &notice.Starter, &notice.Open)
+	).Scan(&notice.CrewID, &notice.Slug, &notice.CrewName, &notice.StarterID, &notice.Starter, &notice.Open, &notice.Attended)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SessionNotice{}, ErrNotFound
 	}

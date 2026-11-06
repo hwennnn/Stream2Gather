@@ -30,7 +30,8 @@ type PushCrew struct {
 }
 
 // SavePushSubscription stores a browser under this person and returns its id. An
-// endpoint is one browser profile, so a second account signing in there takes it over.
+// endpoint is one browser profile, so a second account signing in there takes it
+// over. A saved browser counts as new, or the limit below could remove it at once.
 func (p *Postgres) SavePushSubscription(ctx context.Context, userID, endpoint, p256dh, auth, userAgent string) (string, error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
@@ -43,7 +44,7 @@ func (p *Postgres) SavePushSubscription(ctx context.Context, userID, endpoint, p
 		INSERT INTO push_subscriptions (id, user_id, endpoint, p256dh, auth, user_agent)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh,
-			auth = excluded.auth, user_agent = excluded.user_agent
+			auth = excluded.auth, user_agent = excluded.user_agent, created_at = now()
 		RETURNING id`, ids.New(), userID, endpoint, p256dh, auth, userAgent).Scan(&id)
 	if err != nil {
 		return "", err

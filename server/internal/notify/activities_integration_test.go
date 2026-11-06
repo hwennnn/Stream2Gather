@@ -130,6 +130,22 @@ func TestAPingThatReachedNobodyDoesNotSpendTheCap(t *testing.T) {
 	}
 }
 
+// The sweeper can't end a session for five minutes, so an open session says nothing
+// about a false start. Everyone having gone does.
+func TestAFalseStartPingsNobody(t *testing.T) {
+	s := aCrew(t)
+	activities := &Activities{Store: s.db}
+	s.exec(t, `UPDATE session_people SET left_at = now() WHERE session_id = $1`, s.sessionID)
+
+	plan, err := activities.PlanSession(context.Background(), s.sessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Audience) != 0 {
+		t.Fatalf("pinged %d people to come and find an empty room", len(plan.Audience))
+	}
+}
+
 func TestPlansSayWhatTheSpecSays(t *testing.T) {
 	s := aCrew(t)
 	activities := &Activities{Store: s.db}

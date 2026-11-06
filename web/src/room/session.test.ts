@@ -1,0 +1,669 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { RoomSession, type ChatEntry, type QueueItem } from './session';
+
+class FakeSocket {
+  static OPEN = 1;
+  static last: FakeSocket;
+  static opened = 0;
+  readyState = FakeSocket.OPEN;
+  closed = 0;
+  sent: { t: string; id?: string; d?: Record<string, unknown> }[] = [];
+  onopen: (() => void) | null = null;
+  onmessage: ((event: { data: string }) => void) | null = null;
+  onclose: (() => void) | null = null;
+  constructor() {
+    FakeSocket.last = this;
+    FakeSocket.opened += 1;
+  }
+  send(body: string) {
+    this.sent.push(JSON.parse(body) as FakeSocket['sent'][number]);
+  }
+  close() {
+    this.closed += 1;
+  }
+  deliver(t: string, d: unknown) {
+    this.onmessage?.({ data: JSON.stringify({ t, d }) });
+  }
+  /** Answers the last message with an id, as the server would. */
+  ack() {
+    this.deliver('ack', { id: this.sent.at(-1)?.id });
+  }
+  ofType(t: string) {
+    return this.sent.filter((message) => message.t === t);
+  }
+}
+
+const welcome = (version: number) => ({
+  self: { userId: 'g_1', name: 'Ada', role: 'member' },
+  room: { name: 'Room' },
+  state: {
+    version,
+    playback: { item: '', status: 'idle', pos: 0, at: 0, rate: 1 },
+    queue: [],
+    settings: { controlMode: 'everyone', queueMode: 'everyone' },
+  },
+  members: [],
+});
+
+const pong = (version: number) => ({ t0: 0, ts: 0, version });
+
+const idle = { item: '', status: 'idle', pos: 0, at: 0, rate: 1 };
+
+const person = (userId: string, name: string) => ({ userId, name, role: 'member' });
+const ada = person('g_1', 'Ada');
+const maya = person('g_2', 'Maya');
+const sam = person('g_3', 'Sam');
+
+const item = (id: string) =>
+  ({ id, title: `Video ${id}`, url: '', source: 'direct', sourceId: id }) as unknown as QueueItem;
+
+const chatLine = (id: number) => ({
+  id,
+  userId: 'g_2',
+  author: 'Maya',
+  body: `line ${id}`,
+  createdAt: new Date(1_000_000 + id * 1000).toISOString(),
+});
+
+const playingWelcome = (current: string) => {
+  const base = welcome(1);
+  return { ...base, state: { ...base.state, playback: { ...idle, item: current }, queue: [item(current)] } };
+};
+
+const entries = (session: RoomSession): ChatEntry[] => session.getView().messages;
+
+const lines = (session: RoomSession) =>
+  entries(session).flatMap((entry) => (entry.kind === 'system' ? [entry.text] : []));
+
+const chatIds = (session: RoomSession) =>
+  entries(session).flatMap((entry) => (entry.kind === 'chat' ? [entry.id] : []));
+
+const connected = async () => {
+  const session = new RoomSession('room');
+  await session.connect();
+  return { session, socket: FakeSocket.last };
+};
+
+describe('RoomSession', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    FakeSocket.opened = 0;
+    vi.stubGlobal('WebSocket', FakeSocket);
+    vi.stubGlobal('window', { location: { protocol: 'http:', host: 'test' }, setTimeout, clearInterval, setInterval });
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ ticket: 't', items: [] })));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('does not treat a pong that beats the welcome as a missed event', async () => {
+    const { socket } = await connected();
+    socket.deliver('pong', pong(40));
+    socket.deliver('pong', pong(40));
+    expect(socket.closed).toBe(0);
+  });
+
+  it('tolerates events still in flight behind a pong', async () => {
+    const { socket } = await connected();
+    socket.deliver('welcome', welcome(5));
+    socket.deliver('pong', pong(9));
+    socket.deliver('state', { version: 9, playback: welcome(9).state.playback, cause: 'play' });
+    socket.deliver('pong', pong(9));
+    expect(socket.closed).toBe(0);
+  });
+
+  it('reconnects when a gap survives to the next pong', async () => {
+    const { socket } = await connected();
+    socket.deliver('welcome', welcome(5));
+    socket.deliver('pong', pong(9));
+    socket.deliver('pong', pong(9));
+    expect(socket.closed).toBe(1);
+  });
+
+  it('treats a lower version on two pongs as Redis going backwards', async () => {
+    const { socket } = await connected();
+    socket.deliver('welcome', welcome(50));
+    socket.deliver('pong', pong(12));
+    socket.deliver('pong', pong(12));
+    expect(socket.closed).toBe(1);
+  });
+
+  it('ignores a pong that has no version to report', async () => {
+    const { socket } = await connected();
+    socket.deliver('welcome', welcome(5));
+    socket.deliver('pong', { t0: 0, ts: 0 });
+    socket.deliver('pong', { t0: 0, ts: 0 });
+    expect(socket.closed).toBe(0);
+  });
+
+  describe('version gaps', () => {
+    it('asks for a snapshot instead of jumping forward', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(5));
+      socket.deliver('playback', { version: 9, playback: { ...idle, status: 'paused' }, cause: 'pause' });
+      expect(session.getView().version).toBe(5);
+      expect(session.getView().playback.status).toBe('idle');
+      expect(socket.ofType('sync')).toHaveLength(1);
+    });
+
+    it('asks once while a snapshot is on its way', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(5));
+      socket.deliver('playback', { version: 9, playback: idle, cause: 'pause' });
+      socket.deliver('playback', { version: 10, playback: idle, cause: 'pause' });
+      expect(socket.ofType('sync')).toHaveLength(1);
+    });
+
+    it('takes the snapshot, queue included', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(5));
+      socket.deliver('playback', { version: 9, playback: idle, cause: 'pause' });
+      socket.deliver('state', { version: 9, playback: idle, queue: [item('a')], cause: 'sync' });
+      expect(session.getView().version).toBe(9);
+      expect(session.getView().queue).toHaveLength(1);
+      socket.deliver('pong', pong(9));
+      socket.deliver('pong', pong(9));
+      expect(socket.closed).toBe(0);
+    });
+
+    it('accepts a snapshot behind its own version after a rehydrate', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(50));
+      socket.deliver('state', { version: 12, playback: idle, queue: [], cause: 'sync' });
+      expect(session.getView().version).toBe(12);
+      socket.deliver('playback', { version: 13, playback: { ...idle, status: 'paused' }, cause: 'pause' });
+      expect(session.getView().version).toBe(13);
+    });
+
+    it('falls back to reconnecting if the snapshot never comes', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(5));
+      socket.deliver('playback', { version: 9, playback: idle, cause: 'pause' });
+      vi.advanceTimersByTime(6000);
+      socket.deliver('pong', pong(9));
+      socket.deliver('pong', pong(9));
+      expect(socket.closed).toBe(1);
+    });
+
+    it('applies the next version normally and drops repeats', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(5));
+      const paused = { ...idle, item: 'a', status: 'paused', pos: 10 };
+      socket.deliver('playback', { version: 6, playback: paused, cause: 'pause', by: 'Maya' });
+      socket.deliver('playback', { version: 6, playback: paused, cause: 'pause', by: 'Maya' });
+      socket.deliver('playback', { version: 4, playback: idle, cause: 'pause', by: 'Maya' });
+      expect(session.getView().version).toBe(6);
+      expect(lines(session)).toEqual(['Maya paused at 0:10']);
+      expect(socket.ofType('sync')).toHaveLength(0);
+    });
+  });
+
+  describe('send and request', () => {
+    it('says whether a message left', async () => {
+      const { session, socket } = await connected();
+      expect(session.send('react', { emoji: '🔥' })).toBe(true);
+      socket.readyState = 3;
+      expect(session.send('react', { emoji: '🔥' })).toBe(false);
+    });
+
+    it('resolves on the ack for its own id', async () => {
+      const { session, socket } = await connected();
+      let done = false;
+      const pending = session.request('skip', { item: 'a' }).then(() => (done = true));
+      expect(socket.sent.at(-1)).toMatchObject({ t: 'skip', d: { item: 'a' } });
+      socket.deliver('ack', { id: 'someone-else' });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(done).toBe(false);
+      socket.ack();
+      await pending;
+      expect(done).toBe(true);
+    });
+
+    it('rejects with the server copy, and shows no notice', async () => {
+      const { session, socket } = await connected();
+      const pending = session.request('skip', { item: 'a' });
+      socket.deliver('error', { re: socket.sent.at(-1)?.id, code: 'forbidden', message: 'The host controls this room.' });
+      await expect(pending).rejects.toThrow('The host controls this room.');
+      expect(session.getView().notices).toEqual([]);
+    });
+
+    it('still shows an error nobody is waiting for', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('error', { re: '', code: 'forbidden', message: 'The host controls this room.' });
+      expect(session.getView().notices[0]?.text).toBe('The host controls this room.');
+    });
+
+    it('rejects at once when offline', async () => {
+      const { session, socket } = await connected();
+      socket.readyState = 3;
+      await expect(session.request('skip')).rejects.toThrow(/offline/);
+    });
+
+    it('rejects what was in flight when the connection drops', async () => {
+      const { session, socket } = await connected();
+      const pending = session.request('skip');
+      socket.onclose?.();
+      await expect(pending).rejects.toThrow(/dropped/);
+    });
+
+    it('gives up on an answer that never comes', async () => {
+      const { session } = await connected();
+      const pending = session.request('skip');
+      const outcome = expect(pending).rejects.toThrow(/too long/);
+      await vi.advanceTimersByTimeAsync(16_000);
+      await outcome;
+    });
+
+    it('sends queue changes with their own arguments', async () => {
+      const { session, socket } = await connected();
+      const media = { ...item('a'), url: 'https://youtu.be/abc' };
+      void session.queueAdd({ url: 'https://x.test/a.mp4' }, 'next');
+      expect(socket.sent.at(-1)).toMatchObject({ t: 'queue.add', d: { url: 'https://x.test/a.mp4', mode: 'next' } });
+      void session.queueAdd({ media }, 'now');
+      expect(socket.sent.at(-1)).toMatchObject({ t: 'queue.add', d: { url: 'https://youtu.be/abc', mode: 'now' } });
+      void session.queueMove('a', 2);
+      expect(socket.sent.at(-1)).toMatchObject({ t: 'queue.move', d: { target: 'a', index: 2 } });
+      void session.queueRemove('a');
+      expect(socket.sent.at(-1)).toMatchObject({ t: 'queue.remove', d: { target: 'a' } });
+    });
+  });
+
+  describe('rename', () => {
+    const answer = (status: number, body: unknown) =>
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status })));
+
+    it('saves the cookie, then renames over the open socket', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      answer(200, { user: { id: 'g_1', name: 'Maya', avatarUrl: '', signedIn: false } });
+
+      const pending = session.rename('Maya');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(socket.ofType('rename')[0]?.d).toEqual({ name: 'Maya' });
+      socket.ack();
+      await pending;
+
+      expect(session.getView().self?.name).toBe('Maya');
+      expect(session.getView().connection).toBe('live');
+      expect(socket.closed).toBe(0);
+      expect(FakeSocket.opened).toBe(1);
+    });
+
+    it('rejects with the server copy and touches nothing', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      answer(400, { code: 'invalid', message: 'Names can be up to 32 characters.' });
+      await expect(session.rename('x'.repeat(40))).rejects.toThrow('Names can be up to 32 characters.');
+      expect(session.getView().self?.name).toBe('Ada');
+      expect(socket.ofType('rename')).toHaveLength(0);
+    });
+
+    it('rejects with readable copy when the network is down', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+      await expect(session.rename('Maya')).rejects.toThrow('Could not reach the server. Try again.');
+    });
+
+    it('reconnects if the socket cannot take the new name', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      answer(200, { user: { id: 'g_1', name: 'Maya', avatarUrl: '', signedIn: false } });
+      const pending = session.rename('Maya');
+      await vi.advanceTimersByTimeAsync(0);
+      socket.deliver('error', { re: socket.sent.at(-1)?.id, code: 'rate_limited', message: 'Slow down a little.' });
+      await pending;
+      expect(socket.closed).toBe(1);
+    });
+
+    it('picks up a rename from another tab', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('member.rename', { userId: 'g_1', name: 'Maya' });
+      expect(session.getView().self?.name).toBe('Maya');
+    });
+  });
+
+  describe('connection state', () => {
+    it('records when it went offline and clears it on return', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      expect(session.getView().offlineSince).toBeNull();
+
+      vi.setSystemTime(5000);
+      socket.onclose?.();
+      expect(session.getView().offlineSince).toBe(5000);
+      expect(session.getView().connection).toBe('reconnecting');
+
+      vi.setSystemTime(6000);
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(session.getView().offlineSince).toBe(5000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      expect(session.getView().offlineSince).toBeNull();
+    });
+
+    it('retry reconnects now and resets the backoff', async () => {
+      const { session, socket } = await connected();
+      for (let i = 0; i < 4; i += 1) {
+        FakeSocket.last.onclose?.();
+        await vi.advanceTimersByTimeAsync(6000);
+      }
+      FakeSocket.last.onclose?.();
+      const before = FakeSocket.opened;
+
+      session.retry();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(FakeSocket.opened).toBe(before + 1);
+
+      // The timer it replaced must not open a second socket.
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(FakeSocket.opened).toBe(before + 1);
+
+      // Backoff restarted: the next failure comes back within the first step.
+      FakeSocket.last.onclose?.();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(FakeSocket.opened).toBe(before + 2);
+      expect(socket).not.toBe(FakeSocket.last);
+    });
+
+    it('survives a mount, cleanup and mount with one socket', async () => {
+      const session = new RoomSession('room');
+      const first = session.connect();
+      session.close();
+      const second = session.connect();
+      await Promise.all([first, second]);
+      expect(FakeSocket.opened).toBe(1);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      expect(session.getView().connection).toBe('live');
+    });
+
+    it('stays quiet after close', async () => {
+      const { session, socket } = await connected();
+      session.close();
+      expect(socket.closed).toBe(1);
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(FakeSocket.opened).toBe(1);
+    });
+
+    it('tears down a socket that stopped answering, without waiting for onclose', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.onopen?.();
+      await vi.advanceTimersByTimeAsync(40_000);
+      expect(socket.closed).toBe(1);
+      expect(socket.onclose).toBeNull();
+      expect(session.getView().connection).toBe('reconnecting');
+      expect(session.getView().offlineSince).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(FakeSocket.opened).toBe(2);
+    });
+
+    it('does not count the opening burst as unanswered', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.onopen?.();
+      await vi.advanceTimersByTimeAsync(1000); // Five pings sent, no answer yet.
+      socket.deliver('pong', pong(1));
+      await vi.advanceTimersByTimeAsync(25_000);
+      expect(socket.closed).toBe(0);
+    });
+
+    it('keeps a socket that answers late', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.onopen?.();
+      for (let i = 0; i < 10; i += 1) {
+        await vi.advanceTimersByTimeAsync(10_000);
+        socket.deliver('pong', pong(1));
+      }
+      expect(socket.closed).toBe(0);
+    });
+
+    it('fails for good on a closed room, not on a network blip', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+      const session = new RoomSession('room');
+      await session.connect();
+      expect(session.getView().connection).toBe('reconnecting');
+
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(
+        JSON.stringify({ code: 'room_closed', message: 'This room has closed.' }), { status: 410 },
+      )));
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(session.getView().connection).toBe('failed');
+      expect(session.getView().failure).toBe('This room has closed.');
+    });
+
+    it('knows when nobody else is here', async () => {
+      const { session, socket } = await connected();
+      expect(session.getView().alone).toBe(false);
+      socket.deliver('welcome', { ...welcome(1), members: [ada] });
+      expect(session.getView().alone).toBe(true);
+      socket.deliver('members', { members: [ada, maya] });
+      expect(session.getView().alone).toBe(false);
+      socket.deliver('members', { members: [ada] });
+      expect(session.getView().alone).toBe(true);
+    });
+
+    it('keeps the last action with its author', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('playback', { version: 2, playback: { ...idle, status: 'paused' }, cause: 'pause', by: 'Maya' });
+      socket.deliver('state', { version: 3, playback: idle, queue: [], cause: 'ended' });
+      expect(session.getView().lastAction).toEqual({ by: 'Maya', cause: 'pause' });
+    });
+  });
+
+  describe('system lines', () => {
+    const live = async (members = [ada]) => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', { ...welcome(1), members });
+      await vi.advanceTimersByTimeAsync(0);
+      return { session, socket };
+    };
+
+    it('announces arrivals and departures, but not the first member list', async () => {
+      const { session, socket } = await live([ada, maya]);
+      expect(lines(session)).toEqual([]);
+      socket.deliver('members', { members: [ada, maya, sam] });
+      socket.deliver('members', { members: [ada, sam] });
+      expect(lines(session)).toEqual(['Sam joined', 'Maya left']);
+    });
+
+    it('stays silent through a reload', async () => {
+      const { session, socket } = await live([ada, maya]);
+      socket.deliver('members', { members: [ada] });
+      expect(lines(session)).toEqual(['Maya left']);
+      vi.advanceTimersByTime(2000);
+      socket.deliver('members', { members: [ada, maya] });
+      expect(lines(session)).toEqual([]);
+    });
+
+    it('announces someone who comes back much later', async () => {
+      const { session, socket } = await live([ada, maya]);
+      socket.deliver('members', { members: [ada] });
+      vi.advanceTimersByTime(60_000);
+      socket.deliver('members', { members: [ada, maya] });
+      expect(lines(session)).toEqual(['Maya left', 'Maya joined']);
+    });
+
+    it('does not announce the people it finds on reconnecting', async () => {
+      const { session, socket } = await live([ada]);
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', { ...welcome(1), members: [ada, maya] });
+      expect(lines(session)).toEqual([]);
+    });
+
+    it('says who paused and where', async () => {
+      const { session, socket } = await live();
+      socket.deliver('playback', { version: 2, playback: { ...idle, status: 'paused', pos: 192 }, cause: 'pause', by: 'Maya' });
+      expect(lines(session)).toEqual(['Maya paused at 3:12']);
+    });
+
+    it('tells a jump forward from a jump back', async () => {
+      const { session, socket } = await live();
+      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
+      socket.deliver('playback', { version: 2, playback: at(300), cause: 'pause', by: 'Sam' });
+      socket.deliver('playback', { version: 3, playback: at(760), cause: 'seek', by: 'Maya' });
+      vi.advanceTimersByTime(10_000);
+      socket.deliver('playback', { version: 4, playback: at(125), cause: 'seek', by: 'Maya' });
+      expect(lines(session).slice(1)).toEqual(['Maya jumped to 12:40', 'Maya went back to 2:05']);
+    });
+
+    it('collapses one person scrubbing into one line', async () => {
+      const { session, socket } = await live();
+      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
+      socket.deliver('playback', { version: 2, playback: at(600), cause: 'pause', by: 'Sam' });
+      [610, 620, 300].forEach((pos, i) => {
+        vi.advanceTimersByTime(500);
+        socket.deliver('playback', { version: 3 + i, playback: at(pos), cause: 'seek', by: 'Maya' });
+      });
+      expect(lines(session).slice(1)).toEqual(['Maya went back to 5:00']);
+    });
+
+    it('keeps two people scrubbing apart', async () => {
+      const { session, socket } = await live();
+      const at = (pos: number) => ({ ...idle, status: 'paused', pos });
+      socket.deliver('playback', { version: 2, playback: at(100), cause: 'seek', by: 'Maya' });
+      socket.deliver('playback', { version: 3, playback: at(200), cause: 'seek', by: 'Sam' });
+      expect(lines(session)).toHaveLength(2);
+    });
+
+    it('names what was added and what comes up', async () => {
+      const { session, socket } = await live();
+      const zelda = { ...item('z'), title: 'Zelda trailer' };
+      const current = { ...idle, item: 'a', status: 'playing' };
+      socket.deliver('state', { version: 2, playback: current, queue: [item('a')], cause: 'queue.add', by: 'Sam' });
+      socket.deliver('state', { version: 3, playback: current, queue: [item('a'), zelda], cause: 'queue.add', by: 'Maya' });
+      socket.deliver('state', { version: 4, playback: { ...current, item: 'z' }, queue: [zelda], cause: 'ended' });
+      expect(lines(session)).toEqual(['Sam added Video a', 'Maya added Zelda trailer', 'Up next: Zelda trailer']);
+    });
+
+    it('writes nothing for a snapshot', async () => {
+      const { session, socket } = await live();
+      socket.deliver('state', { version: 9, playback: { ...idle, item: 'a' }, queue: [item('a')], cause: 'sync', by: 'x' });
+      expect(lines(session)).toEqual([]);
+    });
+  });
+
+  describe('chat history', () => {
+    const history = (...ids: number[]) =>
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+        ticket: 't',
+        items: ids.map((id) => chatLine(id)), // Newest first, as the server sends it.
+      }))));
+
+    it('shows history oldest first', async () => {
+      history(3, 2, 1);
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toEqual([1, 2, 3]);
+    });
+
+    it('does not repeat a message that arrived live first', async () => {
+      history(3, 2, 1);
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('chat', { message: chatLine(3) });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toEqual([1, 2, 3]);
+    });
+
+    it('does not repeat history after a reconnect', async () => {
+      history(2, 1);
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(chatIds(session)).toEqual([1, 2]);
+    });
+
+    it('does not repeat a live message delivered twice', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('chat', { message: chatLine(1) });
+      socket.deliver('chat', { message: chatLine(1) });
+      expect(chatIds(session)).toEqual([1]);
+    });
+
+    it('survives a failed fetch', async () => {
+      const { session, socket } = await connected();
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));
+      socket.deliver('welcome', welcome(1));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(session.getView().messages).toEqual([]);
+      expect(session.getView().connection).toBe('live');
+    });
+  });
+
+  describe('viewer health', () => {
+    it('starts over when the video changes', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('member.status', { userId: 'g_2', state: 'synced' });
+      session.reportStatus('synced', 0);
+      session.reportStatus('synced', 0);
+      expect(socket.ofType('status')).toHaveLength(1);
+
+      socket.deliver('state', { version: 2, playback: { ...idle, item: 'b' }, queue: [item('b')], cause: 'skip' });
+      expect(session.getView().viewerStates).toEqual({});
+      session.reportStatus('synced', 0);
+      expect(socket.ofType('status')).toHaveLength(2);
+    });
+
+    it('keeps unavailable until the video changes', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', playingWelcome('a'));
+      socket.deliver('member.status', { userId: 'g_2', state: 'unavailable', item: 'a' });
+      socket.deliver('member.status', { userId: 'g_2', state: 'buffering' });
+      expect(session.getView().viewerStates).toEqual({ g_2: 'unavailable' });
+
+      socket.deliver('state', { version: 2, playback: { ...idle, item: 'b' }, queue: [item('b')], cause: 'skip' });
+      socket.deliver('member.status', { userId: 'g_2', state: 'synced' });
+      expect(session.getView().viewerStates).toEqual({ g_2: 'synced' });
+    });
+
+    it('ignores unavailable for a video that has gone', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', playingWelcome('b'));
+      socket.deliver('member.status', { userId: 'g_2', state: 'unavailable', item: 'a' });
+      expect(session.getView().viewerStates).toEqual({});
+    });
+
+    it('stops reporting health for a video it cannot play', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', playingWelcome('a'));
+      socket.deliver('member.status', { userId: 'g_1', state: 'unavailable', item: 'a' });
+      session.reportStatus('buffering', 0);
+      expect(socket.ofType('status')).toHaveLength(0);
+    });
+
+    it('reports again after a reconnect', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      session.reportStatus('synced', 0);
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(6000);
+      FakeSocket.last.deliver('welcome', welcome(1));
+      session.reportStatus('synced', 0);
+      expect(FakeSocket.last.ofType('status')).toHaveLength(1);
+    });
+
+    it('does not count a report that could not be sent', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.readyState = 3;
+      session.reportStatus('synced', 0);
+      socket.readyState = FakeSocket.OPEN;
+      session.reportStatus('synced', 0);
+      expect(socket.ofType('status')).toHaveLength(1);
+    });
+  });
+});

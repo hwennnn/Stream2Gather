@@ -1,0 +1,49 @@
+{
+  "title": "Watch quality",
+  "uid": "s2g-watch-quality",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "title": "Drift between viewer and room (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "targets": [{
+        "refId": "A", "queryType": "timeseries", "editorType": "sql", "format": 0,
+        "rawSql": "SELECT toStartOfMinute(at) AS time, quantile(0.5)(value) AS p50, quantile(0.95)(value) AS p95 FROM s2g.events WHERE name = 'drift_ms' AND $__timeFilter(at) GROUP BY time ORDER BY time"
+      }]
+    },
+    {
+      "title": "Time to first frame (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "targets": [{
+        "refId": "A", "queryType": "timeseries", "editorType": "sql", "format": 0,
+        "rawSql": "SELECT toStartOfMinute(at) AS time, quantile(0.5)(value) AS p50, quantile(0.95)(value) AS p95 FROM s2g.events WHERE name = 'first_frame_ms' AND $__timeFilter(at) GROUP BY time ORDER BY time"
+      }]
+    },
+    {
+      "title": "Join time (ms)",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "targets": [{
+        "refId": "A", "queryType": "timeseries", "editorType": "sql", "format": 0,
+        "rawSql": "SELECT toStartOfMinute(at) AS time, quantile(0.5)(value) AS p50, quantile(0.95)(value) AS p95 FROM s2g.events WHERE name = 'join_ms' AND $__timeFilter(at) GROUP BY time ORDER BY time"
+      }]
+    },
+    {
+      "title": "Videos that refused to play",
+      "type": "table",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 9 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse" },
+      "targets": [{
+        "refId": "A", "queryType": "table", "editorType": "sql", "format": 1,
+        "rawSql": "SELECT detail AS video, toString(value) AS code, count() AS failures FROM s2g.events WHERE name = 'player_error' AND $__timeFilter(at) GROUP BY video, code ORDER BY failures DESC LIMIT 50"
+      }]
+    }
+  ]
+}

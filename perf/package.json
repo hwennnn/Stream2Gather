@@ -1,0 +1,10 @@
+{
+  "name": "stream2gather-perf",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.1",
+    "socket.io-client": "^4.8.1"
+  }
+}

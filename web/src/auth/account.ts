@@ -1,0 +1,130 @@
+import { useSyncExternalStore } from 'react';
+import { api, type Account } from '../api/http';
+
+/** The parts of Clerk's browser object this app calls. */
+export type ClerkControls = {
+  openSignIn: (options?: { forceRedirectUrl?: string; signUpForceRedirectUrl?: string }) => void;
+  openUserProfile: () => void;
+  signOut: () => Promise<unknown>;
+};
+
+type AccountView = {
+  user: Account | null;
+  publishableKey: string;
+  /** Clerk's script only loads for people who are signing in or signed in. */
+  clerkWanted: boolean;
+  problem: string | null;
+};
+
+// Survives the redirect back from Google, which reloads the page.
+const SIGNING_IN = 's2g:signing-in';
+
+let view: AccountView = { user: null, publishableKey: '', clerkWanted: false, problem: null };
+let clerk: ClerkControls | null = null;
+let openWhenReady = false;
+const listeners = new Set<() => void>();
+const identityListeners = new Set<() => void>();
+
+const update = (patch: Partial<AccountView>) => {
+  view = { ...view, ...patch };
+  for (const listener of listeners) listener();
+};
+
+const setUser = (user: Account | null) => {
+  const changed = user?.id !== view.user?.id;
+  update({ user, problem: null });
+  if (changed) for (const listener of identityListeners) listener();
+};
+
+const open = () => {
+  const here = window.location.href;
+  clerk?.openSignIn({ forceRedirectUrl: here, signUpForceRedirectUrl: here });
+};
+
+export const account = {
+  async start(): Promise<void> {
+    try {
+      const [config, me] = await Promise.all([api.config(), api.me()]);
+      update({
+        user: me.user,
+        publishableKey: config.clerkPublishableKey,
+        clerkWanted: Boolean(me.user?.signedIn) || sessionStorage.getItem(SIGNING_IN) !== null,
+      });
+    } catch {
+      // Guests can still watch; only the sign-in button stays hidden.
+    }
+  },
+
+  /** A rename is the only way a first-time guest gets a session before joining. */
+  async rename(name: string): Promise<void> {
+    update({ user: (await api.rename(name)).user });
+  },
+
+  /** Keeps this store in step after the room session has renamed the viewer. */
+  noteName(name: string): void {
+    if (view.user) update({ user: { ...view.user, name } });
+  },
+
+  signIn(): void {
+    sessionStorage.setItem(SIGNING_IN, '1');
+    if (clerk) {
+      open();
+      return;
+    }
+    openWhenReady = true;
+    update({ clerkWanted: true, problem: null });
+  },
+
+  manage(): void {
+    clerk?.openUserProfile();
+  },
+
+  async signOut(): Promise<void> {
+    await clerk?.signOut();
+    setUser((await api.signOut()).user);
+  },
+
+  /** Called by the Clerk bridge once Clerk's script has loaded. */
+  attach(controls: ClerkControls): void {
+    clerk = controls;
+    if (openWhenReady) {
+      openWhenReady = false;
+      open();
+    }
+  },
+
+  async clerkSignedIn(getToken: () => Promise<string | null>): Promise<void> {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      setUser((await api.clerkSession(token)).user);
+      sessionStorage.removeItem(SIGNING_IN);
+    } catch {
+      update({ problem: 'We couldn’t finish signing you in. Try again.' });
+    }
+  },
+
+  async clerkSignedOut(): Promise<void> {
+    if (!openWhenReady) sessionStorage.removeItem(SIGNING_IN);
+    if (view.user?.signedIn) setUser((await api.signOut()).user);
+  },
+
+  clerkFailed(): void {
+    openWhenReady = false;
+    sessionStorage.removeItem(SIGNING_IN);
+    update({ clerkWanted: false, problem: 'Sign-in is unavailable right now.' });
+  },
+
+  /** Runs when the person behind this browser changes, such as after signing in. */
+  onIdentityChange(listener: () => void): () => void {
+    identityListeners.add(listener);
+    return () => identityListeners.delete(listener);
+  },
+};
+
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+export const useAccount = () => useSyncExternalStore(subscribe, () => view);

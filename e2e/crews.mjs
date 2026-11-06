@@ -80,7 +80,9 @@ await button(mika, 'Join the crew').click();
 check('joining opens the home', await visible(button(mika, /Join the room/)));
 check('joining strips the token', !mika.page.url().includes('join='), mika.page.url());
 await hana.page.reload();
+await button(hana, 'Members and settings').click();
 check('the owner sees the new member', await visible(hana.page.getByRole('list').getByText('Mika')));
+await button(hana, 'Sundays').click();
 await hana.page.screenshot({ path: `${OUT}/crew-home.png`, fullPage: true });
 
 // A guest gets today's flow and one more line.
@@ -100,6 +102,7 @@ await enter(hana);
 await hana.page.getByRole('region', { name: 'Your watchlist' }).getByRole('button', { name: /Queue sample|Play now: sample/ }).first().click();
 check('the watchlist plays through the queue', await visible(hana.page.locator('video')));
 await hana.page.getByRole('link', { name: 'Crew home' }).click();
+await button(hana, 'Members and settings').click();
 check('crew home leaves the room', await visible(hana.page.getByRole('switch', { name: 'Guests can enter the room' })));
 
 // Members only: the owner shuts the door, and a guest can't get in.
@@ -113,7 +116,9 @@ await shut.context.close();
 
 // Removing someone ends the old invite.
 await hana.page.reload();
-await button(hana, 'Remove').filter({ hasText: /^Remove$/ }).last().click();
+await button(hana, 'Members and settings').click();
+await button(hana, 'Actions for Mika').click();
+await button(hana, 'Remove').filter({ hasText: /^Remove$/ }).click();
 await hana.page.getByRole('button', { name: 'Remove Mika?' }).click();
 await sleep(300);
 const stale = await mika.page.evaluate((link) => fetch(`/v1/crews/${new URL(link).pathname.split('/')[2]}/join`, {

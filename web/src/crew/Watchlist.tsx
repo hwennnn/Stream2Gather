@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ApiError, type Media } from '../api/http';
+import { Icon } from '../ui/Icon';
 import { AddBox, SearchResults, useSearch } from '../ui/Omnibox';
 import { Thumb } from '../ui/Thumb';
 import type { Adder } from '../ui/useAdder';
@@ -54,18 +55,18 @@ export const Watchlist = (props: Props) => {
         <ul className="mt-3 divide-y divide-line border-y border-line">
           {items.map((item) => (
             <li key={item.id} className="flex items-center gap-3 py-2">
-              {item.media && <Thumb src={item.media.thumbnailUrl} className="w-20 rounded-md" />}
+              {item.media && <Thumb src={item.media.thumbnailUrl} className="w-16 rounded-md" />}
               <span className="min-w-0 flex-1">
-                <span className={`line-clamp-2 text-sm ${item.media ? '' : 'text-muted'}`}>{item.media?.title ?? 'Video unavailable'}</span>
-                {item.media?.author && <span className="block truncate text-xs text-muted">{item.media.author}</span>}
+                <span className={`block truncate text-sm ${item.media ? '' : 'text-muted'}`}>{item.media?.title ?? 'Video unavailable'}</span>
+                {item.media?.author && <span className="block truncate text-xs text-dim">{item.media.author}</span>}
               </span>
               <button
                 type="button"
                 aria-label={`Remove ${item.media?.title ?? 'this video'}`}
                 onClick={() => remove(item.id)}
-                className="btn btn-ghost btn-sm -mr-2.5"
+                className="btn btn-ghost btn-sm btn-icon -mr-1.5 text-text"
               >
-                Remove
+                <Icon name="close" className="size-3.5" />
               </button>
             </li>
           ))}

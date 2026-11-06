@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import Card from './Card';
+import Card, { PushSettings } from './Card';
 import { deviceName, readPushState, stopPings, turnOn } from './push';
 
 const post = vi.hoisted(() => vi.fn());
@@ -48,7 +48,7 @@ describe('the ping card', () => {
   it('asks nothing and registers nothing until Allow is pressed', async () => {
     const { serviceWorker, pushManager } = worker(false);
     const ask = permission('default', 'granted');
-    render(<Card slug="movie" />);
+    render(<Card />);
     const allow = await screen.findByRole('button', { name: 'Allow' });
     expect(screen.getByText('Get a ping when your crew starts watching.')).toBeTruthy();
     expect(ask).not.toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe('the ping card', () => {
   it('refreshes a browser this person holds on load, claiming nothing and asking nothing', async () => {
     const { subscription } = worker(true);
     const ask = permission('granted');
-    render(<Card slug="movie" />);
+    render(<Card />);
     await screen.findByText('You’re on. We’ll ping this device.');
     expect(post).toHaveBeenCalledWith('/v1/push/subscriptions', { endpoint: 'https://push.test/1', keys: { p256dh: 'k', auth: 'a' } });
     expect(ask).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('the ping card', () => {
     subscription.unsubscribe.mockImplementation(async () => {
       pushManager.getSubscription.mockResolvedValue(null);
     });
-    render(<Card slug="movie" />);
+    render(<Card />);
 
     const allow = await screen.findByRole('button', { name: 'Allow' });
     expect(subscription.unsubscribe).toHaveBeenCalledOnce();
@@ -96,7 +96,7 @@ describe('the ping card', () => {
     const { subscription, pushManager } = worker(true);
     permission('default', 'granted');
     subscription.unsubscribe.mockResolvedValue(true);
-    render(<Card slug="movie" />);
+    render(<Card />);
     fireEvent.click(await screen.findByRole('button', { name: 'Allow' }));
     await screen.findByText('You’re on. We’ll ping this device.');
     expect(subscription.unsubscribe.mock.invocationCallOrder[0]!).toBeLessThan(pushManager.subscribe.mock.invocationCallOrder[0]!);
@@ -106,7 +106,7 @@ describe('the ping card', () => {
     const { subscription } = worker(true);
     permission('granted');
     post.mockRejectedValueOnce({ code: 'rate_limited' });
-    render(<Card slug="movie" />);
+    render(<Card />);
     await screen.findByText('You’re on. We’ll ping this device.');
     expect(subscription.unsubscribe).not.toHaveBeenCalled();
   });
@@ -114,7 +114,7 @@ describe('the ping card', () => {
   it('does not save anything for a browser that never said yes', async () => {
     worker(false);
     permission('default');
-    render(<Card slug="movie" />);
+    render(<Card />);
     await screen.findByRole('button', { name: 'Allow' });
     expect(post).not.toHaveBeenCalled();
   });
@@ -133,7 +133,7 @@ describe('the ping card', () => {
   it('says what blocked it, and never asks again', async () => {
     worker(false);
     const ask = permission('denied');
-    render(<Card slug="movie" />);
+    render(<Card />);
     await screen.findByText(/Notifications are blocked for this site/);
     expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
     expect(ask).not.toHaveBeenCalled();
@@ -150,7 +150,7 @@ describe('the ping card', () => {
     browser('iPhone Safari/605');
     worker(false);
     permission('default');
-    render(<Card slug="movie" />);
+    render(<Card />);
     await screen.findByText(/Add Stream2Gather to your Home Screen to get pings/);
     expect(screen.queryByRole('button', { name: 'Allow' })).toBeNull();
   });
@@ -166,7 +166,7 @@ describe('the ping card', () => {
     worker(false);
     permission('default');
     config.mockResolvedValue({ vapidPublicKey: '' });
-    const { container } = render(<Card slug="movie" />);
+    const { container } = render(<Card />);
     await waitFor(() => expect(config).toHaveBeenCalled());
     expect(container.textContent).toBe('');
   });
@@ -175,7 +175,7 @@ describe('the ping card', () => {
     worker(false);
     permission('default', 'granted');
     post.mockRejectedValue(new Error('down'));
-    render(<Card slug="movie" />);
+    render(<Card />);
     fireEvent.click(await screen.findByRole('button', { name: 'Allow' }));
     await screen.findByText('That didn’t work. Try again.');
     expect(screen.getByRole('button', { name: 'Allow' })).toBeTruthy();
@@ -184,7 +184,7 @@ describe('the ping card', () => {
   it('lists no devices plainly, and turns a crew off', async () => {
     worker(true);
     permission('granted');
-    render(<Card slug="movie" />);
+    render(<PushSettings slug="movie" />);
     await screen.findByText('No devices yet.');
     fireEvent.click(screen.getByLabelText('Ping me about this crew'));
     await waitFor(() => expect(request).toHaveBeenCalledWith('/v1/crews/movie/me', { method: 'PATCH', body: '{"notify":"off"}' }));

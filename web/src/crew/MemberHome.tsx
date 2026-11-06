@@ -7,7 +7,7 @@ import { firstName, seatHues } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { Wordmark } from '../ui/Wordmark';
 import { inviteLink, type CrewDocument } from './api';
-import { CrewSettings, MemberRow } from './CrewSettings';
+import { CrewAdmin, GearIcon } from './CrewSettings';
 import { Sessions } from './Sessions';
 import { Watchlist } from './Watchlist';
 
@@ -21,11 +21,14 @@ type Props = {
   onJoin: (name: string, changed: boolean) => Promise<void>;
 };
 
+/** One row once there's company. The link itself only shows when someone has to copy it by hand. */
 const Invite = ({ slug, home }: Pick<Props, 'slug' | 'home'>) => {
   const link = inviteLink(slug, home.inviteToken);
   const [copied, setCopied] = useState(false);
+  const [refused, setRefused] = useState(false);
   const field = useRef<HTMLInputElement>(null);
   const alone = home.roster.length === 1;
+  const shown = alone || refused;
 
   // Selected on arrival, so a phone's copy menu is one tap from here too.
   useEffect(() => {
@@ -34,22 +37,23 @@ const Invite = ({ slug, home }: Pick<Props, 'slug' | 'home'>) => {
 
   const copy = async () => {
     field.current?.select();
-    await navigator.clipboard.writeText(link).catch(() => {});
-    setCopied(true);
+    const saved = await navigator.clipboard.writeText(link).then(() => true, () => false);
+    setCopied(saved);
+    setRefused(!saved);
   };
 
   return (
-    <section aria-label="Invite" className="mt-6">
-      <p className="text-sm text-muted">{alone ? 'It’s just you. Copy the invite.' : 'Invite someone'}</p>
-      <div className="mt-2 flex gap-2">
-        <label htmlFor="crew-invite" className="sr-only">
-          Invite link
-        </label>
-        <input id="crew-invite" ref={field} readOnly value={link} className="field min-w-0 flex-1 font-mono text-[13px]" />
+    <section aria-label="Invite" className="mt-4 border-t border-line pt-3">
+      <div className="flex items-center gap-3">
+        <p className="min-w-0 flex-1 text-sm text-muted">{alone ? 'It’s just you. Copy the invite.' : 'Invite someone'}</p>
         <button type="button" onClick={() => void copy()} className="btn btn-quiet shrink-0">
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
+      <label htmlFor="crew-invite" className="sr-only">
+        Invite link
+      </label>
+      <input id="crew-invite" ref={field} readOnly value={link} tabIndex={shown ? undefined : -1} className={shown ? 'field mt-2 w-full text-[13px]' : 'sr-only'} />
     </section>
   );
 };
@@ -72,6 +76,7 @@ const Frame = ({ children }: { children: ReactNode }) => (
 export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
   const { user } = useAccount();
   const [joining, setJoining] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const here = home.members.length;
   seatHues(home.members.map((person) => person.userId));
 
@@ -80,9 +85,22 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
     void onJoin(user?.name ?? '', false);
   };
 
+  if (admin) {
+    return (
+      <Frame>
+        <CrewAdmin slug={slug} home={home} onChange={refresh} onBack={() => setAdmin(false)} />
+      </Frame>
+    );
+  }
+
   return (
     <Frame>
-      <h1 className="truncate text-2xl leading-8 font-semibold tracking-[-0.015em]">{home.name}</h1>
+      <div className="flex items-center gap-3">
+        <h1 className="min-w-0 flex-1 truncate text-2xl leading-8 font-semibold tracking-[-0.015em]">{home.name}</h1>
+        <button type="button" aria-label="Members and settings" onClick={() => setAdmin(true)} className="btn btn-ghost btn-icon -mr-2 text-text">
+          <GearIcon />
+        </button>
+      </div>
 
       {problem && (
         <p role="status" className="mt-4 text-sm text-warn">
@@ -114,30 +132,20 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
           </ul>
         )}
         <button type="button" disabled={joining} onClick={enter} className="btn btn-primary h-12 w-full text-base">
-          {here > 0 ? `Join the room (${here} here)` : 'Join the room'}
+          Join the room
         </button>
       </section>
 
-      <Suspense fallback={null}>
-        <PushCard slug={slug} />
-      </Suspense>
-
       <Invite slug={slug} home={home} />
+
+      <Suspense fallback={null}>
+        <PushCard />
+      </Suspense>
 
       <Watchlist slug={slug} items={home.watchlist} onChange={refresh} />
 
       <Sessions slug={slug} />
 
-      <section aria-label="Members" className="mt-8">
-        <h2 className="text-sm font-semibold">Members</h2>
-        <ul className="mt-2 divide-y divide-line border-y border-line">
-          {home.roster.map((person) => (
-            <MemberRow key={person.userId} slug={slug} home={home} person={person} onChange={refresh} />
-          ))}
-        </ul>
-      </section>
-
-      <CrewSettings slug={slug} home={home} onChange={refresh} />
     </Frame>
   );
 };

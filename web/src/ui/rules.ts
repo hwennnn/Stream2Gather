@@ -39,6 +39,9 @@ export const failureNote = (view: RoomView): string => {
   return view.alone ? '' : 'Others are still watching.';
 };
 
+/** Chat keeps its box and People its host switch along the bottom of the rail, clear of toasts. */
+export const toastLift = (tab: string): string => (tab === 'queue' ? 'bottom-3' : 'bottom-[84px]');
+
 export type Pill = { text: string; tone: 'good' | 'paused' | 'warn' | 'bad' };
 
 /** What the sync pill says. Only the room's own words: no milliseconds, no jargon. */

@@ -11,7 +11,7 @@ import { PlayerStage, SkipButton, SyncPill, UnmuteButton } from '../ui/PlayerSta
 import { ReactionLane } from '../ui/Reactions';
 import { QueuePanel } from '../ui/QueuePanel';
 import { RoomHeader } from '../ui/RoomHeader';
-import { canControl } from '../ui/rules';
+import { canControl, toastLift } from '../ui/rules';
 import { JumpToast, ToastStack, useToasts } from '../ui/Toasts';
 import { canFullscreen, useFullscreen } from '../ui/useFullscreen';
 import { useMediaQuery } from '../ui/useMediaQuery';
@@ -378,7 +378,7 @@ const RoomShell = ({ slug, session, view, copied }: ShellProps) => {
           </div>
 
           <ReactionLane reactions={view.reactions} />
-          {!railHidden && toastStack(`absolute inset-x-3 ${tab === 'chat' ? 'bottom-[76px]' : 'bottom-3'}`)}
+          {!railHidden && toastStack(`absolute inset-x-3 ${toastLift(tab)}`)}
         </aside>
       </div>
     </div>

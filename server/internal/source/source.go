@@ -12,7 +12,7 @@ import (
 // Errors a source can return.
 var (
 	ErrUnsupportedURL = errors.New("this link is not supported")
-	ErrUnavailable    = errors.New("this video cannot be played here")
+	ErrUnavailable    = errors.New("This video can’t be played here. Try another.")
 	ErrNoSearch       = errors.New("this source has no search")
 	ErrOverBudget     = errors.New("search is resting until tomorrow")
 	ErrLive           = errors.New("Live streams aren’t supported yet.")

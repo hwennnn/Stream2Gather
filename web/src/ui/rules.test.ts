@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChatEntry, RoomView } from '../room/session';
-import { canControl, canQueue, chatScroll, countUnread, failureNote, pillFor } from './rules';
+import { canControl, canQueue, chatScroll, countUnread, failureNote, pillFor, toastLift } from './rules';
 
 const view = (patch: Partial<RoomView>): RoomView =>
   ({
@@ -66,6 +66,17 @@ describe('failureNote', () => {
 
   it('has nothing to say to someone alone in a room that will move on', () => {
     expect(failureNote(view({ self, members: people('a'), viewerStates: {}, alone: true }))).toBe('Skipping.');
+  });
+});
+
+describe('toastLift', () => {
+  it('keeps toasts off the host switch and the chat box', () => {
+    expect(toastLift('people')).toBe(toastLift('chat'));
+    expect(toastLift('people')).not.toBe('bottom-3');
+  });
+
+  it('uses the bottom of the rail where nothing lives there', () => {
+    expect(toastLift('queue')).toBe('bottom-3');
   });
 });
 

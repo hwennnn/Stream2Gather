@@ -70,14 +70,16 @@ describe('CrewHome', () => {
     expect(await screen.findByText('It’s just you. Copy the invite.')).toBeTruthy();
   });
 
-  it('offers an invited guest the crew and the guest way in', () => {
+  it('saves an invited friend a seat, with one Join, and says what they get', () => {
     window.history.replaceState(null, '', '/r/movie-night?join=tok');
-    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 3, isMember: false, guestAccess: true })} onJoin={onJoin} />);
+    const crew = { memberCount: 3, isMember: false, guestAccess: true };
+    render(<CrewHome slug="movie-night" preview={{ ...preview(crew), members: [{ userId: 'u9', name: 'Maya Lin', role: 'host' }] }} onJoin={onJoin} />);
 
-    expect(screen.getByRole('heading', { name: 'Movie Night' })).toBeTruthy();
-    expect(screen.getByText('3 members')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Continue as guest' })).toBeTruthy();
-    expect(screen.getByText('This crew keeps chat and reactions for its members.')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Maya saved you a seat' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Join' }).className).toContain('btn-primary');
+    expect(screen.getByRole('button', { name: 'Join the crew' }).className).not.toContain('btn');
+    expect(screen.getByText(/You can watch, chat and react tonight/)).toBeTruthy();
+    expect(window.document.body.textContent).not.toMatch(/guest/i);
     fireEvent.click(screen.getByRole('button', { name: 'Join the crew' }));
     expect(signIn).toHaveBeenCalled();
   });
@@ -97,7 +99,7 @@ describe('CrewHome', () => {
     expect(window.location.search).toBe('');
   });
 
-  it('says so when the invite has been rotated, and keeps the guest way in', async () => {
+  it('says so when the invite has been rotated, and keeps Join', async () => {
     signIntoAccount();
     window.history.replaceState(null, '', '/r/movie-night?join=old');
     vi.spyOn(crewApi, 'home').mockRejectedValue(new ApiError(403, 'not_member', 'no'));
@@ -108,12 +110,19 @@ describe('CrewHome', () => {
 
     expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This invite link has expired. Ask for a new one.');
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Join the crew' })).toBeNull());
-    expect(screen.getByRole('button', { name: 'Continue as guest' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Join' })).toBeTruthy();
+  });
+
+  it('gives an invited friend one button when the crew is members only', () => {
+    window.history.replaceState(null, '', '/r/movie-night?join=tok');
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: false })} onJoin={onJoin} />);
+    expect(screen.getByRole('button', { name: 'Join the crew' }).className).toContain('btn-primary');
+    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
   });
 
   it('shuts a members-only room to anyone without an invite', () => {
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: false })} onJoin={onJoin} />);
-    expect(screen.queryByRole('button', { name: 'Continue as guest' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
     expect(screen.getByText('This room is for its crew. Ask them for an invite.')).toBeTruthy();
   });
 

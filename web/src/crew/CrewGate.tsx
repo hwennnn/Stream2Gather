@@ -4,8 +4,6 @@ import { account, useAccount } from '../auth/account';
 import { JoinGate } from '../ui/JoinGate';
 import { crewApi, WANTS_JOIN } from './api';
 
-const memberLine = (count: number) => (count === 1 ? '1 member' : `${count} members`);
-
 const inviteToken = () => new URLSearchParams(window.location.search).get('join');
 
 type Props = {
@@ -16,7 +14,7 @@ type Props = {
   onJoined: () => void;
 };
 
-/** What someone who isn't on the crew sees: an invite, a guest's way in, or neither. */
+/** What someone who isn't on the crew sees: a seat if they can have one, and what the crew keeps for itself. */
 export const CrewGate = ({ slug, preview, onJoin, onJoined }: Props) => {
   const { user, publishableKey } = useAccount();
   const signedIn = Boolean(user?.signedIn);
@@ -56,36 +54,33 @@ export const CrewGate = ({ slug, preview, onJoin, onJoined }: Props) => {
   };
 
   const canJoinCrew = token !== null && problem === null && (signedIn || publishableKey !== '');
+  const canVisit = crew?.guestAccess !== false;
+  const joinCrewLabel = busy ? 'Joining…' : 'Join the crew';
   const aside = (
-    <div className="mt-6 land:mt-3">
-      <p className="text-sm text-muted">{crew ? memberLine(crew.memberCount) : ''}</p>
-      {canJoinCrew && (
-        <button type="button" disabled={busy} onClick={start} className="btn btn-primary mt-3 w-full">
-          {busy ? 'Joining…' : 'Join the crew'}
-        </button>
-      )}
+    <div className="mt-3">
       {problem && (
-        <p role="alert" className="mt-3 text-sm text-warn">
+        <p role="alert" className="mb-3 text-sm text-warn">
           {problem}
         </p>
       )}
-      {crew?.guestAccess ? (
-        <p className="mt-3 text-sm text-muted">This crew keeps chat and reactions for its members.</p>
+      {canVisit ? (
+        <p className="text-sm text-muted">
+          You can watch, chat and react tonight. The watchlist and past nights stay with the crew.{' '}
+          {canJoinCrew && (
+            <button type="button" disabled={busy} onClick={start} className="cursor-pointer text-text underline underline-offset-2">
+              {joinCrewLabel}
+            </button>
+          )}
+        </p>
+      ) : canJoinCrew ? (
+        <button type="button" disabled={busy} onClick={start} className="btn btn-primary w-full">
+          {joinCrewLabel}
+        </button>
       ) : (
-        !canJoinCrew && <p className="mt-3 text-sm text-muted">This room is for its crew. Ask them for an invite.</p>
+        <p className="text-sm text-muted">This room is for its crew. Ask them for an invite.</p>
       )}
     </div>
   );
 
-  return (
-    <JoinGate
-      preview={preview}
-      onJoin={onJoin}
-      heading={preview.name}
-      aside={aside}
-      joinLabel="Continue as guest"
-      quiet={canJoinCrew}
-      canJoin={crew?.guestAccess !== false}
-    />
-  );
+  return <JoinGate preview={preview} onJoin={onJoin} heading={canVisit ? undefined : preview.name} crew aside={aside} canJoin={canVisit} />;
 };

@@ -10,13 +10,12 @@ import { Thumb } from './Thumb';
 type JoinGateProps = {
   preview: RoomPreview | null;
   onJoin: (name: string, changed: boolean) => Promise<void>;
-  /** A crew's gate says whose room this is, not who's inviting. */
+  /** Says whose room this is, for someone who has no seat to be saved. */
   heading?: string;
-  /** Join stands aside for a better way in, shown above it. */
+  /** A crew's room: an empty one is theirs, not one the visitor is first into. */
+  crew?: boolean;
+  /** What comes with this way in, under Join. */
   aside?: ReactNode;
-  joinLabel?: string;
-  /** Join is the lesser way in here. */
-  quiet?: boolean;
   /** False when the room has no way in from here. */
   canJoin?: boolean;
 };
@@ -34,7 +33,7 @@ export const WhereItIs = ({ preview }: { preview: RoomPreview }) => {
 };
 
 /** The Join click is also the gesture that lets the video start with sound. */
-export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', quiet = false, canJoin = true }: JoinGateProps) => {
+export const JoinGate = ({ preview, onJoin, heading, crew = false, aside, canJoin = true }: JoinGateProps) => {
   const { user } = useAccount();
   const [suggested] = useState(suggestName);
   const [edited, setEdited] = useState<string | null>(null);
@@ -60,7 +59,6 @@ export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', 
   seatHues(others.map((person) => person.userId));
   const extra = others.length - SHOWN;
   const inviter = others.find((person) => person.role === 'host') ?? others[0];
-  // A crew's gate counts its members, so seats nobody took would say something else.
   const empties = heading ? 0 : Math.max(0, MIN_EMPTY - others.length);
 
   return (
@@ -80,6 +78,8 @@ export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', 
                 preview.nowPlaying && <p className="mt-1 line-clamp-2 text-muted">Watching {preview.nowPlaying.title}</p>
               ) : inviter ? (
                 <p className="mt-1 line-clamp-2 text-muted">{preview.nowPlaying ? `${preview.name}, watching ${preview.nowPlaying.title}` : preview.name}</p>
+              ) : crew ? (
+                <p className="mt-1 text-muted">Nobody’s in yet. The crew will sit down next to you.</p>
               ) : (
                 <p className="mt-1 text-muted">You’re first in. Friends with the link will sit down next to you.</p>
               )}
@@ -121,8 +121,6 @@ export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', 
             </ul>
           )}
 
-          {aside}
-
           {canJoin && (
             <>
               <label htmlFor="join-name" className="mt-6 block text-[13px] text-muted">
@@ -138,12 +136,14 @@ export const JoinGate = ({ preview, onJoin, heading, aside, joinLabel = 'Join', 
                   spellCheck={false}
                   className="field min-w-0 flex-1"
                 />
-                <button ref={button} type="submit" disabled={!preview || busy} className={`btn ${quiet ? 'btn-quiet' : 'btn-primary'}`}>
-                  {joinLabel}
+                <button ref={button} type="submit" disabled={!preview || busy} className="btn btn-primary">
+                  Join
                 </button>
               </div>
             </>
           )}
+
+          {aside}
         </div>
       </form>
     </Page>

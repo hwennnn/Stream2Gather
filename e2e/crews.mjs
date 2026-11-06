@@ -88,9 +88,9 @@ await hana.page.screenshot({ path: `${OUT}/crew-home.png`, fullPage: true });
 // A guest gets today's flow and one more line.
 const guest = await person(null);
 await guest.page.goto(invite);
-check('guest is told what they miss', await visible(guest.page.getByText('This crew keeps chat and reactions for its members.')));
+check('a visitor is told what they get', await visible(guest.page.getByText(/You can watch, chat and react tonight/)));
 await guest.page.screenshot({ path: `${OUT}/crew-gate.png` });
-await button(guest, 'Continue as guest').click();
+await guest.page.getByRole('button', { name: 'Join', exact: true }).click();
 check('guest reaches the room', await visible(guest.page.getByRole('tab', { name: 'People' })));
 await guest.context.close();
 
@@ -111,7 +111,7 @@ await sleep(300);
 const shut = await person(null);
 await shut.page.goto(hana.page.url());
 check('members only says whose room it is', await visible(shut.page.getByText('This room is for its crew. Ask them for an invite.')));
-check('members only has no guest way in', (await button(shut, 'Continue as guest').count()) === 0);
+check('members only has no guest way in', (await shut.page.getByRole('button', { name: 'Join', exact: true }).count()) === 0);
 await shut.context.close();
 
 // Removing someone ends the old invite.

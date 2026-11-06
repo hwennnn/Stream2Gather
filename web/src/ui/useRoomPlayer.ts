@@ -24,6 +24,7 @@ type Events = {
   onMuted: (muted: boolean) => void;
   onRefused: (refused: boolean) => void;
   onCold: (cold: boolean) => void;
+  onStarted: () => void;
 };
 
 type Cleanup = () => void;
@@ -171,7 +172,10 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
       created.onError(fail);
       cleanups.push(
         watchReady(created, events.onReady),
-        watchFirstFrame(created, item, () => session.send('media_ok', { item: item.id })),
+        watchFirstFrame(created, item, () => {
+          events.onStarted();
+          session.send('media_ok', { item: item.id });
+        }),
         startSync(session, created, item, events),
       );
     },
@@ -211,6 +215,8 @@ export type RoomPlayer = {
   adapter: () => PlayerAdapter | null;
   reports: ReportStore;
   ready: boolean;
+  /** This player has shown a frame of this video. */
+  started: boolean;
   failure: PlayerError | null;
   muted: boolean;
   /** The browser refused to start this player, even muted. */
@@ -227,6 +233,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   const stage = useRef<HTMLDivElement>(null);
   const reports = useMemo(createReportStore, []);
   const [readyId, setReadyId] = useState<string | null>(null);
+  const [startedId, setStartedId] = useState<string | null>(null);
   const [failed, setFailed] = useState<{ id: string; error: PlayerError } | null>(null);
   const [muted, setMuted] = useState(false);
   const [refused, setRefused] = useState(false);
@@ -240,6 +247,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
   useEffect(() => {
     if (!stage.current || !current || !currentId) return undefined;
     reports.set(WAITING);
+    setStartedId(null);
     setMuted(false);
     setRefused(false);
     setCold(false);
@@ -253,6 +261,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
       onMuted: setMuted,
       onRefused: setRefused,
       onCold: setCold,
+      onStarted: () => setStartedId(currentId),
     });
     // Only a new queue item or a retry replaces the player.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -263,6 +272,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
     adapter: () => player.current,
     reports,
     ready: readyId === currentId,
+    started: startedId === currentId,
     failure: failed && failed.id === currentId ? failed.error : null,
     muted,
     refused,

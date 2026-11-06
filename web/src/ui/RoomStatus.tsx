@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { RoomView } from '../room/session';
 import { expectedPosition } from '../sync/controller';
 import { hueOf } from './people';
-import { actFor, statusFor, type Act, type Part } from './status';
+import { actFor, laggingFriend, statusFor, type Act, type Part } from './status';
 import { useSyncReport, type RoomPlayer } from './useRoomPlayer';
 
 const ACT_MS = 4000;
@@ -58,6 +58,21 @@ const Piece = ({ part }: { part: Part }) => {
   );
 };
 
+/** Below this, a stall or a gap clears by itself and saying so would only be noise. */
+const HOLD_MS = 2000;
+
+/** True once `on` has held for HOLD_MS. A new `key` starts the wait again. */
+const useHeld = (on: boolean, key: string | undefined): boolean => {
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    setHeld(false);
+    if (!on) return undefined;
+    const timer = window.setTimeout(() => setHeld(true), HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [on, key]);
+  return on && held;
+};
+
 type Props = {
   view: RoomView;
   player: RoomPlayer;
@@ -75,8 +90,13 @@ export const RoomStatus = ({ view, player, act, offlineFor, onRetry, compact = f
   useTick(playing);
   const position = playing ? expectedPosition(view.playback, Date.now()) : view.playback.pos;
   const { health } = useSyncReport(player);
+  const item = view.playback.item;
+  const friend = laggingFriend(view);
+  const slow = useHeld(playing && !player.started, item);
+  const gap = useHeld(playing && player.started && (health === 'correcting' || health === 'buffering'), item);
+  const friendGap = useHeld(friend !== undefined, friend?.userId);
   const failed = player.failure !== null;
-  const { state, parts, tail, tone, retry } = statusFor({ view, health, failed, act, position, offlineFor, refused: player.refused, live: view.queue[0]?.isLive });
+  const { state, parts, tail, tone, retry } = statusFor({ view, health, failed, act, position, started: player.started, slow, gap, friendGap, offlineFor, refused: player.refused, live: view.queue[0]?.isLive });
   return (
     <p data-room-status={state} role={state === 'offline' ? 'status' : undefined} className={`flex min-w-0 items-center gap-2 text-[13px] leading-5 ${tone === 'warn' ? 'text-warn' : 'text-muted'} ${className}`}>
       <span className="truncate">

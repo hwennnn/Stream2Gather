@@ -12,6 +12,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { createECDH, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { chromium } from 'playwright-core';
 
 const BASE = process.env.BASE ?? 'http://localhost:18082';
 const NOTIFIER = process.env.E2E_NOTIFIER;
@@ -45,6 +46,7 @@ const mint = (name) => JSON.parse(execFileSync(MINT, [name], { cwd: DIR, encodin
 let address = 0;
 const person = (name) => {
   const { id, cookie } = mint(name);
+  const token = cookie;
   address += 1;
   const headers = { 'content-type': 'application/json', cookie: `s2g_session=${cookie}`, 'x-forwarded-for': `10.91.0.${address}` };
   const call = async (method, path, body) => {
@@ -52,7 +54,7 @@ const person = (name) => {
     if (!response.ok) throw new Error(`${method} ${path}: ${response.status} ${await response.text()}`);
     return response.status === 204 ? null : response.json();
   };
-  return { id, name, call };
+  return { id, name, call, token };
 };
 
 const subscribe = async (who, device) => {
@@ -128,10 +130,102 @@ const surviving = async () => {
   check('killing the notifier in the timer gives exactly one', forDevice('killed').length === 1, `${forDevice('killed').length}`);
 };
 
+/** A real worker in real Chrome. Only the browser's own push service is stubbed, so nothing leaves here. */
+const stubPushService = (endpoint) => {
+  const fake = {
+    endpoint,
+    toJSON: () => ({ endpoint, keys: { p256dh: window.__key, auth: 'AAAAAAAAAAAAAAAAAAAAAA' } }),
+    unsubscribe: async () => true,
+  };
+  PushManager.prototype.subscribe = async () => {
+    localStorage.setItem('fake-push', 'yes');
+    return fake;
+  };
+  PushManager.prototype.getSubscription = async () => (localStorage.getItem('fake-push') ? fake : null);
+};
+
+const inChrome = async () => {
+  const key = createECDH('prime256v1');
+  key.generateKeys();
+  const mia = person('Mia');
+  const { slug } = await mia.call('POST', '/v1/crews', { name: 'Chrome crew' });
+  const browser = await chromium.launch({ channel: 'chrome', headless: true });
+  try {
+    const context = await browser.newContext();
+    const { hostname, origin } = new URL(BASE);
+    await context.addCookies([{ name: 's2g_session', value: mia.token, domain: hostname, path: '/' }]);
+    await context.addInitScript(`window.__key = '${key.getPublicKey('base64url')}'`);
+    await context.addInitScript(stubPushService, `http://127.0.0.1:${PUSH_PORT}/chrome`);
+    const page = await context.newPage();
+    const problems = [];
+    page.on('console', (message) => { if (message.type() === 'error') problems.push(message.text()); });
+    page.on('response', (response) => { if (response.status() >= 500) problems.push(`${response.status()} ${response.url()}`); });
+    await page.goto(`${BASE}/r/${slug}`);
+    const allow = page.getByRole('button', { name: 'Allow' });
+    await allow.waitFor();
+    const before = await page.evaluate(async () => [(await navigator.serviceWorker.getRegistrations()).length, Notification.permission]);
+    check('page load registers nothing and asks nothing', before[0] === 0 && before[1] === 'default', before.join(' '));
+
+    await context.grantPermissions(['notifications'], { origin });
+    const worker = context.waitForEvent('serviceworker');
+    await allow.click();
+    await page.getByText('You’re on. We’ll ping this device.').waitFor();
+    const { devices } = await mia.call('GET', '/v1/me/notifications');
+    check('Allow saves this browser', devices.length === 1, `${devices.length}`);
+    const sw = await worker;
+    await page.reload();
+    await page.getByText('You’re on. We’ll ping this device.').waitFor();
+    check('a reload stays on', true);
+
+    const cdp = await context.newCDPSession(page);
+    const registered = new Promise((resolve) => { cdp.once('ServiceWorker.workerRegistrationUpdated', ({ registrations }) => resolve(registrations[0].registrationId)); });
+    await cdp.send('ServiceWorker.enable');
+    const registrationId = await registered;
+    const deliver = async (data) => {
+      await cdp.send('ServiceWorker.deliverPushMessage', { origin, registrationId, data });
+      await sleep(500);
+      return sw.evaluate(async () => {
+        const shown = await self.registration.getNotifications();
+        const last = shown.at(-1);
+        return last ? { title: last.title, body: last.body, url: last.data.url, count: shown.length } : null;
+      });
+    };
+    const payload = (navigate) => JSON.stringify({ web_push: 8030, notification: { title: 'Hana started watching in Chrome crew', body: 'Join in', navigate } });
+    const shown = await deliver(payload(`/r/${slug}`));
+    check('a push shows the notification', shown?.title === 'Hana started watching in Chrome crew' && shown?.body === 'Join in', JSON.stringify(shown));
+    check('it points at the room', shown?.url === `${origin}/r/${slug}`, shown?.url);
+    const unreadable = await deliver('not json');
+    check('an unreadable push still shows something', unreadable?.title === 'Stream2Gather', JSON.stringify(unreadable));
+    const elsewhere = await deliver(payload('https://example.test/phish'));
+    check('a push cannot leave this site', elsewhere?.url === `${origin}/`, elsewhere?.url);
+
+    const click = (url) => sw.evaluate(async (target) => {
+      const shown = await self.registration.getNotifications();
+      const notification = shown.find((one) => one.data.url === target);
+      const opened = [];
+      self.clients.openWindow = async (address) => { opened.push(address); return null; };
+      const pending = [];
+      const event = new NotificationEvent('notificationclick', { notification });
+      event.waitUntil = (promise) => pending.push(promise);
+      self.dispatchEvent(event);
+      await Promise.allSettled(pending);
+      return opened;
+    }, url);
+    check('tapping focuses the room already open', (await click(`${origin}/r/${slug}`)).length === 0);
+    check('nothing complained in the console', problems.length === 0, problems.join(' | ').slice(0, 200));
+    await page.goto(`${BASE}/`);
+    await deliver(payload(`/r/${slug}`));
+    const opened = await click(`${origin}/r/${slug}`);
+    check('tapping opens the room when it is not open', opened[0] === `${origin}/r/${slug}`, opened.join(' '));
+  } finally {
+    await browser.close();
+  }
+};
+
 /** What a crash between starting a workflow and marking its row done leaves behind. */
 const replaying = async () => {
   if (!PG) return;
-  const sql = (query) => execFileSync('docker', ['exec', PG, 'psql', '-U', 's2g', '-d', 's2g', '-Atc', query], { encoding: 'utf8' }).trim();
+  const sql = (query) => execFileSync('docker', ['exec', PG, 'psql', '-q', '-U', 's2g', '-d', 's2g', '-Atc', query], { encoding: 'utf8' }).trim();
   const before = received.length;
   const rows = sql(`UPDATE outbox SET done_at = NULL, created_at = now() WHERE done_at > now() - interval '10 minutes' RETURNING id`);
   sql(`SELECT pg_notify('outbox', '')`);
@@ -143,6 +237,8 @@ const replaying = async () => {
 
 await new Promise((resolve) => { pushService.listen(PUSH_PORT, '127.0.0.1', resolve); });
 try {
+  await inChrome();
+  if (process.env.E2E_BROWSER_ONLY) process.exit(failures.length ? 1 : 0);
   await timing();
   await surviving();
   await replaying();

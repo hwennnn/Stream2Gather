@@ -101,3 +101,22 @@ Chrome 156 plays HLS itself, so hls.js only runs in browsers that can't. `e2e/sy
 Drift checks are sensitive to load. On one day, plain MP4 read 185 ms p95 in `make e2e` at load 120. Alternating master with an older commit at load 34 to 88 then read 1-2 ms and 0-2 ms, so that was not a regression.
 
 Not tested: real networks, real devices, Safari, Firefox, Twitch ads, and a real `https` host refusing CORS. The real-device matrix for voice and push has not been run.
+
+## Phase 2: notifications
+
+Everything here used a fake push service on this machine, so no real push service or device has taken a message. Server, Temporal, notifier, Postgres and Redis were real and private to the run. A crew room really played, and hub capture wrote the outbox row, on one loaded development machine.
+
+| Measure | Result | Target |
+|---|---|---|
+| Absent member gets the push, p95 | 44.0 and 45.3 s over two runs of 20 crews, fastest 30.8 s | At most 60 s, fake endpoint |
+| Pushes per absent member | Exactly 1, 20 of 20 in both runs | 1 |
+| `kill -9` of the notifier during the timer | Exactly 1 after restart | 1 |
+| Finished outbox rows replayed, as after a crash between start and mark-done | 0 new pushes | 0 |
+| Entry JS | 78,072 bytes before and after | Unchanged |
+| Crew home card | 1.95 kB gz, its own chunk | Lazy |
+| `CrewHome` chunk | +0.15 kB gz | No limit set |
+| `RoomPage` chunk | +3 bytes gz | No limit set |
+| `make e2e` with Temporal and the notifier stopped | `sync.mjs` 54 passed, 0 failed. `crews.mjs` stops at its guest switch, and stops the same way with the card removed | Pass |
+| Real-device pass | Not run | Recorded |
+
+The timer alone is 30 to 45 seconds, so the p95 is mostly the wait that stops false starts. `recap.ready` has not run end to end: nothing writes those rows until the recap slices merge. Headless Chrome ran the real worker, with a push delivered through DevTools and tap routing checked; the browser's own push service was stubbed.

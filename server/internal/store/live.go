@@ -241,6 +241,8 @@ type Departure struct {
 	UserID string `json:"userId"`
 	Name   string `json:"name"`
 	At     int64  `json:"at"`
+	// Quiet goes unsaid, because the handover tells it.
+	Quiet bool `json:"quiet,omitempty"`
 }
 
 func goneKey(roomID string) string { return "room:" + roomID + ":gone" }

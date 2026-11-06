@@ -61,6 +61,8 @@ export type RoomView = {
   speaking: string[];
   /** True when nobody else is in the room. */
   alone: boolean;
+  /** Who has really left, not just reloaded, so their seat can go. */
+  vacated: string[];
   viewerStates: Record<string, string>;
   messages: ChatEntry[];
   reactions: Reaction[];
@@ -94,6 +96,7 @@ const initialView: RoomView = {
   members: [],
   speaking: [],
   alone: false,
+  vacated: [],
   viewerStates: {},
   messages: [],
   reactions: [],
@@ -413,6 +416,9 @@ export class RoomSession {
       case 'line':
         this.addLines([d]);
         break;
+      case 'vacated':
+        this.update({ vacated: [...this.view.vacated, (d as { userId: string }).userId] });
+        break;
       case 'notice':
         this.notice(d);
         break;
@@ -571,7 +577,8 @@ export class RoomSession {
   private membersChanged(members: Person[]): void {
     const { self } = this.view;
     const role = members.find((person) => person.userId === self?.userId)?.role;
-    this.update({ members, self: self && role ? { ...self, role } : self });
+    const vacated = this.view.vacated.filter((id) => !members.some((person) => person.userId === id));
+    this.update({ members, vacated, self: self && role ? { ...self, role } : self });
   }
 
   private memberStatus(data: { userId: string; state: string; item?: string }): void {

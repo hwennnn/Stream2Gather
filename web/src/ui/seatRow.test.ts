@@ -33,6 +33,17 @@ describe('placeSeats', () => {
     expect(names(placeSeats(out, [person('a'), person('c')], 2))).toEqual(['a', 'c']);
   });
 
+  it('frees the seat of someone who has really gone', () => {
+    const row = placeSeats([], ['a', 'b', 'c'].map(person));
+    const out = placeSeats(row, [person('a'), person('c')], 8, ['b']);
+    expect(names(out)).toEqual(['a', null, 'c']);
+  });
+
+  it('leaves no gap at the end of the row', () => {
+    const row = placeSeats([], [person('a'), person('b')]);
+    expect(names(placeSeats(row, [person('a')], 8, ['b']))).toEqual(['a']);
+  });
+
   it('counts the people the row can’t hold', () => {
     const members = [person('a'), person('b'), person('c')];
     expect(standing(placeSeats([], members, 2), members)).toBe(1);

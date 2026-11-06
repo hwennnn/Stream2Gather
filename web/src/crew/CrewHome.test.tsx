@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type RoomPreview } from '../api/http';
 import CrewHome from '../routes/CrewHome';
+import { recapApi } from '../recap/api';
 import { crewApi, type CrewDocument } from './api';
 
 const accountState = vi.hoisted(() => ({ view: { user: null as unknown, publishableKey: 'pk', clerkWanted: false, problem: null } }));
@@ -192,6 +193,7 @@ describe('CrewHome', () => {
     expect(await screen.findByText('Your first watch party will show up here.')).toBeTruthy();
     empty.unmount();
 
+    vi.spyOn(recapApi, 'read').mockRejectedValue(new Error('offline'));
     vi.spyOn(crewApi, 'sessions').mockResolvedValue({
       items: [
         {
@@ -206,6 +208,6 @@ describe('CrewHome', () => {
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
     expect((await screen.findByRole('list', { name: 'Past sessions' })).textContent).toContain('Video unavailable + 1 more');
     expect(screen.getByRole('list', { name: 'Past sessions' }).textContent).toContain('1 h 30 min');
-    expect(screen.queryByText(/come from Stream2Gather/)).toBeNull();
+    expect(screen.getByText('Reactions and watch stats come from Stream2Gather, not YouTube.')).toBeTruthy();
   });
 });

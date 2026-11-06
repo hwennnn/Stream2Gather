@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useAccount } from '../auth/account';
+import { RecapCard } from '../recap/RecapCard';
 import { AccountMenu } from '../ui/AccountMenu';
 import { Avatar } from '../ui/Avatar';
 import { WhereItIs } from '../ui/JoinGate';
@@ -8,7 +9,7 @@ import { firstName } from '../ui/people';
 import { Thumb } from '../ui/Thumb';
 import { inviteLink, type CrewDocument } from './api';
 import { CrewAdmin, GearIcon } from './CrewSettings';
-import { Sessions } from './Sessions';
+import { Sessions, useSessions } from './Sessions';
 import { Watchlist } from './Watchlist';
 
 const PushCard = lazy(() => import('../push/Card'));
@@ -72,6 +73,8 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
   const { user } = useAccount();
   const [joining, setJoining] = useState(false);
   const [admin, setAdmin] = useState(false);
+  const [sessions, setSessions] = useSessions(slug);
+  const latest = sessions?.items[0];
   const here = home.members.length;
 
   const enter = () => {
@@ -101,6 +104,8 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
           {problem}
         </p>
       )}
+
+      {latest && <RecapCard key={latest.id} slug={slug} sessionId={latest.id} />}
 
       <section aria-label="Now" className="mt-6">
         {home.nowPlaying && (
@@ -138,7 +143,7 @@ export const MemberHome = ({ slug, home, problem, refresh, onJoin }: Props) => {
 
       <Watchlist slug={slug} items={home.watchlist} onChange={refresh} />
 
-      <Sessions slug={slug} />
+      <Sessions slug={slug} page={sessions} setPage={setSessions} />
 
     </Frame>
   );

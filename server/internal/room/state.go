@@ -33,6 +33,9 @@ const (
 	StartLeadMS = 1500
 	// maxClientSkewMS bounds how far back a client can date a command.
 	maxClientSkewMS = 2000
+	// maxPositionSeconds is past any real video or stream, and bounds the ones
+	// whose length is unknown. Thirty days.
+	maxPositionSeconds = 30 * 24 * 60 * 60
 	// endToleranceMS is how early an "ended" report is believed.
 	endToleranceMS = 5000
 	// undoWindowMS is how long a jump can be undone. Clients offer it for less,

@@ -138,6 +138,15 @@ func applyTransport(s *State, actor Actor, cmd Command, now int64) error {
 		return ErrStale
 	}
 
+	if cmd.Pos < 0 || cmd.Pos > maxPositionSeconds {
+		return ErrInvalid
+	}
+	pos := cmd.Pos
+	// A player can report a little past the end. That is the end, not a mistake.
+	if duration := s.Queue[0].DurationMS; duration > 0 {
+		pos = min(pos, float64(duration)/1000)
+	}
+
 	at := min(max(cmd.CT, now-maxClientSkewMS), now)
 	switch cmd.Type {
 	case CmdPlay:
@@ -148,10 +157,7 @@ func applyTransport(s *State, actor Actor, cmd Command, now int64) error {
 		s.Playback.PausedBy, s.Playback.PausedByID = actor.Name, actor.ID
 	}
 
-	if cmd.Pos < 0 {
-		return ErrInvalid
-	}
-	s.Playback.Pos = cmd.Pos
+	s.Playback.Pos = pos
 	s.Playback.At = at
 	return nil
 }

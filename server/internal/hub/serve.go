@@ -57,7 +57,7 @@ func (h *Hub) Serve(ctx context.Context, ws *websocket.Conn, ticket store.Ticket
 	r.wait(func() { r.join(c, ticket) })
 	// This has to finish before release can close the room, or the last viewer's
 	// presence and empty mark are lost with it.
-	defer r.wait(func() { r.leave(c) })
+	defer r.wait(func() { r.leave(c, false) })
 
 	for {
 		payload, err := readMessage(ctx, ws, h.idleTimeout)
@@ -108,6 +108,9 @@ func (r *liveRoom) handle(ctx context.Context, c *conn, message Message) {
 	switch message.Type {
 	case "ping":
 		r.pong(ctx, c, message)
+	case "leave":
+		r.wait(func() { r.leave(c, true) })
+		c.shut(websocket.StatusNormalClosure, "left")
 	case "sync":
 		r.syncClient(c)
 	case "rename":

@@ -3,6 +3,7 @@
 package hub
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -38,7 +39,8 @@ const (
 	// Chrome runs a hidden tab's timers once a minute, so a healthy viewer can
 	// go that long between pings. Anything shorter drops people who tabbed away.
 	idleTimeout = 90 * time.Second
-	// A host who reloads or loses signal for a moment keeps their lock.
+	// A host who reloads or loses signal for a moment stays the host. One who
+	// says they're leaving doesn't get this.
 	hostGrace = 30 * time.Second
 	// An empty room keeps running briefly, so a reload resumes seamlessly.
 	emptyGraceMS = 60_000
@@ -393,6 +395,13 @@ func (c *conn) who() store.Person {
 	return c.person
 }
 
+func (c *conn) arrive(at int64) store.Person {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.person.Since = at
+	return c.person
+}
+
 func (c *conn) rename(name string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -613,8 +622,8 @@ func (r *liveRoom) touchAll() {
 	r.settleHost(ctx)
 }
 
-// settleHost opens a locked room when its host has been gone a while, and locks
-// it again when they return. The clock lives in Redis and the decision goes
+// settleHost hands the room to the next person when its host has been gone a
+// while, and back when they return. The clock lives in Redis and the decision goes
 // through compare-and-set, so any server can run this and only one announces it.
 func (r *liveRoom) settleHost(ctx context.Context) {
 	people, err := r.hub.live.People(ctx, r.id)
@@ -628,16 +637,18 @@ func (r *liveRoom) settleHost(ctx context.Context) {
 	now := time.Now().UnixMilli()
 
 	if i := slices.IndexFunc(people, func(p store.Person) bool { return p.Role == room.RoleHost }); i >= 0 {
-		host := people[i]
-		if err := r.hub.live.HostSeen(ctx, r.id, host.Name, now); err != nil {
-			r.hub.log.Warn("host presence failed", "room", r.id, "error", err)
-		}
-		if state.Held != nil && r.applySystem(ctx, room.Command{Type: room.CmdRestore}) {
-			r.publishNotice(ctx, map[string]string{"kind": "host", "text": host.Name + " is back, so they control playback again."})
+		owner := people[i]
+		r.noteHost(ctx, owner.Name, now)
+		if state.ActingHost != "" && r.passHost(ctx, "") {
+			r.publishNotice(ctx, map[string]string{"kind": "host", "text": owner.Name + " is back, so they’re the host again."})
 		}
 		return
 	}
-	if state.Held != nil || !state.Settings.Locked() {
+	if i := slices.IndexFunc(people, func(p store.Person) bool { return p.UserID == state.ActingHost }); i >= 0 {
+		r.noteHost(ctx, people[i].Name, now)
+		return
+	}
+	if len(people) == 0 {
 		return
 	}
 	name, seen, err := r.hub.live.HostLastSeen(ctx, r.id, now)
@@ -647,9 +658,31 @@ func (r *liveRoom) settleHost(ctx context.Context) {
 	if name == "" {
 		name = "The host"
 	}
-	if r.applySystem(ctx, room.Command{Type: room.CmdRelease}) {
-		r.publishNotice(ctx, map[string]string{"kind": "host", "text": name + " left, so anyone can control playback."})
+	next := nextInLine(people)
+	if r.passHost(ctx, next.UserID) {
+		r.publishNotice(ctx, map[string]string{"kind": "host", "text": name + " left, so " + next.Name + " is the host now."})
 	}
+}
+
+func (r *liveRoom) noteHost(ctx context.Context, name string, at int64) {
+	if err := r.hub.live.HostSeen(ctx, r.id, name, at); err != nil {
+		r.hub.log.Warn("host presence failed", "room", r.id, "error", err)
+	}
+}
+
+func (r *liveRoom) passHost(ctx context.Context, userID string) bool {
+	passed := r.applySystem(ctx, room.Command{Type: room.CmdHostPass, Target: userID})
+	if passed {
+		r.publishMembers(ctx)
+	}
+	return passed
+}
+
+// nextInLine is whoever has been here longest, the same on every server.
+func nextInLine(people []store.Person) store.Person {
+	return slices.MinFunc(people, func(a, b store.Person) int {
+		return cmp.Or(cmp.Compare(a.Since, b.Since), cmp.Compare(a.UserID, b.UserID))
+	})
 }
 
 func (r *liveRoom) publishNotice(ctx context.Context, notice map[string]string) {
@@ -712,8 +745,21 @@ func (r *liveRoom) save() {
 	}
 }
 
-func (r *liveRoom) publishMembers(ctx context.Context) {
+// roster is who to show in the room, with any stand-in shown as the host.
+func (r *liveRoom) roster(ctx context.Context) ([]store.Person, error) {
 	people, err := r.hub.live.People(ctx, r.id)
+	if err != nil {
+		return nil, err
+	}
+	state, found, err := r.hub.live.Load(ctx, r.id)
+	if err != nil || !found {
+		return people, err
+	}
+	return store.WithActingHost(people, state), nil
+}
+
+func (r *liveRoom) publishMembers(ctx context.Context) {
+	people, err := r.roster(ctx)
 	if err == nil {
 		err = r.hub.live.Publish(ctx, r.id, encode("members", map[string]any{"members": people}))
 	}
@@ -825,7 +871,7 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 	}
 	ctx, cancel := opContext()
 	defer cancel()
-	person := c.who()
+	person := c.arrive(time.Now().UnixMilli())
 
 	// A crash leaves its connections behind with nothing to clear them. Nobody
 	// here means nothing else will, and they would count against this viewer.
@@ -865,12 +911,14 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 	r.conns[c] = struct{}{}
 	r.hub.recorder.Joined(r.id, person)
 
-	people, err := r.hub.live.People(ctx, r.id)
+	people, err := r.roster(ctx)
 	if err != nil {
 		r.hub.log.Warn("presence read failed", "room", r.id, "error", err)
 	}
+	self := person
+	self.Role = state.RoleOf(person.UserID, person.Role)
 	c.send(encode("welcome", map[string]any{
-		"self":    person,
+		"self":    self,
 		"room":    map[string]string{"id": r.id, "slug": ticket.RoomSlug, "name": ticket.RoomName},
 		"state":   state,
 		"members": people,
@@ -893,7 +941,9 @@ func (r *liveRoom) full(ctx context.Context, person store.Person, limit int) boo
 	return !here && len(people) >= limit
 }
 
-func (r *liveRoom) leave(c *conn) {
+// leave runs for every closed socket. said is true when the viewer pressed Leave,
+// and a drop or reload gets the grace period instead.
+func (r *liveRoom) leave(c *conn, said bool) {
 	ctx, cancel := opContext()
 	defer cancel()
 
@@ -907,16 +957,22 @@ func (r *liveRoom) leave(c *conn) {
 	r.publishMembers(ctx)
 
 	person := c.who()
-	if person.Role == room.RoleHost {
+	if state, found, err := r.hub.live.Load(ctx, r.id); err == nil && found &&
+		state.RoleOf(person.UserID, person.Role) == room.RoleHost {
 		// The grace period counts from now, not from the last presence refresh.
-		if err := r.hub.live.HostSeen(ctx, r.id, person.Name, time.Now().UnixMilli()); err != nil {
-			r.hub.log.Warn("host presence failed", "room", r.id, "error", err)
+		seen := time.Now().UnixMilli()
+		if said {
+			seen -= r.hub.hostGrace.Milliseconds()
 		}
+		r.noteHost(ctx, person.Name, seen)
 	}
 
 	people, err := r.hub.live.People(ctx, r.id)
 	if err == nil && !slices.ContainsFunc(people, func(p store.Person) bool { return p.UserID == person.UserID }) {
 		r.hub.recorder.Left(r.id, person.UserID)
+	}
+	if err == nil && len(people) > 0 {
+		r.settleHost(ctx)
 	}
 	if err == nil && len(people) == 0 {
 		if err := r.hub.live.MarkEmpty(ctx, r.id, time.Now().UnixMilli()); err != nil {

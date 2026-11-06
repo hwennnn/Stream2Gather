@@ -644,7 +644,7 @@ func (s *Server) buildPreview(ctx context.Context, record store.Room) (preview, 
 	if err != nil {
 		return out, err
 	}
-	out.Members = people
+	out.Members = store.WithActingHost(people, state)
 	return out, nil
 }
 

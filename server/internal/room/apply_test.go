@@ -469,44 +469,44 @@ func TestQueueAddModes(t *testing.T) {
 	}
 }
 
-func TestLockReleaseAndRestore(t *testing.T) {
+func TestAStandInHoldsTheHostsRightsUntilTheHostIsBack(t *testing.T) {
 	system := Actor{System: true}
+	skip := Command{Type: CmdSkip, Item: "a"}
 	s := controlLocked(add(t, New(), "a", 0))
+	if _, _, err := Apply(s, member, skip, now); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("before the handover: %v", err)
+	}
 
-	released, change, err := Apply(s, system, Command{Type: CmdRelease}, now)
+	passed, _, err := Apply(s, system, Command{Type: CmdHostPass, Target: member.ID}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if released.Settings.Locked() || released.Held == nil || !change.Settings {
-		t.Fatalf("released = %+v", released)
+	if !passed.Settings.Locked() {
+		t.Fatalf("the lock went with the host: %+v", passed.Settings)
 	}
-	if _, _, err := Apply(released, member, Command{Type: CmdSkip, Item: "a"}, now); err != nil {
-		t.Fatalf("anyone can control a released room: %v", err)
+	if _, _, err := Apply(passed, member, skip, now); err != nil {
+		t.Fatalf("the stand-in can't control: %v", err)
 	}
-	if _, _, err := Apply(released, system, Command{Type: CmdRelease}, now); !errors.Is(err, ErrStale) {
-		t.Fatalf("second server releasing: %v", err)
+	open := Settings{ControlMode: ModeEveryone, QueueMode: ModeEveryone}
+	if _, _, err := Apply(passed, member, Command{Type: CmdSettings, Settings: &open}, now); err != nil {
+		t.Fatalf("the stand-in can't open the room: %v", err)
+	}
+	if _, _, err := Apply(passed, system, Command{Type: CmdHostPass, Target: member.ID}, now); !errors.Is(err, ErrStale) {
+		t.Fatalf("second server passing: %v", err)
 	}
 
-	restored, _, err := Apply(released, system, Command{Type: CmdRestore}, now)
+	back, _, err := Apply(passed, system, Command{Type: CmdHostPass}, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if restored.Settings != s.Settings || restored.Held != nil {
-		t.Fatalf("restored = %+v", restored)
-	}
-	if _, _, err := Apply(restored, system, Command{Type: CmdRestore}, now); !errors.Is(err, ErrStale) {
-		t.Fatalf("second server restoring: %v", err)
-	}
-
-	for _, kind := range []string{CmdRelease, CmdRestore} {
-		if _, _, err := Apply(s, host, Command{Type: kind}, now); !errors.Is(err, ErrForbidden) {
-			t.Fatalf("%s from a person: %v", kind, err)
-		}
+	if _, _, err := Apply(back, member, skip, now); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("after the host came back: %v", err)
 	}
 }
 
-func TestReleaseLeavesAnOpenRoomAlone(t *testing.T) {
-	if _, _, err := Apply(add(t, New(), "a", 0), Actor{System: true}, Command{Type: CmdRelease}, now); !errors.Is(err, ErrStale) {
+func TestOnlyTheServerPassesTheHost(t *testing.T) {
+	s := add(t, New(), "a", 0)
+	if _, _, err := Apply(s, host, Command{Type: CmdHostPass, Target: member.ID}, now); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("got %v", err)
 	}
 }

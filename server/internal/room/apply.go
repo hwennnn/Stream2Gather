@@ -20,8 +20,7 @@ const (
 	CmdQueueUndo   = "queue.undo"
 	CmdSettings    = "settings"
 	// Issued only by the server, when the host goes away and comes back.
-	CmdRelease = "settings.release"
-	CmdRestore = "settings.restore"
+	CmdHostPass = "host.pass"
 )
 
 // Where queue.add puts a video.
@@ -79,6 +78,7 @@ type Change struct {
 // a rejected command returns an error with no state change.
 func Apply(s State, actor Actor, cmd Command, now int64) (State, Change, error) {
 	s.Queue = slices.Clone(s.Queue)
+	actor.Role = s.RoleOf(actor.ID, actor.Role)
 
 	change := Change{Cause: cmd.Type, By: actor.Name}
 	var err error
@@ -110,12 +110,8 @@ func Apply(s State, actor Actor, cmd Command, now int64) (State, Change, error) 
 	case CmdSettings:
 		change.Settings = true
 		err = applySettings(&s, actor, cmd)
-	case CmdRelease:
-		change.Settings = true
-		err = applyRelease(&s, actor)
-	case CmdRestore:
-		change.Settings = true
-		err = applyRestore(&s, actor)
+	case CmdHostPass:
+		err = applyHostPass(&s, actor, cmd)
 	default:
 		err = ErrInvalid
 	}
@@ -317,34 +313,21 @@ func applySettings(s *State, actor Actor, cmd Command) error {
 		return ErrInvalid
 	}
 	s.Settings = *cmd.Settings
-	s.Held = nil
 	return nil
 }
 
 // applyRelease opens a locked room whose host has gone, keeping the lock to
 // restore. A second server arriving at the same decision finds nothing to do.
-func applyRelease(s *State, actor Actor) error {
+// applyHostPass names who stands in for an absent host. No target hands the room
+// back. Passing to whoever already holds it is stale, so only one server announces.
+func applyHostPass(s *State, actor Actor, cmd Command) error {
 	if !actor.System {
 		return ErrForbidden
 	}
-	if s.Held != nil || !s.Settings.Locked() {
+	if s.ActingHost == cmd.Target {
 		return ErrStale
 	}
-	held := s.Settings
-	s.Held = &held
-	s.Settings = Settings{ControlMode: ModeEveryone, QueueMode: ModeEveryone}
-	return nil
-}
-
-func applyRestore(s *State, actor Actor) error {
-	if !actor.System {
-		return ErrForbidden
-	}
-	if s.Held == nil {
-		return ErrStale
-	}
-	s.Settings = *s.Held
-	s.Held = nil
+	s.ActingHost = cmd.Target
 	return nil
 }
 

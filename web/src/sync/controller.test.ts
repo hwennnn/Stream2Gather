@@ -285,6 +285,190 @@ describe('SyncController', () => {
     expect(commands).toEqual([]);
   });
 
+  describe('coming back from buffering', () => {
+    const stall = (seconds: number) => {
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(5);
+      player.seeks = [];
+      player.fire('buffering');
+      timers.advance(seconds * 1000);
+      sync.tick();
+      return room;
+    };
+
+    it('goes straight to the room the moment it plays', () => {
+      const room = stall(2);
+      player.fire('playing');
+      expect(player.seeks).toHaveLength(1);
+      expect(Math.abs(drift(room))).toBeLessThan(0.3);
+      expect(commands).toEqual([]);
+    });
+
+    it('is not held back by the seek that put it on the room', () => {
+      const room = playing(100, timers.now);
+      sync.apply(room); // Joining: this seek lands seconds late.
+      player.fire('buffering');
+      timers.advance(4000);
+      sync.tick();
+      player.current = 100;
+      player.seeks = [];
+      player.fire('playing');
+      expect(player.seeks).toHaveLength(1);
+      expect(Math.abs(drift(room))).toBeLessThan(0.3);
+    });
+
+    it('nudges when it lost too little to be worth a jump', () => {
+      stall(0.3);
+      player.fire('playing');
+      run(1);
+      expect(player.seeks).toEqual([]);
+      expect(player.rate).toBe(1.25);
+    });
+
+    it('gives up a nudge that buffering overtook', () => {
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(3);
+      player.current -= 0.8;
+      run(1);
+      expect(player.rate).toBe(1.25);
+      player.seeks = [];
+      player.fire('buffering');
+      timers.advance(1000);
+      sync.tick();
+      player.fire('playing');
+      expect(player.seeks).toHaveLength(1);
+      expect(player.rate).toBe(1);
+    });
+
+    it('can jump again once the last jump has held', () => {
+      stall(2);
+      player.fire('playing');
+      run(6);
+      player.seeks = [];
+      player.fire('buffering');
+      timers.advance(2000);
+      sync.tick();
+      player.fire('playing');
+      expect(player.seeks).toHaveLength(1);
+    });
+
+    it('does not keep jumping on a connection that cannot keep up', () => {
+      stall(2);
+      player.fire('playing');
+      for (let i = 0; i < 4; i += 1) {
+        run(2);
+        player.fire('buffering');
+        timers.advance(1000);
+        sync.tick();
+        player.fire('playing');
+      }
+      expect(player.seeks.length).toBeLessThanOrEqual(2);
+    });
+  });
+
+  describe('falling behind without buffering', () => {
+    const slip = () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.seeks = [];
+      timers.advance(1500); // The clock moves on and the player doesn't.
+      sync.tick();
+    };
+
+    it('jumps on YouTube, where a nudge would take four times the gap', () => {
+      slip();
+      expect(player.seeks).toHaveLength(1);
+      expect(player.rate).toBe(1);
+      expect(commands).toEqual([]);
+    });
+
+    it('nudges a file, which can do it gently', () => {
+      player.rates = 'fine';
+      slip();
+      expect(player.seeks).toEqual([]);
+      expect(player.rate).toBeCloseTo(1.05);
+    });
+
+    it('nudges YouTube while it may not jump', () => {
+      slip();
+      run(3);
+      player.seeks = [];
+      timers.advance(1500);
+      sync.tick();
+      expect(player.seeks).toEqual([]);
+      expect(player.rate).toBe(1.25);
+    });
+  });
+
+  describe('how far a seek aims past the room', () => {
+    it('barely at all for a file, which seeks at once', () => {
+      player.rates = 'fine';
+      sync.apply(playing(100, timers.now));
+      expect(player.seeks).toEqual([100.05]);
+    });
+
+    const landsShortBy = (seconds: number) => {
+      player.seek = (target) => { player.current = target - seconds; player.seeks.push(target); };
+    };
+    const stallThenPlay = () => {
+      sync.apply(playing(0, timers.now));
+      run(3);
+      player.seeks = [];
+      player.fire('buffering');
+      timers.advance(3000);
+      sync.tick();
+      player.fire('playing');
+    };
+
+    it('tries once more when a jump lands short', () => {
+      landsShortBy(1.5);
+      stallThenPlay();
+      run(3);
+      expect(player.seeks).toHaveLength(2);
+      expect((player.seeks[1] ?? 0) - (player.seeks[0] ?? 0)).toBeGreaterThan(2);
+    });
+
+    it('stops at that one retry', () => {
+      landsShortBy(2.5); // More than the longest lead can make up, so the retry falls short too.
+      stallThenPlay();
+      run(8);
+      expect(player.seeks).toHaveLength(2);
+    });
+
+    it('earns the retry back once a jump has held', () => {
+      landsShortBy(1.5);
+      stallThenPlay();
+      run(6);
+      player.seeks = [];
+      landsShortBy(3);
+      player.fire('buffering');
+      timers.advance(2000);
+      sync.tick();
+      player.fire('playing');
+      run(3);
+      expect(player.seeks).toHaveLength(2);
+    });
+
+    it('learns from a seek that landed behind', () => {
+      const room = playing(0, timers.now);
+      sync.apply(room);
+      run(3);
+      // It costs a second more than the lead allows.
+      player.seek = (seconds) => { player.current = seconds - 1; player.seeks.push(seconds); };
+      player.fire('buffering');
+      timers.advance(3000);
+      sync.tick();
+      player.fire('playing');
+      run(2);
+      player.seeks = [];
+      timers.advance(11_000);
+      sync.tick();
+      expect((player.seeks[0] ?? 0) - expectedPosition(room, timers.now)).toBeGreaterThan(0.9);
+    });
+  });
+
   it('reports the video ending', () => {
     sync.apply(playing(0, timers.now));
     run(3);

@@ -32,7 +32,7 @@ func crashed(t *testing.T, r *rig, roomID string, lastSeen time.Time, people ...
 	}
 }
 
-func TestARoomACrashLeftRunningPausesWhereTheViewersWent(t *testing.T) {
+func TestARoomACrashLeftRunningPicksUpWhereTheViewersWent(t *testing.T) {
 	r := newRig(t, testRedis)
 	state := directVideo(t)
 	state.Playback.At = time.Now().Add(-10 * time.Minute).UnixMilli()
@@ -47,11 +47,11 @@ func TestARoomACrashLeftRunningPausesWhereTheViewersWent(t *testing.T) {
 	if err := json.Unmarshal(c.expect(t, "welcome").D, &welcome); err != nil {
 		t.Fatal(err)
 	}
-	if welcome.State.Playback.Status != room.StatusPaused {
-		t.Fatalf("playback = %+v: nobody was here for five minutes and it kept running", welcome.State.Playback)
+	if welcome.State.Playback.Status != room.StatusPlaying {
+		t.Fatalf("playback = %+v: the first person back should set it going", welcome.State.Playback)
 	}
 	if pos := welcome.State.Playback.Pos; pos < 295 || pos > 305 {
-		t.Fatalf("paused at %v, want about 300: five minutes in, when the viewers went", pos)
+		t.Fatalf("resumed at %v, want about 300: five minutes in, when the viewers went", pos)
 	}
 	if len(welcome.Members) != 1 {
 		t.Fatalf("members = %+v: the crashed server's viewer is still listed", welcome.Members)

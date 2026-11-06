@@ -91,6 +91,17 @@ type Item struct {
 	AddedByName string `json:"addedByName"`
 }
 
+// PickUpOnReturn says whether the first person back should set the room going.
+// It stopped because nobody was watching, nobody paused it, and video is left.
+func (s State) PickUpOnReturn() bool {
+	p := s.Playback
+	if p.Status != StatusPaused || p.ItemID == "" || p.PausedBy != "" || p.PausedByID != "" || len(s.Queue) == 0 {
+		return false
+	}
+	duration := s.Queue[0].DurationMS
+	return duration <= 0 || p.Pos*1000 < float64(duration-endToleranceMS)
+}
+
 // Playback says the video was at Pos seconds at server time At, moving at Rate.
 // At can be in the future, which is how viewers start together.
 type Playback struct {

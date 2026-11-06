@@ -288,15 +288,25 @@ func playingSince(t *testing.T, ago time.Duration, duration time.Duration) room.
 	return state
 }
 
-func TestRehydratingAnEmptyRoomLeavesItPausedWhereItWasSaved(t *testing.T) {
+func TestTheFirstPersonBackPicksUpWhereTheRoomWasSaved(t *testing.T) {
 	r := newRig(t, testRedis)
 	// Started 3700s ago and saved 3650s ago, so it was 50s in.
 	state := rehydrated(t, r, playingSince(t, 3700*time.Second, 600*time.Second), 3650*time.Second)
-	if state.Playback.Status != room.StatusPaused || len(state.Queue) != 1 {
+	if state.Playback.Status != room.StatusPlaying || len(state.Queue) != 1 {
 		t.Fatalf("state = %+v", state)
 	}
 	if pos := state.Playback.Pos; pos < 49 || pos > 51 {
 		t.Fatalf("pos = %v, want 50", pos)
+	}
+}
+
+func TestARoomSomeonePausedStaysPausedForTheFirstPersonBack(t *testing.T) {
+	r := newRig(t, testRedis)
+	paused := playingSince(t, 3700*time.Second, 600*time.Second)
+	paused.Playback.Status, paused.Playback.Pos, paused.Playback.PausedBy = room.StatusPaused, 50, "Ana"
+	state := rehydrated(t, r, paused, 3650*time.Second)
+	if state.Playback.Status != room.StatusPaused || state.Playback.PausedBy != "Ana" {
+		t.Fatalf("playback = %+v, want paused by Ana", state.Playback)
 	}
 }
 

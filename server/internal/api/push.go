@@ -33,7 +33,9 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 	}
 	var request struct {
 		Endpoint string `json:"endpoint"`
-		Keys     struct {
+		// Claim is someone pressing Allow. Without it a browser stays with its holder.
+		Claim bool `json:"claim"`
+		Keys  struct {
 			P256dh string `json:"p256dh"`
 			Auth   string `json:"auth"`
 		} `json:"keys"`
@@ -60,7 +62,15 @@ func (s *Server) savePushSubscription(w http.ResponseWriter, r *http.Request) {
 		userAgent = userAgent[:maxUserAgent]
 	}
 	userAgent = strings.ToValidUTF8(userAgent, "") // Postgres refuses half a character.
-	id, err := s.DB.SavePushSubscription(r.Context(), claims.Subject, subscription.Endpoint, subscription.P256dh, subscription.Auth, userAgent)
+	save := s.DB.RefreshPushSubscription
+	if request.Claim {
+		save = s.DB.SavePushSubscription
+	}
+	id, err := save(r.Context(), claims.Subject, subscription.Endpoint, subscription.P256dh, subscription.Auth, userAgent)
+	if errors.Is(err, store.ErrNotFound) {
+		writeProblem(w, http.StatusConflict, "not_yours", "This browser isn't set up for your pings.")
+		return
+	}
 	if err != nil {
 		s.internal(w, err)
 		return

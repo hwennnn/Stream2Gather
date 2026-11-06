@@ -59,16 +59,56 @@ describe('the ping card', () => {
     expect(ask).toHaveBeenCalledOnce();
     expect(serviceWorker.register).toHaveBeenCalledWith('/sw.js');
     expect(pushManager.subscribe).toHaveBeenCalledWith(expect.objectContaining({ userVisibleOnly: true }));
-    expect(post).toHaveBeenCalledWith('/v1/push/subscriptions', { endpoint: 'https://push.test/1', keys: { p256dh: 'k', auth: 'a' } });
+    expect(post).toHaveBeenCalledWith('/v1/push/subscriptions', { endpoint: 'https://push.test/1', keys: { p256dh: 'k', auth: 'a' }, claim: true });
   });
 
-  it('puts a subscribed browser back under whoever is here, without asking', async () => {
-    worker(true);
+  it('refreshes a browser this person holds on load, claiming nothing and asking nothing', async () => {
+    const { subscription } = worker(true);
     const ask = permission('granted');
     render(<Card slug="movie" />);
     await screen.findByText('You’re on. We’ll ping this device.');
     expect(post).toHaveBeenCalledWith('/v1/push/subscriptions', { endpoint: 'https://push.test/1', keys: { p256dh: 'k', auth: 'a' } });
     expect(ask).not.toHaveBeenCalled();
+    expect(subscription.unsubscribe).not.toHaveBeenCalled();
+  });
+
+  it('lets go of a browser someone else holds, and only Allow claims it', async () => {
+    const { subscription, pushManager } = worker(true);
+    permission('granted');
+    localStorage.setItem('s2g:push-device', 'theirs');
+    post.mockRejectedValueOnce({ code: 'not_yours' });
+    subscription.unsubscribe.mockImplementation(async () => {
+      pushManager.getSubscription.mockResolvedValue(null);
+    });
+    render(<Card slug="movie" />);
+
+    const allow = await screen.findByRole('button', { name: 'Allow' });
+    expect(subscription.unsubscribe).toHaveBeenCalledOnce();
+    expect(localStorage.getItem('s2g:push-device')).toBeNull();
+    expect(post).toHaveBeenCalledOnce();
+
+    fireEvent.click(allow);
+    await screen.findByText('You’re on. We’ll ping this device.');
+    expect(post).toHaveBeenLastCalledWith('/v1/push/subscriptions', expect.objectContaining({ claim: true }));
+  });
+
+  it('starts from a fresh subscription when Allow finds one still here', async () => {
+    const { subscription, pushManager } = worker(true);
+    permission('default', 'granted');
+    subscription.unsubscribe.mockResolvedValue(true);
+    render(<Card slug="movie" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Allow' }));
+    await screen.findByText('You’re on. We’ll ping this device.');
+    expect(subscription.unsubscribe.mock.invocationCallOrder[0]!).toBeLessThan(pushManager.subscribe.mock.invocationCallOrder[0]!);
+  });
+
+  it('keeps a subscription when the check fails for any other reason', async () => {
+    const { subscription } = worker(true);
+    permission('granted');
+    post.mockRejectedValueOnce({ code: 'rate_limited' });
+    render(<Card slug="movie" />);
+    await screen.findByText('You’re on. We’ll ping this device.');
+    expect(subscription.unsubscribe).not.toHaveBeenCalled();
   });
 
   it('does not save anything for a browser that never said yes', async () => {

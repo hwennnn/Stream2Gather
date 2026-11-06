@@ -27,9 +27,9 @@ export const readPushState = async (): Promise<PushState> => {
   return Notification.permission === 'granted' && (await subscription()) ? 'on' : 'off';
 };
 
-const save = async (current: PushSubscription) => {
+const save = async (current: PushSubscription, claim: boolean) => {
   const { endpoint, keys } = current.toJSON();
-  const { id } = await post<{ id: string }>('/v1/push/subscriptions', { endpoint, keys });
+  const { id } = await post<{ id: string }>('/v1/push/subscriptions', claim ? { endpoint, keys, claim } : { endpoint, keys });
   localStorage.setItem(THIS_DEVICE, id);
 };
 
@@ -39,24 +39,38 @@ const keyBytes = (key: string) =>
 /**
  * Call straight from a click: Safari refuses a permission request made any later.
  * The worker registers here and nowhere else, so first load doesn't change.
+ * This is the only claim on a browser, and it starts from a fresh endpoint, so
+ * nothing someone else set up here carries over.
  */
 export const turnOn = async (publicKey: string): Promise<PushState> => {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
   const registration = await navigator.serviceWorker.register('/sw.js');
   await navigator.serviceWorker.ready;
+  await (await registration.pushManager.getSubscription())?.unsubscribe().catch(() => {});
   const created = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(publicKey) });
-  await save(created);
+  await save(created, true);
   return 'on';
 };
 
 /**
- * Signing out takes this browser off the server, but elsewhere it can't take it
- * off the browser. Without this the card would say on for a device nothing pings.
+ * For a page load, so it never claims anything. A subscription this person doesn't
+ * hold was signed out elsewhere or is someone else's: letting go stops their pings
+ * showing here, and Allow is how this person gets their own. Any other failure says
+ * nothing about whose it is, so the card keeps saying what the browser says.
  */
-export const saveThisDevice = async () => {
+export const keepThisDevice = async (): Promise<PushState> => {
   const current = await subscription();
-  if (current) await save(current);
+  if (!current) return 'off';
+  try {
+    await save(current, false);
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'not_yours') return 'on';
+    localStorage.removeItem(THIS_DEVICE);
+    await current.unsubscribe().catch(() => {});
+    return 'off';
+  }
+  return 'on';
 };
 
 /** A browser that signed out holds no subscription. Others are ended by the server. */

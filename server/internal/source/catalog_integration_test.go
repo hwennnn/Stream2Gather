@@ -174,3 +174,43 @@ func TestSourcesThatCostNothingAreNotCharged(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// Hiding a refused video would leave people wondering where it went, and a mark
+// may be wrong for them, so it stays findable with the working videos above it.
+func TestRefusedVideosSinkInFreshAndCachedSearch(t *testing.T) {
+	db := catalogDB(t)
+	ctx := context.Background()
+	refused, fine := ids.New(), ids.New()
+	first := room.Media{Source: "fake", SourceID: refused, Title: "refused"}
+	second := room.Media{Source: "fake", SourceID: fine, Title: "fine"}
+	if err := db.PutMedia(ctx, []room.Media{first, second}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.MarkEmbedBlocked(ctx, "fake", refused); err != nil {
+		t.Fatal(err)
+	}
+	catalog := NewCatalog(db, 10, quiet(), &fakeSource{})
+
+	check := func(name string, items []room.Media) {
+		t.Helper()
+		if len(items) != 2 || items[0].SourceID != fine || items[1].SourceID != refused {
+			t.Fatalf("%s: order = %+v", name, items)
+		}
+		if items[0].Refused || !items[1].Refused {
+			t.Fatalf("%s: marks = %+v", name, items)
+		}
+	}
+
+	query := "q" + ids.New()
+	fresh, err := catalog.remember(ctx, "fake", query, "", []room.Media{first, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	check("fresh", fresh)
+
+	cached, found, err := db.CachedSearch(ctx, "fake", query, "", time.Hour)
+	if err != nil || !found {
+		t.Fatal(found, err)
+	}
+	check("cached", cached)
+}

@@ -28,12 +28,13 @@ type Events = {
 
 type Cleanup = () => void;
 
-const watchFirstFrame = (player: PlayerAdapter, item: QueueItem): Cleanup => {
+export const watchFirstFrame = (player: PlayerAdapter, item: QueueItem, onPlayed: () => void): Cleanup => {
   const mountedAt = performance.now();
   const timer = window.setInterval(() => {
     if (player.state() === 'playing' && player.time() > 0) {
       window.clearInterval(timer);
       track({ name: 'first_frame_ms', value: performance.now() - mountedAt, source: item.source });
+      onPlayed();
     }
   }, 200);
   return () => window.clearInterval(timer);
@@ -165,7 +166,7 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
       created.onError(fail);
       cleanups.push(
         watchReady(created, item, events.onReady),
-        watchFirstFrame(created, item),
+        watchFirstFrame(created, item, () => session.send('media_ok', { item: item.id })),
         startSync(session, created, item, events),
       );
     },

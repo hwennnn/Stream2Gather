@@ -486,6 +486,11 @@ func (l *Live) ReportEmbedBlocked(ctx context.Context, source, sourceID, userID 
 	return count.Val(), nil
 }
 
+// ForgetEmbedReports drops the reports against a video that has since played.
+func (l *Live) ForgetEmbedReports(ctx context.Context, source, sourceID string) error {
+	return l.rdb.Del(ctx, "embed:reports:"+source+":"+sourceID).Err()
+}
+
 // HostSeen records that the host is here, or was until this moment.
 func (l *Live) HostSeen(ctx context.Context, roomID, name string, at int64) error {
 	key := hostKey(roomID)

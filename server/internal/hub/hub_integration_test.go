@@ -595,8 +595,51 @@ func TestEmbedBlockExpires(t *testing.T) {
 		t.Fatal(err)
 	}
 	items, found, err := r.db.CachedSearch(ctx, "youtube", "q"+sourceID, "", time.Hour)
-	if err != nil || !found || len(items) != 1 {
-		t.Fatalf("expired block still hides cached search: %v %v %v", items, found, err)
+	if err != nil || !found || len(items) != 1 || items[0].Refused {
+		t.Fatalf("expired block still marks cached search: %v %v %v", items, found, err)
+	}
+}
+
+// A refusal may be local to one viewer, so a video that has played stops being
+// marked for everyone, and old reports cannot quickly bring the mark back.
+func TestAPlayClearsTheMark(t *testing.T) {
+	r := newRig(t, testRedis)
+	ctx := context.Background()
+	sourceID := "t" + ids.New()
+
+	c := r.joined(t, r.newRoom(t, youtubeVideo(t, r, sourceID)), "viewer", room.RoleMember)
+	if err := r.db.MarkEmbedBlocked(ctx, "youtube", sourceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.live.ReportEmbedBlocked(ctx, "youtube", sourceID, "someone"); err != nil {
+		t.Fatal(err)
+	}
+
+	c.send(t, "media_ok", map[string]any{"item": "item1"})
+	eventually(t, "the mark to clear", func() bool {
+		blocked, _ := r.db.EmbedBlocked(ctx, "youtube", []string{sourceID})
+		return !blocked[sourceID]
+	})
+	reports, err := r.live.ReportEmbedBlocked(ctx, "youtube", sourceID, "another")
+	if err != nil || reports != 1 {
+		t.Fatalf("old reports survived the play: %d %v", reports, err)
+	}
+}
+
+func TestAPlayOfAnOldItemClearsNothing(t *testing.T) {
+	r := newRig(t, testRedis)
+	ctx := context.Background()
+	sourceID := "t" + ids.New()
+
+	c := r.joined(t, r.newRoom(t, youtubeVideo(t, r, sourceID)), "viewer", room.RoleMember)
+	if err := r.db.MarkEmbedBlocked(ctx, "youtube", sourceID); err != nil {
+		t.Fatal(err)
+	}
+	c.send(t, "media_ok", map[string]any{"item": "not-playing"})
+	c.send(t, "ping", map[string]any{"t0": 1})
+	c.expect(t, "pong")
+	if blocked, _ := r.db.EmbedBlocked(ctx, "youtube", []string{sourceID}); !blocked[sourceID] {
+		t.Fatal("a report about another item cleared the mark")
 	}
 }
 

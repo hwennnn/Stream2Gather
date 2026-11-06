@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerAdapter, PlayerError } from '../players/types';
 import { createYouTubePlayer } from '../players/youtube';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
-import { useRoomPlayer } from './useRoomPlayer';
+import { useRoomPlayer, watchFirstFrame } from './useRoomPlayer';
 
 vi.mock('../players/youtube', () => ({ createYouTubePlayer: vi.fn() }));
 vi.mock('../room/telemetry', () => ({ track: vi.fn() }));
@@ -84,5 +84,27 @@ describe('Try again', () => {
     act(() => retry());
     await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(2));
     await screen.findByText('failed 150');
+  });
+});
+
+describe('the first frame', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('is told once, so a refusal elsewhere can be forgiven', () => {
+    let state = 'loading';
+    let time = 0;
+    const player = { state: () => state, time: () => time } as unknown as PlayerAdapter;
+    const played = vi.fn();
+    const stop = watchFirstFrame(player, item, played);
+
+    vi.advanceTimersByTime(1000);
+    expect(played).not.toHaveBeenCalled();
+
+    state = 'playing';
+    time = 1;
+    vi.advanceTimersByTime(1000);
+    expect(played).toHaveBeenCalledTimes(1);
+    stop();
   });
 });

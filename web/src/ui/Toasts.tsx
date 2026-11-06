@@ -92,7 +92,7 @@ export const JumpToast = ({ session, view, onToast }: JumpProps) => {
   return (
     <p key={jump.id} className="enter float pointer-events-auto relative flex w-full items-center gap-3 overflow-hidden py-2 pr-2 pl-3 text-[13px] leading-[18px]">
       <span className="min-w-0 flex-1 truncate">
-        <span className="font-semibold">{who}</span> jumped to {jump.title}
+        <span className="font-semibold">{who}</span> {jump.skip ? 'skipped' : 'jumped'} to {jump.title}
       </span>
       {canControl(view) && (
         <button

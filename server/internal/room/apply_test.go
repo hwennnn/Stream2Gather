@@ -622,7 +622,16 @@ func TestNarrateSaysOnlyWhatChangedTheRoom(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := Narrate(playing, jumped, change); got != "Maya jumped to Second" {
+	if got := Narrate(playing, jumped, change); got != "Maya skipped to Second" {
+		t.Fatalf("skip: %q", got)
+	}
+	further := add(t, playing, "c", 0)
+	further.Queue[2].Title = "Third"
+	leapt, change, err := Apply(further, by, Command{Type: CmdQueuePlay, Target: "c"}, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := Narrate(further, leapt, change); got != "Maya jumped to Third" {
 		t.Fatalf("jump: %q", got)
 	}
 	back, change, err := Apply(jumped, by, Command{Type: CmdQueueUndo, Target: "b"}, now)

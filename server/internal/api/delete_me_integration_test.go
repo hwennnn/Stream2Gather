@@ -2,6 +2,9 @@ package api
 
 import (
 	"context"
+	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"testing"
 
@@ -74,5 +77,43 @@ func TestGuestsHaveNoAccountToDelete(t *testing.T) {
 	guest := signedIn(t, s, auth.Claims{Subject: "g_" + ids.New(), Name: "Guest"})
 	if response, _ := serve(s, http.MethodDelete, "/v1/me", "", guest); response.Code != http.StatusUnauthorized {
 		t.Fatalf("guest: %d", response.Code)
+	}
+}
+
+// Clerk outlives the account here, so a device still signed in there could click
+// Sign in and get a new account with no password.
+func TestDeletingAnAccountEndsItsClerkSessions(t *testing.T) {
+	test, server := sessionStack(t)
+	clerk := &clerkOnTwoDevices{fakeClerk: server.Clerk.(fakeClerk)}
+	server.Clerk = clerk
+	cookies := signInAs(t, test, "good", nil)
+
+	response, body := call(t, http.MethodDelete, test.URL+"/v1/me", "", cookies)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("delete: %d %v", response.StatusCode, body)
+	}
+
+	if len(clerk.ended) != 1 || clerk.ended[0] != clerk.identity.ClerkID {
+		t.Fatalf("ended %v, want the deleted person's Clerk id", clerk.ended)
+	}
+	again, _ := call(t, http.MethodPost, test.URL+"/v1/session/clerk", "good", nil)
+	if again.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status %d: one click made a new account", again.StatusCode)
+	}
+}
+
+// The account is gone by then, so saying it failed would be a lie.
+func TestAClerkOutageDoesNotUndoADeletion(t *testing.T) {
+	test, server := sessionStack(t)
+	server.Log = slog.New(slog.NewTextHandler(io.Discard, nil))
+	server.Clerk = &clerkOnTwoDevices{fakeClerk: server.Clerk.(fakeClerk), failure: errors.New("clerk is down")}
+	cookies := signInAs(t, test, "good", nil)
+
+	response, body := call(t, http.MethodDelete, test.URL+"/v1/me", "", cookies)
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("delete: %d %v", response.StatusCode, body)
+	}
+	if user := meOf(t, test, cookies); user != nil {
+		t.Fatalf("still here: %v", user)
 	}
 }

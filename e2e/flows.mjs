@@ -1,6 +1,6 @@
 // Every user flow, from the first visit, against a real server, Postgres and
 // Redis. `make flows` runs it. All it needs is Docker, Go, Node, ffmpeg and Chrome.
-//   node flows.mjs [--grep text] [--list] [--concurrency n] [--tree path] [--out dir] [--real]
+//   node flows.mjs [--grep text] [--list] [--concurrency n] [--shard i/n] [--retries n] [--tree path] [--out dir] [--real]
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -16,6 +16,8 @@ import { addRealFlows } from './flows/real.mjs';
 const { values: args } = parseArgs({
   options: {
     grep: { type: 'string' },
+    shard: { type: 'string' },
+    retries: { type: 'string', default: '0' },
     list: { type: 'boolean', default: false },
     concurrency: { type: 'string', default: process.env.FLOWS_CONCURRENCY ?? '3' },
     tree: { type: 'string', default: process.env.FLOWS_TREE ?? path.resolve(import.meta.dirname, '..') },
@@ -55,6 +57,8 @@ let passed = false;
 try {
   passed = await runAll({
     grep: args.grep ? new RegExp(args.grep, 'i') : null,
+    shard: args.shard,
+    retries: Number(args.retries),
     concurrency: Number(args.concurrency),
     out: path.resolve(args.out),
     label: args.label,

@@ -7,14 +7,18 @@ const train = video('Night Train');
 const rain = video('Rainy Window');
 
 /** The first seconds after a join have a flow of their own, so most flows wait them out. */
-const watching = async (t, url, { settle = 2000 } = {}) => {
+const watching = async (t, url, { settle = 3000 } = {}) => {
   const a = await t.person('Ana');
   const b = await t.person('Ben');
   const room = await startRoom(t, a, { url });
   await joinRoom(b, room.url);
   await t.until('both play', async () =>
     (await Promise.all([a.sample(), b.sample()])).every((s) => s?.state === 'playing' && s.time > 0.5), 12_000);
+  // A joiner a moment ahead is held still for about 250ms around two seconds in, and a
+  // pause then is lost: the player is already paused, so nothing fires. See P-08.
   await t.sleep(settle);
+  await t.until('both still playing', async () =>
+    (await Promise.all([a.sample(), b.sample()])).every((s) => s?.state === 'playing'));
   return { a, b, room };
 };
 

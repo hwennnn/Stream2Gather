@@ -33,6 +33,13 @@ const startContainers = async (id) => {
   return { redis, postgres, redisPort: await hostPort(redis, 6379), postgresPort: await hostPort(postgres, 5432) };
 };
 
+/** CI's service containers, when the job names them. They are the job's, so close leaves them. */
+const attachContainers = async () => {
+  const { FLOWS_REDIS_CONTAINER: redis, FLOWS_POSTGRES_CONTAINER: postgres } = process.env;
+  if (!redis || !postgres) return null;
+  return { redis, postgres, attached: true, redisPort: await hostPort(redis, 6379), postgresPort: await hostPort(postgres, 5432) };
+};
+
 const sampleVideo = async (cache, file, seconds) => {
   const out = path.join(cache, file);
   if (existsSync(out)) return out;
@@ -62,8 +69,11 @@ export const startStack = async ({ tree, port, cache, youtubeUrl, youtubeKey }) 
   const work = await mkdtemp(path.join(tmpdir(), 's2g-flows-'));
   // Named, as people's are: the server sends a page opened at an IP on to its name.
   const base = `http://localhost:${port}`;
-  const [{ webDir, binary }, containers] = await Promise.all([build(tree, work, cache), startContainers(id)]);
-  const { redis, postgres, redisPort, postgresPort } = containers;
+  const [{ webDir, binary }, containers] = await Promise.all([
+    build(tree, work, cache),
+    attachContainers().then((found) => found ?? startContainers(id)),
+  ]);
+  const { redis, postgres, redisPort, postgresPort, attached } = containers;
 
   let server = null;
   const log = createWriteStream(path.join(work, 'server.log'), { flags: 'a' });
@@ -122,7 +132,7 @@ export const startStack = async ({ tree, port, cache, youtubeUrl, youtubeKey }) 
     },
     async close({ keepLogs = false } = {}) {
       await stack.stop().catch(() => {});
-      await Promise.allSettled([run('docker', ['rm', '-f', redis]), run('docker', ['rm', '-f', postgres])]);
+      if (!attached) await Promise.allSettled([run('docker', ['rm', '-f', redis]), run('docker', ['rm', '-f', postgres])]);
       if (!keepLogs) await rm(work, { recursive: true, force: true });
     },
   };

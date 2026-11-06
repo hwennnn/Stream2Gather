@@ -17,15 +17,18 @@ flow('seats: everyone keeps their seat, and the status line says who came and we
   await joinRoom(b, room.url);
   await t.see('Ana hears Ben sit', ui.bar(a.page).getByText(/Ben took a seat/));
   await joinRoom(c, room.url);
-  await t.see('Cal on the row', seats(a.page).getByText('Cal'));
   const order = () => seats(a.page).getByRole('listitem').allInnerTexts();
   const names = (rows) => rows.map((row) => row.split('\n').at(-1)).filter(Boolean);
+  // By initial, since a seat shows "catching up" in place of a name while someone does.
+  const initials = (rows) => rows.map((row) => row.split('\n')[0]);
+  await t.until('Cal on the row', async () => initials(await order()).includes('C'));
   const before = names(await order());
+  const seatOfCal = initials(await order()).indexOf('C');
   t.check('you are You', before.includes('You'), before.join(', '));
   await b.page.goto('about:blank');
   await t.see('Ana hears Ben go', ui.bar(a.page).getByText(/Ben stepped out/), 8000);
   await t.gone('Ben off the row, or dimmed', seats(a.page).locator('[data-away=false]').getByText('Ben'), 12_000);
-  t.eq('Cal has not moved', names(await order()).indexOf('Cal'), before.indexOf('Cal'));
+  t.eq('Cal has not moved', initials(await order()).indexOf('C'), seatOfCal);
 });
 
 flow('seats: a full row says how many more, and that opens People', async (t) => {

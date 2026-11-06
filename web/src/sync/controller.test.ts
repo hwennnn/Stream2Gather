@@ -10,11 +10,13 @@ class FakePlayer implements PlayerAdapter {
   rate = 1;
   status: PlayerState = 'paused';
   seeks: number[] = [];
+  cues: number[] = [];
   private listener: (state: PlayerState) => void = () => {};
 
   play() { this.status = 'playing'; }
   pause() { this.status = 'paused'; }
   seek(seconds: number) { this.current = seconds; this.seeks.push(seconds); }
+  cue(seconds: number) { this.current = seconds; this.cues.push(seconds); }
   setRate(rate: number) { this.rate = rate; }
   time() { return this.current; }
   state() { return this.status; }
@@ -1019,6 +1021,44 @@ describe('SyncController', () => {
       timers.advance(ms);
       sync.tick();
     };
+
+    describe('with a player that has not started', () => {
+      beforeEach(() => { player.status = 'ready'; });
+
+      it('cues it at the room position, without seeking or pausing it', () => {
+        sync.apply(paused(724));
+        for (let i = 0; i < 4; i += 1) tick();
+        expect(player.cues).toEqual([724]);
+        expect(player.seeks).toEqual([]);
+        expect(player.status).toBe('ready');
+        expect(commands).toEqual([]);
+      });
+
+      it('cues it again when the room moves', () => {
+        sync.apply(paused(724));
+        tick();
+        sync.apply(paused(800));
+        expect(player.cues).toEqual([724, 800]);
+      });
+
+      it('takes a click on its play button for a resume', () => {
+        sync.apply(paused(724));
+        tick(3000);
+        player.fire('buffering');
+        player.fire('playing');
+        expect(commands).toEqual([expect.objectContaining({ type: 'play', pos: 724 })]);
+        tick();
+        expect(player.status).toBe('playing');
+      });
+
+      it('starts it when the room resumes', () => {
+        sync.apply(paused(724));
+        tick();
+        sync.apply(playing(724, timers.now));
+        expect(player.status).toBe('playing');
+        expect(commands).toEqual([]);
+      });
+    });
 
     it('paused late joiner emits nothing', () => {
       const landed: number[] = [];

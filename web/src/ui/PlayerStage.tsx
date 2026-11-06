@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { Media } from '../api/http';
 import type { PlayerError } from '../players/types';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
+import { formatTime } from './format';
 import { Icon } from './Icon';
 import { AddBox, SearchResults, useSearch } from './Omnibox';
 import { ReactionBar, ReactionTicker } from './Reactions';
@@ -214,6 +215,25 @@ export const UnmuteButton = ({ player, className = '' }: { player: RoomPlayer; c
   );
 };
 
+/** Says where the room stopped, here because nothing may be drawn over the player. */
+const ColdPause = ({ session, view, onToast }: { session: RoomSession; view: RoomView; onToast: (text: string) => void }) => {
+  const { item, pos } = view.playback;
+  const resume = () => void session.request('play', { item, pos, ct: session.clock.now() }).catch(toastError(onToast));
+  return (
+    <>
+      <span className="chip shrink-0">
+        <span className="size-1.5 shrink-0 rounded-full bg-muted" />
+        Paused at {formatTime(pos)}
+      </span>
+      {canControl(view) && (
+        <button type="button" disabled={isOffline(view)} onClick={resume} className="btn btn-primary">
+          Resume for everyone
+        </button>
+      )}
+    </>
+  );
+};
+
 const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullscreen, onTheatre, onFullscreen, onToast, railHidden, toastSlot }: StageProps & { item: QueueItem }) => (
   <section aria-label="Player controls" className="player-bar relative flex items-center gap-4 px-4 phone:flex-col phone:items-stretch phone:gap-1 phone:py-2 sm:max-lg:py-2.5">
     <div className="min-w-28 flex-1">
@@ -226,9 +246,10 @@ const PlayerBar = ({ session, view, player, item, theatre, fullscreen, canFullsc
     {railHidden && <ReactionTicker reactions={view.reactions} />}
 
     <div className="flex min-w-0 items-center gap-2">
-      {!player.failure && <SyncPill view={view} player={player} />}
+      {!player.failure && !player.cold && <SyncPill view={view} player={player} />}
       {isLocked(view) && <HostChip className="hidden phone:inline-flex" />}
       <UnmuteButton player={player} />
+      {player.cold && !player.failure && <ColdPause session={session} view={view} onToast={onToast} />}
       <span className="flex-1" />
       {canControl(view) && <SkipButton session={session} view={view} onToast={onToast} />}
       <ReactionBar session={session} disabled={isOffline(view)} className={railHidden ? 'flex' : 'hidden xl:flex'} />

@@ -65,6 +65,9 @@ export const createHtml5Player = async (
     seek: (seconds) => {
       video.currentTime = seconds;
     },
+    cue: (seconds) => {
+      video.currentTime = seconds;
+    },
     setRate: (rate) => {
       video.playbackRate = rate;
     },

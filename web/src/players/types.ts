@@ -7,12 +7,17 @@ export type PlayerError = { kind: PlayerErrorKind; code: number };
 /** 'fine' takes any playback rate; 'discrete' only the steps YouTube offers; 'none' can't change rate. */
 export type PlayerRates = 'fine' | 'discrete' | 'none';
 
+/** A player in these states has shown nothing yet, and a seek would start it. */
+export const notStarted = (state: PlayerState): boolean => state === 'loading' || state === 'ready';
+
 /** The only surface sync logic sees, so every source behaves the same to it. */
 export interface PlayerAdapter {
   readonly rates: PlayerRates;
   play(): void;
   pause(): void;
   seek(seconds: number): void;
+  /** Shows the video at this position without starting it, for a player that hasn't started. */
+  cue(seconds: number): void;
   setRate(rate: number): void;
   time(): number;
   state(): PlayerState;

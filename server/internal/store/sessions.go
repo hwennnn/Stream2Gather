@@ -346,6 +346,15 @@ func (p *Postgres) EndSession(ctx context.Context, sessionID string, at time.Tim
 // purgeMediaRefs forgets a video that has left media. A session keeps its row, so
 // it still says that something was on.
 func purgeMediaRefs(ctx context.Context, tx pgx.Tx, source string, sourceIDs []string) error {
+	rows, err := tx.Query(ctx, `
+		SELECT DISTINCT session_id FROM session_items WHERE source = $1 AND source_id = ANY($2)`, source, sourceIDs)
+	if err != nil {
+		return err
+	}
+	sessionIDs, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return err
+	}
 	for _, statement := range []string{
 		`DELETE FROM watchlist_items WHERE source = $1 AND source_id = ANY($2)`,
 		`DELETE FROM moments WHERE source = $1 AND source_id = ANY($2)`,
@@ -355,7 +364,7 @@ func purgeMediaRefs(ctx context.Context, tx pgx.Tx, source string, sourceIDs []s
 			return err
 		}
 	}
-	return nil
+	return rebuildRecaps(ctx, tx, sessionIDs)
 }
 
 // OpenSessionStart says when the room's running session began, if one is running.

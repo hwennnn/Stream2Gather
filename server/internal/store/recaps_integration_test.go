@@ -113,6 +113,55 @@ func TestARecapHoldsNothingTheSourceToldUs(t *testing.T) {
 	}
 }
 
+func TestPurgingAVideoRewritesTheRecapsThatNamedIt(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	crewID, owner := testCrew(t, db)
+	sourceID := ids.New()
+	if err := db.PutMedia(ctx, []room.Media{{Source: "purged", SourceID: sourceID, URL: "https://a.test/" + sourceID}}); err != nil {
+		t.Fatal(err)
+	}
+	mika := aGuest(t, db, "Mika")
+	moment := func(user string, pos int64) CapturedMoment {
+		return CapturedMoment{Kind: "reaction", UserID: user, Author: "x", Emoji: "🔥", Source: "purged", SourceID: sourceID, PosMs: pos, At: time.Now()}
+	}
+	err := db.RecordCapture(ctx, Capture{
+		CrewID: crewID, At: time.Now().Add(-time.Hour), Playing: true, Source: "purged", SourceID: sourceID,
+		Present: []Person{{UserID: owner, Name: "Hana", Member: true}, {UserID: mika, Name: "Mika"}},
+		Moments: []CapturedMoment{moment(owner, 1000), moment(mika, 2000), moment(owner, 3000)},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sessionID string
+	if err := db.pool.QueryRow(ctx, `SELECT id FROM crew_sessions WHERE crew_id = $1`, crewID).Scan(&sessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.EndSession(ctx, sessionID, time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.BuildRecap(ctx, sessionID); err != nil {
+		t.Fatal(err)
+	}
+	if got := count(t, db, `SELECT count(*) FROM session_recaps WHERE doc::text LIKE '%' || $1 || '%'`, sourceID); got != 1 {
+		t.Fatal("the recap should start out naming the video")
+	}
+
+	if err := db.DeleteMedia(ctx, "purged", []string{sourceID}); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := count(t, db, `SELECT count(*) FROM session_recaps WHERE doc::text LIKE '%' || $1 || '%'`, sourceID); got != 0 {
+		t.Fatal("a purged video's id stayed in a recap")
+	}
+	stored, err := db.RecapOf(ctx, crewID, sessionID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(stored.Doc.Items) != 1 || stored.Doc.Biggest != nil {
+		t.Fatalf("%+v", stored.Doc)
+	}
+}
+
 // The spec's exit: 4 people, 2 hours, under a second. 57,600 is every one of them
 // reacting twice a second for the whole session, the most the rate limit allows.
 func TestAFourPersonTwoHourSessionBuildsInUnderASecond(t *testing.T) {

@@ -103,3 +103,31 @@ func TestAStaleVideoLosesItsTitleAndItsReliveLink(t *testing.T) {
 		t.Fatalf("a video that can't play can't be relived: %s", response.Body)
 	}
 }
+
+func TestDeletingAnAccountTakesItsNameOutOfRecaps(t *testing.T) {
+	s, pool := stackServer(t)
+	ctx := context.Background()
+	_, as := signUp(t, s, "Hana")
+	slug, token := newCrew(t, s, as)
+	leaver, leaverAs := signUp(t, s, "Mika")
+	if response, _ := serve(s, http.MethodPost, "/v1/crews/"+slug+"/join", `{"token":"`+token+`"}`, leaverAs); response.Code != http.StatusOK {
+		t.Fatalf("join: %d", response.Code)
+	}
+	_, crewID := crewIDOf(t, s, slug)
+	sessionID := watchParty(t, s, crewID, "a", store.Person{UserID: leaver.Subject, Name: "Mika", Member: true})
+	if err := s.DB.BuildRecap(ctx, sessionID); err != nil {
+		t.Fatal(err)
+	}
+
+	if response, _ := serve(s, http.MethodDelete, "/v1/me", "", leaverAs); response.Code != http.StatusOK {
+		t.Fatalf("delete: %d %s", response.Code, response.Body)
+	}
+
+	var doc string
+	if err := pool.QueryRow(ctx, `SELECT doc::text FROM session_recaps WHERE session_id = $1`, sessionID).Scan(&doc); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(doc, "Mika") || !strings.Contains(doc, "Former member") {
+		t.Fatal(doc)
+	}
+}

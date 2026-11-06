@@ -25,4 +25,39 @@ describe('PeoplePanel', () => {
     expect(screen.getByText('Speaking')).toBeDefined();
     expect(screen.queryByText('Listening')).toBeNull();
   });
+
+  describe('each row', () => {
+    const people = [
+      { userId: 'a', name: 'Bea', role: 'member' },
+      { userId: 'h', name: 'Neon', role: 'host' },
+      { userId: 'me', name: 'Solar', role: 'member' },
+    ];
+    const show = (viewerStates = {}, self = people[2]) =>
+      render(
+        <PeoplePanel
+          session={{} as RoomSession}
+          view={{ self, members: people, viewerStates, speaking: [], settings: { controlMode: 'everyone', queueMode: 'everyone' } } as unknown as RoomView}
+          onToast={() => {}}
+        />,
+      );
+    const rows = () => screen.getAllByRole('listitem').map((row) => row.textContent ?? '');
+
+    it('puts you first, then the host, however the server ordered them', () => {
+      show();
+      expect(rows().map((row) => people.find(({ name }) => row.includes(name))?.name)).toEqual(['Solar', 'Neon', 'Bea']);
+    });
+
+    it('still says who is the host when they have a status too', () => {
+      show({ h: 'unavailable' });
+      const host = rows().find((row) => row.includes('Neon')) ?? '';
+      expect(host).toContain('Host');
+      expect(host).toContain('Can’t play this video');
+    });
+
+    it('marks you, even when you are the host', () => {
+      show({}, people[1]);
+      expect(rows()[0]).toContain('(you)');
+      expect(rows()[0]).toContain('Host');
+    });
+  });
 });

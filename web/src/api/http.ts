@@ -19,6 +19,8 @@ export type Person = {
   /** On the room's crew roster. */
   member?: boolean;
   voice?: VoiceState;
+  /** When they arrived. */
+  since?: number;
 };
 
 export type Account = { id: string; name: string; avatarUrl: string; signedIn: boolean };

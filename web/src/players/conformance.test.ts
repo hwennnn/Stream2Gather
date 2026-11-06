@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHtml5Player } from './html5';
+import { createTwitchPlayer } from './twitch';
 import type { PlayerAdapter, PlayerState } from './types';
+import { createVimeoPlayer } from './vimeo';
 import { createYouTubePlayer } from './youtube';
 
 /** What each source's fake must offer, so one set of rules can be run against them all. */
@@ -14,10 +16,99 @@ type Harness = {
   at: (seconds: number) => void;
 };
 
-/** The name a DOM video gives each of these. */
+/** The name a DOM video, Vimeo and Twitch all nearly give each of these. */
 const EVENT_NAMES = { playing: 'playing', paused: 'pause', ended: 'ended' };
 
 const element = () => ({ replaceChildren: vi.fn() }) as unknown as HTMLElement & { replaceChildren: ReturnType<typeof vi.fn> };
+
+const vimeo = vi.hoisted(() => ({ current: null as null | Record<string, unknown> }));
+
+vi.mock('@vimeo/player', () => ({
+  default: function FakeVimeo() {
+    return vimeo.current;
+  },
+}));
+
+const mountVimeo = async (host: HTMLElement): Promise<Harness> => {
+  const calls: string[] = [];
+  const handlers = new Map<string, (data: never) => void>();
+  const call = (name: string) => (value?: unknown) => {
+    calls.push(value === undefined ? name : `${name}:${value}`);
+    return Promise.resolve();
+  };
+  vimeo.current = {
+    on: (event: string, handler: (data: never) => void) => handlers.set(event, handler),
+    ready: () => Promise.resolve(),
+    getVolume: () => Promise.resolve(1),
+    getMuted: () => Promise.resolve(false),
+    play: call('play'),
+    pause: call('pause'),
+    setCurrentTime: call('seek'),
+    setPlaybackRate: call('rate'),
+    setVolume: call('volume'),
+    setMuted: call('muted'),
+    destroy: call('destroy'),
+  };
+  vi.stubGlobal('document', { createElement: () => ({}) });
+  const player = await createVimeoPlayer(host, '123', 0, false);
+  const fire = (event: string, data: unknown) => handlers.get(event)?.(data as never);
+  return {
+    player,
+    calls,
+    become: (state) => fire(EVENT_NAMES[state], { percent: 0.5, seconds: 0 }),
+    at: (seconds) => fire('timeupdate', { seconds }),
+  };
+};
+
+vi.mock('../api/http', () => ({ api: { config: () => Promise.resolve({ twitchParent: 'localhost' }) } }));
+
+const twitch = { calls: [] as string[], handlers: new Map<string, () => void>(), seconds: 0, level: 1 };
+
+/** The loader keeps the first API it gets, so every mount shares this one class. */
+class FakeTwitch {
+  static READY = 'ready';
+  static PLAYING = 'playing';
+  static PAUSE = 'pause';
+  static ENDED = 'ended';
+  addEventListener = (event: string, listener: () => void) => twitch.handlers.set(event, listener);
+  play = () => twitch.calls.push('play');
+  pause = () => twitch.calls.push('pause');
+  seek = (seconds: number) => twitch.calls.push(`seek:${seconds}`);
+  isPaused = () => true;
+  getCurrentTime = () => twitch.seconds;
+  getDuration = () => 600;
+  getMuted = () => true;
+  setMuted = () => {};
+  getVolume = () => twitch.level;
+  setVolume = (level: number) => {
+    twitch.calls.push(`volume:${level}`);
+    twitch.level = level;
+  };
+  destroy = () => twitch.calls.push('destroy');
+}
+
+const mountTwitch = async (host: HTMLElement): Promise<Harness> => {
+  Object.assign(twitch, { calls: [], handlers: new Map(), seconds: 0, level: 1 });
+  Object.assign(host, { clientWidth: 800, clientHeight: 450, childElementCount: 0 });
+  vi.stubGlobal('window', { Twitch: { Player: FakeTwitch }, setInterval, clearInterval, setTimeout, clearTimeout });
+  vi.stubGlobal('document', { createElement: () => ({}) });
+  vi.stubGlobal('ResizeObserver', vi.fn(() => ({ observe: vi.fn(), disconnect: vi.fn() })));
+  const pending = createTwitchPlayer(host, 'video:42', '', 0, false);
+  for (let turn = 0; turn < 5; turn += 1) await Promise.resolve();
+  twitch.handlers.get('ready')?.();
+  return {
+    player: await pending,
+    calls: twitch.calls,
+    become: (state) => {
+      twitch.handlers.get(EVENT_NAMES[state])?.();
+      // A pause only counts once it has lasted.
+      vi.advanceTimersByTime(1500);
+    },
+    at: (seconds) => {
+      twitch.seconds = seconds;
+    },
+  };
+};
 
 class FakeVideo extends EventTarget {
   ended = false;
@@ -111,6 +202,8 @@ const mountYouTube = async (host: HTMLElement): Promise<Harness> => {
 const SOURCES: [string, (host: HTMLElement) => Promise<Harness>][] = [
   ['html5', mountHtml5],
   ['youtube', mountYouTube],
+  ['vimeo', mountVimeo],
+  ['twitch', mountTwitch],
 ];
 
 describe.each(SOURCES)('%s meets the adapter contract', (_name, mount) => {
@@ -158,6 +251,11 @@ describe.each(SOURCES)('%s meets the adapter contract', (_name, mount) => {
       if (tick % 3 === 0) harness.at(tick / 10 - 0.08);
       expect(harness.player.time()).toBeGreaterThanOrEqual(before);
     }
+  });
+
+  it('gives a length, or null until it knows', () => {
+    const length = harness.player.duration();
+    expect(length === null || length > 0).toBe(true);
   });
 
   it('passes volume to the SDK and reads it back', () => {

@@ -55,11 +55,16 @@ const mount = async (element: HTMLElement, sourceId = 'video:42', startAt = 90, 
 };
 
 describe('createTwitchPlayer', () => {
+  let resized = () => {};
+
   beforeEach(() => {
     embeds.length = 0;
     vi.useFakeTimers();
     window.Twitch = { Player: FakeEmbed as never };
-    vi.stubGlobal('ResizeObserver', vi.fn(() => ({ observe: vi.fn(), disconnect: vi.fn() })));
+    vi.stubGlobal('ResizeObserver', vi.fn((callback: () => void) => {
+      resized = callback;
+      return { observe: vi.fn(), disconnect: vi.fn() };
+    }));
   });
 
   afterEach(() => {
@@ -119,5 +124,63 @@ describe('createTwitchPlayer', () => {
     expect(player.time()).toBe(80);
     expect(embeds[0]?.calls).toEqual([]);
     expect(player.duration()).toBeNull();
+  });
+
+  it('passes on a refusal from the browser', async () => {
+    const player = await mount(wide());
+    const blocked = vi.fn();
+    player.onBlocked(blocked);
+    embeds[0]?.fire('blocked');
+    expect(blocked).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps time moving between the embed\'s coarse reports, and never backwards', async () => {
+    const player = await mount(wide(), 'video:42', 0);
+    embeds[0]?.fire('playing');
+    const seen: number[] = [];
+    for (let tick = 1; tick <= 30; tick += 1) {
+      if (tick % 10 === 0) embeds[0]!.seconds = tick / 10 - 0.15;
+      vi.advanceTimersByTime(100);
+      seen.push(player.time());
+    }
+    expect(seen).toEqual([...seen].sort((a, b) => a - b));
+    expect(seen.at(-1)).toBeGreaterThan(2);
+  });
+
+  it('never shrinks the embed: below 400 px it says so, and keeps the room moving', async () => {
+    const element = sized(() => 390);
+    const player = await createTwitchPlayer(element, 'video:42', 'https://www.twitch.tv/videos/42', 10, true);
+    expect(embeds).toHaveLength(0);
+    expect(element.textContent).toContain('Rotate your phone or open on Twitch');
+    player.pause();
+    expect(player.state()).toBe('paused');
+    player.play();
+    expect(player.state()).toBe('playing');
+    vi.advanceTimersByTime(2000);
+    expect(player.time()).toBeGreaterThan(10);
+  });
+
+  it('takes the embed off a screen that shrinks, and brings it back where the room is', async () => {
+    let width = 800;
+    const element = sized(() => width);
+    const player = await mount(element, 'video:42', 30);
+    width = 390;
+    resized();
+    expect(embeds[0]?.destroyed).toBe(true);
+    expect(element.querySelector('a')?.href).toContain('twitch.tv');
+    player.seek(100);
+    width = 800;
+    resized();
+    expect(embeds[1]?.options.time).toBe('0h1m40s');
+  });
+
+  it('does not hand back a player the embed would refuse calls on', async () => {
+    const done = vi.fn();
+    void createTwitchPlayer(wide(), 'video:42', '', 0, false).then(done);
+    await flush();
+    expect(done).not.toHaveBeenCalled();
+    embeds[0]?.fire('ready');
+    await flush();
+    expect(done).toHaveBeenCalled();
   });
 });

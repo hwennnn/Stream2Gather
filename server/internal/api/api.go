@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/coder/websocket"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -41,6 +42,7 @@ const (
 	guestsPerHour = 600
 	// Each search can spend YouTube quota the whole site shares.
 	searchesPerHour = 20
+	searchMaxQuery  = 200
 	// Tabs flush every ten seconds. This leaves room for a shared address.
 	telemetryPerMinute = 240
 	// Counts rooms that exist, so a mistyped link costs nothing here. What a link
@@ -785,8 +787,14 @@ func (s *Server) search(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusTooManyRequests, "rate_limited", "Too many searches. Try again later.")
 		return
 	}
-	query := r.URL.Query()
-	items, err := s.Catalog.Search(r.Context(), "youtube", query.Get("q"), query.Get("region"))
+	query := r.URL.Query().Get("q")
+	if utf8.RuneCountInString(query) > searchMaxQuery {
+		writeProblem(w, http.StatusBadRequest, "invalid", "That search is too long.")
+		return
+	}
+	// No region from the client: each new value would miss the cache and spend
+	// the day's search quota.
+	items, err := s.Catalog.Search(r.Context(), "youtube", query, "")
 	if err != nil {
 		s.mediaFailed(w, err)
 		return

@@ -611,6 +611,9 @@ func (s *Server) buildPreview(ctx context.Context, record store.Room) (preview, 
 		out.NowPlaying = &state.Queue[0].Media
 		out.Playback = &playbackPeek{Status: state.Playback.Status, Pos: state.PositionAt(now)}
 	}
+	if _, err := s.Live.Prune(ctx, record.ID); err != nil {
+		return out, err
+	}
 	people, err := s.Live.People(ctx, record.ID)
 	if err != nil {
 		return out, err
@@ -648,6 +651,12 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 
 	member, ok := s.crewEntry(w, r, record, claims)
 	if !ok {
+		return
+	}
+	// With nobody connected nothing else clears what a crashed server left, and
+	// those ghosts would fill the room.
+	if _, err := s.Live.Prune(r.Context(), record.ID); err != nil {
+		s.internal(w, err)
 		return
 	}
 	sockets, err := s.Live.Sockets(r.Context(), record.ID, claims.Subject)

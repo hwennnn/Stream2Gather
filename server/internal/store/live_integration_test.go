@@ -148,3 +148,50 @@ func TestSocketsCountsEveryTab(t *testing.T) {
 		t.Fatalf("count %d, err %v", count, err)
 	}
 }
+
+func TestPruneMarksARoomEmptyWhenOnlyGhostsWereLeft(t *testing.T) {
+	rdb := liveStore(t)
+	live := NewLive(rdb)
+	ctx := context.Background()
+	roomID := ids.New()
+	lastSeen := time.Now().Add(-2 * time.Minute).UnixMilli()
+	ghost(t, rdb, roomID, "conn", lastSeen)
+
+	pruned, err := live.Prune(ctx, roomID)
+	if err != nil || pruned != 1 {
+		t.Fatalf("pruned %d: %v", pruned, err)
+	}
+	if at, err := live.TakeEmpty(ctx, roomID); err != nil || at != lastSeen {
+		t.Fatalf("emptied at %d, want %d: %v", at, lastSeen, err)
+	}
+}
+
+func TestPruneLeavesARoomWithSomeoneInItAlone(t *testing.T) {
+	rdb := liveStore(t)
+	live := NewLive(rdb)
+	ctx := context.Background()
+	roomID := ids.New()
+	ghost(t, rdb, roomID, "conn", time.Now().Add(-2*time.Minute).UnixMilli())
+	if err := live.Touch(ctx, roomID, "alive", Person{UserID: "u"}); err != nil {
+		t.Fatal(err)
+	}
+
+	if pruned, err := live.Prune(ctx, roomID); err != nil || pruned != 1 {
+		t.Fatalf("pruned %d: %v", pruned, err)
+	}
+	if at, err := live.TakeEmpty(ctx, roomID); err != nil || at != 0 {
+		t.Fatalf("emptied at %d with a viewer present: %v", at, err)
+	}
+}
+
+// ghost leaves a connection behind the way a crash does.
+func ghost(t *testing.T, rdb *redis.Client, roomID, connID string, lastSeen int64) {
+	t.Helper()
+	ctx := context.Background()
+	if err := rdb.ZAdd(ctx, presenceKey(roomID), redis.Z{Score: float64(lastSeen), Member: connID}).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := rdb.HSet(ctx, peopleKey(roomID), connID, `{"userId":"gone"}`).Err(); err != nil {
+		t.Fatal(err)
+	}
+}

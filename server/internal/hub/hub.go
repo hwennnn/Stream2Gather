@@ -636,7 +636,8 @@ func (r *liveRoom) ensureState(ctx context.Context) (room.State, error) {
 // point the last viewer left, instead of letting it run on without them.
 func (r *liveRoom) settleEmptyRoom(ctx context.Context) {
 	emptiedAt, err := r.hub.live.TakeEmpty(ctx, r.id)
-	if err != nil || emptiedAt == 0 {
+	// Redis can stall long enough for viewers still here to look gone.
+	if err != nil || emptiedAt == 0 || len(r.conns) > 0 {
 		return
 	}
 	now := time.Now().UnixMilli()
@@ -700,6 +701,12 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 	ctx, cancel := opContext()
 	defer cancel()
 	person := c.who()
+
+	// A crash leaves its connections behind with nothing to clear them. Nobody
+	// here means nothing else will, and they would count against this viewer.
+	if _, err := r.hub.live.Prune(ctx, r.id); err != nil {
+		r.hub.log.Warn("presence prune failed", "room", r.id, "error", err)
+	}
 
 	// The ticket checks this too. This is the check that races can't get past,
 	// and the reconnect it causes gets the reason from the ticket.

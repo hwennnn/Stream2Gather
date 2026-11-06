@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RoomPreview } from '../api/http';
+import { ApiError, type RoomPreview } from '../api/http';
 import CrewHome from '../routes/CrewHome';
 import { crewApi, type CrewDocument } from './api';
 
@@ -67,5 +67,52 @@ describe('CrewHome', () => {
     vi.spyOn(crewApi, 'home').mockResolvedValue(document([hana]));
     render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: true, guestAccess: true })} onJoin={onJoin} />);
     expect(await screen.findByText('It’s just you. Copy the invite.')).toBeTruthy();
+  });
+
+  it('offers an invited guest the crew and the guest way in', () => {
+    window.history.replaceState(null, '', '/r/movie-night?join=tok');
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 3, isMember: false, guestAccess: true })} onJoin={onJoin} />);
+
+    expect(screen.getByRole('heading', { name: 'Movie Night' })).toBeTruthy();
+    expect(screen.getByText('3 members')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Continue as guest' })).toBeTruthy();
+    expect(screen.getByText('This crew keeps chat and reactions for its members.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Join the crew' }));
+    expect(signIn).toHaveBeenCalled();
+  });
+
+  it('joins with the token and strips it from the address', async () => {
+    signIntoAccount();
+    window.history.replaceState(null, '', '/r/movie-night?join=tok');
+    const home = vi.spyOn(crewApi, 'home').mockRejectedValueOnce(new ApiError(403, 'not_member', 'no'));
+    const join = vi.spyOn(crewApi, 'join').mockResolvedValue({});
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: true })} onJoin={onJoin} />);
+
+    home.mockResolvedValue(document([hana, mika]));
+    fireEvent.click(await screen.findByRole('button', { name: 'Join the crew' }));
+
+    await screen.findByRole('button', { name: 'Join the room' });
+    expect(join).toHaveBeenCalledWith('movie-night', 'tok');
+    expect(window.location.search).toBe('');
+  });
+
+  it('says so when the invite has been rotated, and keeps the guest way in', async () => {
+    signIntoAccount();
+    window.history.replaceState(null, '', '/r/movie-night?join=old');
+    vi.spyOn(crewApi, 'home').mockRejectedValue(new ApiError(403, 'not_member', 'no'));
+    vi.spyOn(crewApi, 'join').mockRejectedValue(new ApiError(403, 'invalid_invite', 'This invite link has expired. Ask for a new one.'));
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: true })} onJoin={onJoin} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Join the crew' }));
+
+    expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'This invite link has expired. Ask for a new one.');
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Join the crew' })).toBeNull());
+    expect(screen.getByRole('button', { name: 'Continue as guest' })).toBeTruthy();
+  });
+
+  it('shuts a members-only room to anyone without an invite', () => {
+    render(<CrewHome slug="movie-night" preview={preview({ memberCount: 1, isMember: false, guestAccess: false })} onJoin={onJoin} />);
+    expect(screen.queryByRole('button', { name: 'Continue as guest' })).toBeNull();
+    expect(screen.getByText('This room is for its crew. Ask them for an invite.')).toBeTruthy();
   });
 });

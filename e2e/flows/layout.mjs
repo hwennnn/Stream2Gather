@@ -6,6 +6,23 @@ import { flow } from '../lib/runner.mjs';
 
 const rain = video('Rainy Window'); // Not the flows' next video, or the strip has two of one title.
 
+/** Runs in the page: the words a reaction's emoji or name is on right now, as far as anyone can see them. */
+const reactionsOnWords = () => {
+  const box = (el) => el.getBoundingClientRect();
+  const hit = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const lane = box(document.querySelector('.reaction-lane'));
+  const log = box(document.querySelector('[role=log]'));
+  const words = [...document.querySelectorAll('[role=log] p')].flatMap((line) => {
+    const range = document.createRange();
+    range.selectNodeContents(line);
+    return [...range.getClientRects()].filter((rect) => hit(rect, log));
+  });
+  const shown = [...document.querySelectorAll('.reaction-emoji, .reaction-name')].filter((el) => hit(box(el), lane));
+  const on = shown.flatMap((el) => words.filter((rect) => hit(box(el), rect)).map((rect) =>
+    `${el.textContent} ${Math.round(box(el).left)}-${Math.round(box(el).right)} on a line ending ${Math.round(rect.right)}`));
+  return { shown: shown.length, on };
+};
+
 const WIDTHS = [
   { width: 390, height: 844, phone: true },
   { width: 1024, height: 768 },
@@ -123,6 +140,30 @@ const checkPage = async (t, where, page) => {
   const blocked = await blockedControls(page);
   t.check(`${where}: every control can be reached`, blocked.length === 0, blocked.slice(0, 4).join('; '));
 };
+
+for (const { width, height, phone } of [...WIDTHS, { width: 844, height: 390, phone: true }]) {
+  flow(`layout ${width}: a reaction crosses nobody's words`, { timeout: 60_000 }, async (t) => {
+    const host = await t.person('host', { viewport: { width, height }, phone });
+    const guest = await t.person('Bartholomew the Long');
+    const room = await startRoom(t, host, { url: video('Golden Hour').url });
+    await joinRoom(guest, room.url);
+    for (const line of [LINES[9], LINES[1], LINES[2]]) await sendChat(guest.page, line.slice(0, 200));
+    await t.see('the long lines', ui.chatLog(host.page).getByText(LINES[2].slice(0, 200)));
+    const on = new Set();
+    let shown = 0;
+    const watching = (async () => {
+      for (const end = Date.now() + 6000; Date.now() < end;) {
+        const sample = await host.page.evaluate(reactionsOnWords);
+        shown = Math.max(shown, sample.shown);
+        sample.on.forEach((one) => on.add(one));
+      }
+    })();
+    for (const emoji of ['🔥', '😂', '❤️', '👏']) await react(guest.page, emoji);
+    await watching;
+    t.check(`${width}: reactions rose`, shown > 0);
+    t.check(`${width}: no emoji or name is on a chat line`, on.size === 0, [...on].slice(0, 3).join('; '));
+  });
+}
 
 for (const size of WIDTHS) {
   const { width, height, phone } = size;

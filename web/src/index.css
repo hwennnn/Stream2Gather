@@ -62,6 +62,7 @@
   /* Wide enough for chat, then whatever hands the player the height "Up next" doesn't need. */
   --rail: clamp(320px, calc(100vw - (100dvh - 48px - var(--bar) - 104px) * 16 / 9), 420px);
   --gutter: 1rem;
+  --lane: 3rem;
   --seats: 88px;
   --info: 64px;
   --bar: calc(var(--seats) + var(--info));
@@ -364,6 +365,11 @@ body {
   padding-inline: var(--gutter);
   overflow-y: auto;
   overflow-wrap: anywhere;
+}
+
+/* Words stop short of the reaction lane, so a reaction crosses nobody's. */
+.chat-line {
+  padding-right: calc(var(--lane) - var(--gutter) + 0.25rem);
 }
 
 /* A mouse gets a real scrollbar on some systems. Taking it out of the gutter keeps the right edge put. */
@@ -1043,7 +1049,7 @@ body {
 
 /* ---- Reactions ------------------------------------------------------------
  * The lane sits in the rail and clips what it holds, so a reaction can't reach
- * the player, and in the gutter chat lines keep clear, so it crosses no words.
+ * the player, and in the room .chat-line leaves, so it crosses no words.
  */
 
 .reaction-lane {
@@ -1052,7 +1058,7 @@ body {
   top: 3.25rem;
   right: 0;
   bottom: 4.75rem;
-  width: 4rem;
+  width: var(--lane);
   overflow: hidden;
   pointer-events: none;
   container-type: size;
@@ -1071,7 +1077,7 @@ body {
 }
 
 .reaction-emoji {
-  font-size: 2rem;
+  font-size: 1.75rem;
   line-height: 1;
   filter: drop-shadow(0 2px 6px rgb(0 0 0 / 0.5));
   animation: pop 450ms cubic-bezier(0.3, 1.7, 0.5, 1) both;
@@ -1079,7 +1085,7 @@ body {
 
 .reaction-name {
   max-width: 100%;
-  padding-inline: 0.375rem;
+  padding-inline: 0.25rem;
   overflow: hidden;
   border-radius: 999px;
   background: rgb(23 26 35 / 0.78);
@@ -1110,7 +1116,7 @@ body {
   }
   to {
     opacity: 0;
-    transform: translate(var(--sway), calc(3.5rem - 100cqh));
+    transform: translate(calc(var(--sway) / 2), calc(3.5rem - 100cqh));
   }
 }
 

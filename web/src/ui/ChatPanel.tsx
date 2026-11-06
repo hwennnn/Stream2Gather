@@ -68,7 +68,7 @@ export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => 
         }
         if (block.kind === 'system') {
           return (
-            <p key={block.entry.id} className="mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
+            <p key={block.entry.id} className="chat-line mt-2 text-[13px] leading-[18px] text-dim first:mt-auto">
               {block.entry.text}
               {block.entry.url && (
                 <>
@@ -263,7 +263,7 @@ const Message = memo(({ session, canAdd, offline, message, name, onToast }: Mess
 
   return (
     <div title={formatClock(message.createdAt)}>
-      <p data-delivery={message.delivery} className={`leading-5 transition-opacity [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}>
+      <p data-delivery={message.delivery} className={`chat-line leading-5 transition-opacity [overflow-wrap:anywhere] ${message.delivery ? 'opacity-55' : ''}`}>
         {name && (
           <span style={{ color: hueOf(message.userId) }} className="mr-1.5 inline-block max-w-[90%] truncate align-bottom font-semibold">
             {name}

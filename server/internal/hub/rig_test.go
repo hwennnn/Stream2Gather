@@ -22,14 +22,16 @@ import (
 	"stream2gather/internal/room"
 	"stream2gather/internal/source"
 	"stream2gather/internal/store"
+	"stream2gather/internal/testenv"
 )
 
 // These tests need the stack from deploy/compose.yaml and skip without it.
 const (
-	testRedis    = "127.0.0.1:63809"
 	testPostgres = "postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable"
 	waitFor      = 3 * time.Second
 )
+
+var testRedis = testenv.RedisAddr()
 
 // rig is one server: a hub with its own Redis connection and HTTP listener.
 type rig struct {

@@ -18,6 +18,7 @@ import (
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
 	"stream2gather/internal/store"
+	"stream2gather/internal/testenv"
 )
 
 // This test needs the stack from deploy/compose.yaml and skips without it.
@@ -30,7 +31,7 @@ func TestWelcomeArrivesBeforeAnyPong(t *testing.T) {
 		t.Skip(err)
 	}
 	t.Cleanup(pool.Close)
-	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:63809"})
+	rdb := redis.NewClient(&redis.Options{Addr: testenv.RedisAddr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	if pool.Ping(ctx) != nil || rdb.Ping(ctx).Err() != nil {
 		t.Skip("stack not running")

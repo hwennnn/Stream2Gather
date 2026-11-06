@@ -15,6 +15,7 @@ import (
 	"stream2gather/internal/auth"
 	"stream2gather/internal/ids"
 	"stream2gather/internal/store"
+	"stream2gather/internal/testenv"
 )
 
 type fakeClerk struct{ identity auth.Identity }
@@ -36,7 +37,7 @@ func sessionServer(t *testing.T) *httptest.Server {
 		t.Skip(err)
 	}
 	t.Cleanup(pool.Close)
-	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:63809"})
+	rdb := redis.NewClient(&redis.Options{Addr: testenv.RedisAddr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	if pool.Ping(ctx) != nil || rdb.Ping(ctx).Err() != nil {
 		t.Skip("stack not running")

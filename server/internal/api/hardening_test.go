@@ -22,6 +22,7 @@ import (
 	"stream2gather/internal/room"
 	"stream2gather/internal/source"
 	"stream2gather/internal/store"
+	"stream2gather/internal/testenv"
 )
 
 const testSeed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
@@ -44,7 +45,7 @@ func stackServer(t *testing.T) (*Server, *pgxpool.Pool) {
 		t.Skip(err)
 	}
 	t.Cleanup(pool.Close)
-	rdb := redis.NewClient(&redis.Options{Addr: "127.0.0.1:63809"})
+	rdb := redis.NewClient(&redis.Options{Addr: testenv.RedisAddr()})
 	t.Cleanup(func() { _ = rdb.Close() })
 	if pool.Ping(ctx) != nil || rdb.Ping(ctx).Err() != nil {
 		t.Skip("stack not running")

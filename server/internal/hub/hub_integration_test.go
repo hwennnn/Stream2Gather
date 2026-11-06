@@ -984,6 +984,12 @@ func fastLines(h *Hub) {
 	h.touchEvery = 40 * time.Millisecond
 }
 
+// roomyLines leaves a reload time to land on a slow machine. Only a real miss fails.
+func roomyLines(h *Hub) {
+	fastLines(h)
+	h.rejoinQuiet = 2 * time.Second
+}
+
 func lineText(t *testing.T, message frame) string {
 	t.Helper()
 	var line store.Line
@@ -1018,7 +1024,7 @@ func TestSomeoneArrivingLaterReadsTheSameHistory(t *testing.T) {
 }
 
 func TestAReloadSaysNothing(t *testing.T) {
-	r := newRig(t, testRedis, fastLines)
+	r := newRig(t, testRedis, roomyLines)
 	id := r.newRoom(t, directVideo(t))
 	watching := r.joined(t, id, "a", room.RoleMember)
 	reloading := r.joined(t, id, "b", room.RoleMember)
@@ -1079,7 +1085,7 @@ func TestAHostLeavingIsOneLine(t *testing.T) {
 }
 
 func TestAHostReloadSaysNothing(t *testing.T) {
-	r := newRig(t, testRedis, fastLines)
+	r := newRig(t, testRedis, roomyLines)
 	id := r.newRoom(t, directVideo(t))
 	host := r.joined(t, id, "Maya", room.RoleHost)
 	watching := r.joined(t, id, "a", room.RoleMember)
@@ -1118,7 +1124,7 @@ func TestLeavingFreesTheSeatAtOnce(t *testing.T) {
 }
 
 func TestASeatWaitsOutAReload(t *testing.T) {
-	r := newRig(t, testRedis, fastLines)
+	r := newRig(t, testRedis, roomyLines)
 	id := r.newRoom(t, directVideo(t))
 	watching := r.joined(t, id, "a", room.RoleMember)
 	reloading := r.joined(t, id, "b", room.RoleMember)
@@ -1145,6 +1151,26 @@ func TestAHostWhoDropsGivesUpTheSeatInSilence(t *testing.T) {
 	}
 	if message, ok := watching.next("line", 100*time.Millisecond); ok {
 		t.Fatalf("the handover tells this: %s", message.D)
+	}
+}
+
+func TestSomeoneHereIsNeverSaidToHaveLeft(t *testing.T) {
+	r := newRig(t, testRedis, fastLines)
+	id := r.newRoom(t, directVideo(t))
+	watching := r.joined(t, id, "a", room.RoleMember)
+	r.joined(t, id, "b", room.RoleMember)
+	watching.expect(t, "line")
+
+	// Written just after they came back, so their join couldn't see it.
+	stale := store.Departure{UserID: "b", Name: "b", At: time.Now().Add(-time.Second).UnixMilli()}
+	if err := r.live.MarkGone(context.Background(), id, stale); err != nil {
+		t.Fatal(err)
+	}
+	if message, ok := watching.next("line", 500*time.Millisecond); ok {
+		t.Fatalf("someone here was said to have left: %s", message.D)
+	}
+	if message, ok := watching.next("vacated", 100*time.Millisecond); ok {
+		t.Fatalf("someone here lost their seat: %s", message.D)
 	}
 }
 

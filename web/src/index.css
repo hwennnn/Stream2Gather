@@ -558,6 +558,12 @@ body {
   }
 }
 
+@media (max-width: 639px) {
+  .seat-spare {
+    display: none;
+  }
+}
+
 .seats {
   display: flex;
   align-items: flex-start;
@@ -570,7 +576,7 @@ body {
   display: flex;
   flex: none;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.25rem;
   width: 4.5rem;
   color: var(--color-muted);
@@ -616,7 +622,7 @@ body {
 .seat-invite {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.25rem;
   width: 100%;
   color: var(--color-muted);

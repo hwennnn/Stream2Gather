@@ -25,6 +25,7 @@ const (
 	sweepScheduleID = "sessions-sweep"
 	emptyFor        = 5 * time.Minute
 	quietFor        = 30 * time.Minute
+	recapBatch      = 200
 )
 
 // SessionStore is what kept rooms and their sessions need from Postgres. It grows
@@ -37,6 +38,8 @@ type SessionStore interface {
 	OpenSessions(ctx context.Context) ([]store.OpenSession, error)
 	TouchSession(ctx context.Context, sessionID string, at time.Time) error
 	EndSession(ctx context.Context, sessionID string, at time.Time) (bool, error)
+	UnbuiltSessions(ctx context.Context, limit int) ([]string, error)
+	BuildRecap(ctx context.Context, sessionID string) error
 }
 
 // Presence says who is in a room right now, and what it's doing.
@@ -110,6 +113,16 @@ func (a *Activities) SweepSessions(ctx context.Context) (int, error) {
 		}
 		if done {
 			ended++
+		}
+	}
+	// Reading back what has no recap also picks up a build that failed last time.
+	unbuilt, err := a.Sessions.UnbuiltSessions(ctx, recapBatch)
+	if err != nil {
+		failures = append(failures, err)
+	}
+	for _, sessionID := range unbuilt {
+		if err := a.Sessions.BuildRecap(ctx, sessionID); err != nil {
+			failures = append(failures, fmt.Errorf("recap %s: %w", sessionID, err))
 		}
 	}
 	return ended, errors.Join(failures...)

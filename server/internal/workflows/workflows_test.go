@@ -3,6 +3,7 @@ package workflows
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -48,8 +49,27 @@ type fakeSessions struct {
 	open    []store.OpenSession
 	ended   map[string]time.Time
 	touched []string
+	unbuilt []string
+	built   []string
+	broken  string
 
 	cohort, returned int64
+}
+
+func (f *fakeSessions) UnbuiltSessions(context.Context, int) ([]string, error) {
+	unbuilt := []string{}
+	for id := range f.ended {
+		unbuilt = append(unbuilt, id)
+	}
+	return append(unbuilt, f.unbuilt...), nil
+}
+
+func (f *fakeSessions) BuildRecap(_ context.Context, id string) error {
+	if id == f.broken {
+		return errors.New("build failed")
+	}
+	f.built = append(f.built, id)
+	return nil
 }
 
 func (f *fakeSessions) SecondSessions(context.Context) (int64, int64, error) {
@@ -238,5 +258,21 @@ func TestTheHeadlineMetricIsAShareAndStaysQuietWithNoCohort(t *testing.T) {
 	}
 	if len(metrics.events) != 1 || metrics.events[0].Name != "crew_second_session_14d" || metrics.events[0].Value != 0.25 {
 		t.Fatalf("%+v", metrics.events)
+	}
+}
+
+func TestTheSweepBuildsWhatJustEndedAndRetriesWhatFailedBefore(t *testing.T) {
+	sessions := &fakeSessions{ended: map[string]time.Time{}, unbuilt: []string{"earlier", "broken"}, broken: "broken", open: []store.OpenSession{
+		{ID: "gone", RoomID: "empty", LastActivity: time.Now().Add(-time.Hour)},
+	}}
+	activities := &Activities{Sessions: sessions, Presence: fakePresence{}}
+
+	_, err := activities.SweepSessions(context.Background())
+
+	if err == nil {
+		t.Fatal("a failed build must fail the run, so it shows up")
+	}
+	if !slices.Contains(sessions.built, "gone") || !slices.Contains(sessions.built, "earlier") {
+		t.Fatalf("one bad recap stopped the rest: %v", sessions.built)
 	}
 }

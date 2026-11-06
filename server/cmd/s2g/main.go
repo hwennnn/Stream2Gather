@@ -40,7 +40,7 @@ const (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: s2g serve | worker | notifier | migrate | vapid-keys")
+		fmt.Fprintln(os.Stderr, "usage: s2g serve | worker | notifier | migrate | sweep | vapid-keys")
 		os.Exit(2)
 	}
 
@@ -58,6 +58,8 @@ func main() {
 			err = worker(ctx, cfg, log)
 		case "notifier":
 			err = notifier(ctx, cfg, log)
+		case "sweep":
+			err = sweepOnce(ctx, cfg, log)
 		case "vapid-keys":
 			err = vapidKeys()
 		default:
@@ -68,6 +70,22 @@ func main() {
 		log.Error("stopped", "error", err)
 		os.Exit(1)
 	}
+}
+
+// sweepOnce does what the worker's schedule does, without Temporal, for when you
+// want a session ended now.
+func sweepOnce(ctx context.Context, cfg config.Config, log *slog.Logger) error {
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	defer rdb.Close()
+	activities := &workflows.Activities{Sessions: store.NewPostgres(pool), Presence: store.NewLive(rdb)}
+	ended, err := activities.SweepSessions(ctx)
+	log.Info("swept", "ended", ended)
+	return err
 }
 
 func migrate(cfg config.Config) error {

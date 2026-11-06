@@ -16,7 +16,6 @@ const MAX_LENGTH = 500;
 type Props = {
   session: RoomSession;
   view: RoomView;
-  entries: ChatEntry[];
   active: boolean;
   inviteUrl: string;
   onCopyInvite: () => void;
@@ -42,12 +41,13 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   return blocks;
 };
 
-export const ChatPanel = ({ session, view, entries, active, inviteUrl, onCopyInvite, onToast }: Props) => {
+export const ChatPanel = ({ session, view, active, inviteUrl, onCopyInvite, onToast }: Props) => {
   const [text, setText] = useState('');
   const [missed, setMissed] = useState(false);
   const list = useRef<HTMLDivElement>(null);
   const stuck = useRef(true);
   const offline = isOffline(view);
+  const entries = view.messages;
   const empty = text.trim().length === 0;
   const sideways = useMediaQuery(PHONE_LANDSCAPE); // There's no bar under the player then.
 

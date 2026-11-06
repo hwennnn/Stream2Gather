@@ -1,7 +1,7 @@
 import { api, ApiError, type ChatMessage, type Media, type Person } from '../api/http';
 import { ServerClock } from '../sync/clock';
-import { expectedPosition, type Playback, type SyncHealth } from '../sync/controller';
-import { formatTime } from '../ui/format';
+import type { Playback, SyncHealth } from '../sync/controller';
+import { Narrator } from './narrate';
 
 export type QueueItem = Media & { id: string; addedBy: string; addedByName: string };
 
@@ -38,7 +38,7 @@ export type RoomView = {
   lastAction: { by: string; cause: string } | null;
 };
 
-type StateMessage = {
+export type StateMessage = {
   version: number;
   playback: Playback;
   queue?: QueueItem[];
@@ -78,11 +78,6 @@ const MAX_UNANSWERED_PINGS = 3;
 const REQUEST_TIMEOUT_MS = 15_000;
 /** How long a requested snapshot may take before pongs may force a reconnect. */
 const RESYNC_WAIT_MS = 5000;
-/** One person dragging the scrubber is one line in the chat. */
-const SEEK_COLLAPSE_MS = 3000;
-/** A reload shows as leaving and joining; within this it shows as nothing. */
-const REJOIN_QUIET_MS = 10_000;
-
 const OFFLINE_COPY = 'You’re offline right now. Try again once you’re back.';
 const LOST_COPY = 'The connection dropped before that went through. Try again.';
 const TIMEOUT_COPY = 'That took too long. Try again.';
@@ -96,7 +91,7 @@ export class RoomSession {
   private view = initialView;
   private socket: WebSocket | null = null;
   private listeners = new Set<() => void>();
-  private playbackListener: (playback: Playback) => void = () => {};
+  private playbackListener: (playback: Playback, resync: boolean) => void = () => {};
   private pinger: number | null = null;
   private reconnectTimer: number | null = null;
   private attempts = 0;
@@ -109,8 +104,12 @@ export class RoomSession {
   private lastStatus = '';
   private behindAt: number | null = null;
   private resyncAt: number | null = null;
-  private seekRun: { by: string; lineId: string; from: number; at: number } | null = null;
-  private recentlyLeft = new Map<string, { lineId: string; at: number }>();
+  private narrator = new Narrator({
+    say: (text) => this.say(text),
+    rewrite: (lineId, text) => this.rewrite(lineId, text),
+    remove: (lineId) => this.update({ messages: this.view.messages.filter((entry) => entry.id !== lineId) }),
+    now: () => this.clock.now(),
+  });
   readonly marks: { joinMs?: number } = {};
 
   constructor(private readonly slug: string) {}
@@ -130,7 +129,8 @@ export class RoomSession {
     for (const listener of this.listeners) listener();
   }
 
-  onPlayback(listener: (playback: Playback) => void): void {
+  /** Resync is true when the room is insisting, not reporting a change. */
+  onPlayback(listener: (playback: Playback, resync: boolean) => void): void {
     this.playbackListener = listener;
   }
 
@@ -273,7 +273,7 @@ export class RoomSession {
     if (this.view.self) this.update({ self: { ...this.view.self, name: saved } });
     // The name is safe in the cookie. A socket that cannot take it will pick it
     // up from the next ticket, so this is not a failure the viewer can act on.
-    if (this.socket) await this.request('rename', { name: saved }).catch(() => this.rejoin());
+    if (this.socket) await this.request('rename', { name: saved }).catch(() => this.retry());
   }
 
   private receive(raw: string): void {
@@ -336,7 +336,7 @@ export class RoomSession {
     this.attempts = 0;
     this.behindAt = null;
     this.resyncAt = null;
-    this.seekRun = null;
+    this.narrator.endSeekRun();
     this.lastStatus = '';
     this.marks.joinMs ??= performance.now() - this.joinStartedAt;
     this.update({
@@ -352,7 +352,7 @@ export class RoomSession {
       members: data.members ?? [],
       viewerStates: {},
     });
-    this.playbackListener(data.state.playback);
+    this.playbackListener(data.state.playback, true);
     void this.loadHistory();
   }
 
@@ -418,7 +418,7 @@ export class RoomSession {
     const itemChanged = message.playback.item !== previous.playback.item;
     if (itemChanged) {
       this.lastStatus = '';
-      this.seekRun = null;
+      this.narrator.endSeekRun();
     }
     this.update({
       version: message.version,
@@ -428,35 +428,8 @@ export class RoomSession {
       lastAction: message.by ? { by: message.by, cause: message.cause } : previous.lastAction,
       viewerStates: itemChanged ? {} : previous.viewerStates,
     });
-    if (!snapshot) this.narrate(message, previous);
-    this.playbackListener(message.playback);
-  }
-
-  /** Writes what just happened into the chat. */
-  private narrate(message: StateMessage, previous: RoomView): void {
-    const { by, cause, playback } = message;
-    if (by && cause === 'pause') this.say(`${by} paused at ${formatTime(playback.pos)}`);
-    if (by && cause === 'seek') this.narrateSeek(by, playback.pos, previous.playback);
-    if (cause === 'queue.add') {
-      const existing = new Set(previous.queue.map((item) => item.id));
-      const added = message.queue?.find((item) => !existing.has(item.id));
-      if (by && added) this.say(`${by} added ${added.title}`);
-      return;
-    }
-    const current = message.queue?.[0];
-    if (current && playback.item !== previous.playback.item) this.say(`Up next: ${current.title}`);
-  }
-
-  private narrateSeek(by: string, to: number, before: Playback): void {
-    const now = this.clock.now();
-    const run = this.seekRun?.by === by && now - this.seekRun.at < SEEK_COLLAPSE_MS ? this.seekRun : null;
-    const from = run?.from ?? expectedPosition(before, now);
-    const text = `${by} ${to < from ? 'went back to' : 'jumped to'} ${formatTime(to)}`;
-    if (run && this.rewrite(run.lineId, text)) {
-      run.at = now;
-      return;
-    }
-    this.seekRun = { by, lineId: this.say(text), from, at: now };
+    if (!snapshot) this.narrator.stateChanged(message, previous);
+    this.playbackListener(message.playback, snapshot);
   }
 
   private rewrite(lineId: string, text: string): boolean {
@@ -485,22 +458,7 @@ export class RoomSession {
     this.update({ members });
     if (this.view.connection !== 'live') return;
 
-    const selfId = this.view.self?.userId;
-    const now = Date.now();
-    for (const person of members) {
-      if (person.userId === selfId || before.some((other) => other.userId === person.userId)) continue;
-      const left = this.recentlyLeft.get(person.userId);
-      this.recentlyLeft.delete(person.userId);
-      if (left && now - left.at < REJOIN_QUIET_MS) {
-        this.update({ messages: this.view.messages.filter((entry) => entry.id !== left.lineId) });
-      } else {
-        this.say(`${person.name} joined`);
-      }
-    }
-    for (const person of before) {
-      if (person.userId === selfId || members.some((other) => other.userId === person.userId)) continue;
-      this.recentlyLeft.set(person.userId, { lineId: this.say(`${person.name} left`), at: now });
-    }
+    this.narrator.membersChanged(before, members, this.view.self?.userId);
   }
 
   private memberStatus(data: { userId: string; state: string; item?: string }): void {
@@ -552,18 +510,13 @@ export class RoomSession {
     }
   }
 
-  /** Reconnects now, without waiting out the backoff. */
+  /** Reconnects now, without waiting out the backoff. A new socket also carries a new identity. */
   retry(): void {
     this.clearReconnect();
     this.attempts = 0;
     this.dropSocket();
     this.update({ connection: 'reconnecting', offlineSince: this.view.offlineSince ?? Date.now() });
     void this.connect();
-  }
-
-  /** A new socket carries the new identity; the room state comes back with it. */
-  rejoin(): void {
-    this.retry();
   }
 
   close(): void {

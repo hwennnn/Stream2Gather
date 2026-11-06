@@ -200,6 +200,30 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('playback listener', () => {
+    const heard = async () => {
+      const { session, socket } = await connected();
+      const calls: boolean[] = [];
+      session.onPlayback((_playback, resync) => calls.push(resync));
+      return { socket, calls };
+    };
+
+    it('marks the welcome and snapshots as the room insisting', async () => {
+      const { socket, calls } = await heard();
+      socket.deliver('welcome', welcome(1));
+      socket.deliver('state', { version: 1, playback: idle, queue: [], cause: 'sync' });
+      expect(calls).toEqual([true, true]);
+    });
+
+    it('does not for an ordinary change', async () => {
+      const { socket, calls } = await heard();
+      socket.deliver('welcome', welcome(1));
+      calls.length = 0;
+      socket.deliver('state', { version: 2, playback: idle, queue: [], cause: 'settings' });
+      expect(calls).toEqual([false]);
+    });
+  });
+
   describe('send and request', () => {
     it('says whether a message left', async () => {
       const { session, socket } = await connected();
@@ -540,6 +564,34 @@ describe('RoomSession', () => {
       socket.deliver('state', { version: 3, playback: current, queue: [item('a'), zelda], cause: 'queue.add', by: 'Maya' });
       socket.deliver('state', { version: 4, playback: { ...current, item: 'z' }, queue: [zelda], cause: 'ended' });
       expect(lines(session)).toEqual(['Sam added Video a', 'Maya added Zelda trailer', 'Up next: Zelda trailer']);
+    });
+
+    const settings = (mode: string) => ({ controlMode: mode, queueMode: mode });
+    const locked = { version: 2, playback: idle, queue: [], settings: settings('hosts'), cause: 'settings', by: 'Maya' };
+
+    it('says who locked and unlocked the room', async () => {
+      const { session, socket } = await live();
+      socket.deliver('state', locked);
+      socket.deliver('state', { ...locked, version: 3, settings: settings('everyone') });
+      expect(lines(session)).toEqual(['Maya turned on host controls', 'Maya turned off host controls']);
+    });
+
+    it('does not blame anyone for a handover', async () => {
+      const { session, socket } = await live();
+      socket.deliver('state', locked);
+      socket.deliver('state', { version: 3, playback: idle, queue: [], settings: settings('everyone'), cause: 'settings.release' });
+      socket.deliver('state', { version: 4, playback: idle, queue: [], settings: settings('hosts'), cause: 'settings.restore' });
+      expect(lines(session)).toEqual([
+        'Maya turned on host controls',
+        'Host controls are off until the host is back',
+        'Host controls are back on',
+      ]);
+    });
+
+    it('stays quiet when settings change nothing about control', async () => {
+      const { session, socket } = await live();
+      socket.deliver('state', { ...locked, settings: { controlMode: 'everyone', queueMode: 'hosts' } });
+      expect(lines(session)).toEqual([]);
     });
 
     it('writes nothing for a snapshot', async () => {

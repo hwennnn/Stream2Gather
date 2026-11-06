@@ -113,6 +113,11 @@ export const createYouTubePlayer = async (
     state: () => state,
     setMuted: (muted) => (muted ? player.mute?.() : player.unMute?.()),
     muted: () => player.isMuted?.() ?? false,
+    setVolume: (volume) => player.setVolume?.(Math.round(volume * 100)),
+    volume: () => {
+      const level = player.getVolume?.();
+      return level === undefined ? null : level / 100;
+    },
     onState: (listener) => {
       stateListener = listener;
     },

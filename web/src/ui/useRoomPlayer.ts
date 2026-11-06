@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { watchAutoplay } from '../players/autoplay';
-import { createHtml5Player } from '../players/html5';
+import { createPlayer } from '../players/registry';
 import type { PlayerAdapter, PlayerError } from '../players/types';
-import { createYouTubePlayer } from '../players/youtube';
 import type { QueueItem, RoomSession, RoomView } from '../room/session';
 import { track } from '../room/telemetry';
 import { expectedPosition, SyncController, type SyncReport } from '../sync/controller';
@@ -19,11 +18,6 @@ const BEHIND_FOR_MS = 3000;
 const LOAD_TIMEOUT_MS = 20_000;
 /** Some browsers won't fetch a file until play is pressed, so the poster can't wait for it. */
 const POSTER_LIMIT_MS = 8000;
-
-const createPlayer = (element: HTMLElement, item: QueueItem, startAt: number) =>
-  item.source === 'youtube'
-    ? createYouTubePlayer(element, item.sourceId, startAt)
-    : createHtml5Player(element, item.url, startAt);
 
 type Events = {
   onPlayer: (player: PlayerAdapter | null) => void;
@@ -181,6 +175,8 @@ const mountPlayer = (stage: HTMLElement, session: RoomSession, item: QueueItem, 
 
 export type RoomPlayer = {
   stage: React.RefObject<HTMLDivElement | null>;
+  /** The player on the stage now, for anything outside sync that needs one. */
+  adapter: () => PlayerAdapter | null;
   report: SyncReport;
   ready: boolean;
   failure: PlayerError | null;
@@ -219,6 +215,7 @@ export const useRoomPlayer = (session: RoomSession, view: RoomView): RoomPlayer 
 
   return {
     stage,
+    adapter: () => player.current,
     report,
     ready: readyId === currentId,
     failure: failed && failed.id === currentId ? failed.error : null,

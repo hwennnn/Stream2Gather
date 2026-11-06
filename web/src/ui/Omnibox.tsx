@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { api, ApiError, type Media } from '../api/http';
+import { useAccount } from '../auth/account';
 import type { QueueMode } from '../room/session';
 import { formatTime, looksLikeUrl, normalizeUrl } from './format';
 import { Icon } from './Icon';
+import { addPrompt } from './sources';
 import { Thumb } from './Thumb';
 import type { Adder, AddStatus } from './useAdder';
 
@@ -75,6 +77,7 @@ export const useSearch = (adder: Adder): Search => {
 type AddBoxProps = { id: string; search: Search; adder: Adder; large?: boolean };
 
 export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
+  const { config } = useAccount();
   const { close } = search;
   const open = search.query !== null;
   const errorId = `${id}-error`;
@@ -112,7 +115,7 @@ export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
             search.setValue(event.target.value);
             adder.clearProblem();
           }}
-          placeholder={large ? 'Paste a link or search YouTube' : 'Paste a link or search'}
+          placeholder={large ? addPrompt(config?.sources ?? []) : 'Paste a link or search'}
           autoComplete="off"
           spellCheck={false}
           enterKeyHint="search"
@@ -147,7 +150,17 @@ export const AddBox = ({ id, search, adder, large }: AddBoxProps) => {
   );
 };
 
-export const SearchResults = ({ search, adder }: { search: Search; adder: Adder }) => {
+type ResultsProps = { search: Search; adder: Adder };
+
+/** Extra is a labelled group of its own beside the results, which YouTube's rules keep unmixed. */
+export const SearchResults = ({ extra, ...props }: ResultsProps & { extra?: ReactNode }) => (
+  <>
+    {props.search.query !== null && extra}
+    <Results {...props} />
+  </>
+);
+
+const Results = ({ search, adder }: ResultsProps) => {
   if (search.query === null) return null;
   return (
     <section aria-label="Search results" className="enter">

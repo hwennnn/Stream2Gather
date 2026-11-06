@@ -15,6 +15,12 @@ const STATUS_TEXT = new Map([
   ['unavailable', 'Can’t play this video'],
 ]);
 
+const VOICE_TEXT = new Map([
+  ['listening', 'Listening'],
+  ['muted', 'Muted'],
+  ['live', 'Mic on'],
+]);
+
 const MAX_NAME = 32;
 
 export const PeoplePanel = ({ session, view, onToast }: Props) => {
@@ -27,6 +33,7 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
           const own = person.userId === view.self?.userId;
           const status = view.viewerStates[person.userId];
           const detail = (status && STATUS_TEXT.get(status)) ?? (person.role === 'host' ? 'Host' : '');
+          const badges = [person.member ? 'Crew' : undefined, VOICE_TEXT.get(person.voice ?? '')].filter(Boolean);
 
           if (own && editing) {
             return (
@@ -42,6 +49,11 @@ export const PeoplePanel = ({ session, view, onToast }: Props) => {
                 <span className="min-w-0 truncate">{person.name}</span>
                 {own && <span className="shrink-0 font-normal text-muted">(you)</span>}
               </span>
+              {badges.map((badge) => (
+                <span key={badge} className="chip shrink-0">
+                  {badge}
+                </span>
+              ))}
               {detail && <span className="shrink-0 text-xs text-muted">{detail}</span>}
               {own && (
                 <button type="button" onClick={() => setEditing(true)} className="btn btn-ghost btn-sm">

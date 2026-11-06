@@ -75,6 +75,10 @@ export const createHtml5Player = async (
       video.muted = muted;
     },
     muted: () => video.muted,
+    setVolume: (volume) => {
+      video.volume = volume;
+    },
+    volume: () => video.volume,
     onState: (listener) => {
       stateListener = listener;
     },

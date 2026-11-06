@@ -40,4 +40,10 @@ describe('createHtml5Player', () => {
     expect(states).toEqual(['playing', 'ended']);
     expect(player.state()).toBe('ended');
   });
+
+  it('reads back the volume it was given', async () => {
+    const { player } = await mount();
+    player.setVolume(0.3);
+    expect(player.volume()).toBe(0.3);
+  });
 });

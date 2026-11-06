@@ -69,6 +69,39 @@ describe('an error raised before ready', () => {
   });
 });
 
+describe('volume', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const mount = async (getVolume?: () => number) => {
+    const setVolume = vi.fn();
+    class FakePlayer {
+      setVolume = setVolume;
+      getVolume = getVolume;
+      constructor(_target: unknown, options: { events: { onReady: () => void } }) {
+        queueMicrotask(() => options.events.onReady());
+      }
+    }
+    const YT = { Player: FakePlayer };
+    vi.stubGlobal('YT', YT);
+    vi.stubGlobal('window', { YT, location: { origin: 'http://test' } });
+    vi.stubGlobal('document', { createElement: () => ({}) });
+    const player = await createYouTubePlayer({ replaceChildren: () => {} } as unknown as HTMLElement, 'abc', 0);
+    return { player, setVolume };
+  };
+
+  it('converts to and from the 0 to 100 YouTube uses', async () => {
+    const { player, setVolume } = await mount(() => 30);
+    player.setVolume(0.25);
+    expect(setVolume).toHaveBeenCalledWith(25);
+    expect(player.volume()).toBe(0.3);
+  });
+
+  it('says so when a player cannot report its volume', async () => {
+    const { player } = await mount();
+    expect(player.volume()).toBeNull();
+  });
+});
+
 describe('createErrorChannel', () => {
   it('passes errors straight through once someone listens', () => {
     const channel = createErrorChannel();

@@ -20,6 +20,8 @@ class FakePlayer implements PlayerAdapter {
   state() { return this.status; }
   setMuted() {}
   muted() { return false; }
+  setVolume() {}
+  volume() { return 1; }
   onState(listener: (state: PlayerState) => void) { this.listener = listener; }
   onError(_listener: (error: PlayerError) => void) {}
   destroy() {}

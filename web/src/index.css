@@ -735,6 +735,145 @@ body {
   transition-duration: var(--beat);
 }
 
+/* ---- The floor -----------------------------------------------------------
+ * The room's light comes from the people in it: each one casts a pool of their own colour on the
+ * floor around their seat, so an empty room is dark and a full one is warm. Nothing is taken from
+ * the video. A pool ends at the row's top edge, so it never reaches the player. It's painted once
+ * and only its opacity changes: down with the house lights, up when they come up, and a second
+ * copy for a moment when someone reacts. A pale colour at low strength reads as fog, so the lamp
+ * is the same hue, deeper. Seat names are read through this light: at these levels, with a flare at
+ * its peak, they stay above 4.5:1 for every hue. Check that before turning anything up.
+ */
+.room-shell {
+  --floor: 0.24;
+  --floor-away: 0.08;
+  --flare: 0.28;
+  --pool-w: 9rem;
+  --pool-h: 7.5rem;
+  --pool-top: -0.375rem;
+  --pool-x: 1.25rem;
+}
+
+.room-shell[data-lights='up'] {
+  --floor: 0.3;
+  --floor-away: 0.1;
+  --flare: 0.14;
+}
+
+.front-row[data-idle='true'] {
+  --pool-w: 10rem;
+  --pool-top: 0;
+  --pool-x: 1.625rem;
+}
+
+/* In the top bar a pool stays inside the bar, clear of the player. */
+.seats[data-compact='true'] {
+  --pool-w: 4rem;
+  --pool-h: 2.5rem;
+  --pool-top: 0.125rem;
+  --pool-x: 0.875rem;
+}
+
+@media (max-width: 639px) and (min-height: 501px) {
+  .seats[data-compact='true'] {
+    --pool-w: 5rem;
+    --pool-h: 2.75rem;
+    --pool-top: 0;
+    --pool-x: 1.25rem;
+  }
+}
+
+.seat[data-away] {
+  --lamp: oklch(from var(--hue) 0.5 calc(c * 1.5) h);
+}
+
+.seat[data-away]::before,
+.seat[data-hop]::after {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  top: var(--pool-top);
+  left: calc(var(--pool-x) - var(--pool-w) / 2);
+  width: var(--pool-w);
+  height: var(--pool-h);
+  background: radial-gradient(
+    closest-side,
+    var(--lamp),
+    color-mix(in srgb, var(--lamp) 80%, transparent) 22%,
+    color-mix(in srgb, var(--lamp) 48%, transparent) 46%,
+    color-mix(in srgb, var(--lamp) 20%, transparent) 68%,
+    color-mix(in srgb, var(--lamp) 6%, transparent) 85%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.seat[data-away]::before {
+  opacity: var(--floor);
+  transition: opacity 900ms var(--ease-room);
+  animation: pool-on var(--glance) var(--ease-room) both;
+}
+
+.room-shell[data-lights='up'] .seat[data-away]::before {
+  transition-duration: var(--beat);
+}
+
+.seat[data-away='true']::before {
+  opacity: var(--floor-away);
+}
+
+.seat[data-hop]::after {
+  opacity: 0;
+}
+
+/* Their name is the dimmest text in the row, so their light stays as it is. */
+.seat[data-away='true']::after {
+  display: none;
+}
+
+.seat[data-hop='0']::after {
+  animation: pool-flare-a 1.8s linear both;
+}
+
+.seat[data-hop='1']::after {
+  animation: pool-flare-b 1.8s linear both;
+}
+
+@keyframes pool-on {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Two names for one flare, so a second reaction in the same seat starts it again. */
+@keyframes pool-flare-a {
+  12% {
+    opacity: var(--flare);
+  }
+  45% {
+    opacity: calc(var(--flare) * 0.4);
+  }
+}
+
+@keyframes pool-flare-b {
+  12% {
+    opacity: var(--flare);
+  }
+  45% {
+    opacity: calc(var(--flare) * 0.4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat[data-hop]::after {
+    display: none;
+  }
+
+  .seat[data-away]::before {
+    animation: none;
+  }
+}
+
 /* ---- Seats ---------------------------------------------------------------
  * The room's signature. Fixed places under the screen, one per person, in the
  * order they sat down. Nothing here is ever drawn over the player.
@@ -751,8 +890,14 @@ body {
   gap: 0.25rem 1.5rem;
   height: var(--seats);
   padding-inline: 1rem;
-  /* The row's moments can't reach the player, however far a seat moves. */
-  overflow-y: clip;
+  /* The row's moments can't reach the player, however far a seat moves. Below it, the light can fall on the floor. */
+  clip-path: inset(0 -100vw -100vh);
+}
+
+/* The row's clip puts it above what follows, and its light belongs under that. */
+.front-row ~ * {
+  position: relative;
+  z-index: 1;
 }
 
 /*
@@ -1382,6 +1527,38 @@ body {
     width: 0.5rem;
     background: inherit;
     transition: inherit;
+  }
+}
+
+/* On a phone the floor is the strip under the seats, down to the bar's hairline. The row reaches into
+ * it without taking any height, each pool stays under its own disc, and a seat that has slid behind
+ * the count and Invite takes its light with it. */
+@media (max-width: 639px) and (min-height: 600px) {
+  .seats[data-compact='true'] {
+    --pool-w: 3.5rem;
+    --pool-h: 5.75rem;
+    overflow-y: hidden;
+    margin-bottom: -1.125rem;
+    padding-bottom: 1.125rem;
+  }
+
+  .seats[data-compact='true'] .seat-pin::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    inset-inline: 0;
+    height: 1.125rem;
+    background: inherit;
+    transition: inherit;
+  }
+
+  .seats[data-compact='true'] .seat-pin[data-count]::before {
+    bottom: -1.125rem;
+  }
+
+  .seat-track-slot {
+    position: relative;
+    z-index: 2;
   }
 }
 

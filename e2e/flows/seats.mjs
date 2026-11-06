@@ -152,6 +152,9 @@ flow('moments: with reduced motion the news still arrives and nothing moves', as
   await t.see('the reaction shows', said);
   await t.sleep(1000);
   t.check('and can still be read a second on', Number(await said.evaluate((node) => getComputedStyle(node).opacity)) > 0.9);
+  const light = await ui.seat(a.page, 'Ben').evaluate((seat) => ({ pool: Number(getComputedStyle(seat, '::before').opacity), flare: getComputedStyle(seat, '::after').display }));
+  t.check('their light stays on', light.pool > 0, String(light.pool));
+  t.eq('and doesn’t pulse', light.flare, 'none');
   const mark = a.page.locator('.front-row .wake-mark > span');
   const first = await mark.evaluate((node) => node.getBoundingClientRect().left);
   await t.sleep(800);
@@ -246,6 +249,50 @@ flow('moments: the room is dark until something plays, and the lights come up at
   t.eq('lights up for the credits', await lights(), 'up');
   const seat = await ui.seats(a.page).locator('.seat-disc').first().evaluate((el) => el.getBoundingClientRect().width);
   t.check('seats don’t outgrow the words', seat <= 52, String(seat));
+});
+
+// What each place on the row casts, and where that light ends.
+const floor = (page) => page.evaluate(() => {
+  const end = document.querySelector('[data-player]').getBoundingClientRect().bottom;
+  return [...document.querySelectorAll('.front-row .seat')].map((seat) => {
+    const pool = getComputedStyle(seat, '::before');
+    return {
+      light: pool.backgroundImage.startsWith('radial-gradient') ? pool.backgroundImage : null,
+      strength: Number(pool.opacity),
+      clear: seat.getBoundingClientRect().top + parseFloat(pool.top) >= end,
+    };
+  });
+});
+
+flow('floor: the light comes from who is here, stays off the player, and follows the house lights', async (t) => {
+  const a = await t.person('Ana', { viewport: { width: 1440, height: 800 } });
+  const b = await t.person('Ben');
+  const room = await startRoom(t, a);
+  await addByMessage(t, a.page, [sample(t.base)]);
+  await joinRoom(b, room.url);
+  await t.until('both play', async () => (await Promise.all([a.sample(), b.sample()])).every((s) => s?.state === 'playing'), 12_000);
+  const lit = async () => (await floor(a.page)).filter(({ light }) => light);
+  await t.until('two people, two pools', async () => (await lit()).length === 2, 4000);
+  t.check('an empty seat casts nothing', (await floor(a.page)).some(({ light }) => !light));
+  const pools = await lit();
+  t.check('each in their own colour', pools[0].light !== pools[1].light);
+  t.check('none of it reaches the player', pools.every(({ clear }) => clear));
+  const strength = async () => (await lit())[0].strength;
+  await t.until('low while it plays', async () => (await strength()) < 0.25, 3000);
+  const low = await strength();
+
+  await react(b.page, '🔥');
+  const flare = () => ui.seat(a.page, 'Ben').evaluate((seat) => seat.getAnimations({ subtree: true }).some(({ animationName }) => animationName?.startsWith('pool-flare')));
+  await t.until('a reaction brightens that seat', flare, 2000);
+  t.check('and nobody else’s', !(await ui.seat(a.page, 'You').evaluate((seat) => seat.getAnimations({ subtree: true }).some(({ animationName }) => animationName?.startsWith('pool-flare')))));
+
+  await player(b.page).pause();
+  await t.see('who paused', ui.bar(a.page).getByText(/Paused by Ben/));
+  await t.until('the pools lift with the lights', async () => (await strength()) > low, 3000);
+  const solid = await ui.bar(a.page).getByRole('button', { name: 'Resume for everyone' });
+  t.eq('the main button stays solid', await solid.evaluate((node) => getComputedStyle(node).backgroundImage), 'none');
+  await solid.click();
+  await t.until('and settle when it plays', async () => Math.abs((await strength()) - low) < 0.01, 4000);
 });
 
 flow('moments: theatre mode passes on what a friend says, off the video', async (t) => {

@@ -35,7 +35,7 @@ func TestWatchlistStoresOnlyIdsAndJoinsTitlesFresh(t *testing.T) {
 	kept, stale := seedMedia(t, s, "test", "Marker title"), seedMedia(t, s, "test", "Old title")
 
 	for _, media := range []room.Media{kept, kept, stale} {
-		if response, _ := serve(s, http.MethodPost, path, watchBody(media), as); response.Code != http.StatusNoContent {
+		if response, _ := serve(s, http.MethodPost, path, watchBody(media), as); response.Code != http.StatusOK {
 			t.Fatalf("add: %d %s", response.Code, response.Body)
 		}
 	}
@@ -56,13 +56,13 @@ func TestWatchlistStoresOnlyIdsAndJoinsTitlesFresh(t *testing.T) {
 
 	_, removeBody := serve(s, http.MethodGet, "/v1/crews/"+slug, "", as)
 	id := removeBody["watchlist"].([]any)[0].(map[string]any)["id"].(float64)
-	if response, _ := serve(s, http.MethodDelete, path+"/"+strconv.FormatInt(int64(id), 10), "", as); response.Code != http.StatusNoContent {
+	if response, _ := serve(s, http.MethodDelete, path+"/"+strconv.FormatInt(int64(id), 10), "", as); response.Code != http.StatusOK {
 		t.Fatalf("remove: %d", response.Code)
 	}
 	if response, _ := serve(s, http.MethodDelete, path+"/"+strconv.FormatInt(int64(id), 10), "", as); response.Code != http.StatusNotFound {
 		t.Fatalf("remove twice: %d", response.Code)
 	}
-	if response, _ := serve(s, http.MethodPost, path, watchBody(kept), as); response.Code != http.StatusNoContent {
+	if response, _ := serve(s, http.MethodPost, path, watchBody(kept), as); response.Code != http.StatusOK {
 		t.Fatalf("add it back: %d", response.Code)
 	}
 }
@@ -120,7 +120,7 @@ func TestWatchlistLimitHoldsUnderParallelAdds(t *testing.T) {
 		})
 	}
 	group.Wait()
-	if first, second := <-codes, <-codes; first+second != http.StatusNoContent+http.StatusConflict {
+	if first, second := <-codes, <-codes; first+second != http.StatusOK+http.StatusConflict {
 		t.Fatalf("racing for the last place: %d and %d", first, second)
 	}
 }

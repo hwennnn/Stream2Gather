@@ -16,3 +16,14 @@ func TestSlugHasEnoughRandomness(t *testing.T) {
 		seen[slug] = true
 	}
 }
+
+func TestARoomHasOneName(t *testing.T) {
+	for slug, want := range map[string]string{
+		"sleepy-maple-ztcecw5k": "Sleepy maple room",
+		"amber-otter-x2mb4e28":  "Amber otter room",
+	} {
+		if got := RoomNameFor(slug); got != want {
+			t.Fatalf("RoomNameFor(%q) = %q, want %q", slug, got, want)
+		}
+	}
+}

@@ -46,6 +46,7 @@ func (f *fakeRecorder) waitFor(t *testing.T, event string, want int) {
 }
 
 func (f *fakeRecorder) Run(context.Context)             {}
+func (f *fakeRecorder) Dropped() int64                  { return 0 }
 func (f *fakeRecorder) Applied(_ string, s room.State)  { f.add("applied:" + s.Playback.Status) }
 func (f *fakeRecorder) Joined(_ string, p store.Person) { f.add("joined:" + p.UserID) }
 func (f *fakeRecorder) Left(_, userID string)           { f.add("left:" + userID) }

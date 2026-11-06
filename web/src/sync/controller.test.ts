@@ -179,6 +179,35 @@ describe('SyncController', () => {
     expect(Math.abs(drift(playback))).toBeLessThan(DRIFT_OK_S);
   });
 
+  describe('a player that cannot change rate', () => {
+    beforeEach(() => {
+      player.rates = 'none';
+    });
+
+    it('leaves drift alone inside its wider target', () => {
+      sync.apply(playing(0, timers.now));
+      run(2);
+      player.rate = 0.8; // Falls behind slowly, as a player does, not in a jump.
+      run(6);
+      expect(player.seeks).toEqual([]);
+      expect(player.rate).toBe(0.8); // Nothing tried to nudge it either.
+      expect(reports.at(-1)?.health).toBe('synced');
+    });
+
+    it('corrects by seeking alone, once past it', () => {
+      const playback = playing(0, timers.now);
+      sync.apply(playback);
+      run(2);
+      player.rate = 0.7;
+      run(7);
+      expect(player.seeks).toHaveLength(1);
+      expect(player.rate).toBe(0.7); // No nudge touched it.
+      expect(player.status).toBe('playing');
+      expect(Math.abs(drift(playback))).toBeLessThan(1.5);
+      expect(commands).toEqual([]);
+    });
+  });
+
   it('seeks when too far behind for a nudge', () => {
     const playback = playing(100, timers.now);
     player.current = 100;

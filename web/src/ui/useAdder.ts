@@ -10,7 +10,7 @@ const ADDED_GRACE_MS = 3000;
 /** Reworded here so a raw server sentence can't reach the add box. */
 const friendly = (error: unknown): string => {
   const message = error instanceof Error ? error.message : 'That didn’t work. Try again.';
-  return /not supported/i.test(message) ? 'That link isn’t supported. Paste a YouTube link.' : message;
+  return /not supported/i.test(message) ? 'That link isn’t supported yet.' : message;
 };
 
 export type Adder = {

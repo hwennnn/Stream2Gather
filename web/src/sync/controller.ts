@@ -30,6 +30,8 @@ const browserTimers: Timers = {
 
 /** Below this, viewers cannot perceive the gap and correcting only adds risk. */
 export const DRIFT_OK_S = 0.15;
+/** Every correction a player without rate control makes is a visible jump, so it allows more. */
+const SEEK_ONLY_OK_S = 1.5;
 const NUDGE_AHEAD_MAX_S = 2;
 const NUDGE_BEHIND_MAX_S = 3;
 const CATCH_UP_RATE = 1.25;
@@ -325,7 +327,8 @@ export class SyncController {
   private correct(drift: number, expected: number, now: number): void {
     const size = Math.abs(drift);
     this.noteHeld(size, now);
-    if (size < DRIFT_OK_S) {
+    const seekOnly = this.player.rates === 'none';
+    if (size < (seekOnly ? SEEK_ONLY_OK_S : DRIFT_OK_S)) {
       this.report({ health: 'synced', drift });
       return;
     }
@@ -338,6 +341,10 @@ export class SyncController {
       return;
     }
     if (this.nudging || this.settling(now)) return;
+    if (seekOnly) {
+      if (mayJump) this.jumpToRoom(expected, now);
+      return;
+    }
 
     const nudgeMax = ahead ? NUDGE_AHEAD_MAX_S : NUDGE_BEHIND_MAX_S;
     const jumpFrom = !ahead && this.player.rates === 'discrete' ? JUMP_BEHIND_S : nudgeMax;

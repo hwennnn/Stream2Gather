@@ -115,6 +115,7 @@ const SEND_PATIENCE_MS = 5000;
 const STAMP_SLACK_MS = 2000;
 /** How long a requested snapshot may take before pongs may force a reconnect. */
 const RESYNC_WAIT_MS = 5000;
+const LEAVE_PATIENCE_MS = 1000;
 const OFFLINE_COPY = 'You’re offline right now. Try again once you’re back.';
 const LOST_COPY = 'The connection dropped before that went through. Try again.';
 const TIMEOUT_COPY = 'That took too long. Try again.';
@@ -566,7 +567,9 @@ export class RoomSession {
 
   private membersChanged(members: Person[]): void {
     const before = this.view.members;
-    this.update({ members });
+    const { self } = this.view;
+    const role = members.find((person) => person.userId === self?.userId)?.role;
+    this.update({ members, self: self && role ? { ...self, role } : self });
     if (this.view.connection !== 'live') return;
 
     this.narrator.membersChanged(before, members, this.view.self?.userId);
@@ -707,5 +710,46 @@ export class RoomSession {
     if (this.voiceTimer !== null) clearTimeout(this.voiceTimer);
     this.voiceTimer = null;
     this.dropSocket();
+  }
+
+  /**
+   * Chrome can hold a dead page's socket open for many seconds, which keeps its
+   * seat in the room. Closing on the way out tells the server now.
+   */
+  followPage(page: Window = window): () => void {
+    const hide = () => this.close();
+    const show = (event: Event) => {
+      if ((event as PageTransitionEvent).persisted) this.retry();
+    };
+    page.addEventListener('pagehide', hide);
+    page.addEventListener('pageshow', show);
+    return () => {
+      page.removeEventListener('pagehide', hide);
+      page.removeEventListener('pageshow', show);
+    };
+  }
+
+  /**
+   * Says this is goodbye, so the seat goes now instead of after the grace a dropped
+   * signal gets. Waits for the server, so the next page can't still count them.
+   */
+  leave(): Promise<void> {
+    const socket = this.socket;
+    this.generation += 1;
+    this.clearReconnect();
+    this.stopClock();
+    if (!socket || !this.send('leave')) {
+      this.dropSocket();
+      return Promise.resolve();
+    }
+    return new Promise((resolve) => {
+      const gone = () => {
+        clearTimeout(timer);
+        this.dropSocket();
+        resolve();
+      };
+      const timer = setTimeout(gone, LEAVE_PATIENCE_MS);
+      socket.onclose = gone;
+    });
   }
 }

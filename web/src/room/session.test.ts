@@ -782,6 +782,105 @@ describe('RoomSession', () => {
     });
   });
 
+  describe('leaving', () => {
+    it('says goodbye and waits for the server before the page moves on', async () => {
+      const { session, socket } = await connected();
+      let left = false;
+      void session.leave().then(() => {
+        left = true;
+      });
+      expect(socket.ofType('leave')).toHaveLength(1);
+      await Promise.resolve();
+      expect(left).toBe(false);
+
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(left).toBe(true);
+    });
+
+    it('does not come back after the server closes the socket', async () => {
+      const { session, socket } = await connected();
+      void session.leave();
+      const opened = FakeSocket.opened;
+      socket.onclose?.();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(FakeSocket.opened).toBe(opened);
+    });
+
+    it('moves on anyway if the server never answers', async () => {
+      const { session } = await connected();
+      let left = false;
+      void session.leave().then(() => {
+        left = true;
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(left).toBe(true);
+    });
+
+    it('needs nothing from a socket that is already gone', async () => {
+      const { session, socket } = await connected();
+      socket.readyState = 3;
+      await expect(session.leave()).resolves.toBeUndefined();
+    });
+  });
+
+  describe('page lifecycle', () => {
+    const fakePage = () => {
+      const listeners = new Map<string, (event: { persisted?: boolean }) => void>();
+      return {
+        listeners,
+        addEventListener: (type: string, listener: (event: { persisted?: boolean }) => void) => listeners.set(type, listener),
+        removeEventListener: (type: string) => listeners.delete(type),
+      };
+    };
+
+    it('closes the socket as the page goes, because Chrome can keep it open for a while after', async () => {
+      const { session, socket } = await connected();
+      const page = fakePage();
+      session.followPage(page as unknown as Window);
+      page.listeners.get('pagehide')?.({});
+      expect(socket.closed).toBe(1);
+    });
+
+    it('comes back when the page is restored from the back-forward cache', async () => {
+      const { session } = await connected();
+      const page = fakePage();
+      session.followPage(page as unknown as Window);
+      page.listeners.get('pagehide')?.({});
+      const opened = FakeSocket.opened;
+      page.listeners.get('pageshow')?.({ persisted: true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(FakeSocket.opened).toBe(opened + 1);
+    });
+
+    it('ignores the first show of a page that was never hidden', async () => {
+      const { session } = await connected();
+      const page = fakePage();
+      session.followPage(page as unknown as Window);
+      const opened = FakeSocket.opened;
+      page.listeners.get('pageshow')?.({ persisted: false });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(FakeSocket.opened).toBe(opened);
+    });
+
+    it('stops listening when the room goes', async () => {
+      const { session } = await connected();
+      const page = fakePage();
+      session.followPage(page as unknown as Window)();
+      expect(page.listeners.size).toBe(0);
+    });
+  });
+
+  describe('host handover', () => {
+    it('makes a viewer the host when the roster says so', async () => {
+      const { session, socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      expect(session.getView().self?.role).toBe('member');
+      socket.deliver('members', { members: [{ userId: 'g_1', name: 'Ada', role: 'host' }] });
+      expect(session.getView().self?.role).toBe('host');
+    });
+  });
+
   describe('own chat lines', () => {
     const sent = async () => {
       const { session, socket } = await connected();

@@ -275,6 +275,7 @@ func decodeState(t *testing.T, message frame) (out struct {
 	Version  int64         `json:"version"`
 	Playback room.Playback `json:"playback"`
 	Queue    []room.Item   `json:"queue"`
+	Patch    *queuePatch   `json:"patch"`
 	Settings room.Settings `json:"settings"`
 	Cause    string        `json:"cause"`
 }) {

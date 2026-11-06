@@ -329,15 +329,51 @@ func encode(kind string, data any) []byte {
 	return body
 }
 
-// stateMessage carries what changed, with attribution for the UI. Queue has no
-// omitempty: an empty queue is news, and only playback events leave it out.
+// stateMessage carries what changed, with attribution for the UI. Queue is the
+// whole queue, for a client taking a snapshot. omitzero keeps an empty one, which
+// is news. Everyone else gets Patch, or neither if the queue didn't change.
 type stateMessage struct {
 	Version  int64          `json:"version"`
 	Playback room.Playback  `json:"playback"`
-	Queue    []room.Item    `json:"queue"`
+	Queue    []room.Item    `json:"queue,omitzero"`
+	Patch    *queuePatch    `json:"patch,omitempty"`
 	Settings *room.Settings `json:"settings,omitempty"`
 	Cause    string         `json:"cause"`
 	By       string         `json:"by,omitempty"`
+}
+
+// queuePatch turns the queue at the version before this one into this one:
+// replace Remove items at At with IDs. Items holds any of those a client can't
+// already have. Every viewer gets every change, so one full queue per change was
+// the largest thing the server sent. Size lets a client notice it had a different
+// queue, and ask for a snapshot.
+type queuePatch struct {
+	At     int         `json:"at"`
+	Remove int         `json:"remove"`
+	IDs    []string    `json:"ids"`
+	Items  []room.Item `json:"items,omitempty"`
+	Size   int         `json:"size"`
+}
+
+// diffQueue finds the one stretch that differs. Items are compared whole, so an
+// item that changed under its id is sent again.
+func diffQueue(before, after []room.Item) *queuePatch {
+	start := 0
+	for start < len(before) && start < len(after) && before[start] == after[start] {
+		start++
+	}
+	end := 0
+	for end < len(before)-start && end < len(after)-start && before[len(before)-1-end] == after[len(after)-1-end] {
+		end++
+	}
+	patch := &queuePatch{At: start, Remove: len(before) - start - end, IDs: []string{}, Size: len(after)}
+	for _, item := range after[start : len(after)-end] {
+		patch.IDs = append(patch.IDs, item.ID)
+		if !slices.Contains(before, item) {
+			patch.Items = append(patch.Items, item)
+		}
+	}
+	return patch
 }
 
 type playbackMessage struct {
@@ -361,6 +397,22 @@ func encodeChange(state room.State, change room.Change) []byte {
 		Version: state.Version, Playback: state.Playback, Queue: queue, Settings: &state.Settings,
 		Cause: change.Cause, By: change.By,
 	})
+}
+
+// encodeApplied is encodeChange for one step from a known queue, sending only
+// what that step changed. A client that missed a step notices by its version.
+func encodeApplied(before []room.Item, state room.State, change room.Change) []byte {
+	if !change.Queue && !change.Settings {
+		return encodeChange(state, change)
+	}
+	message := stateMessage{Version: state.Version, Playback: state.Playback, Cause: change.Cause, By: change.By}
+	if change.Queue {
+		message.Patch = diffQueue(before, state.Queue)
+	}
+	if change.Settings {
+		message.Settings = &state.Settings
+	}
+	return encode("state", message)
 }
 
 // encodeSnapshot tells a client to take this state whatever it holds now.
@@ -965,7 +1017,7 @@ func (r *liveRoom) mutate(ctx context.Context, actor room.Actor, cmd room.Comman
 				change, before = applied, state
 				return next, err
 			},
-			func(state room.State) ([]byte, error) { return encodeChange(state, change), nil },
+			func(state room.State) ([]byte, error) { return encodeApplied(before.Queue, state, change), nil },
 		)
 	}
 	state, err := attempt()

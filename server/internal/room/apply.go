@@ -21,6 +21,8 @@ const (
 	CmdSettings    = "settings"
 	// Issued only by the server, when the host goes away and comes back.
 	CmdHostPass = "host.pass"
+	// Issued only by the server, to bring a kept room's titles up to date.
+	CmdMediaRefresh = "media.refresh"
 )
 
 // Where queue.add puts a video.
@@ -48,6 +50,8 @@ type Command struct {
 	Mode      string `json:"-"`
 	Media     *Media `json:"-"`
 	NewItemID string `json:"-"`
+	// Fresh is the current metadata for a media refresh.
+	Fresh []Media `json:"-"`
 }
 
 // UnmarshalJSON accepts a fractional CT. Browsers compute it from a clock
@@ -115,6 +119,9 @@ func Apply(s State, actor Actor, cmd Command, now int64) (State, Change, error) 
 		err = applySettings(&s, actor, cmd)
 	case CmdHostPass:
 		err = applyHostPass(&s, actor, cmd)
+	case CmdMediaRefresh:
+		change.Queue = true
+		err = applyMediaRefresh(&s, actor, cmd, now)
 	default:
 		err = ErrInvalid
 	}
@@ -364,6 +371,49 @@ func Narrate(before, after State, change Change) string {
 		return change.By + " turned off host controls"
 	}
 	return ""
+}
+
+func applyMediaRefresh(s *State, actor Actor, cmd Command, now int64) error {
+	if !actor.System {
+		return ErrForbidden
+	}
+	if !s.Renew(cmd.Fresh, now) {
+		return ErrStale
+	}
+	return nil
+}
+
+// Renew rewrites the queue from current metadata, the only copy this state may
+// keep past its source's time limit. A video with none has gone and leaves the
+// queue; if it was playing, the next one starts. It reports whether anything
+// changed, and takes the pending jump with it, which holds an old copy of a video.
+func (s *State) Renew(fresh []Media, now int64) bool {
+	current := make(map[[2]string]Media, len(fresh))
+	for _, media := range fresh {
+		current[[2]string{media.Source, media.SourceID}] = media
+	}
+	kept := make([]Item, 0, len(s.Queue))
+	changed := false
+	for _, item := range s.Queue {
+		media, found := current[[2]string{item.Source, item.SourceID}]
+		if !found {
+			changed = true
+			continue
+		}
+		changed = changed || media != item.Media
+		item.Media = media
+		kept = append(kept, item)
+	}
+	if !changed {
+		return false
+	}
+	wasPlaying := len(s.Queue) > 0 && (len(kept) == 0 || kept[0].ID != s.Queue[0].ID)
+	s.Queue = kept
+	s.Jump = nil
+	if wasPlaying {
+		start(s, now)
+	}
+	return true
 }
 
 func validMode(mode string) bool { return mode == ModeEveryone || mode == ModeHosts }

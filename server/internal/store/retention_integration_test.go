@@ -98,3 +98,28 @@ func TestStaleCountSeesOnlyWhatIsPastDue(t *testing.T) {
 		t.Fatalf("count = %d", count)
 	}
 }
+
+func TestFreshMediaLeavesOutWhatIsPastTheLimit(t *testing.T) {
+	db, ctx := testPostgres(t), context.Background()
+	source := "test-" + ids.New()
+	if err := db.PutMedia(ctx, []room.Media{{Source: source, SourceID: "new"}, {Source: source, SourceID: "old"}}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := db.pool.Exec(ctx, `
+		UPDATE media SET fetched_at = now() - interval '31 days' WHERE source = $1 AND source_id = 'old'`, source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	queue := []room.Item{
+		{Media: room.Media{Source: source, SourceID: "new"}},
+		{Media: room.Media{Source: source, SourceID: "old"}},
+		{Media: room.Media{Source: source, SourceID: "missing"}},
+	}
+	fresh, err := db.FreshMedia(ctx, queue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fresh) != 1 || fresh[0].SourceID != "new" {
+		t.Fatalf("fresh = %+v", fresh)
+	}
+}

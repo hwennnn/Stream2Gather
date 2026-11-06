@@ -485,6 +485,8 @@ type liveRoom struct {
 	// subscribed turns true on Redis's first confirmation. Any later one means
 	// the subscription was lost and restored.
 	subscribed atomic.Bool
+	// renewed is set once this server has checked a kept room's titles.
+	renewed bool
 }
 
 func (r *liveRoom) limitsFor(userID string) *limits {
@@ -856,6 +858,25 @@ func (r *liveRoom) ensureState(ctx context.Context) (room.State, error) {
 	return state, nil
 }
 
+// renewMedia runs at a room's first join. A crew room can sit for weeks, and what
+// it queued then may have changed or gone by the time anyone comes back.
+func (r *liveRoom) renewMedia(ctx context.Context, state room.State) {
+	if r.renewed || len(state.Queue) == 0 {
+		return
+	}
+	r.renewed = true
+	access, err := r.hub.db.CrewAccessOf(ctx, r.id, "")
+	if err != nil || !access.Exists {
+		return
+	}
+	fresh, err := r.hub.db.FreshMedia(ctx, state.Queue)
+	if err != nil {
+		r.hub.log.Warn("media refresh failed", "room", r.id, "error", err)
+		return
+	}
+	r.applySystem(ctx, room.Command{Type: room.CmdMediaRefresh, Fresh: fresh})
+}
+
 // settleEmptyRoom pauses a room that nobody has watched for a while, at the
 // point the last viewer left, instead of letting it run on without them.
 func (r *liveRoom) settleEmptyRoom(ctx context.Context) {
@@ -1003,6 +1024,7 @@ func (r *liveRoom) join(c *conn, ticket store.Ticket) {
 		return
 	}
 	r.settleEmptyRoom(ctx)
+	r.renewMedia(ctx, state)
 	if latest, found, err := r.hub.live.Load(ctx, r.id); err == nil && found {
 		state = latest
 	}

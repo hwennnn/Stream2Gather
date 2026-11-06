@@ -653,3 +653,70 @@ func TestNarrateSaysOnlyWhatChangedTheRoom(t *testing.T) {
 		}
 	}
 }
+
+func refreshState() State {
+	s := New()
+	s.Queue = []Item{
+		{ID: "a", Media: Media{Source: "youtube", SourceID: "A", Title: "Old A"}, AddedBy: "u1"},
+		{ID: "b", Media: Media{Source: "youtube", SourceID: "B", Title: "Old B"}},
+	}
+	s.Playback = Playback{ItemID: "a", Status: StatusPlaying, Pos: 12, At: 1000, Rate: 1}
+	return s
+}
+
+func TestMediaRefreshRewritesTitlesWithoutTouchingPlayback(t *testing.T) {
+	s := refreshState()
+	fresh := []Media{{Source: "youtube", SourceID: "A", Title: "New A"}, {Source: "youtube", SourceID: "B", Title: "Old B"}}
+	next, change, err := Apply(s, Actor{System: true}, Command{Type: CmdMediaRefresh, Fresh: fresh}, 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if next.Queue[0].Title != "New A" || next.Queue[0].AddedBy != "u1" || next.Playback != s.Playback || !change.Queue {
+		t.Fatalf("next = %+v, change = %+v", next, change)
+	}
+	if s.Queue[0].Title != "Old A" {
+		t.Fatal("input state was modified")
+	}
+}
+
+func TestMediaRefreshDropsWhatHasGoneAndMovesOn(t *testing.T) {
+	fresh := []Media{{Source: "youtube", SourceID: "B", Title: "Old B"}}
+	next, _, err := Apply(refreshState(), Actor{System: true}, Command{Type: CmdMediaRefresh, Fresh: fresh}, 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next.Queue) != 1 || next.Playback.ItemID != "b" || next.Playback.Pos != 0 {
+		t.Fatalf("next = %+v", next)
+	}
+
+	next, _, err = Apply(refreshState(), Actor{System: true}, Command{Type: CmdMediaRefresh}, 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next.Queue) != 0 || next.Playback.Status != StatusIdle {
+		t.Fatalf("with everything gone: %+v", next)
+	}
+}
+
+func TestMediaRefreshKeepsThePlaceWhenALaterVideoGoes(t *testing.T) {
+	s := refreshState()
+	fresh := []Media{{Source: "youtube", SourceID: "A", Title: "Old A"}}
+	next, _, err := Apply(s, Actor{System: true}, Command{Type: CmdMediaRefresh, Fresh: fresh}, 2000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(next.Queue) != 1 || next.Playback != s.Playback {
+		t.Fatalf("next = %+v", next)
+	}
+}
+
+func TestMediaRefreshIsSilentWithNothingToDoAndNeverAClientCommand(t *testing.T) {
+	s := refreshState()
+	same := []Media{s.Queue[0].Media, s.Queue[1].Media}
+	if _, _, err := Apply(s, Actor{System: true}, Command{Type: CmdMediaRefresh, Fresh: same}, 2000); !errors.Is(err, ErrStale) {
+		t.Fatalf("no change: %v", err)
+	}
+	if _, _, err := Apply(s, Actor{Role: RoleHost}, Command{Type: CmdMediaRefresh}, 2000); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("from a client: %v", err)
+	}
+}

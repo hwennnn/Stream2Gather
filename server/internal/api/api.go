@@ -35,6 +35,9 @@ const (
 	sessionCookie = "s2g_session"
 	sessionTTL    = 90 * 24 * time.Hour
 	maxBodyBytes  = 64 << 10
+	// requestTimeout bounds what a stuck Redis or Postgres can hold open. It stays
+	// under the client's wait, so an answer comes back rather than a silence.
+	requestTimeout = 12 * time.Second
 	// High enough for a watch party behind one campus or office address.
 	guestsPerHour = 600
 	// Each search can spend YouTube quota the whole site shares.
@@ -83,6 +86,8 @@ type Server struct {
 
 	assets   sync.Map
 	versions sessionVersions
+	// requestTimeout is here so that tests need not wait it out.
+	requestTimeout time.Duration
 }
 
 // Handler returns the route table.
@@ -109,7 +114,11 @@ func (s *Server) Handler() http.Handler {
 	s.crewRoutes(mux)
 	s.voiceRoutes(mux)
 	s.pushRoutes(mux)
-	return securityHeaders(mux, contentPolicy(policy{
+	timeout := s.requestTimeout
+	if timeout == 0 {
+		timeout = requestTimeout
+	}
+	return securityHeaders(withDeadline(mux, timeout), contentPolicy(policy{
 		ClerkHost:   auth.ClerkHost(s.ClerkPublishableKey),
 		Socket:      socketOrigin(s.PublicOrigin),
 		DirectMedia: s.DirectMedia,
@@ -181,6 +190,16 @@ func contentPolicy(p policy) string {
 		"worker-src 'self' blob:; " +
 		"connect-src 'self'" + connect + "; " +
 		"object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+}
+
+// withDeadline gives every request a deadline. A socket leaves it behind once it
+// has upgraded, because Serve runs on a context without one.
+func withDeadline(next http.Handler, timeout time.Duration) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
+		defer cancel()
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 func securityHeaders(next http.Handler, policy string) http.Handler {

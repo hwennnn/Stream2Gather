@@ -216,11 +216,19 @@ func (r *liveRoom) command(c *conn, message Message) {
 		}
 	}
 	cmd.Type = message.Type
-	r.do(func() { r.applyFor(c, message.ID, cmd) })
+	r.queueFor(c, message.ID, cmd)
 }
 
-func (r *liveRoom) applyFor(c *conn, id string, cmd room.Command) {
-	ctx, cancel := opContext()
+// queueFor hands a command to the room. Its time starts now, not when the room
+// gets to it: after a stall, a pause from half a minute ago must not land on
+// viewers who have long since moved on.
+func (r *liveRoom) queueFor(c *conn, id string, cmd room.Command) {
+	deadline := time.Now().Add(r.hub.commandPatience)
+	r.do(func() { r.applyFor(c, id, cmd, deadline) })
+}
+
+func (r *liveRoom) applyFor(c *conn, id string, cmd room.Command, deadline time.Time) {
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
 	defer cancel()
 
 	_, err := r.mutate(ctx, actorOf(c), cmd)
@@ -284,7 +292,7 @@ func (r *liveRoom) queueAdd(ctx context.Context, c *conn, message Message) {
 	}
 
 	cmd := room.Command{Type: room.CmdQueueAdd, Mode: request.Mode, Media: &media, NewItemID: ids.New()}
-	r.do(func() { r.applyFor(c, message.ID, cmd) })
+	r.queueFor(c, message.ID, cmd)
 }
 
 func (r *liveRoom) chat(c *conn, message Message) {

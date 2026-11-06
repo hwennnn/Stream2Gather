@@ -27,6 +27,48 @@ type Config struct {
 	ClerkPublishable  string
 	ClerkSecret       string
 	SearchDailyBudget int
+	LiveKit           LiveKit
+	VAPID             VAPID
+	EnableVimeo       bool
+	EnableTwitch      bool
+	TwitchParent      string
+}
+
+// LiveKit is the voice server. The zero value means voice is off.
+type LiveKit struct {
+	URL       string
+	APIKey    string
+	APISecret string
+}
+
+// minLiveKitSecret is the shortest secret LiveKit accepts.
+const minLiveKitSecret = 32
+
+// Enabled reports whether voice can mint tokens.
+func (l LiveKit) Enabled() bool {
+	return l.URL != "" && l.APIKey != "" && len(l.APISecret) >= minLiveKitSecret
+}
+
+// Origins lists the addresses a browser needs to reach: the socket, and the
+// plain HTTP address the client probes when that socket fails.
+func (l LiveKit) Origins() []string {
+	if !l.Enabled() {
+		return nil
+	}
+	if rest, ok := strings.CutPrefix(l.URL, "wss://"); ok {
+		return []string{l.URL, "https://" + rest}
+	}
+	if rest, ok := strings.CutPrefix(l.URL, "ws://"); ok {
+		return []string{l.URL, "http://" + rest}
+	}
+	return []string{l.URL}
+}
+
+// VAPID signs web push. Only the notifier holds the private key.
+type VAPID struct {
+	PublicKey  string
+	PrivateKey string
+	Subject    string
 }
 
 // Load reads the environment. Values in .env.local fill in anything unset, and
@@ -54,6 +96,19 @@ func Load() (Config, error) {
 		ClerkPublishable:  os.Getenv("CLERK_PUBLISHABLE_KEY"),
 		ClerkSecret:       os.Getenv("CLERK_SECRET_KEY"),
 		SearchDailyBudget: 90,
+		LiveKit: LiveKit{
+			URL:       os.Getenv("LIVEKIT_URL"),
+			APIKey:    os.Getenv("LIVEKIT_API_KEY"),
+			APISecret: os.Getenv("LIVEKIT_API_SECRET"),
+		},
+		VAPID: VAPID{
+			PublicKey:  os.Getenv("VAPID_PUBLIC_KEY"),
+			PrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
+			Subject:    os.Getenv("VAPID_SUBJECT"),
+		},
+		EnableVimeo:  os.Getenv("ENABLE_VIMEO") == "true",
+		EnableTwitch: os.Getenv("ENABLE_TWITCH") == "true",
+		TwitchParent: env("TWITCH_PARENT", "localhost"),
 	}
 	if cfg.Env != "dev" && cfg.SessionKey == "" {
 		return Config{}, fmt.Errorf("SESSION_KEY is required outside dev")

@@ -128,11 +128,11 @@ func connectSrc(policy string) string {
 }
 
 func TestConnectPolicy(t *testing.T) {
-	plain := connectSrc(contentPolicy("", "wss://s2g.example", false))
+	plain := connectSrc(contentPolicy(policy{Socket: "wss://s2g.example"}))
 	if plain != "connect-src 'self' wss://s2g.example" {
 		t.Fatalf("got %q", plain)
 	}
-	direct := connectSrc(contentPolicy("", "wss://s2g.example", true))
+	direct := connectSrc(contentPolicy(policy{Socket: "wss://s2g.example", DirectMedia: true}))
 	if !strings.Contains(direct, " https:") {
 		t.Fatalf("hls.js could not load: %q", direct)
 	}

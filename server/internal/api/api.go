@@ -23,6 +23,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"stream2gather/internal/auth"
+	"stream2gather/internal/config"
 	"stream2gather/internal/hub"
 	"stream2gather/internal/ids"
 	"stream2gather/internal/room"
@@ -72,6 +73,12 @@ type Server struct {
 	// Clerk is nil when sign-in is not configured; guests still work.
 	Clerk               ClerkVerifier
 	ClerkPublishableKey string
+	// Voice is the zero value when LiveKit is not configured.
+	Voice          config.LiveKit
+	VAPIDPublicKey string
+	// Vimeo and Twitch open the content policy to those players.
+	Vimeo, Twitch bool
+	TwitchParent  string
 
 	assets   sync.Map
 	versions sessionVersions
@@ -97,7 +104,17 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/ws", s.socket)
 	mux.HandleFunc("GET /r/{slug}", s.roomPage)
 	mux.HandleFunc("GET /", s.static)
-	return securityHeaders(mux, contentPolicy(auth.ClerkHost(s.ClerkPublishableKey), socketOrigin(s.PublicOrigin), s.DirectMedia))
+	s.crewRoutes(mux)
+	s.voiceRoutes(mux)
+	s.pushRoutes(mux)
+	return securityHeaders(mux, contentPolicy(policy{
+		ClerkHost:   auth.ClerkHost(s.ClerkPublishableKey),
+		Socket:      socketOrigin(s.PublicOrigin),
+		DirectMedia: s.DirectMedia,
+		Voice:       s.Voice.Origins(),
+		Vimeo:       s.Vimeo,
+		Twitch:      s.Twitch,
+	}))
 }
 
 // socketOrigin is the page's own origin as a WebSocket address. Not every
@@ -112,23 +129,44 @@ func socketOrigin(public string) string {
 	return ""
 }
 
+// policy is what the page may reach beyond itself and YouTube.
+type policy struct {
+	ClerkHost   string
+	Socket      string
+	DirectMedia bool
+	// Voice is LiveKit's addresses: its socket, and the https one it probes.
+	Voice         []string
+	Vimeo, Twitch bool
+}
+
 // contentPolicy allows Clerk's script, sign-in calls and bot check only when
 // sign-in is configured. Direct media needs https: because hls.js fetches its
 // playlists and segments, from whatever host they are on, with fetch.
-func contentPolicy(clerkHost, socket string, directMedia bool) string {
+func contentPolicy(p policy) string {
 	script, frame, images, connect := "", "", "", ""
-	if socket != "" {
-		connect = " " + socket
+	if p.Socket != "" {
+		connect = " " + p.Socket
 	}
-	if directMedia {
+	if p.DirectMedia {
 		connect += " https:"
 	}
-	if clerkHost != "" {
+	for _, origin := range p.Voice {
+		connect += " " + origin
+	}
+	if p.Vimeo {
+		frame += " https://player.vimeo.com"
+		images += " https://i.vimeocdn.com"
+	}
+	if p.Twitch {
+		script += " https://player.twitch.tv"
+		frame += " https://player.twitch.tv"
+	}
+	if clerkHost := p.ClerkHost; clerkHost != "" {
 		const challenge = " https://challenges.cloudflare.com"
 		const protection = " https://*.protect.clerk.com"
-		script = " https://" + clerkHost + challenge + protection
-		frame = challenge
-		images = " https://img.clerk.com"
+		script += " https://" + clerkHost + challenge + protection
+		frame += challenge
+		images += " https://img.clerk.com"
 		// Clerk's bot check probes several ports on this host.
 		connect += " https://" + clerkHost + protection + ":*"
 	}
@@ -147,6 +185,7 @@ func securityHeaders(next http.Handler, policy string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header := w.Header()
 		header.Set("Content-Security-Policy", policy)
+		header.Set("Permissions-Policy", "microphone=(self)")
 		// YouTube's player needs the origin to identify the embedding site.
 		header.Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		header.Set("X-Content-Type-Options", "nosniff")
@@ -218,7 +257,13 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) config(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"sources": s.Catalog.Names(), "clerkPublishableKey": s.ClerkPublishableKey})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"sources":             s.Catalog.Names(),
+		"clerkPublishableKey": s.ClerkPublishableKey,
+		"voice":               s.Voice.Enabled(),
+		"vapidPublicKey":      s.VAPIDPublicKey,
+		"twitchParent":        s.TwitchParent,
+	})
 }
 
 // session returns the caller's identity, if any.
@@ -533,6 +578,7 @@ type preview struct {
 	Playback   *playbackPeek  `json:"playback"`
 	Members    []store.Person `json:"members"`
 	MaxMembers int            `json:"maxMembers"`
+	Crew       *crewSummary   `json:"crew,omitempty"`
 }
 
 // playbackPeek is where a room is, without the fields only the sync engine needs.
@@ -573,6 +619,9 @@ func (s *Server) roomPreview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	out, err := s.buildPreview(r.Context(), record)
+	if err == nil {
+		out.Crew, err = s.crewPreview(r, record)
+	}
 	if err != nil {
 		s.internal(w, err)
 		return
@@ -591,6 +640,10 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	member, ok := s.crewEntry(w, r, record, claims)
+	if !ok {
+		return
+	}
 	sockets, err := s.Live.Sockets(r.Context(), record.ID, claims.Subject)
 	if err != nil {
 		s.internal(w, err)
@@ -623,7 +676,7 @@ func (s *Server) ticket(w http.ResponseWriter, r *http.Request) {
 		RoomID:   record.ID,
 		RoomSlug: record.Slug,
 		RoomName: record.Name,
-		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar},
+		Person:   store.Person{UserID: claims.Subject, Name: claims.Name, Role: role, AvatarURL: claims.Avatar, Member: member},
 	})
 	if err != nil {
 		s.internal(w, err)
@@ -666,7 +719,7 @@ func (s *Server) messages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	before, _ := strconv.ParseInt(r.URL.Query().Get("before"), 10, 64)
-	items, err := s.DB.Messages(r.Context(), record.ID, before, 50)
+	items, err := s.roomMessages(r, record, before, 50)
 	if err != nil {
 		s.internal(w, err)
 		return

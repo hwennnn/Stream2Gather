@@ -73,9 +73,11 @@ const MAX_BACKOFF_MS = 5000;
 const REACTION_LIFE_MS = 2600;
 const NOTICE_LIFE_MS = 8000;
 const MAX_ENTRIES = 300;
-const PING_EVERY_MS = 10_000;
+const PING_EVERY_MS = 3000;
+/** Only every third ping samples the clock and compares versions, so both keep their pace. */
+const CHECK_EVERY_PINGS = 3;
 /** A dead network can take minutes to fire onclose, so silence counts as closed. */
-const MAX_UNANSWERED_PINGS = 3;
+const SILENCE_LIMIT_MS = 8000;
 const REQUEST_TIMEOUT_MS = 15_000;
 /** How long a requested snapshot may take before pongs may force a reconnect. */
 const RESYNC_WAIT_MS = 5000;
@@ -100,7 +102,9 @@ export class RoomSession {
   private generation = 0;
   private nextId = 1;
   private pending = new Map<string, Pending>();
-  private unanswered = 0;
+  private beats = 0;
+  private lastBeat = 0;
+  private lastHeard = 0;
   private joinStartedAt = performance.now();
   private lastStatus = '';
   private behindAt: number | null = null;
@@ -187,10 +191,10 @@ export class RoomSession {
   }
 
   private startClock(): void {
-    // The opening burst tunes the clock. It is not counted, because a slow link
-    // sends all of it before the first answer can arrive.
+    // The opening burst tunes the clock.
     for (let i = 0; i < 5; i += 1) window.setTimeout(() => this.ping(), i * 120);
-    this.unanswered = 0;
+    this.lastBeat = Date.now();
+    this.lastHeard = this.lastBeat;
     this.pinger = window.setInterval(() => this.heartbeat(), PING_EVERY_MS);
   }
 
@@ -200,13 +204,18 @@ export class RoomSession {
   }
 
   private heartbeat(): void {
-    if (this.unanswered >= MAX_UNANSWERED_PINGS) {
+    const now = Date.now();
+    // A background tab's timers run late, and then the silence proves nothing.
+    if (now - this.lastBeat > PING_EVERY_MS * 2) this.lastHeard = now;
+    this.lastBeat = now;
+    if (now - this.lastHeard >= SILENCE_LIMIT_MS) {
       this.dropSocket();
       this.handleClose();
       return;
     }
-    this.unanswered += 1;
-    this.ping();
+    this.beats += 1;
+    if (this.beats % CHECK_EVERY_PINGS === 0) this.ping();
+    else this.send('ping');
   }
 
   private dropSocket(): void {
@@ -279,6 +288,7 @@ export class RoomSession {
   }
 
   private receive(raw: string): void {
+    this.lastHeard = Date.now();
     const { t, d } = JSON.parse(raw) as { t: string; d: never };
     switch (t) {
       case 'welcome':
@@ -384,7 +394,7 @@ export class RoomSession {
   }
 
   private pong(data: { t0: number; ts: number; version?: number }): void {
-    this.unanswered = 0;
+    if (data.t0 === 0) return; // A ping that only asked whether anyone is there.
     this.clock.addSample(data.t0, data.ts, Date.now());
     if (this.view.connection !== 'live' || data.version === undefined) return;
     if (this.resyncAt !== null && Date.now() - this.resyncAt < RESYNC_WAIT_MS) return;

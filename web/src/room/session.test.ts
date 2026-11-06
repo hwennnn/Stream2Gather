@@ -45,7 +45,7 @@ const welcome = (version: number) => ({
   members: [],
 });
 
-const pong = (version: number) => ({ t0: 0, ts: 0, version });
+const pong = (version: number) => ({ t0: 1, ts: 0, version });
 
 const idle = { item: '', status: 'idle', pos: 0, at: 0, rate: 1 };
 
@@ -133,8 +133,8 @@ describe('RoomSession', () => {
   it('ignores a pong that has no version to report', async () => {
     const { socket } = await connected();
     socket.deliver('welcome', welcome(5));
-    socket.deliver('pong', { t0: 0, ts: 0 });
-    socket.deliver('pong', { t0: 0, ts: 0 });
+    socket.deliver('pong', { t0: 1, ts: 0 });
+    socket.deliver('pong', { t0: 1, ts: 0 });
     expect(socket.closed).toBe(0);
   });
 
@@ -412,11 +412,13 @@ describe('RoomSession', () => {
       expect(FakeSocket.opened).toBe(1);
     });
 
-    it('tears down a socket that stopped answering, without waiting for onclose', async () => {
+    it('calls a silent socket dead within ten seconds, without waiting for onclose', async () => {
       const { session, socket } = await connected();
       socket.deliver('welcome', welcome(1));
       socket.onopen?.();
-      await vi.advanceTimersByTimeAsync(40_000);
+      await vi.advanceTimersByTimeAsync(7900);
+      expect(socket.closed).toBe(0);
+      await vi.advanceTimersByTimeAsync(2100);
       expect(socket.closed).toBe(1);
       expect(socket.onclose).toBeNull();
       expect(session.getView().connection).toBe('reconnecting');
@@ -425,24 +427,48 @@ describe('RoomSession', () => {
       expect(FakeSocket.opened).toBe(2);
     });
 
-    it('does not count the opening burst as unanswered', async () => {
+    it('keeps a socket that goes on answering', async () => {
       const { socket } = await connected();
       socket.deliver('welcome', welcome(1));
       socket.onopen?.();
-      await vi.advanceTimersByTimeAsync(1000); // Five pings sent, no answer yet.
-      socket.deliver('pong', pong(1));
-      await vi.advanceTimersByTimeAsync(25_000);
+      for (let i = 0; i < 20; i += 1) {
+        await vi.advanceTimersByTimeAsync(5000);
+        socket.deliver('pong', { t0: 0, ts: 0 });
+      }
       expect(socket.closed).toBe(0);
     });
 
-    it('keeps a socket that answers late', async () => {
+    it('counts any frame as a sign of life, not just a pong', async () => {
       const { socket } = await connected();
       socket.deliver('welcome', welcome(1));
       socket.onopen?.();
-      for (let i = 0; i < 10; i += 1) {
-        await vi.advanceTimersByTimeAsync(10_000);
-        socket.deliver('pong', pong(1));
-      }
+      await vi.advanceTimersByTimeAsync(6000);
+      socket.deliver('react', { emoji: '🔥', name: 'Maya' });
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(socket.closed).toBe(0);
+    });
+
+    it('does not blame the socket when the browser slept through its timers', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(1));
+      socket.onopen?.();
+      vi.setSystemTime(Date.now() + 60_000); // No timer ran for a minute.
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(socket.closed).toBe(0);
+    });
+
+    it('samples the clock and checks versions at the old pace, not on every ping', async () => {
+      const { socket } = await connected();
+      socket.deliver('welcome', welcome(9));
+      socket.onopen?.();
+      await vi.advanceTimersByTimeAsync(5000);
+      socket.deliver('pong', { t0: 0, ts: 0 });
+      await vi.advanceTimersByTimeAsync(4000);
+      const pings = socket.ofType('ping').slice(-3);
+      expect(pings.map((ping) => ping.d?.t0 !== undefined)).toEqual([false, false, true]);
+      // A pong that only proves life can't count towards a version gap.
+      socket.deliver('pong', { t0: 0, ts: 0, version: 12 });
+      socket.deliver('pong', { t0: 0, ts: 0, version: 12 });
       expect(socket.closed).toBe(0);
     });
 

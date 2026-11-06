@@ -55,9 +55,6 @@ export const failureNote = (view: RoomView): string => {
   return view.alone ? '' : 'Others are still watching.';
 };
 
-/** Chat keeps its box and People its host switch along the bottom of the rail, clear of toasts. */
-export const toastLift = (tab: string): string => (tab === 'queue' ? 'bottom-3' : 'bottom-[84px]');
-
 /** Alone with nothing said, the invite stays open without being asked for. */
 export const offersInvite = (view: RoomView): boolean => view.alone && !view.messages.some(({ kind }) => kind === 'chat');
 

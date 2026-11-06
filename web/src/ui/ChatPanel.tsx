@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { ChatEntry, ChatLine, RoomSession, RoomView } from '../room/session';
 import { formatClock, isYouTubeUrl, splitLinks } from './format';
 import { Icon } from './Icon';
@@ -17,6 +17,8 @@ type Props = {
   view: RoomView;
   active: boolean;
   onToast: (text: string) => void;
+  /** Sits between the log and the box, so it shortens the log rather than covering a line. */
+  toasts?: ReactNode;
 };
 
 type Block = { kind: 'system'; entry: Extract<ChatEntry, { kind: 'system' }> } | { kind: 'chat'; messages: ChatLine[] } | { kind: 'time'; at: string };
@@ -39,7 +41,7 @@ const toBlocks = (entries: ChatEntry[]): Block[] => {
   return blocks;
 };
 
-export const ChatPanel = ({ session, view, active, onToast }: Props) => {
+export const ChatPanel = ({ session, view, active, onToast, toasts }: Props) => {
   const [text, setText] = useState('');
   const [slow, setSlow] = useState(false);
   const [missed, setMissed] = useState(false);
@@ -107,6 +109,17 @@ export const ChatPanel = ({ session, view, active, onToast }: Props) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [last?.id, active]);
 
+  // A notice shortens the log from below, and the latest line shouldn't go behind it.
+  useEffect(() => {
+    const element = list.current;
+    if (!element || !active) return undefined;
+    const observer = new ResizeObserver(() => {
+      if (stuck.current) element.scrollTop = element.scrollHeight;
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [active]);
+
   const onScroll = () => {
     const element = list.current;
     if (!element || !active) return;
@@ -159,6 +172,8 @@ export const ChatPanel = ({ session, view, active, onToast }: Props) => {
           </button>
         )}
       </div>
+
+      {toasts}
 
       <form onSubmit={(event) => void submit(event)} className="rail-edge relative border-t border-line py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <label htmlFor="chat" className="sr-only">

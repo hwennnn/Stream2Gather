@@ -142,6 +142,10 @@ for (const size of WIDTHS) {
     await checkPage(t, `${width} chat`, page);
     await checkPlayer(t, `${width} chat`, page);
 
+    await ui.chatLog(page).getByRole('button', { name: 'Add to queue' }).last().click();
+    await t.see('a notice', rail.locator('[aria-live] p'));
+    await checkPage(t, `${width} chat with a notice`, page);
+
     await openTab(page, 'Queue');
     await t.see('the long queue', ui.upNext(page).getByRole('listitem'));
     report(seen, width, 'queue', checkGutters(t, `${width} queue`, await gutters(page)));

@@ -4,4 +4,3 @@
 # hide among old ones. Fix the bug, delete its line.
 # P-01 stays on purpose: a seek before the controller's first tick is dropped, so a joiner's player reporting 0 can't move the room.
 P-01 | a seek in the first moment after joining
-L-09 | with the Undo notice: every control can be reached: Add to queue is under

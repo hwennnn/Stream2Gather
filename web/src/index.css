@@ -642,10 +642,12 @@ body {
   border-radius: 999px;
 }
 
-/* On a phone the track comes up to the top bar with the seats, in a row kept whether or not a video is on. */
+/* On a phone the track comes up to the top bar with the seats, in a row kept whether or not a video is on.
+ * The clock's text box runs past the row, so the margin keeps it off the bar's bottom edge. */
 .seat-track-slot {
   display: none;
   height: 0.75rem;
+  margin-bottom: 0.125rem;
 }
 
 /* A short phone has no height to spare from chat, and a sideways one has no row under its seats. */

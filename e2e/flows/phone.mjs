@@ -1,6 +1,7 @@
 import { addByMessage, joinRoom, openTab, search, sendChat, startRoom, ui } from '../lib/app.mjs';
 import { LANDSCAPE, PHONE } from '../lib/client.mjs';
 import { video } from '../lib/fixtures.mjs';
+import { insets } from '../lib/layout.mjs';
 import { flow } from '../lib/runner.mjs';
 
 const golden = video('Golden Hour');
@@ -186,6 +187,11 @@ flow('phone: the track sits under the seats, in a row kept for it, and a short p
   t.eq('the header did not grow', await box('.room-header'), header);
   const above = await a.page.evaluate(() => document.querySelector('.seat-track-slot').getBoundingClientRect().bottom <= document.querySelector('[data-player]').getBoundingClientRect().top);
   t.check('the track is off the player', above);
+  for (const viewport of [PHONE, { width: 360, height: 740 }]) {
+    await a.page.setViewportSize(viewport);
+    const room = await insets(a.page, a.page.getByRole('banner'));
+    t.check(`${viewport.width}: the clock clears the bottom of the bar`, room?.bottom >= 4, JSON.stringify(room));
+  }
   await a.page.setViewportSize({ width: 320, height: 568 });
   await t.until('a short phone keeps the height for chat', async () => !(await slot.isVisible()));
 });

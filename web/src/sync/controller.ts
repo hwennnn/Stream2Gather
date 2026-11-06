@@ -43,6 +43,8 @@ const SEEK_COOLDOWN_MS = 10_000;
  */
 const SETTLE_MS = 1500;
 const USER_SEEK_THRESHOLD_S = 1;
+/** Buffering can skip a small gap in the video, so a jump across it must be bigger. */
+const USER_SEEK_BUFFERED_S = 3;
 /** A jump to within this of where we last sent the player is that seek landing. */
 const OWN_SEEK_WINDOW_S = 2;
 /** Beyond this, a throttled tab makes the time between ticks meaningless. */
@@ -66,9 +68,14 @@ export class SyncController {
   private playback: Playback | null = null;
   private settleFrom = -Infinity;
   private lastSeekAt = -Infinity;
-  private lastTime = 0;
   private lastTickAt = 0;
-  private lastState: PlayerState | null = null;
+  /**
+   * Where the player last was at a tick, running or resting on the room's paused
+   * position. It can only have moved on from here at its own speed, so anything
+   * else is a jump. Buffering leaves it alone: a seek that passes through
+   * buffering is still measured from where the player left.
+   */
+  private anchor: { time: number; at: number; buffered: boolean } | null = null;
   /** Where we sent the player, until it is seen arriving. Seeks can land late. */
   private pendingSeek: number | null = null;
   /**
@@ -127,7 +134,8 @@ export class SyncController {
 
     const expected = expectedPosition(playback, now);
     const jumped = Math.abs(this.player.time() - expected) > NUDGE_BEHIND_MAX_S;
-    const sameTimeline = previous?.item === playback.item && previous.status === 'playing';
+    // A new timeline is a command: everyone goes there now, however short the move.
+    const sameTimeline = previous !== null && samePlayback(previous, playback);
     this.act(() => {
       if (jumped || !sameTimeline) {
         if (Math.abs(this.player.time() - expected) > DRIFT_OK_S) this.seekTo(expected);
@@ -168,7 +176,8 @@ export class SyncController {
       // Either the room refused this viewer's play, or it never heard about it.
       if (state === 'playing' && !this.settling(now)) this.act(() => this.pausePlayer());
       this.detectPausedSeek(playback, state, time, now);
-      this.remember(time, now, state);
+      this.lastTickAt = now;
+      if (state === 'paused' && this.settled) this.remember(time, now);
       return;
     }
     if (playback.status !== 'playing' || now < playback.at) return;
@@ -178,7 +187,8 @@ export class SyncController {
 
     if (state === 'buffering' || state === 'loading') {
       this.report({ health: 'buffering', drift });
-      this.remember(time, now, state);
+      this.lastTickAt = now;
+      if (this.anchor) this.anchor.buffered = true;
       return;
     }
 
@@ -186,7 +196,7 @@ export class SyncController {
       // Most likely an ad. It is never skipped; the room carries on and this
       // viewer catches up afterwards.
       this.report({ health: 'stalled', drift });
-      this.remember(time, now, state);
+      this.remember(time, now);
       return;
     }
 
@@ -194,13 +204,14 @@ export class SyncController {
       this.act(() => this.playPlayer());
     }
 
-    if (!landed) this.detectUserSeek(playback, state, time, now, expected);
+    if (!landed && state === 'playing') this.detectUserSeek(playback, time, now, expected);
     this.correct(drift, expected, now);
-    this.remember(time, now, state);
+    if (state === 'playing') this.remember(time, now);
+    else this.lastTickAt = now;
   }
 
   private isStalled(state: PlayerState, time: number): boolean {
-    if (state !== 'playing' || Math.abs(time - this.lastTime) > 0.05) {
+    if (state !== 'playing' || !this.anchor || Math.abs(time - this.anchor.time) > 0.05) {
       this.stalledTicks = 0;
       return false;
     }
@@ -215,32 +226,23 @@ export class SyncController {
     return true;
   }
 
-  private remember(time: number, now: number, state: PlayerState): void {
-    this.lastTime = time;
+  private remember(time: number, now: number): void {
     this.lastTickAt = now;
-    this.lastState = state;
+    this.anchor = { time, at: now, buffered: false };
   }
 
   /**
    * The native player controls stay on, so a viewer's seek shows as a jump. It
-   * moves the whole room, so anything else must not pass for one: a player that
-   * was not running across both ticks, one that froze (its time did not move, it
-   * only fell behind the clock), or a tab the browser put to sleep between ticks.
+   * moves the whole room, so anything else must not pass for one: a player never
+   * seen running, one that froze or buffered (it only fell behind the clock), or
+   * a tab the browser put to sleep between ticks.
    */
-  private detectUserSeek(
-    playback: Playback,
-    state: PlayerState,
-    time: number,
-    now: number,
-    expected: number,
-  ): void {
-    if (state !== 'playing' || this.lastState !== 'playing') return;
-    if (now - this.lastTickAt > MAX_TICK_GAP_MS) return;
-    if (Math.abs(time - this.lastTime) <= USER_SEEK_THRESHOLD_S) return;
-
-    const elapsed = ((now - this.lastTickAt) / 1000) * playback.rate;
-    const jump = time - (this.lastTime + elapsed);
-    if (Math.abs(jump) > USER_SEEK_THRESHOLD_S && Math.abs(time - expected) > USER_SEEK_THRESHOLD_S) {
+  private detectUserSeek(playback: Playback, time: number, now: number, expected: number): void {
+    if (!this.anchor || now - this.lastTickAt > MAX_TICK_GAP_MS) return;
+    const elapsed = ((now - this.anchor.at) / 1000) * playback.rate;
+    const margin = this.anchor.buffered ? USER_SEEK_BUFFERED_S : USER_SEEK_THRESHOLD_S;
+    const jumped = time < this.anchor.time - margin || time > this.anchor.time + elapsed + margin;
+    if (jumped && Math.abs(time - expected) > USER_SEEK_THRESHOLD_S) {
       this.pendingSeek = null;
       this.markAction();
       this.emit({ type: 'seek', pos: time, ct: now });

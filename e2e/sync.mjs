@@ -305,17 +305,20 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   check('latency: both start', await waitPlaying([a, far], 20000), '');
 
   // The numbers below mean nothing unless the delay is really there.
+  // The app pings too, so only the pong that echoes this ping's t0 counts.
   const roundTrip = await far.page.evaluate(() => new Promise((resolve) => {
     const socket = window.__sockets.at(-1);
     const handler = socket.onmessage;
     const started = performance.now();
+    const t0 = Date.now();
     socket.onmessage = (event) => {
       handler(event);
-      if (JSON.parse(event.data).t !== 'pong') return;
+      const { t, d } = JSON.parse(event.data);
+      if (t !== 'pong' || d.t0 !== t0) return;
       socket.onmessage = handler;
       resolve(performance.now() - started);
     };
-    socket.send(JSON.stringify({ t: 'ping', d: { t0: Date.now() } }));
+    socket.send(JSON.stringify({ t: 'ping', d: { t0 } }));
   }));
   report.latencyRoundTripMs = Math.round(roundTrip);
   check('latency: round trip is really delayed', roundTrip >= LATENCY_MS * 2, `${Math.round(roundTrip)}ms`);
@@ -334,9 +337,7 @@ const waitPlaying = async (viewers, timeout = 15000) => {
   }
   check('latency: every pause and play lands', landed === 12, `${landed} of 12`);
 
-  // A seek shows as a jump between two ticks of a running player, so one made in
-  // the tick after resuming isn't seen. That is a known limit, not what this tests.
-  await sleep(2500);
+  // Straight after resuming, which is when a seek used to go unseen.
   const before = (await sampleAll([a]))[0].time;
   await far.page.evaluate((to) => { document.querySelector('video').currentTime = to; }, before + 30);
   const moved = await waitFor(async () => {

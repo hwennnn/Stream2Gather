@@ -40,6 +40,7 @@ func (s *Server) crewRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /s/{token}", s.recapPage)
 	mux.HandleFunc("GET /v1/crews/{slug}/items/{id}", s.crewItem)
 	mux.HandleFunc("GET /v1/crews/{slug}/moments", s.moments)
+	mux.HandleFunc("POST /v1/crews/{slug}/moments", s.addMoment)
 	mux.HandleFunc("GET /v1/crews/{slug}/watchlist", s.watchlist)
 	mux.HandleFunc("POST /v1/crews/{slug}/watchlist", s.addWatch)
 	mux.HandleFunc("DELETE /v1/crews/{slug}/watchlist/{id}", s.removeWatch)

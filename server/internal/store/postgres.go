@@ -228,11 +228,16 @@ func (p *Postgres) SaveMessage(ctx context.Context, roomID string, m Message) (M
 	return m, false, err
 }
 
+// visibleInRoom leaves out what someone said while catching up. It belongs to its
+// place in the video, and would make no sense in the room's chat.
+const visibleInRoom = `NOT EXISTS (
+	SELECT 1 FROM moments catchup WHERE catchup.message_id = messages.id AND catchup.origin = 'catchup')`
+
 // Messages returns chat older than before, newest first. Zero means latest.
 func (p *Postgres) Messages(ctx context.Context, roomID string, before int64, limit int) ([]Message, error) {
 	rows, err := p.pool.Query(ctx, `
 		SELECT id, user_id, author_name, body, created_at, COALESCE(client_id, '') FROM messages
-		WHERE room_id = $1 AND ($2 = 0 OR id < $2)
+		WHERE room_id = $1 AND ($2 = 0 OR id < $2) AND `+visibleInRoom+`
 		ORDER BY id DESC LIMIT $3`, roomID, before, limit)
 	if err != nil {
 		return nil, err
@@ -247,7 +252,7 @@ func (p *Postgres) Messages(ctx context.Context, roomID string, before int64, li
 func (p *Postgres) MessagesSince(ctx context.Context, roomID string, since time.Time, before int64, limit int) ([]Message, error) {
 	rows, err := p.pool.Query(ctx, `
 		SELECT id, user_id, author_name, body, created_at, COALESCE(client_id, '') FROM messages
-		WHERE room_id = $1 AND created_at >= $2 AND ($3 = 0 OR id < $3)
+		WHERE room_id = $1 AND created_at >= $2 AND ($3 = 0 OR id < $3) AND `+visibleInRoom+`
 		ORDER BY id DESC LIMIT $4`, roomID, since, before, limit)
 	if err != nil {
 		return nil, err

@@ -217,3 +217,6 @@ type Actor struct {
 	// System marks commands the server issues itself.
 	System bool `json:"-"`
 }
+
+// Reactions are the emoji a room offers. Anything else is refused.
+var Reactions = map[string]bool{"😂": true, "❤️": true, "🔥": true, "😮": true, "👏": true, "😭": true}

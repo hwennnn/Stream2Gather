@@ -54,3 +54,56 @@ func (p *Postgres) CrewItem(ctx context.Context, crewID string, itemID int64) (s
 	}
 	return source, sourceID, err
 }
+
+// CrewWatched reports whether any of a crew's sessions played this video.
+func (p *Postgres) CrewWatched(ctx context.Context, crewID, source, sourceID string) (bool, error) {
+	var watched bool
+	err := p.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM session_items i JOIN crew_sessions s ON s.id = i.session_id
+			WHERE s.crew_id = $1 AND i.source = $2 AND i.source_id = $3)`, crewID, source, sourceID).Scan(&watched)
+	return watched, err
+}
+
+// CatchupMoment is a reaction or chat line left by someone watching later.
+type CatchupMoment struct {
+	CrewID, RoomID   string
+	Source, SourceID string
+	PosMs            int64
+	UserID, Author   string
+	Emoji, Body      string
+}
+
+// AddCatchupMoment stores it for the next person. A chat line gets a messages row,
+// as a live one has, but stays out of the room: see visibleInRoom.
+func (p *Postgres) AddCatchupMoment(ctx context.Context, m CatchupMoment) (int64, error) {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+	kind := "reaction"
+	var emoji *string
+	var messageID *int64
+	if m.Body == "" {
+		emoji = &m.Emoji
+	} else {
+		kind = "chat"
+		messageID = new(int64)
+		err := tx.QueryRow(ctx, `
+			INSERT INTO messages (room_id, user_id, author_name, body) VALUES ($1, $2, $3, $4) RETURNING id`,
+			m.RoomID, m.UserID, m.Author, m.Body).Scan(messageID)
+		if err != nil {
+			return 0, err
+		}
+	}
+	var id int64
+	err = tx.QueryRow(ctx, `
+		INSERT INTO moments (crew_id, source, source_id, pos_ms, kind, origin, user_id, author_name, emoji, message_id)
+		VALUES ($1, $2, $3, $4, $5, 'catchup', $6, $7, $8, $9) RETURNING id`,
+		m.CrewID, m.Source, m.SourceID, m.PosMs, kind, m.UserID, m.Author, emoji, messageID).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	return id, tx.Commit(ctx)
+}

@@ -17,7 +17,7 @@ const hostPort = async (name, port) => {
   return stdout.trim().split('\n')[0].split(':').at(-1);
 };
 
-const startContainers = async (id) => {
+export const startContainers = async (id) => {
   const redis = `s2g-flows-redis-${id}`;
   const postgres = `s2g-flows-pg-${id}`;
   await run('docker', ['run', '-d', '--rm', '--name', redis, '-p', '127.0.0.1::6379', 'redis:8-alpine']);
@@ -32,6 +32,9 @@ const startContainers = async (id) => {
   }
   return { redis, postgres, redisPort: await hostPort(redis, 6379), postgresPort: await hostPort(postgres, 5432) };
 };
+
+export const stopContainers = ({ redis, postgres }) =>
+  Promise.allSettled([run('docker', ['rm', '-f', redis]), run('docker', ['rm', '-f', postgres])]);
 
 /** CI's service containers, when the job names them. They are the job's, so close leaves them. */
 const attachContainers = async () => {
@@ -132,7 +135,7 @@ export const startStack = async ({ tree, port, cache, youtubeUrl, youtubeKey }) 
     },
     async close({ keepLogs = false } = {}) {
       await stack.stop().catch(() => {});
-      if (!attached) await Promise.allSettled([run('docker', ['rm', '-f', redis]), run('docker', ['rm', '-f', postgres])]);
+      if (!attached) await stopContainers(containers);
       if (!keepLogs) await rm(work, { recursive: true, force: true });
     },
   };

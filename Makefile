@@ -63,6 +63,6 @@ e2e-push:
 flows:
 	cd e2e && npm ci --silent && node flows.mjs $(if $(GREP),--grep '$(GREP)')
 
-# Needs `make up` and Google Chrome. Measures a busy room in throttled Chrome and fails over e2e/perf-budgets.json.
+# Needs Docker and Google Chrome. Measures a busy room in throttled Chrome on its own databases, and fails over e2e/perf-budgets.json.
 perf:
-	cd e2e && npm ci --silent && DATABASE_URL=$${DATABASE_URL:-postgres://s2g:s2g@127.0.0.1:54339/s2g?sslmode=disable} node perf.mjs
+	cd e2e && npm ci --silent && node perf.mjs

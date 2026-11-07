@@ -23,7 +23,7 @@ import type { Beat } from './useBeat';
 import { NO_FRONT_ROW, useMediaQuery } from './useMediaQuery';
 import type { RoomPlayer } from './useRoomPlayer';
 import type { Act } from './status';
-import { useTrending, notInRoom } from './useTrending';
+import { useTrending } from './useTrending';
 import { Whisper } from './Whisper';
 
 type StageProps = {
@@ -83,7 +83,7 @@ export const PlayerStage = (props: StageProps) => {
       </div>
 
       {current && <PlayerBar {...props} item={current} />}
-      {!current && <Suggestions session={session} view={view} />}
+      {!current && <div className="up-next" />}
       {current && <UpNext session={session} view={view} onPickAnother={onPickAnother} onShowQueue={onShowQueue} onToast={onToast} />}
     </main>
   );
@@ -306,37 +306,3 @@ export const PlayerBar = ({ session, view, player, item, theatre, fullscreen, ca
   );
 };
 
-const STRIP_ITEMS = 6;
-
-/** With nothing on yet, this space goes to what could be. Once a video plays it's Up next, on every tab. */
-const Suggestions = ({ session, view }: { session: RoomSession; view: RoomView }) => {
-  const adder = useAdder(session, view);
-  const items = notInRoom(useTrending(), view.queue)?.slice(0, STRIP_ITEMS);
-  if (!items?.length || !canQueue(view)) return <div className="up-next" />;
-  return (
-    <section aria-label="Popular on YouTube" className="up-next">
-      <div className="up-next-inner h-full items-center gap-3 px-4 py-3">
-        <h3 className="w-16 shrink-0 text-[13px] leading-snug font-semibold">Popular</h3>
-        <ol className="up-next-cards up-next-flow">
-          {items.map((media) => (
-            <li key={media.sourceId} className="min-w-0">
-              <button
-                type="button"
-                disabled={adder.statusOf(media) === 'adding'}
-                title={`Add ${media.title}`}
-                onClick={() => void adder.addMedia(media, 'end')}
-                className="flex w-full items-center gap-2.5 rounded-md p-1 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-raised"
-              >
-                <Thumb src={media.thumbnailUrl} className="up-next-thumb w-24 rounded-md" />
-                <span className="min-w-0 flex-1">
-                  <span className="line-clamp-2 text-[13px] leading-[18px] font-medium">{media.title}</span>
-                  <span className="block truncate text-xs leading-4 text-muted">{media.author}</span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ol>
-      </div>
-    </section>
-  );
-};

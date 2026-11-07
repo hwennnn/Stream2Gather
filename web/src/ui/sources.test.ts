@@ -8,8 +8,8 @@ describe('addPrompt', () => {
   });
 
   it('names each link source that is on', () => {
-    expect(addPrompt(['youtube', 'direct'])).toBe('Search YouTube or paste a .m3u8 link');
-    expect(addPrompt(['youtube', 'vimeo', 'twitch', 'direct'])).toBe('Search YouTube or paste a Vimeo, Twitch or .m3u8 link');
+    expect(addPrompt(['youtube', 'direct'])).toBe('Search YouTube or paste a video link');
+    expect(addPrompt(['youtube', 'vimeo', 'twitch', 'direct'])).toBe('Search YouTube or paste a Vimeo, Twitch or video link');
   });
 });
 

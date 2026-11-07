@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright-core';
-import { BASE, bot, build, fakeYouTube, feedback, feedbacks, here, PHONE, results, startServer, thumbnails, viewer, windowed, youtubeId } from './perf-lib.mjs';
+import { BASE, bot, build, fakeYouTube, feedback, feedbacks, here, PHONE, results, startDatabases, startServer, thumbnails, viewer, windowed, youtubeId } from './perf-lib.mjs';
 
 const QUEUE_ROWS = 30;
 const CHAT_LINES = 300;
@@ -275,7 +275,8 @@ const checkBudgets = () => {
 const main = async () => {
   const work = mkdtempSync(join(tmpdir(), 's2g-perf-'));
   const youtube = await fakeYouTube();
-  const server = await startServer(build(work), work, youtube.url);
+  const databases = await startDatabases();
+  const server = await startServer(build(work), work, youtube.url, databases);
   const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
   try {
     const thumbs = await thumbnails();
@@ -307,6 +308,7 @@ const main = async () => {
     await browser.close();
     server.kill();
     youtube.server.close();
+    await databases.close();
   }
 
   const failures = process.env.PERF_NO_BUDGET ? [] : checkBudgets();

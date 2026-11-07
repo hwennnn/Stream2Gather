@@ -1,12 +1,12 @@
 // What e2e/perf.mjs is built from: a private server, a fake YouTube API, viewers
 // with no browser, and throttled real ones. See perf.mjs for how to run it.
 import { execFileSync, spawn } from 'node:child_process';
-import { randomInt } from 'node:crypto';
 import { copyFileSync, existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+import { startContainers, stopContainers } from './lib/stack.mjs';
 
 export const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -16,10 +16,6 @@ const CPU_SLOWDOWN = 4;
 const SOCKET_DELAY_MS = 40; // Each way, so about what a nearby server costs.
 const NETWORK = { offline: false, latency: 2 * SOCKET_DELAY_MS, downloadThroughput: 2.5e6, uploadThroughput: 1e6 };
 const SEARCH_DELAY_MS = 250;
-// Limits live in the shared Redis, where everything on this machine counts as one address,
-// so a run brings its own. A busy night used up the rooms limit and every run failed at the start.
-const ADDRESS = `10.${randomInt(256)}.${randomInt(256)}.${randomInt(1, 255)}`;
-const FROM_HERE = { 'x-forwarded-for': ADDRESS };
 
 export const youtubeId = (n) => `perfvideo${String(n).padStart(2, '0')}`;
 const video = (id) => {
@@ -69,14 +65,27 @@ export const build = (work) => {
   return { web, bin };
 };
 
-export const startServer = async ({ web, bin }, work, youtube) => {
+// The fake trending list is cached in Postgres, so a run on the shared one puts it on the real
+// preview's landing page for an hour. Everything a run writes goes when it ends.
+export const startDatabases = async () => {
+  const containers = await startContainers(`perf-${process.pid}`);
+  return {
+    env: {
+      DATABASE_URL: `postgres://s2g:s2g@127.0.0.1:${containers.postgresPort}/s2g?sslmode=disable`,
+      REDIS_ADDR: `127.0.0.1:${containers.redisPort}`,
+    },
+    close: () => stopContainers(containers),
+  };
+};
+
+export const startServer = async ({ web, bin }, work, youtube, databases) => {
   // A server left by a killed run would answer readyz and measure the wrong build.
   if (await fetch(`${BASE}/readyz`).then(() => true, () => false)) throw new Error(`port ${port} is already serving`);
   // It runs away from server/ so that a real YOUTUBE_API_KEY in .env.local can't apply.
   const server = spawn(bin, ['serve'], {
     cwd: work,
     stdio: 'ignore',
-    env: { ...process.env, HTTP_ADDR: `127.0.0.1:${port}`, PUBLIC_ORIGIN: BASE, ALLOW_DIRECT_MEDIA: 'true', TRUSTED_PROXY: 'true', WEB_DIR: web, YOUTUBE_API_KEY: 'fake', YOUTUBE_BASE_URL: youtube },
+    env: { ...process.env, ...databases.env, HTTP_ADDR: `127.0.0.1:${port}`, PUBLIC_ORIGIN: BASE, ALLOW_DIRECT_MEDIA: 'true', TRUSTED_PROXY: 'true', WEB_DIR: web, YOUTUBE_API_KEY: 'fake', YOUTUBE_BASE_URL: youtube },
   });
   for (let i = 0; i < 100; i += 1) {
     if (await fetch(`${BASE}/readyz`).then((r) => r.ok, () => false)) return server;
@@ -87,10 +96,10 @@ export const startServer = async ({ web, bin }, work, youtube) => {
 
 /** A viewer with no browser: a socket and a name, enough to be someone in the room. */
 export const bot = async (slug, name) => {
-  const session = await fetch(`${BASE}/v1/me`, { method: 'PATCH', headers: { 'content-type': 'application/json', ...FROM_HERE }, body: JSON.stringify({ name }) });
+  const session = await fetch(`${BASE}/v1/me`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
   if (!session.ok) throw new Error(`no guest session (${session.status})`);
   const cookie = session.headers.getSetCookie().map((value) => value.split(';')[0]).join('; ');
-  const answer = await fetch(`${BASE}/v1/rooms/${slug}/ticket`, { method: 'POST', headers: { cookie, ...FROM_HERE } });
+  const answer = await fetch(`${BASE}/v1/rooms/${slug}/ticket`, { method: 'POST', headers: { cookie } });
   const { ticket } = await answer.json();
   const socket = new WebSocket(`ws://127.0.0.1:${port}/v1/ws?ticket=${ticket}`);
   await new Promise((resolve, reject) => {
@@ -111,7 +120,7 @@ export const bot = async (slug, name) => {
 export const PHONE = { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true };
 
 export const viewer = async (browser, thumbs, { slow = true, device = { viewport: { width: 1280, height: 800 } } } = {}) => {
-  const context = await browser.newContext({ ...device, extraHTTPHeaders: FROM_HERE });
+  const context = await browser.newContext(device);
   await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
   // Thumbnails come from memory at their real sizes, so no run waits on the network.
   await context.route('https://i.ytimg.com/**', (route) => {

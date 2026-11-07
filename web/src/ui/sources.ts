@@ -43,7 +43,7 @@ export const failureReason = (source: string, kind: string): string => {
 const LINK_KINDS = new Map([
   ['vimeo', 'Vimeo'],
   ['twitch', 'Twitch'],
-  ['direct', '.m3u8'],
+  ['direct', 'video'],
 ]);
 
 /** Only YouTube has search, so the rest are named as links, and only when they're on. */

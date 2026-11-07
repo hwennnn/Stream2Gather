@@ -1,46 +1,83 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<p align="center"><img alt="cover" src="docs/logo.png" width="80px"/></p>
+<p align="center"><img alt="Stream2Gather logo" src="web/public/icons/192.png" width="80px"/></p>
 
 <h1 align="center">Stream2Gather</h1>
 
-<p align="center"><b>Stay connected made easier</b></p>
+<p align="center"><b>Save your friends a seat.</b></p>
 
-<p align="center"><img alt="cover" src="docs/cover.jpeg" width="80%"/></p>
+<p align="center"><img alt="Two people watching in a room, with seats under the video and chat beside it" src="docs/screenshots/room.jpg" width="100%"/></p>
 
-## Overview
+Stream2Gather is a watch-together web app. Paste a YouTube link, send the room to your friends, and everyone sees the same moment. When one of you pauses, everyone waits. Nobody needs an account to join.
 
-**Stream2Gather** is a watch-together web app. Everyone in a room sees the same YouTube video at the same moment, with a shared queue and live chat. Play, pause and seek reach the whole room over a WebSocket, and each browser keeps itself on the room's timeline. Nobody needs an account to join.
+## What's in a room
 
-> **Rebuild in progress.** `server/` (Go) and `web/` (Vite, React) replace `backend/` and `frontend/`. See [the plan](docs/rebuild/plan.md) and [the measurements](docs/rebuild/measurements.md).
->
-> To run it, add `YOUTUBE_API_KEY` to `server/.env.local`, then run `make up web serve` and open <http://localhost:18080>. Background jobs need `make temporal` and `make worker`.
->
-> `make test` runs the unit tests. `make e2e` runs real browsers against a private server on port 18082; it needs `make up`, Google Chrome and ffmpeg, and builds everything else itself.
+- **Playback in sync:** play, pause and seek reach everyone, and each browser keeps itself on the room's timeline.
+- **Seats:** everyone has a place under the video, and reactions appear on their seat.
+- **Shared queue:** search YouTube or paste a link, then reorder what's next together.
+- **Live chat:** it stays beside the video, and in fullscreen too.
+- **Voice:** optional, through LiveKit.
+- **Crews and recaps:** signed-in friends can keep a regular group, look back at what they watched, and catch up on what they missed.
 
-## Quick Demo
+Videos always play in each site's own player. YouTube is on by default; Vimeo, Twitch and direct video links can be turned on in the server config.
 
-### Video Controls and Playback
+## Screenshots
 
-<p align="center"><img alt="play-pause-seek" src="docs/play-pause-seek.gif" width="100%"/></p>
+| Start a room | Join a friend |
+| --- | --- |
+| <img alt="Landing page with a link box and a row of seats" src="docs/screenshots/landing.jpg"/> | <img alt="Join screen saying Maya saved you a seat" src="docs/screenshots/join.jpg"/> |
 
-### Live Chat
+The film in these screenshots is [Big Buck Bunny](https://peach.blender.org/), © Blender Foundation, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/).
 
-<p align="center"><img alt="live-chat" src="docs/live-chat.gif" width="100%"/></p>
+## Run it locally
 
-## Built With
+You need Docker, Go 1.26, Node 24 and a YouTube Data API key.
 
-- [Go](https://go.dev/) - The server: HTTP API, WebSocket hub and background jobs
-- [Redis](https://redis.io/) - Live room state, presence and pub/sub between servers
-- [PostgreSQL](https://www.postgresql.org/) - Rooms, chat history and cached video metadata
-- [React](https://react.dev/) with [Vite](https://vite.dev/) - The web client, styled with [Tailwind CSS](https://tailwindcss.com/)
-- [Temporal](https://temporal.io/) - Background jobs, kept off the playback path
-- [ClickHouse](https://clickhouse.com/) and [Grafana](https://grafana.com/) - Playback telemetry
-- [Clerk](https://clerk.com/) - Optional sign-in; guests need no account
+```sh
+cp server/.env.example server/.env.local   # then set YOUTUBE_API_KEY
+make up web serve
+```
 
-## Installation
+Open <http://localhost:18080>.
 
-See the note under [Overview](#overview) to run the rebuild. The [frontend](/frontend/README.md) and [backend](/backend/README.md) folders hold the legacy app, with their own instructions.
+| Command | What it adds |
+| --- | --- |
+| `make temporal` and `make worker` | Background jobs |
+| `make voice` | Voice rooms |
+| `make down` | Stops the local services |
+
+Sign-in is optional. Without Clerk keys in `server/.env.local`, everyone is a guest.
+
+## Test it
+
+| Command | What it runs |
+| --- | --- |
+| `make test` | Go and web unit tests |
+| `make flows` | Every user flow against a real server, Postgres and Redis |
+| `make e2e` | Sync checks in real browsers; needs `make up`, Google Chrome and ffmpeg |
+| `make perf` | A busy room in throttled Chrome, checked against `e2e/perf-budgets.json` |
+
+## Built with
+
+- [Go](https://go.dev/): HTTP API, WebSocket hub and background jobs
+- [React](https://react.dev/), [Vite](https://vite.dev/) and [Tailwind CSS](https://tailwindcss.com/): the web client
+- [PostgreSQL](https://www.postgresql.org/): rooms, chat history and cached video details
+- [Redis](https://redis.io/): live room state, presence and messages between servers
+- [Temporal](https://temporal.io/): background jobs, kept off the playback path
+- [ClickHouse](https://clickhouse.com/) and [Grafana](https://grafana.com/): playback telemetry
+- [Clerk](https://clerk.com/): optional sign-in
+- [LiveKit](https://livekit.io/): voice
+
+## Project layout
+
+| Folder | What's in it |
+| --- | --- |
+| `server/` | The Go server |
+| `web/` | The web client |
+| `e2e/` | Flow, browser and performance tests |
+| `deploy/` | Local services and telemetry dashboards |
+| `docs/rebuild/` | [The plan](docs/rebuild/plan.md) and [measurements](docs/rebuild/measurements.md) from the rebuild |
+| `backend/`, `frontend/` | The old app, kept for reference |
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE)
+MIT. See [LICENSE](LICENSE).

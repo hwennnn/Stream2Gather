@@ -1,7 +1,6 @@
 // Puts a throttled real browser in a busy room and measures every interaction on
 // the production build. `make perf` builds what it needs and runs it against a
-// private server and a fake YouTube API, so it costs no quota. A run makes about
-// 40 guests and the limit is 600 an hour, so clear limit:guest:* between long series.
+// private server and a fake YouTube API, so it costs no quota.
 //   PERF_BIN, PERF_WEB  a server binary and web build (with sample.mp4) to use instead
 //   PERF_PORT           port for the private server (18086)
 //   PERF_OUT            where to write the JSON results
@@ -220,8 +219,10 @@ const measureRoom = async (host, peer, bots) => {
 
   await tab('Queue').click();
   await windowed(page, 'play_now', async () => {
+    // Interrupting everyone waits in the tray, so the row's ⋯ comes first.
     const row = page.locator('[aria-label="Up next"] li.row').first();
     await row.hover();
+    await row.getByRole('button', { name: /^More for/ }).click();
     await page.evaluate(() => {
       window.__oldVideo = document.querySelector('[data-player] video');
     });
@@ -231,7 +232,8 @@ const measureRoom = async (host, peer, bots) => {
     };
     const [feedbackMs, frameMs] = await feedbacks(
       page,
-      [() => document.querySelector('[data-starting], .stage [role=status]') !== null, newFrame],
+      // The stage says nothing in words, so its first answer is the old video leaving.
+      [() => document.querySelector('[data-player] video') !== window.__oldVideo, newFrame],
       () => row.getByRole('button', { name: /^Play now/ }).click(),
     );
     return { feedbackMs, frameMs };
@@ -281,7 +283,7 @@ const main = async () => {
     await host.page.goto(BASE);
     const slug = await host.page.evaluate(async (url) => {
       const answer = await fetch('/v1/rooms', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) });
-      return (await answer.json()).slug;
+      return answer.ok ? (await answer.json()).slug : Promise.reject(new Error(`no room (${answer.status})`));
     }, HOST_VIDEO);
     await host.page.goto(`${BASE}/r/${slug}`);
     // The host of a new room walks straight in; anyone else stops at the gate.

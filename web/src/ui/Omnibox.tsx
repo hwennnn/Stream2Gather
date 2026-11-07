@@ -32,6 +32,8 @@ export const useSearch = (adder: Adder): Search => {
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const latest = useRef(0);
+  const typed = useRef(value);
+  typed.current = value;
 
   const close = useCallback(() => {
     latest.current += 1;
@@ -49,7 +51,8 @@ export const useSearch = (adder: Adder): Search => {
       setBusy(true);
       const added = await adder.addLink(normalizeUrl(text));
       setBusy(false);
-      if (added) close(); // A rejected link stays put so it can be fixed.
+      // A rejected link stays put so it can be fixed, and whatever came next stays too.
+      if (added && typed.current === value) close();
       return;
     }
 

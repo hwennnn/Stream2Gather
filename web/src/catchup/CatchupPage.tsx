@@ -8,7 +8,7 @@ import { catchupApi, type CrewVideo, type Moment } from './api';
 import { Company } from './Company';
 import { Compose } from './Compose';
 import { Density } from './Density';
-import { createFiring } from './firing';
+import { createFiring, posMsAt } from './firing';
 import { Rail } from './Rail';
 
 const POLL_MS = 250;
@@ -107,7 +107,7 @@ const Watch = ({ slug, video, media }: { slug: string; video: CrewVideo; media: 
   }, [media, tick]);
 
   const send = async (part: { emoji?: string; body?: string }) => {
-    const posMs = Math.round((adapter.current?.time() ?? 0) * 1000);
+    const posMs = posMsAt(adapter.current?.time() ?? 0);
     const moment = { source: video.source, id: video.sourceId, posMs, ...part };
     setProblem(false);
     try {

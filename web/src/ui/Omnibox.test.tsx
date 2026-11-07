@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Media } from '../api/http';
-import { MediaRow } from './Omnibox';
+import { MediaRow, useSearch } from './Omnibox';
+import type { Adder } from './useAdder';
 
 const media = (patch: Partial<Media> = {}): Media => ({
   source: 'youtube',
@@ -45,5 +46,33 @@ describe('a search result', () => {
   it('says nothing about a video that plays', () => {
     render(<MediaRow media={media()} status="idle" onAdd={vi.fn()} />);
     expect(screen.queryByText(/won’t play here/)).toBeNull();
+  });
+});
+
+describe('the add box', () => {
+  afterEach(cleanup);
+
+  const adding = () => {
+    let finish = (_added: boolean) => {};
+    const addLink = () => new Promise<boolean>((resolve) => { finish = resolve; });
+    const { result } = renderHook(() => useSearch({ addLink, clearProblem: () => {} } as unknown as Adder));
+    return { result, finish: (added: boolean) => act(async () => finish(added)) };
+  };
+
+  it('clears once its link is in', async () => {
+    const { result, finish } = adding();
+    act(() => result.current.setValue('https://example.com/one.mp4'));
+    await act(async () => { void result.current.submit(); });
+    await finish(true);
+    expect(result.current.value).toBe('');
+  });
+
+  it('keeps what was typed while the last link went in', async () => {
+    const { result, finish } = adding();
+    act(() => result.current.setValue('https://example.com/one.mp4'));
+    await act(async () => { void result.current.submit(); });
+    act(() => result.current.setValue('https://example.com/two.mp4'));
+    await finish(true);
+    expect(result.current.value).toBe('https://example.com/two.mp4');
   });
 });

@@ -1487,6 +1487,60 @@ describe('SyncController', () => {
     });
   });
 
+  describe('in the first moment after joining', () => {
+    /** On the room when its player first runs, with the first tick still to come. */
+    const started = (pos: number) => {
+      player.status = 'loading';
+      player.current = pos;
+      sync.apply(playing(pos, timers.now));
+      timers.advance(200);
+      player.current = pos + 0.2;
+      player.fire('playing');
+    };
+
+    it('hears a seek made before the first tick', () => {
+      started(100);
+      player.current = 200;
+      timers.advance(800);
+      sync.tick();
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 200 })]);
+      expect(player.seeks).toEqual([]);
+    });
+
+    it('hears one that buffers on the way there', () => {
+      started(100);
+      player.fire('buffering');
+      player.current = 200;
+      timers.advance(300);
+      player.fire('playing');
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 200 })]);
+    });
+
+    it('hears one made just after its own seek put it on the room', () => {
+      player.status = 'loading';
+      sync.apply(playing(100, timers.now));
+      timers.advance(200);
+      player.fire('playing'); // The seek that put it there has landed.
+      player.current = 200;
+      timers.advance(800);
+      sync.tick();
+      expect(commands).toEqual([expect.objectContaining({ type: 'seek', pos: 200 })]);
+    });
+
+    it('still does not hear a player that first runs away from the room', () => {
+      const landed: number[] = [];
+      player.seek = (seconds) => { landed.push(seconds); };
+      player.status = 'loading';
+      sync.apply(playing(600, timers.now));
+      timers.advance(200);
+      player.fire('playing'); // Reporting 0, with the seek still to land.
+      timers.advance(800);
+      player.current = landed[0] ?? 0;
+      sync.tick();
+      expect(commands).toEqual([]);
+    });
+  });
+
   describe('a seek by someone else', () => {
     it('reaches a viewer at once, however short the move', () => {
       const room = playing(0, timers.now);

@@ -317,6 +317,17 @@ export class SyncController {
   }
 
   /**
+   * Seeing a player first run on the room is where the watch for a viewer's seek starts,
+   * or one made before the first tick is lost. Away from the room it hasn't arrived yet,
+   * like a joiner's player still reporting 0, so that says nothing.
+   */
+  private noteRunning(playback: Playback, time: number): void {
+    const now = this.clock.now();
+    if (this.anchor || playback.status !== 'playing' || now < playback.at) return;
+    if (Math.abs(time - expectedPosition(playback, now)) <= USER_SEEK_THRESHOLD_S) this.anchor = { time, at: now };
+  }
+
+  /**
    * The native player controls stay on, so a viewer's seek shows as a jump. It
    * moves the whole room, so anything else must not pass for one: a player never
    * seen running, one that froze or buffered (it only fell behind the clock), or
@@ -332,7 +343,7 @@ export class SyncController {
   }
 
   private jumped(playback: Playback, time: number, now: number): boolean {
-    if (!this.anchor || now - this.lastTickAt > MAX_TICK_GAP_MS) return false;
+    if (!this.anchor || now - Math.max(this.lastTickAt, this.anchor.at) > MAX_TICK_GAP_MS) return false;
     const elapsed = ((now - this.anchor.at) / 1000) * playback.rate;
     const margin = this.wasBuffering ? USER_SEEK_BUFFERED_S : USER_SEEK_THRESHOLD_S;
     return time < this.anchor.time - margin || time > this.anchor.time + elapsed + margin;
@@ -570,6 +581,7 @@ export class SyncController {
       return;
     }
     if (state !== 'paused' && state !== 'playing') return;
+    if (state === 'playing') this.noteRunning(playback, this.player.time());
     if (this.expecting) {
       if (this.expecting === state) this.expecting = null;
       return;

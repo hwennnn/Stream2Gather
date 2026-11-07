@@ -171,7 +171,7 @@ describe('CatchupPage', () => {
     });
 
     expect(add).toHaveBeenCalledTimes(2);
-    expect(add).toHaveBeenLastCalledWith('sundays', { source: 'youtube', id: 'a', posMs: 12_500, emoji: '🔥' });
+    expect(add).toHaveBeenLastCalledWith('sundays', { source: 'youtube', id: 'a', posMs: 12_499, emoji: '🔥' });
     expect(screen.getByRole('list', { name: 'Reactions' }).textContent).toContain('Mika');
   });
 

@@ -33,9 +33,12 @@ if [ ! -f "$sample" ]; then
   make -C "$root" sample SAMPLE="$sample"
 fi
 cp "$sample" "$web/sample.mp4"
-mkdir -p "$web/hls"
-ffmpeg -loglevel error -y -i "$sample" -t 60 -c copy -hls_time 4 -hls_playlist_type vod \
-  -hls_segment_filename "$web/hls/%03d.ts" "$web/hls/index.m3u8"
+# Only sync.mjs plays HLS, and CI's runners have no ffmpeg for the rest to wait on.
+if [[ " $scripts " == *" sync.mjs "* ]]; then
+  mkdir -p "$web/hls"
+  ffmpeg -loglevel error -y -i "$sample" -t 60 -c copy -hls_time 4 -hls_playlist_type vod \
+    -hls_segment_filename "$web/hls/%03d.ts" "$web/hls/index.m3u8"
+fi
 [ -d "$root/e2e/node_modules" ] || (cd "$root/e2e" && npm ci)
 (cd "$root/server" && go build -o "$work/s2g" ./cmd/s2g && go build -o "$work/mint-account" ./cmd/mint-account)
 

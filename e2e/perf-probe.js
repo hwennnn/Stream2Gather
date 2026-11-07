@@ -30,8 +30,11 @@
     onCommitFiberUnmount: () => {},
     onPostCommitFiberRoot: () => {},
     onCommitFiberRoot: (_id, root) => {
-      win.commits += 1;
+      // A state set to what it already was can still commit, with nothing rendered and
+      // nothing on the page changed. That costs nothing, so only real work counts.
+      const before = win.renders;
       visit(root.current);
+      if (win.renders > before) win.commits += 1;
     },
   };
 

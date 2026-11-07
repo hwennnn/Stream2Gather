@@ -269,6 +269,8 @@ flow('queue: a long queue stays usable, up to the 200 limit', { timeout: 120_000
   await ui.addBox(a.page).fill(train.url);
   await ui.addBox(a.page).press('Enter');
   await t.see('number 199 goes in', ui.tab(b.page, 'Queue').getByText('199'));
+  // Ben hears of it before Ana's own answer lands, and until then her box still holds the link.
+  await t.until('the box clears', async () => (await ui.addBox(a.page).inputValue()) === '');
   await ui.addBox(a.page).fill(rain.url);
   await ui.addBox(a.page).press('Enter');
   await t.see('then it is full', ui.rail(a.page).getByRole('alert').getByText(/queue is full/i));

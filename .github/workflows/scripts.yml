@@ -1,0 +1,81 @@
+name: Scripts
+
+# The long walks flows doesn't take: a crew's whole evening, its recap, and catching up.
+# A workflow of its own, because only a workflow can be limited by path.
+on:
+  push:
+    branches: [master]
+    paths: ['web/**', 'server/**', 'e2e/**', '.github/workflows/scripts.yml']
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ['web/**', 'server/**', 'e2e/**', '.github/workflows/scripts.yml']
+
+# A new push to a PR replaces its run. Every commit on master keeps its own.
+concurrency:
+  group: scripts-${{ github.head_ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  scripts:
+    # Like flows: drafts wait until they're marked ready.
+    if: github.event_name == 'push' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    # The same ports as deploy/compose.yaml, which is where e2e/run.sh looks.
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 63809:6379
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 3s --health-retries 20
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: s2g
+          POSTGRES_PASSWORD: s2g
+          POSTGRES_DB: s2g
+        ports:
+          - 54339:5432
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U s2g" --health-interval 2s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            e2e/package-lock.json
+      # Restore only: this is the flows job's cache, and it holds more than this job makes.
+      - uses: actions/cache/restore@v4
+        id: samples
+        with:
+          path: .data
+          key: flows-samples-v1
+      - name: Use ffmpeg from Docker
+        if: steps.samples.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .data "$RUNNER_TEMP/bin"
+          printf '#!/bin/sh\nexec docker run --rm -v "%s:%s" linuxserver/ffmpeg:7.1.1 "$@"\n' "$PWD/.data" "$PWD/.data" > "$RUNNER_TEMP/bin/ffmpeg"
+          chmod +x "$RUNNER_TEMP/bin/ffmpeg"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: Run the scripts
+        env:
+          E2E_SCRIPT: crews.mjs recaps.mjs catchup.mjs
+          E2E_OUT: ${{ runner.temp }}/scripts
+        run: |
+          mkdir -p "$E2E_OUT"
+          ./e2e/run.sh
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: scripts
+          path: ${{ runner.temp }}/scripts
+          retention-days: 7

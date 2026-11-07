@@ -3,6 +3,9 @@ const JUMP_MS = 2000;
 
 type Timed = { posMs: number };
 
+/** Where a moment left now goes: a hair behind the player, or the next poll takes it for one still to come. */
+export const posMsAt = (seconds: number): number => Math.max(0, Math.floor(seconds * 1000) - 1);
+
 /**
  * Decides which moments the video has just reached. Moments only fire when normal
  * play crosses them: seeking, in either direction, moves the cursor and fires nothing.
@@ -24,6 +27,8 @@ export const createFiring = <T extends Timed>(initial: T[]) => {
 
     tick(seconds: number, playing: boolean): T[] {
       const ms = seconds * 1000;
+      // Resting on the spot says nothing new. At the very start nothing can sit behind the player.
+      if (!playing && ms === last) return [];
       const jumped = last === null || ms < last || ms - last > JUMP_MS;
       last = ms;
       if (!playing || jumped) {

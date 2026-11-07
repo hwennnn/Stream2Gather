@@ -120,7 +120,8 @@ flow('gate: looks like the room it opens into', async (t) => {
   const guest = await t.person('guest');
   const room = await startRoom(t, host, { url: golden.url });
   await guest.page.goto(room.url);
-  await t.see('the gate', ui.join(guest.page));
+  // The button shows, greyed, before the room's preview has answered. Enabled means it has.
+  await t.see('the gate', ui.join(guest.page).and(guest.page.locator(':enabled')));
   const geometry = await guest.page.evaluate(() => {
     const screen = document.querySelector('.door-screen').getBoundingClientRect();
     const row = document.querySelector('.door-row').getBoundingClientRect();

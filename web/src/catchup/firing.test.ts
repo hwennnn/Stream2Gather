@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFiring } from './firing';
+import { createFiring, posMsAt } from './firing';
 
 const at = (...seconds: number[]) => seconds.map((second) => ({ posMs: second * 1000 }));
 const fired = (moments: { posMs: number }[]) => moments.map((moment) => moment.posMs / 1000);
@@ -88,5 +88,26 @@ describe('firing', () => {
 
     expect(fired(firing.passed())).toEqual([1, 5]);
     expect(play(firing, 5.25, 10)).toEqual([9]);
+  });
+
+  it.each([5.0006, 5.0004, 5])('keeps a reaction left at %ss on the rail, paused there', (time) => {
+    const firing = createFiring(at(1));
+    firing.tick(4.75, true); // The video pauses, and the reaction lands before the next poll.
+
+    firing.add({ posMs: posMsAt(time) });
+    firing.tick(time, false);
+    firing.tick(time, false);
+
+    expect(firing.passed()).toHaveLength(2);
+  });
+
+  it('keeps a reaction left before the video has moved', () => {
+    const firing = createFiring(at(1));
+    firing.tick(0, false);
+
+    firing.add({ posMs: posMsAt(0) });
+    firing.tick(0, false);
+
+    expect(firing.passed()).toHaveLength(1);
   });
 });

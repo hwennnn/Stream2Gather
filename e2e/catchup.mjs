@@ -153,8 +153,10 @@ await video.evaluate((element) => element.pause());
 await button(mika, 'React 😂').click();
 await mika.page.fill('#catchup-chat', 'caught up');
 await mika.page.keyboard.press('Enter');
-check('her reaction joins the rail', await visible(mika.page.getByRole('list', { name: 'Reactions' }).getByText('😂')));
-await sleep(300);
+const hers = mika.page.getByRole('list', { name: 'Reactions' }).getByText('😂');
+check('her reaction joins the rail', await visible(hers));
+await sleep(600); // A couple of polls, which must leave it where it is.
+check('and it stays there', await hers.isVisible());
 
 const AT_MS = 2000;
 await hana.page.goto(`${mika.page.url().split('?')[0]}?at=${AT_MS}`);
